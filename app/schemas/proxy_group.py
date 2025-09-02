@@ -1,11 +1,11 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List, Optional
-from .proxy import Proxy
+from typing import List
+from .base import TimestampModel
 
 class ProxyGroupBase(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
 
 class ProxyGroupCreate(ProxyGroupBase):
     pass
@@ -13,11 +13,9 @@ class ProxyGroupCreate(ProxyGroupBase):
 class ProxyGroupUpdate(ProxyGroupBase):
     pass
 
-class ProxyGroup(ProxyGroupBase):
+class ProxyGroup(ProxyGroupBase, TimestampModel):
     id: int
-    created_at: datetime
-    updated_at: datetime
-    proxies: List[Proxy] = []
+    proxies_count: int
 
     class Config:
         from_attributes = True

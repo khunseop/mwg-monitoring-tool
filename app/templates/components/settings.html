@@ -19,7 +19,7 @@
             </div>
             <div class="level-right">
                 <div class="level-item">
-                    <button class="button is-link" onclick="openAddProxyModal()">
+                    <button class="button is-link" onclick="openModal('proxy')">
                         프록시 추가
                     </button>
                 </div>
@@ -38,8 +38,7 @@
                         <th>작업</th>
                     </tr>
                 </thead>
-                <tbody id="proxyTableBody">
-                </tbody>
+                <tbody id="proxyTableBody"></tbody>
             </table>
         </div>
     </div>
@@ -56,7 +55,7 @@
             </div>
             <div class="level-right">
                 <div class="level-item">
-                    <button class="button is-link" onclick="openAddGroupModal()">
+                    <button class="button is-link" onclick="openModal('group')">
                         그룹 추가
                     </button>
                 </div>
@@ -73,8 +72,7 @@
                         <th>작업</th>
                     </tr>
                 </thead>
-                <tbody id="groupTableBody">
-                </tbody>
+                <tbody id="groupTableBody"></tbody>
             </table>
         </div>
     </div>
@@ -86,10 +84,10 @@
     <div class="modal-card">
         <header class="modal-card-head">
             <p class="modal-card-title">프록시 서버</p>
-            <button class="delete" aria-label="close" onclick="closeProxyModal()"></button>
+            <button class="delete" aria-label="close" onclick="closeModal('proxy')"></button>
         </header>
         <section class="modal-card-body">
-            <form id="proxyForm">
+            <form id="proxyForm" onsubmit="return false;">
                 <input type="hidden" id="proxyId">
                 <div class="field">
                     <label class="label">호스트</label>
@@ -141,7 +139,7 @@
         </section>
         <footer class="modal-card-foot">
             <button class="button is-link" onclick="saveProxy()">저장</button>
-            <button class="button" onclick="closeProxyModal()">취소</button>
+            <button class="button" onclick="closeModal('proxy')">취소</button>
         </footer>
     </div>
 </div>
@@ -152,10 +150,10 @@
     <div class="modal-card">
         <header class="modal-card-head">
             <p class="modal-card-title">프록시 그룹</p>
-            <button class="delete" aria-label="close" onclick="closeGroupModal()"></button>
+            <button class="delete" aria-label="close" onclick="closeModal('group')"></button>
         </header>
         <section class="modal-card-body">
-            <form id="groupForm">
+            <form id="groupForm" onsubmit="return false;">
                 <input type="hidden" id="groupId">
                 <div class="field">
                     <label class="label">그룹명</label>
@@ -173,20 +171,27 @@
         </section>
         <footer class="modal-card-foot">
             <button class="button is-link" onclick="saveGroup()">저장</button>
-            <button class="button" onclick="closeGroupModal()">취소</button>
+            <button class="button" onclick="closeModal('group')">취소</button>
         </footer>
     </div>
 </div>
 
 <script>
-// 탭 전환 처리
+// 공통 유틸리티 함수
+const utils = {
+    showError: (message) => alert(message || '오류가 발생했습니다.'),
+    formatTag: (isActive) => isActive ? 
+        '<span class="tag is-success">활성</span>' : 
+        '<span class="tag is-danger">비활성</span>',
+    resetForm: (formId) => document.getElementById(formId).reset()
+};
+
+// 탭 관리
 document.querySelectorAll('.tabs li').forEach(tab => {
     tab.addEventListener('click', () => {
-        // 활성 탭 변경
         document.querySelectorAll('.tabs li').forEach(t => t.classList.remove('is-active'));
         tab.classList.add('is-active');
         
-        // 패널 전환
         const target = tab.dataset.target;
         document.querySelectorAll('.tab-panel').forEach(panel => {
             panel.style.display = 'none';
@@ -195,90 +200,169 @@ document.querySelectorAll('.tabs li').forEach(tab => {
     });
 });
 
-// 프록시 관련 함수들
+// 모달 관리
+function openModal(type, id = null) {
+    const modalId = `${type}Modal`;
+    if (id) {
+        const endpoint = type === 'proxy' ? 'proxies' : 'proxy-groups';
+        $.get(`/api/${endpoint}/${id}`)
+            .done(data => fillForm(type, data))
+            .fail(() => utils.showError('데이터를 불러오는데 실패했습니다.'));
+    } else {
+        utils.resetForm(`${type}Form`);
+        $(`#${type}Id`).val('');
+    }
+    $(`#${modalId}`).addClass('is-active');
+}
+
+function closeModal(type) {
+    $(`#${type}Modal`).removeClass('is-active');
+}
+
+function fillForm(type, data) {
+    if (type === 'proxy') {
+        $('#proxyId').val(data.id);
+        $('#host').val(data.host);
+        $('#port').val(data.port);
+        $('#username').val(data.username);
+        $('#password').val('');
+        $('#group_id').val(data.group_id || '');
+        $('#description').val(data.description || '');
+        $('#is_active').prop('checked', data.is_active);
+    } else {
+        $('#groupId').val(data.id);
+        $('#groupName').val(data.name);
+        $('#groupDescription').val(data.description || '');
+    }
+}
+
+// 프록시 관리
 function loadProxies() {
-    // 프록시 목록 로드
-    $.get('/api/proxies', function(proxies) {
-        const tbody = $('#proxyTableBody');
-        tbody.empty();
-        
-        proxies.forEach(proxy => {
-            tbody.append(`
-                <tr>
-                    <td>${proxy.host}</td>
-                    <td>${proxy.port}</td>
-                    <td>${proxy.group?.name || '-'}</td>
-                    <td>
-                        ${proxy.is_active ? 
-                            '<span class="tag is-success">활성</span>' : 
-                            '<span class="tag is-danger">비활성</span>'}
-                    </td>
-                    <td>${proxy.description || ''}</td>
-                    <td>
-                        <div class="buttons are-small">
-                            <button class="button is-link is-light" onclick="editProxy(${proxy.id})">
-                                수정
-                            </button>
-                            <button class="button is-danger is-light" onclick="deleteProxy(${proxy.id})">
-                                삭제
-                            </button>
-                            <button class="button is-success is-light" onclick="testProxy(${proxy.id})">
-                                테스트
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `);
-        });
-    });
+    $.get('/api/proxies')
+        .done(proxies => {
+            const tbody = $('#proxyTableBody');
+            tbody.empty();
+            
+            proxies.forEach(proxy => {
+                tbody.append(`
+                    <tr>
+                        <td>${proxy.host}</td>
+                        <td>${proxy.port}</td>
+                        <td>${proxy.group_name || '-'}</td>
+                        <td>${utils.formatTag(proxy.is_active)}</td>
+                        <td>${proxy.description || ''}</td>
+                        <td>
+                            <div class="buttons are-small">
+                                <button class="button is-link is-light" onclick="openModal('proxy', ${proxy.id})">
+                                    수정
+                                </button>
+                                <button class="button is-danger is-light" onclick="deleteProxy(${proxy.id})">
+                                    삭제
+                                </button>
+                                <button class="button is-success is-light" onclick="testProxy(${proxy.id})">
+                                    테스트
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `);
+            });
+        })
+        .fail(() => utils.showError('프록시 목록을 불러오는데 실패했습니다.'));
 
     // 그룹 선택 옵션 업데이트
-    $.get('/api/proxy-groups', function(groups) {
-        const select = $('#group_id');
-        select.find('option:gt(0)').remove(); // 첫 번째 옵션('그룹 선택')을 제외한 모든 옵션 제거
-        
-        groups.forEach(group => {
-            select.append(`<option value="${group.id}">${group.name}</option>`);
+    $.get('/api/proxy-groups')
+        .done(groups => {
+            const select = $('#group_id');
+            select.find('option:gt(0)').remove();
+            groups.forEach(group => {
+                select.append(`<option value="${group.id}">${group.name}</option>`);
+            });
         });
+}
+
+function saveProxy() {
+    const proxyId = $('#proxyId').val();
+    const password = $('#password').val();
+    
+    const data = {
+        host: $('#host').val(),
+        port: parseInt($('#port').val()),
+        username: $('#username').val(),
+        is_active: $('#is_active').is(':checked'),
+        group_id: $('#group_id').val() ? parseInt($('#group_id').val()) : null,
+        description: $('#description').val() || null
+    };
+
+    if (!proxyId || password) {
+        data.password = password;
+    }
+
+    const method = proxyId ? 'PUT' : 'POST';
+    const url = proxyId ? `/api/proxies/${proxyId}` : '/api/proxies';
+
+    $.ajax({
+        url,
+        method,
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: () => {
+            loadProxies();
+            closeModal('proxy');
+        },
+        error: (xhr) => utils.showError(xhr.responseText)
     });
 }
 
-// 그룹 관련 함수들
+function deleteProxy(id) {
+    if (confirm('정말 삭제하시겠습니까?')) {
+        $.ajax({
+            url: `/api/proxies/${id}`,
+            method: 'DELETE',
+            success: loadProxies,
+            error: (xhr) => utils.showError(xhr.responseText)
+        });
+    }
+}
+
+function testProxy(id) {
+    $.post(`/api/proxies/${id}/test`)
+        .done(result => alert('테스트 성공: ' + result.message))
+        .fail(xhr => alert('테스트 실패: ' + xhr.responseJSON.detail));
+}
+
+// 그룹 관리
 function loadGroups() {
-    $.get('/api/proxy-groups', function(groups) {
-        const tbody = $('#groupTableBody');
-        tbody.empty();
-        
-        groups.forEach(group => {
-            tbody.append(`
-                <tr>
-                    <td>${group.name}</td>
-                    <td>${group.description || ''}</td>
-                    <td>${group.proxies.length}</td>
-                    <td>
-                        <div class="buttons are-small">
-                            <button class="button is-link is-light" onclick="editGroup(${group.id})">
-                                수정
-                            </button>
-                            <button class="button is-danger is-light" onclick="deleteGroup(${group.id})">
-                                삭제
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `);
+    $.get('/api/proxy-groups')
+        .done(groups => {
+            console.log('Loaded groups:', groups);  // 디버깅용
+            const tbody = $('#groupTableBody');
+            tbody.empty();
+            
+            groups.forEach(group => {
+                tbody.append(`
+                    <tr>
+                        <td>${group.name}</td>
+                        <td>${group.description || ''}</td>
+                        <td>${group.proxies_count}</td>
+                        <td>
+                            <div class="buttons are-small">
+                                <button class="button is-link is-light" onclick="openModal('group', ${group.id})">
+                                    수정
+                                </button>
+                                <button class="button is-danger is-light" onclick="deleteGroup(${group.id})">
+                                    삭제
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `);
+            });
+        })
+        .fail((xhr) => {
+            console.error('Failed to load groups:', xhr);  // 디버깅용
+            utils.showError('그룹 목록을 불러오는데 실패했습니다.');
         });
-    });
-}
-
-function openAddGroupModal() {
-    $('#groupForm')[0].reset();
-    $('#groupId').val('');
-    $('#groupModal').addClass('is-active');
-}
-
-function closeGroupModal() {
-    $('#groupModal').removeClass('is-active');
 }
 
 function saveGroup() {
@@ -292,27 +376,16 @@ function saveGroup() {
     const url = groupId ? `/api/proxy-groups/${groupId}` : '/api/proxy-groups';
 
     $.ajax({
-        url: url,
-        method: method,
+        url,
+        method,
         contentType: 'application/json',
         data: JSON.stringify(data),
-        success: function() {
+        success: () => {
             loadGroups();
-            loadProxies(); // 프록시 목록의 그룹 정보도 업데이트
-            closeGroupModal();
+            loadProxies();
+            closeModal('group');
         },
-        error: function(xhr) {
-            alert('오류가 발생했습니다: ' + xhr.responseText);
-        }
-    });
-}
-
-function editGroup(id) {
-    $.get(`/api/proxy-groups/${id}`, function(group) {
-        $('#groupId').val(group.id);
-        $('#groupName').val(group.name);
-        $('#groupDescription').val(group.description);
-        $('#groupModal').addClass('is-active');
+        error: (xhr) => utils.showError(xhr.responseText)
     });
 }
 
@@ -321,124 +394,19 @@ function deleteGroup(id) {
         $.ajax({
             url: `/api/proxy-groups/${id}`,
             method: 'DELETE',
-            success: function() {
+            success: () => {
                 loadGroups();
-                loadProxies(); // 프록시 목록도 업데이트
+                loadProxies();
             },
-            error: function(xhr) {
-                alert('오류가 발생했습니다: ' + xhr.responseText);
-            }
+            error: (xhr) => utils.showError(xhr.responseText)
         });
     }
 }
 
-// 페이지 로드 시 초기화
-$(document).ready(function() {
+// 초기화
+$(document).ready(() => {
     loadProxies();
     loadGroups();
 });
-
-// 기존 프록시 관련 함수들...
-function openAddProxyModal() {
-    $('#proxyForm')[0].reset();
-    $('#proxyId').val('');
-    $('#proxyModal').addClass('is-active');
-}
-
-function closeProxyModal() {
-    $('#proxyModal').removeClass('is-active');
-}
-
-function saveProxy() {
-    const proxyId = $('#proxyId').val();
-    const password = $('#password').val();
-    
-    // 기본 데이터 구성
-    const data = {
-        host: $('#host').val(),
-        port: parseInt($('#port').val()),
-        username: $('#username').val(),
-        is_active: $('#is_active').is(':checked'),
-        group_id: $('#group_id').val() ? parseInt($('#group_id').val()) : null,
-        description: $('#description').val() || null
-    };
-
-    // 수정 시 비밀번호가 입력된 경우에만 포함
-    if (proxyId && !password) {
-        console.log('Updating without password');  // 디버깅용
-    } else {
-        data.password = password;
-    }
-
-    const method = proxyId ? 'PUT' : 'POST';
-    const url = proxyId ? `/api/proxies/${proxyId}` : '/api/proxies';
-
-    $.ajax({
-        url: url,
-        method: method,
-        contentType: 'application/json',
-        data: JSON.stringify(data),
-        success: function() {
-            loadProxies();
-            closeProxyModal();
-        },
-        error: function(xhr) {
-            alert('오류가 발생했습니다: ' + xhr.responseText);
-        }
-    });
-}
-
-function editProxy(id) {
-    console.log('Editing proxy with ID:', id);  // 디버깅용
-    
-    // 먼저 모달을 초기화
-    $('#proxyForm')[0].reset();
-    $('#proxyId').val(id);
-    
-    // 프록시 정보 가져오기
-    $.get(`/api/proxies/${id}`)
-        .done(function(proxy) {
-            console.log('Received proxy data:', proxy);  // 디버깅용
-            
-            // 폼 필드 채우기
-            $('#host').val(proxy.host || '');
-            $('#port').val(proxy.port || '');
-            $('#username').val(proxy.username || '');
-            $('#password').val('');  // 수정 시에는 비밀번호를 입력하지 않으면 기존 값 유지
-            $('#group_id').val(proxy.group_id || '');
-            $('#description').val(proxy.description || '');
-            $('#is_active').prop('checked', proxy.is_active);
-            
-            // 모달 표시
-            $('#proxyModal').addClass('is-active');
-        })
-        .fail(function(xhr) {
-            console.error('Failed to get proxy:', xhr);  // 디버깅용
-            alert('프록시 정보를 불러오는데 실패했습니다.');
-        });
-}
-
-function deleteProxy(id) {
-    if (confirm('정말 삭제하시겠습니까?')) {
-        $.ajax({
-            url: `/api/proxies/${id}`,
-            method: 'DELETE',
-            success: function() {
-                loadProxies();
-            },
-            error: function(xhr) {
-                alert('오류가 발생했습니다: ' + xhr.responseText);
-            }
-        });
-    }
-}
-
-function testProxy(id) {
-    $.post(`/api/proxies/${id}/test`, function(result) {
-        alert('테스트 성공: ' + result.message);
-    }).fail(function(xhr) {
-        alert('테스트 실패: ' + xhr.responseJSON.detail);
-    });
-}
 </script>
 {% endblock %}

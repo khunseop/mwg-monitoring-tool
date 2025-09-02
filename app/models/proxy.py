@@ -18,3 +18,7 @@ class Proxy(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 
     group = relationship("ProxyGroup", backref="proxies")
+
+    @property
+    def group_name(self) -> str | None:
+        return self.group.name if self.group else None

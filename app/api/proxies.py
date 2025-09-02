@@ -11,11 +11,11 @@ router = APIRouter()
 
 @router.get("/proxies", response_model=List[ProxySchema])
 def get_proxies(db: Session = Depends(get_db)):
-    return db.query(Proxy).all()
+    return db.query(Proxy).join(Proxy.group, isouter=True).all()
 
 @router.get("/proxies/{proxy_id}", response_model=ProxySchema)
 def get_proxy(proxy_id: int, db: Session = Depends(get_db)):
-    proxy = db.query(Proxy).filter(Proxy.id == proxy_id).first()
+    proxy = db.query(Proxy).join(Proxy.group, isouter=True).filter(Proxy.id == proxy_id).first()
     if not proxy:
         raise HTTPException(status_code=404, detail="Proxy not found")
     return proxy
