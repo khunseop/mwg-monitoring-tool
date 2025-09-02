@@ -13,6 +13,13 @@ router = APIRouter()
 def get_proxies(db: Session = Depends(get_db)):
     return db.query(Proxy).all()
 
+@router.get("/proxies/{proxy_id}", response_model=ProxySchema)
+def get_proxy(proxy_id: int, db: Session = Depends(get_db)):
+    proxy = db.query(Proxy).filter(Proxy.id == proxy_id).first()
+    if not proxy:
+        raise HTTPException(status_code=404, detail="Proxy not found")
+    return proxy
+
 @router.post("/proxies", response_model=ProxySchema, status_code=status.HTTP_201_CREATED)
 def create_proxy(proxy: ProxyCreate, db: Session = Depends(get_db)):
     db_proxy = Proxy(**proxy.model_dump())
@@ -27,7 +34,13 @@ def update_proxy(proxy_id: int, proxy: ProxyUpdate, db: Session = Depends(get_db
     if not db_proxy:
         raise HTTPException(status_code=404, detail="Proxy not found")
     
-    for key, value in proxy.model_dump().items():
+    update_data = proxy.model_dump(exclude_unset=True)
+    
+    # 비밀번호가 제공되지 않은 경우 업데이트에서 제외
+    if not update_data.get('password'):
+        update_data.pop('password', None)
+    
+    for key, value in update_data.items():
         setattr(db_proxy, key, value)
     
     db.commit()

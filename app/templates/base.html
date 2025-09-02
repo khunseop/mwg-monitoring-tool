@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PPAT</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <style>
+        .tab-content {
+            display: none;
+        }
+        .tab-content.is-active {
+            display: block;
+        }
+        .table-container {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar is-link mb-3" role="navigation" aria-label="main navigation">
+        <div class="container">
+            <div class="navbar-brand">
+                <a class="navbar-item has-text-weight-bold" href="/">
+                    PPAT
+                </a>
+            </div>
+
+            <div class="navbar-menu">
+                <div class="navbar-end">
+                    <a class="navbar-item tab-link" data-tab="resource">
+                        자원사용률
+                    </a>
+                    <a class="navbar-item tab-link" data-tab="sessions">
+                        세션브라우저
+                    </a>
+                    <a class="navbar-item tab-link is-active" data-tab="settings">
+                        설정
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <section class="section">
+        <div class="container">
+            <div id="resource" class="tab-content">
+                <div class="notification is-info">
+                    자원사용률 모니터링 기능은 준비 중입니다.
+                </div>
+            </div>
+            <div id="sessions" class="tab-content">
+                <div class="notification is-info">
+                    세션브라우저 기능은 준비 중입니다.
+                </div>
+            </div>
+            <div id="settings" class="tab-content is-active">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </section>
+
+    <script>
+        $(document).ready(function() {
+            $('.tab-link').click(function(e) {
+                e.preventDefault();
+                const tabId = $(this).data('tab');
+                
+                // 탭 활성화 상태 변경
+                $('.tab-link').removeClass('is-active');
+                $(this).addClass('is-active');
+                
+                // 컨텐츠 표시/숨김
+                $('.tab-content').removeClass('is-active');
+                $(`#${tabId}`).addClass('is-active');
+
+                // URL 해시 업데이트
+                window.history.pushState(null, '', `#${tabId}`);
+            });
+
+            // 페이지 로드시 URL 해시에 따라 탭 활성화
+            const hash = window.location.hash.substring(1);
+            if (hash && ['resource', 'sessions', 'settings'].includes(hash)) {
+                $(`.tab-link[data-tab="${hash}"]`).click();
+            }
+        });
+    </script>
+</body>
+</html>
