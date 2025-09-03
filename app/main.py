@@ -46,3 +46,7 @@ async def read_settings(request: Request):
 @app.get("/resource")
 async def read_resource(request: Request):
     return templates.TemplateResponse("components/resource_usage.html", {"request": request})
+
+@app.get("/session")
+async def read_session(request: Request):
+    return templates.TemplateResponse("components/session_browser.html", {"request": request})

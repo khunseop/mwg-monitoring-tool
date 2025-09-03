@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="box">
+    <h3 class="title is-4">세션브라우저</h3>
+
+    <div class="columns is-multiline">
+        <div class="column is-4">
+            <div class="field">
+                <label class="label">그룹</label>
+                <div class="control">
+                    <div class="select is-fullwidth">
+                        <select id="sbGroupSelect">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="column is-8">
+            <div class="field">
+                <label class="label">프록시 선택</label>
+                <div class="control">
+                    <div class="columns is-gapless">
+                        <div class="column is-narrow">
+                            <label class="checkbox mr-3">
+                                <input type="checkbox" id="sbSelectAll"> 모두 선택
+                            </label>
+                        </div>
+                        <div class="column">
+                            <div class="select is-multiple is-fullwidth">
+                                <select id="sbProxySelect" multiple size="6"></select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="column is-12">
+            <div class="buttons">
+                <button class="button is-link" id="sbLoadBtn">세션 불러오기</button>
+                <span id="sbStatus" class="tag is-light ml-2">대기</span>
+            </div>
+            <p id="sbError" class="help is-danger" style="display:none;"></p>
+        </div>
+    </div>
+
+    <div class="table-container mt-4">
+        <table id="sbTable" class="table is-fullwidth is-striped is-hoverable">
+            <thead>
+                <tr>
+                    <th>프록시</th>
+                    <th>수집시각</th>
+                    <th>트랜잭션</th>
+                    <th>프로토콜</th>
+                    <th>사용자</th>
+                    <th>클라이언트 IP</th>
+                    <th>서버 IP</th>
+                    <th>상태</th>
+                    <th>URL</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- DataTables (Bulma styling) from CDN: kept minimal and override via Bulma table classes -->
+<link rel="stylesheet" href="https://cdn.datatables.net/v/dt/dt-2.0.7/b-3.0.2/r-3.0.2/datatables.min.css">
+<script src="https://cdn.datatables.net/v/dt/dt-2.0.7/b-3.0.2/r-3.0.2/datatables.min.js"></script>
+
+<script>
+$(document).ready(function() {
+    const sb = { proxies: [], groups: [], dt: null };
+
+    function showErr(msg) { $('#sbError').text(msg).show(); }
+    function clearErr() { $('#sbError').hide().text(''); }
+    function setStatus(text, isError) {
+        const $t = $('#sbStatus');
+        $t.text(text || '');
+        $t.removeClass('is-success is-danger is-light');
+        if (isError) $t.addClass('is-danger'); else $t.addClass(text ? 'is-success' : 'is-light');
+    }
+
+    function fetchGroups() {
+        return $.getJSON('/api/proxy-groups').then(data => {
+            sb.groups = data || [];
+            const $sel = $('#sbGroupSelect');
+            $sel.empty();
+            $sel.append('<option value="">전체</option>');
+            sb.groups.forEach(g => { $sel.append(`<option value="${g.id}">${g.name}</option>`); });
+        }).catch(() => { showErr('그룹 목록을 불러오지 못했습니다.'); });
+    }
+
+    function fetchProxies() {
+        return $.getJSON('/api/proxies').then(data => {
+            sb.proxies = data || [];
+            renderProxySelect();
+        }).catch(() => { showErr('프록시 목록을 불러오지 못했습니다.'); });
+    }
+
+    function renderProxySelect() {
+        const selectedGroupId = $('#sbGroupSelect').val();
+        const $sel = $('#sbProxySelect');
+        $sel.empty();
+        (sb.proxies || []).filter(p => {
+            if (!p.is_active) return false;
+            if (!selectedGroupId) return true;
+            return String(p.group_id || '') === String(selectedGroupId);
+        }).forEach(p => {
+            const label = `${p.host}:${p.port}${p.group_name ? ' ('+p.group_name+')' : ''}`;
+            $sel.append(`<option value="${p.id}">${label}</option>`);
+        });
+    }
+
+    function getSelectedProxyIds() { return ($('#sbProxySelect').val() || []).map(v => parseInt(v, 10)); }
+
+    function initTable() {
+        if (sb.dt) return;
+        sb.dt = new DataTable('#sbTable', {
+            paging: true,
+            searching: true,
+            ordering: true,
+            info: true,
+            responsive: true,
+            pageLength: 25,
+            language: {
+                search: '검색:',
+                lengthMenu: '_MENU_ 개씩 보기',
+                info: '총 _TOTAL_건 중 _START_–_END_',
+                infoEmpty: '표시할 항목 없음',
+                zeroRecords: '일치하는 항목이 없습니다.',
+                paginate: { first: '처음', last: '마지막', next: '다음', previous: '이전' }
+            },
+            columns: [
+                { title: '프록시' },
+                { title: '수집시각' },
+                { title: '트랜잭션' },
+                { title: '프로토콜' },
+                { title: '사용자' },
+                { title: '클라이언트 IP' },
+                { title: '서버 IP' },
+                { title: '상태' },
+                { title: 'URL' }
+            ]
+        });
+    }
+
+    function rowsFromItems(items) {
+        return (items || []).map(row => {
+            const proxy = (sb.proxies || []).find(p => p.id === row.proxy_id);
+            const name = proxy ? `${proxy.host}:${proxy.port}` : `#${row.proxy_id}`;
+            const timeStr = row.collected_at ? new Date(row.collected_at).toLocaleString() : '';
+            return [
+                name,
+                timeStr,
+                row.transaction || '',
+                row.protocol || '',
+                row.user_name || '',
+                row.client_ip || '',
+                row.server_ip || '',
+                row.status || '',
+                row.url || ''
+            ];
+        });
+    }
+
+    function loadLatest() {
+        clearErr();
+        const proxyIds = getSelectedProxyIds();
+        if (proxyIds.length === 0) { showErr('프록시를 하나 이상 선택하세요.'); return; }
+        setStatus('수집 중...');
+        return $.ajax({
+            url: '/api/session-browser/collect',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ proxy_ids: proxyIds })
+        }).then(res => {
+            const rows = rowsFromItems(res && res.items ? res.items : []);
+            if (sb.dt) { sb.dt.clear().rows.add(rows).draw(); }
+            if (res && res.failed && res.failed > 0) { showErr('일부 프록시 수집에 실패했습니다.'); }
+            setStatus('완료');
+        }).catch(() => { setStatus('오류', true); showErr('수집 요청 중 오류가 발생했습니다.'); });
+    }
+
+    $('#sbLoadBtn').on('click', function() { loadLatest(); });
+    $('#sbGroupSelect').on('change', function() { renderProxySelect(); });
+    $('#sbSelectAll').on('change', function() {
+        const checked = $(this).is(':checked');
+        $('#sbProxySelect option').prop('selected', checked);
+    });
+
+    initTable();
+    Promise.all([fetchGroups(), fetchProxies()]);
+});
+</script>
+{% endblock %}
+

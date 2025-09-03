@@ -6,6 +6,7 @@
         <li class="is-active" data-target="proxy-list"><a>프록시 목록</a></li>
         <li data-target="proxy-groups"><a>프록시 그룹</a></li>
         <li data-target="resource-config"><a>리소스 설정</a></li>
+        <li data-target="session-config"><a>세션브라우저 설정</a></li>
     </ul>
 </div>
 
@@ -115,6 +116,71 @@
         <div class="buttons">
             <button class="button is-link" onclick="saveResourceConfig()">저장</button>
             <span id="cfgStatus" class="tag is-light ml-2">로딩 중...</span>
+        </div>
+    </div>
+</div>
+<!-- 세션브라우저 설정 탭 -->
+<div id="session-config" class="tab-panel" style="display: none;">
+    <div class="box">
+        <div class="level">
+            <div class="level-left">
+                <div class="level-item">
+                    <h3 class="title is-4">세션브라우저 설정</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="columns is-multiline">
+            <div class="column is-3">
+                <div class="field">
+                    <label class="label">SSH 포트</label>
+                    <div class="control">
+                        <input class="input" id="sbCfgPort" type="number" min="1" max="65535" value="22">
+                    </div>
+                </div>
+            </div>
+            <div class="column is-5">
+                <div class="field">
+                    <label class="label">명령 경로</label>
+                    <div class="control">
+                        <input class="input" id="sbCfgPath" type="text" placeholder="/opt/mwg/bin/mwg-core">
+                    </div>
+                </div>
+            </div>
+            <div class="column is-4">
+                <div class="field">
+                    <label class="label">명령 인자</label>
+                    <div class="control">
+                        <input class="input" id="sbCfgArgs" type="text" placeholder="-S connections">
+                    </div>
+                </div>
+            </div>
+            <div class="column is-3">
+                <div class="field">
+                    <label class="label">타임아웃(초)</label>
+                    <div class="control">
+                        <input class="input" id="sbCfgTimeout" type="number" min="1" max="120" value="10">
+                    </div>
+                </div>
+            </div>
+            <div class="column is-4">
+                <div class="field">
+                    <label class="label">호스트키 정책</label>
+                    <div class="control">
+                        <div class="select is-fullwidth">
+                            <select id="sbCfgHostKeyPolicy">
+                                <option value="auto_add">auto_add</option>
+                                <option value="reject">reject</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="buttons">
+            <button class="button is-link" onclick="saveSessionConfig()">저장</button>
+            <span id="sbCfgStatus" class="tag is-light ml-2">로딩 중...</span>
         </div>
     </div>
 </div>
@@ -489,6 +555,45 @@ function saveResourceConfig() {
     });
 }
 
+// 세션브라우저 설정 로드/저장
+function loadSessionConfig() {
+    $.get('/api/session-browser/config')
+        .done(cfg => {
+            $('#sbCfgPort').val(cfg.ssh_port || 22);
+            $('#sbCfgPath').val(cfg.command_path || '');
+            $('#sbCfgArgs').val(cfg.command_args || '');
+            $('#sbCfgTimeout').val(cfg.timeout_sec || 10);
+            $('#sbCfgHostKeyPolicy').val(cfg.host_key_policy || 'auto_add');
+            $('#sbCfgStatus').removeClass('is-danger').addClass('is-success').text('불러오기 완료');
+        })
+        .fail(() => {
+            $('#sbCfgStatus').removeClass('is-success').addClass('is-danger').text('불러오기 실패');
+        });
+}
+
+function saveSessionConfig() {
+    const payload = {
+        ssh_port: parseInt($('#sbCfgPort').val(), 10) || 22,
+        command_path: ($('#sbCfgPath').val() || '').toString(),
+        command_args: ($('#sbCfgArgs').val() || '').toString(),
+        timeout_sec: parseInt($('#sbCfgTimeout').val(), 10) || 10,
+        host_key_policy: ($('#sbCfgHostKeyPolicy').val() || 'auto_add').toString()
+    };
+
+    $.ajax({
+        url: '/api/session-browser/config',
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        success: () => {
+            $('#sbCfgStatus').removeClass('is-danger').addClass('is-success').text('저장 완료');
+        },
+        error: () => {
+            $('#sbCfgStatus').removeClass('is-success').addClass('is-danger').text('저장 실패');
+        }
+    });
+}
+
 function saveGroup() {
     const groupId = $('#groupId').val();
     const data = {
@@ -532,6 +637,7 @@ $(document).ready(() => {
     loadProxies();
     loadGroups();
     loadResourceConfig();
+    loadSessionConfig();
 });
 </script>
 {% endblock %}
