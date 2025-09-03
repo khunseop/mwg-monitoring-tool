@@ -6,7 +6,7 @@ from .base import TimestampModel
 
 class SessionRecordBase(BaseModel):
     transaction: Optional[str] = None
-    creation_time: Optional[str] = None
+    creation_time: Optional[datetime] = None
     protocol: Optional[str] = None
     cust_id: Optional[str] = None
     user_name: Optional[str] = None

@@ -101,14 +101,13 @@ def _parse_sessions(output: str) -> List[Dict[str, Any]]:
                 creation_time_idx = i
                 break
 
-        creation_time = parts[creation_time_idx] if creation_time_idx is not None else None
-        # Normalize creation_time format if possible (keep as string in DB)
-        if creation_time:
+        creation_time = None
+        if creation_time_idx is not None:
+            ct = parts[creation_time_idx]
             try:
-                dt = datetime.strptime(creation_time, "%Y-%m-%d %H:%M:%S")
-                creation_time = dt.strftime("%Y-%m-%d %H:%M:%S")
+                creation_time = datetime.strptime(ct, "%Y-%m-%d %H:%M:%S")
             except Exception:
-                pass
+                creation_time = None
 
         # Columns AFTER creation_time are shifted by (creation_time_idx - 1)
         shift_after = (creation_time_idx - 1) if creation_time_idx is not None else 0
@@ -213,6 +212,7 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
 
     errors: Dict[int, str] = {}
     collected_models: List[SessionRecordModel] = []
+    cleared_proxy_ids: set[int] = set()
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         future_to_proxy = {executor.submit(_collect_for_proxy, p, cfg): p for p in proxies}
@@ -223,6 +223,10 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
                 if err:
                     errors[proxy_id] = err
                     continue
+                # Clear previous records for this proxy once before inserting new batch
+                if proxy_id not in cleared_proxy_ids:
+                    db.query(SessionRecordModel).filter(SessionRecordModel.proxy_id == proxy_id).delete(synchronize_session=False)
+                    cleared_proxy_ids.add(proxy_id)
                 for rec in records or []:
                     model = SessionRecordModel(
                         proxy_id=proxy_id,

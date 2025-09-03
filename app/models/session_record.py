@@ -12,7 +12,7 @@ class SessionRecord(Base):
 
     # Columns as provided by MWG session browser output
     transaction = Column(String, nullable=True)
-    creation_time = Column(String, nullable=True)  # keep raw string; parser can also provide parsed_at if needed
+    creation_time = Column(DateTime(timezone=True), nullable=True)
     protocol = Column(String, nullable=True)
     cust_id = Column(String, nullable=True)
     user_name = Column(String, nullable=True)
