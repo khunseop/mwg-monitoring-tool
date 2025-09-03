@@ -5,7 +5,7 @@
     <ul>
         <li class="is-active" data-target="proxy-list"><a>프록시 목록</a></li>
         <li data-target="proxy-groups"><a>프록시 그룹</a></li>
-        <li data-target="resource-config"><a>리소스 설정</a></li>
+        <li data-target="resource-config"><a>SNMP 설정</a></li>
         <li data-target="session-config"><a>세션브라우저 설정</a></li>
     </ul>
 </div>
@@ -46,10 +46,10 @@
     </div>
 </div>
 
-<!-- 리소스 설정 탭 -->
+<!-- SNMP 설정 탭 -->
 <div id="resource-config" class="tab-panel" style="display: none;">
     <div class="box">
-        <h3 class="title is-4">리소스 수집 설정</h3>
+        <h3 class="title is-4">SNMP 설정</h3>
 
         <div class="level">
             <div class="level-left">
@@ -57,7 +57,7 @@
                     <div class="box" style="padding: 0.75rem 1rem;">
                         <div class="field is-horizontal" style="margin-bottom: 0;">
                             <div class="field-label is-normal" style="min-width: 9rem;">
-                                <label class="label" style="margin-bottom: 0;">SNMP Community</label>
+                                <label class="label" style="margin-bottom: 0;">Community String</label>
                             </div>
                             <div class="field-body">
                                 <div class="field" style="margin-bottom: 0;">
@@ -506,7 +506,7 @@ function loadGroups() {
         });
 }
 
-// 리소스 설정 로드/저장
+// SNMP 설정 로드/저장
 function loadResourceConfig() {
     $.get('/api/resource-config')
         .done(cfg => {
