@@ -1,17 +1,19 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="tabs">
+{% set active_tab = request.query_params.get('tab') or 'proxy-list' %}
+<div class="tabs" id="settingsTabs">
     <ul>
-        <li class="is-active" data-target="proxy-list"><a>프록시 목록</a></li>
-        <li data-target="proxy-groups"><a>프록시 그룹</a></li>
-        <li data-target="resource-config"><a>리소스 설정</a></li>
-        <li data-target="session-config"><a>세션브라우저 설정</a></li>
+        <li class="{% if active_tab == 'proxy-list' %}is-active{% endif %}" data-target="proxy-list"><a href="/?tab=proxy-list">프록시 목록</a></li>
+        <li class="{% if active_tab == 'proxy-groups' %}is-active{% endif %}" data-target="proxy-groups"><a href="/?tab=proxy-groups">프록시 그룹</a></li>
+        <li class="{% if active_tab == 'resource-config' %}is-active{% endif %}" data-target="resource-config"><a href="/?tab=resource-config">리소스 설정</a></li>
+        <li class="{% if active_tab == 'session-config' %}is-active{% endif %}" data-target="session-config"><a href="/?tab=session-config">세션브라우저 설정</a></li>
     </ul>
+
 </div>
 
 <!-- 프록시 목록 탭 -->
-<div id="proxy-list" class="tab-panel is-active">
+<div id="proxy-list" class="tab-panel {% if active_tab == 'proxy-list' %}is-active{% endif %}" style="{% if active_tab != 'proxy-list' %}display: none;{% endif %}">
     <div class="box">
         <div class="level">
             <div class="level-left">
@@ -47,7 +49,7 @@
 </div>
 
 <!-- 리소스 설정 탭 -->
-<div id="resource-config" class="tab-panel" style="display: none;">
+<div id="resource-config" class="tab-panel {% if active_tab == 'resource-config' %}is-active{% endif %}" style="{% if active_tab != 'resource-config' %}display: none;{% endif %}">
     <div class="box">
         <h3 class="title is-4">리소스 수집 설정</h3>
 
@@ -136,7 +138,7 @@
     </div>
 </div>
 <!-- 세션브라우저 설정 탭 -->
-<div id="session-config" class="tab-panel" style="display: none;">
+<div id="session-config" class="tab-panel {% if active_tab == 'session-config' %}is-active{% endif %}" style="{% if active_tab != 'session-config' %}display: none;{% endif %}">
     <div class="box">
         <div class="level">
             <div class="level-left">
@@ -193,7 +195,7 @@
     </div>
 </div>
 <!-- 프록시 그룹 탭 -->
-<div id="proxy-groups" class="tab-panel" style="display: none;">
+<div id="proxy-groups" class="tab-panel {% if active_tab == 'proxy-groups' %}is-active{% endif %}" style="{% if active_tab != 'proxy-groups' %}display: none;{% endif %}">
     <div class="box">
         <div class="level">
             <div class="level-left">
@@ -334,17 +336,19 @@ const utils = {
     resetForm: (formId) => document.getElementById(formId).reset()
 };
 
-// 탭 관리
-document.querySelectorAll('.tabs li').forEach(tab => {
-    tab.addEventListener('click', () => {
-        document.querySelectorAll('.tabs li').forEach(t => t.classList.remove('is-active'));
-        tab.classList.add('is-active');
-        
-        const target = tab.dataset.target;
-        document.querySelectorAll('.tab-panel').forEach(panel => {
-            panel.style.display = 'none';
-        });
-        document.getElementById(target).style.display = 'block';
+// 탭 관리: 링크를 통해 쿼리파람으로 동기화
+document.querySelectorAll('#settingsTabs li > a').forEach(function(a){
+    a.addEventListener('click', function(e){
+        const href = this.getAttribute('href') || '';
+        if (href.indexOf('/?tab=') === 0) { return; }
+        e.preventDefault();
+        const li = this.closest('li');
+        if (!li) return;
+        const target = li.getAttribute('data-target');
+        if (!target) return;
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', target);
+        window.location.href = url.toString();
     });
 });
 

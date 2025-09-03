@@ -80,6 +80,19 @@ body {
 .navbar-burger:hover { background: rgba(2, 6, 23, 0.06); }
 .navbar-burger.is-active { background: rgba(2, 6, 23, 0.08); }
 
+/* Navbar submenu: expands the navbar frame vertically (not a detached dropdown) */
+.navbar-submenu {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 220ms ease;
+    border-top: 1px solid var(--color-border);
+}
+.navbar-submenu .tabs { margin-bottom: 0; }
+.navbar-submenu.is-open { max-height: 120px; }
+
+/* When settings is active/open, hide duplicate page-level tabs */
+body.has-subnav-open #settingsTabs { display: none; }
+
 /* Primary button remap to tokenized blue, with softer radius and shadow */
 .button.is-link {
     background-color: var(--color-primary);

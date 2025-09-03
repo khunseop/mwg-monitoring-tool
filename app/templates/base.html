@@ -47,6 +47,17 @@
                     </a>
                 </div>
             </div>
+            {% set settings_active_tab = request.query_params.get('tab') or 'proxy-list' %}
+            <div class="navbar-submenu {% if request.url.path == '/' %}is-open{% endif %}" id="settingsSubnav">
+                <div class="tabs is-small">
+                    <ul>
+                        <li class="{% if settings_active_tab == 'proxy-list' %}is-active{% endif %}"><a href="/?tab=proxy-list">프록시 목록</a></li>
+                        <li class="{% if settings_active_tab == 'proxy-groups' %}is-active{% endif %}"><a href="/?tab=proxy-groups">프록시 그룹</a></li>
+                        <li class="{% if settings_active_tab == 'resource-config' %}is-active{% endif %}"><a href="/?tab=resource-config">리소스 설정</a></li>
+                        <li class="{% if settings_active_tab == 'session-config' %}is-active{% endif %}"><a href="/?tab=session-config">세션브라우저 설정</a></li>
+                    </ul>
+                </div>
+            </div>
         </div>
     </nav>
 
@@ -83,6 +94,25 @@
                 const willOpen = !$acc.hasClass('is-open');
                 $acc.toggleClass('is-open', willOpen);
                 $body.stop(true, true).slideToggle(150);
+            });
+
+            // Settings submenu expand on hover/active
+            const isSettingsRoute = {% if request.url.path == '/' %}true{% else %}false{% endif %};
+            const $subnav = $('#settingsSubnav');
+            if (isSettingsRoute) {
+                $('body').addClass('has-subnav-open');
+                $subnav.addClass('is-open');
+            }
+            const $settingsItem = $('.navbar-end .navbar-item[href="/"]');
+            $settingsItem.on('mouseenter focusin', function(){
+                $('body').addClass('has-subnav-open');
+                $subnav.addClass('is-open');
+            });
+            $('.navbar').on('mouseleave', function(){
+                if (!isSettingsRoute) {
+                    $('body').removeClass('has-subnav-open');
+                    $subnav.removeClass('is-open');
+                }
             });
         });
     </script>
