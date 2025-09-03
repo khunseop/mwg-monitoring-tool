@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Tuple
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import asyncio
 from datetime import datetime
 import json
 
@@ -14,16 +14,8 @@ from app.schemas.resource_usage import (
     CollectResponse,
 )
 
-# pysnmp imports kept local to avoid import cost on app startup
-from pysnmp.hlapi import (
-    SnmpEngine,
-    CommunityData,
-    UdpTransportTarget,
-    ContextData,
-    ObjectType,
-    ObjectIdentity,
-    getCmd,
-)
+# aiosnmp import for SNMP operations
+from aiosnmp import Snmp
 
 
 router = APIRouter()
@@ -32,30 +24,23 @@ router = APIRouter()
 SUPPORTED_KEYS = {"cpu", "mem", "cc", "cs", "http", "https", "ftp"}
 
 
-def _snmp_get(host: str, port: int, community: str, oid: str, timeout_sec: int = 2) -> float | None:
-    iterator = getCmd(
-        SnmpEngine(),
-        CommunityData(community, mpModel=1),  # SNMPv2c
-        UdpTransportTarget((host, 161), timeout=timeout_sec, retries=1),
-        ContextData(),
-        ObjectType(ObjectIdentity(oid)),
-    )
-    error_indication, error_status, error_index, var_binds = next(iterator)
-    if error_indication or error_status:
-        return None
+async def _snmp_get(host: str, port: int, community: str, oid: str, timeout_sec: int = 2) -> float | None:
     try:
-        value = var_binds[0][1]
-        return float(value)
+        async with Snmp(host=host, port=port, community=community, timeout=timeout_sec) as snmp:
+            values = await snmp.get(oid)
+            if values and len(values) > 0:
+                return float(values[0].value)
+            return None
     except Exception:
         return None
 
 
-def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str) -> Tuple[int, Dict[str, Any] | None, str | None]:
+async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str) -> Tuple[int, Dict[str, Any] | None, str | None]:
     result: Dict[str, Any] = {k: None for k in SUPPORTED_KEYS}
     for key, oid in oids.items():
         if key not in SUPPORTED_KEYS:
             continue
-        value = _snmp_get(proxy.host, proxy.port or 161, community, oid)
+        value = await _snmp_get(proxy.host, 161, community, oid)
         result[key] = value
     return proxy.id, result, None
 
@@ -78,35 +63,37 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
     errors: Dict[int, str] = {}
     collected_models: List[ResourceUsageModel] = []
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        future_to_proxy = {
-            executor.submit(_collect_for_proxy, p, payload.oids, payload.community): p
-            for p in proxies
-        }
-        for future in as_completed(future_to_proxy):
-            proxy = future_to_proxy[future]
-            try:
-                proxy_id, metrics, err = future.result()
-                if err:
-                    errors[proxy_id] = err
-                    continue
-                model = ResourceUsageModel(
-                    proxy_id=proxy_id,
-                    cpu=metrics.get("cpu"),
-                    mem=metrics.get("mem"),
-                    cc=metrics.get("cc"),
-                    cs=metrics.get("cs"),
-                    http=metrics.get("http"),
-                    https=metrics.get("https"),
-                    ftp=metrics.get("ftp"),
-                    community=payload.community,
-                    oids_raw=json.dumps(payload.oids),
-                    collected_at=datetime.utcnow(),
-                )
-                db.add(model)
-                collected_models.append(model)
-            except Exception as e:
-                errors[proxy.id] = str(e)
+    # Gather all SNMP collection tasks
+    tasks = [_collect_for_proxy(p, payload.oids, payload.community) for p in proxies]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    for proxy, result in zip(proxies, results):
+        try:
+            if isinstance(result, Exception):
+                errors[proxy.id] = str(result)
+                continue
+            proxy_id, metrics, err = result
+            if err:
+                errors[proxy_id] = err
+                continue
+            
+            model = ResourceUsageModel(
+                proxy_id=proxy_id,
+                cpu=metrics.get("cpu"),
+                mem=metrics.get("mem"),
+                cc=metrics.get("cc"),
+                cs=metrics.get("cs"),
+                http=metrics.get("http"),
+                https=metrics.get("https"),
+                ftp=metrics.get("ftp"),
+                community=payload.community,
+                oids_raw=json.dumps(payload.oids),
+                collected_at=datetime.utcnow(),
+            )
+            db.add(model)
+            collected_models.append(model)
+        except Exception as e:
+            errors[proxy.id] = str(e)
 
     db.commit()
     for model in collected_models:
