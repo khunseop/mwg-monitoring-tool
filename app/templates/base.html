@@ -30,13 +30,13 @@
 
             <div class="navbar-menu">
                 <div class="navbar-end">
-                    <a class="navbar-item" href="/resource">
+                    <a class="navbar-item {% if request.url.path.startswith('/resource') %}is-active{% endif %}" href="/resource">
                         자원사용률
                     </a>
-                    <a class="navbar-item" href="/session">
+                    <a class="navbar-item {% if request.url.path.startswith('/session') %}is-active{% endif %}" href="/session">
                         세션브라우저
                     </a>
-                    <a class="navbar-item is-active" href="/">
+                    <a class="navbar-item {% if request.url.path == '/' %}is-active{% endif %}" href="/">
                         설정
                     </a>
                 </div>

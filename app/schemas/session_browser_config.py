@@ -18,3 +18,9 @@ class SessionBrowserConfig(SessionBrowserConfigBase, TimestampModel):
     class Config:
         from_attributes = True
 
+
+class SessionBrowserConfigUpdateSafe(BaseModel):
+    ssh_port: conint(ge=1, le=65535) = 22
+    timeout_sec: conint(ge=1, le=120) = 10
+    host_key_policy: str = "auto_add"
+

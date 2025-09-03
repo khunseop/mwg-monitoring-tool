@@ -139,22 +139,7 @@
                     </div>
                 </div>
             </div>
-            <div class="column is-5">
-                <div class="field">
-                    <label class="label">명령 경로</label>
-                    <div class="control">
-                        <input class="input" id="sbCfgPath" type="text" placeholder="/opt/mwg/bin/mwg-core">
-                    </div>
-                </div>
-            </div>
-            <div class="column is-4">
-                <div class="field">
-                    <label class="label">명령 인자</label>
-                    <div class="control">
-                        <input class="input" id="sbCfgArgs" type="text" placeholder="-S connections">
-                    </div>
-                </div>
-            </div>
+            
             <div class="column is-3">
                 <div class="field">
                     <label class="label">타임아웃(초)</label>
@@ -399,9 +384,6 @@ function loadProxies() {
                                 <button class="button is-danger is-light" onclick="deleteProxy(${proxy.id})">
                                     삭제
                                 </button>
-                                <button class="button is-success is-light" onclick="testProxy(${proxy.id})">
-                                    테스트
-                                </button>
                             </div>
                         </td>
                     </tr>
@@ -465,11 +447,7 @@ function deleteProxy(id) {
     }
 }
 
-function testProxy(id) {
-    $.post(`/api/proxies/${id}/test`)
-        .done(result => alert('테스트 성공: ' + result.message))
-        .fail(xhr => alert('테스트 실패: ' + xhr.responseJSON.detail));
-}
+// 테스트 기능 제거됨
 
 // 그룹 관리
 function loadGroups() {
@@ -560,8 +538,6 @@ function loadSessionConfig() {
     $.get('/api/session-browser/config')
         .done(cfg => {
             $('#sbCfgPort').val(cfg.ssh_port || 22);
-            $('#sbCfgPath').val(cfg.command_path || '');
-            $('#sbCfgArgs').val(cfg.command_args || '');
             $('#sbCfgTimeout').val(cfg.timeout_sec || 10);
             $('#sbCfgHostKeyPolicy').val(cfg.host_key_policy || 'auto_add');
             $('#sbCfgStatus').removeClass('is-danger').addClass('is-success').text('불러오기 완료');
@@ -574,8 +550,6 @@ function loadSessionConfig() {
 function saveSessionConfig() {
     const payload = {
         ssh_port: parseInt($('#sbCfgPort').val(), 10) || 22,
-        command_path: ($('#sbCfgPath').val() || '').toString(),
-        command_args: ($('#sbCfgArgs').val() || '').toString(),
         timeout_sec: parseInt($('#sbCfgTimeout').val(), 10) || 10,
         host_key_policy: ($('#sbCfgHostKeyPolicy').val() || 'auto_add').toString()
     };
