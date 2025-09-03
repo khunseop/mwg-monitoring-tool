@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+import re
 import warnings
 try:
     from cryptography.utils import CryptographyDeprecationWarning
@@ -83,26 +84,41 @@ def _parse_sessions(output: str) -> List[Dict[str, Any]]:
 
     records: List[Dict[str, Any]] = []
     for line in lines[start_idx:]:
-        # split by pipe and trim cells
+        # split by pipe and trim cells (keep empty tokens)
         parts = [p.strip() for p in line.split("|")]
-        # Some outputs may have empty fields around pipes; normalize length by padding
-        # Expected columns count = 19 per user spec
-        if len(parts) < 19:
-            parts += [None] * (19 - len(parts))
 
-        # Map fields by index per the provided order
-        # 0: Transaction
-        # 1: Creation Time? (the sample shows blanks; actual date appears at index 2)
-        # Adjust: prefer non-empty among 1 and 2 as creation_time
-        transaction = parts[0] or None
-        creation_time = (parts[1] or parts[2] or None)
-        protocol = parts[3] or None
-        cust_id = parts[4] or None
-        user_name = parts[6] or (parts[5] or None)  # sample shows username at index 6
-        client_ip = parts[7] or None
-        client_side_mwg_ip = parts[8] or None
-        server_side_mwg_ip = parts[9] or None
-        server_ip = parts[10] or None
+        if not parts:
+            continue
+
+        # Transaction is always at index 0
+        transaction = parts[0] if len(parts) > 0 and parts[0] != "" else None
+
+        # Find creation time token within the next few positions (handles extra blank column before it)
+        dt_regex = re.compile(r"^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}$")
+        creation_time_idx = None
+        for i in range(1, min(6, len(parts))):
+            if dt_regex.match(parts[i] or ""):
+                creation_time_idx = i
+                break
+
+        creation_time = parts[creation_time_idx] if creation_time_idx is not None else None
+        # Normalize creation_time format if possible (keep as string in DB)
+        if creation_time:
+            try:
+                dt = datetime.strptime(creation_time, "%Y-%m-%d %H:%M:%S")
+                creation_time = dt.strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                pass
+
+        # Columns AFTER creation_time are shifted by (creation_time_idx - 1)
+        shift_after = (creation_time_idx - 1) if creation_time_idx is not None else 0
+
+        def get_after(expected_index: int) -> Any:
+            idx = expected_index + shift_after
+            if 0 <= idx < len(parts):
+                value = parts[idx].strip()
+                return value if value != "" else None
+            return None
 
         def _to_int(value: Any) -> int | None:
             try:
@@ -115,21 +131,28 @@ def _parse_sessions(output: str) -> List[Dict[str, Any]]:
             except Exception:
                 return None
 
-        cl_bytes_received = _to_int(parts[11])
-        cl_bytes_sent = _to_int(parts[12])
-        srv_bytes_received = _to_int(parts[13])
-        srv_bytes_sent = _to_int(parts[14])
-        trxn_index = _to_int(parts[15])
-        age_seconds = _to_int(parts[16])
-        status = parts[17] or None
-        in_use = _to_int(parts[18]) if len(parts) > 18 else None
-        url = parts[19] if len(parts) > 19 else (parts[18] if status is None else None)
+        protocol = get_after(2)
+        cust_id = get_after(3)
+        user_name = get_after(4)
+        client_ip = get_after(5)
+        client_side_mwg_ip = get_after(6)
+        server_side_mwg_ip = get_after(7)
+        server_ip = get_after(8)
 
-        # Some outputs may shift columns; if url seems missing but last token looks like URL, use it
+        cl_bytes_received = _to_int(get_after(9))
+        cl_bytes_sent = _to_int(get_after(10))
+        srv_bytes_received = _to_int(get_after(11))
+        srv_bytes_sent = _to_int(get_after(12))
+        trxn_index = _to_int(get_after(13))
+        age_seconds = _to_int(get_after(14))
+        status = get_after(15)
+        in_use = _to_int(get_after(16))
+
+        url = get_after(17)
         if not url and parts:
             last = parts[-1]
             if isinstance(last, str) and (last.startswith("http://") or last.startswith("https://")):
-                url = last
+                url = last.strip()
 
         record = {
             "transaction": transaction,
