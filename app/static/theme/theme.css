@@ -216,6 +216,9 @@ body {
     .navbar-menu .navbar-item.is-active {
         background: color-mix(in srgb, var(--color-primary) 10%, transparent) !important;
     }
+
+    /* Hide settings submenu entirely on mobile to avoid lingering below burger menu */
+    .navbar-submenu { display: none !important; }
 }
 
 /* Primary button remap to tokenized blue, with softer radius and shadow */
