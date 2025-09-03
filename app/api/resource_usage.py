@@ -125,7 +125,7 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
 async def list_resource_usage(db: Session = Depends(get_db)):
     rows = (
         db.query(ResourceUsageModel)
-        .order_by(ResourceUsageModel.created_at.desc())
+        .order_by(ResourceUsageModel.collected_at.desc())
         .limit(500)
         .all()
     )
@@ -137,7 +137,7 @@ async def latest_resource_usage(proxy_id: int, db: Session = Depends(get_db)):
     row = (
         db.query(ResourceUsageModel)
         .filter(ResourceUsageModel.proxy_id == proxy_id)
-        .order_by(ResourceUsageModel.created_at.desc())
+        .order_by(ResourceUsageModel.collected_at.desc())
         .first()
     )
     if not row:

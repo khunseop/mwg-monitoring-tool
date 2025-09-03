@@ -7,6 +7,7 @@ from app.models import resource_usage as resource_usage_model
 from app.api import proxies, proxy_groups
 from app.api import resource_usage as resource_usage_api
 import os
+from fastapi_standalone_docs import StandaloneDocs
 
 proxy.Base.metadata.create_all(bind=engine)
 resource_usage_model.Base.metadata.create_all(bind=engine)
@@ -16,6 +17,7 @@ app = FastAPI(
     description="Proxy Performance Analysis Tool",
     version="1.0.0"
 )
+StandaloneDocs(app)
 
 # 템플릿과 정적 파일 설정
 templates = Jinja2Templates(directory="app/templates")
