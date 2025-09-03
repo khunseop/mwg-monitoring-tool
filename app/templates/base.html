@@ -94,19 +94,30 @@
                 if (collapseTimer) clearTimeout(collapseTimer);
                 collapseTimer = setTimeout(() => setNavbarExpanded(false), 500);
             });
-            // Simple accordion toggle
-            // Ensure accordion initial state matches DOM classes
+            // Simple accordion toggle (avoid mixing inline display with CSS class)
+            // Initialize: clear any inline display so CSS controls initial visibility
             $('.accordion').each(function(){
-                const $acc = $(this);
-                const isOpen = $acc.hasClass('is-open');
-                $acc.find('.accordion-body').toggle(isOpen);
+                $(this).find('.accordion-body').css('display', '');
             });
             $(document).on('click', '.accordion .accordion-header', function(){
                 const $acc = $(this).closest('.accordion');
                 const $body = $acc.find('.accordion-body').first();
-                const willOpen = !$acc.hasClass('is-open');
-                $acc.toggleClass('is-open', willOpen);
-                $body.stop(true, true).slideToggle(150);
+                // Stop current animations and jump to end, then sync class with actual visibility
+                $body.stop(true, true);
+                const isVisible = $body.is(':visible');
+                $acc.toggleClass('is-open', isVisible);
+                const willOpen = !isVisible;
+                if (willOpen) {
+                    $body.slideDown(150, function(){
+                        $acc.addClass('is-open');
+                        $body.css('display', '');
+                    });
+                } else {
+                    $body.slideUp(150, function(){
+                        $acc.removeClass('is-open');
+                        $body.css('display', '');
+                    });
+                }
             });
         });
     </script>
