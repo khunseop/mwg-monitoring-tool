@@ -29,6 +29,10 @@ app.include_router(proxy_groups.router, prefix="/api", tags=["proxy-groups"])
 app.include_router(resource_usage_api.router, prefix="/api", tags=["resource-usage"])
 
 # 페이지 라우터
-@app.get("/{path:path}")
-async def read_root(request: Request, path: str = ""):
+@app.get("/")
+async def read_settings(request: Request):
     return templates.TemplateResponse("components/settings.html", {"request": request})
+
+@app.get("/resource")
+async def read_resource(request: Request):
+    return templates.TemplateResponse("components/resource_usage.html", {"request": request})
