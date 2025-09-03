@@ -55,15 +55,24 @@ body {
 
 /* Navbar: make light surface with subtle divider and premium hover */
 .navbar.is-link {
-    background: var(--color-primary);
+    background: var(--color-surface);
     box-shadow: 0 1px 0 var(--color-border);
 }
 .navbar.is-link .navbar-item,
 .navbar.is-link .navbar-link,
-.navbar.is-link .navbar-brand .navbar-item { color: rgba(255,255,255,0.92) !important; }
-.navbar.is-link .navbar-item:hover { background: transparent; color: #ffffff !important; }
-.navbar.is-link .navbar-item.is-active { color: #ffffff !important; }
-.navbar-burger { color: #ffffff; }
+.navbar.is-link .navbar-brand .navbar-item {
+    color: var(--color-text) !important;
+    border-bottom: 2px solid transparent;
+}
+.navbar.is-link .navbar-item:hover {
+    background: transparent;
+    color: var(--color-text) !important;
+}
+.navbar.is-link .navbar-item.is-active {
+    color: var(--color-text) !important;
+    border-bottom-color: var(--color-primary);
+}
+.navbar-burger { color: var(--color-text); }
 
 /* Primary button remap to tokenized blue, with softer radius and shadow */
 .button.is-link {

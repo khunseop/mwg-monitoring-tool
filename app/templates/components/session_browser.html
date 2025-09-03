@@ -6,7 +6,7 @@
 
     <div class="columns is-multiline">
         <div class="column is-12">
-            <div class="accordion is-open" id="sbSelectAccordion">
+            <div class="accordion" id="sbSelectAccordion">
                 <div class="accordion-header">
                     <h4>대상 선택</h4>
                 </div>
@@ -67,24 +67,29 @@
         </div>
     </div>
 
-    <div class="table-container mt-4 sb-table-wrap" style="overflow-x:auto;">
-        <table id="sbTable" class="table is-fullwidth is-striped is-hoverable">
-            <thead>
-                <tr>
-                    <th>프록시</th>
-                    <th>생성시각</th>
-                    <th>트랜잭션</th>
-                    <th>프로토콜</th>
-                    <th>사용자</th>
-                    <th>클라이언트 IP</th>
-                    <th>서버 IP</th>
-                    <th>상태</th>
-                    <th>Age(s)</th>
-                    <th>URL</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+    <div class="mt-4">
+        <div id="sbEmptyState" class="box" style="display:none; text-align:center; color: var(--color-text-muted);">
+            현재 표시할 세션이 없습니다. 상단에서 대상을 선택하고 "세션 불러오기"를 클릭하세요.
+        </div>
+        <div class="table-container sb-table-wrap" id="sbTableWrap" style="overflow-x:auto;">
+            <table id="sbTable" class="table is-fullwidth is-striped is-hoverable">
+                <thead>
+                    <tr>
+                        <th>프록시</th>
+                        <th>생성시각</th>
+                        <th>트랜잭션</th>
+                        <th>프로토콜</th>
+                        <th>사용자</th>
+                        <th>클라이언트 IP</th>
+                        <th>서버 IP</th>
+                        <th>상태</th>
+                        <th>Age(s)</th>
+                        <th>URL</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -309,8 +314,16 @@ $(document).ready(function() {
             contentType: 'application/json',
             data: JSON.stringify({ proxy_ids: proxyIds })
         }).then(res => {
-            const rows = rowsFromItems(res && res.items ? res.items : []);
-            if (sb.dt) { sb.dt.clear().rows.add(rows).draw(); }
+            const items = res && res.items ? res.items : [];
+            const rows = rowsFromItems(items);
+            if (sb.dt) {
+                sb.dt.clear();
+                if (rows.length > 0) { sb.dt.rows.add(rows).draw(); }
+                else { sb.dt.draw(); }
+            }
+            // Toggle empty/table state
+            if (rows.length === 0) { $('#sbTableWrap').hide(); $('#sbEmptyState').show(); }
+            else { $('#sbEmptyState').hide(); $('#sbTableWrap').show(); }
             if (res && res.failed && res.failed > 0) { showErr('일부 프록시 수집에 실패했습니다.'); }
             setStatus('완료');
             // persist current state and items
@@ -338,6 +351,9 @@ $(document).ready(function() {
     });
 
     initTable();
+    // Show empty state initially
+    $('#sbTableWrap').hide();
+    $('#sbEmptyState').show();
     Promise.all([fetchGroups(), fetchProxies()]).then(() => { restoreState(); });
 });
 
