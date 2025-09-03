@@ -21,40 +21,38 @@
     </style>
 </head>
 <body>
-    <nav class="navbar mb-3" role="navigation" aria-label="main navigation">
+    <div class="section">
         <div class="container">
-            <div class="navbar-brand">
-                <a class="navbar-item" href="/">
-                    PPAT
-                </a>
-                <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="mainNavbar">
-                    <span aria-hidden="true"></span>
-                    <span aria-hidden="true"></span>
-                    <span aria-hidden="true"></span>
-                </a>
-            </div>
-
-            <div id="mainNavbar" class="navbar-menu">
-                <div class="navbar-end">
-                    <a class="navbar-item {% if request.url.path.startswith('/resource') %}is-active{% endif %}" href="/resource">
-                        자원사용률
+            <nav class="navbar" role="navigation" aria-label="main navigation">
+                <div class="navbar-brand">
+                    <a class="navbar-item" href="/">
+                        PPAT
                     </a>
-                    <a class="navbar-item {% if request.url.path.startswith('/session') %}is-active{% endif %}" href="/session">
-                        세션브라우저
-                    </a>
-                    <a class="navbar-item {% if request.url.path == '/' %}is-active{% endif %}" href="/">
-                        설정
+                    <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="mainNavbar">
+                        <span aria-hidden="true"></span>
+                        <span aria-hidden="true"></span>
+                        <span aria-hidden="true"></span>
                     </a>
                 </div>
-            </div>
-        </div>
-    </nav>
 
-    <section class="section">
-        <div class="container">
+                <div id="mainNavbar" class="navbar-menu">
+                    <div class="navbar-start">
+                        <a class="navbar-item {% if request.url.path.startswith('/resource') %}is-active{% endif %}" href="/resource">
+                            자원사용률
+                        </a>
+                        <a class="navbar-item {% if request.url.path.startswith('/session') %}is-active{% endif %}" href="/session">
+                            세션브라우저
+                        </a>
+                        <a class="navbar-item {% if request.url.path == '/' %}is-active{% endif %}" href="/">
+                            설정
+                        </a>
+                    </div>
+                </div>
+            </nav>
+
             {% block content %}{% endblock %}
         </div>
-    </section>
+    </div>
 
     <script>
         $(document).ready(function() {

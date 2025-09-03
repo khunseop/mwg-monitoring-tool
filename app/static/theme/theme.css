@@ -49,20 +49,47 @@ body {
     min-height: 100%;
 }
 
-/* Container and section refinements */
-.section { padding-top: 2.25rem; padding-bottom: 2.25rem; background: var(--color-bg); }
-.container { max-width: 1200px; }
+/* Basic layout */
+.section { 
+    padding: 1.5rem;
+    background: var(--color-bg);
+    min-height: 100vh;
+}
 
-/* Navbar: modern design with smooth interactions */
-.navbar {
+.container { 
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Components */
+.navbar,
+.box {
     background: var(--color-surface);
-    box-shadow: var(--shadow-sm);
-    padding: 0.5rem 0;
     border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+.navbar {
+    margin-bottom: 1.5rem;
+    padding: 0.5rem 1rem;
+}
+
+.box {
+    padding: 1.5rem;
+}
+
+/* Tabs */
+.tabs {
+    margin-bottom: 1.5rem;
+}
+
+.tabs ul {
+    border-bottom-color: var(--color-border);
 }
 
 .navbar .container { 
-    max-width: 1200px; 
+    max-width: 100%;
+    padding: 0;
     background: transparent;
     height: 3.25rem;
 }
@@ -186,10 +213,7 @@ body {
 
 /* Card/box surfaces */
 .box {
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-sm);
+    padding: 1.5rem;
 }
 
 /* Titles and labels: slightly lighter weight for a refined tone */
@@ -197,9 +221,17 @@ body {
 .title strong { font-weight: 600; }
 .label { color: var(--color-text); font-weight: 500; }
 
-/* Tabs: thin underline and primary active color */
-.tabs a { color: var(--color-text-muted); border-bottom-color: transparent; }
-.tabs li.is-active a { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+/* Tabs: contained within box */
+.box .tabs {
+    margin-bottom: 1rem;
+}
+.tabs a { 
+    color: var(--color-text-muted); 
+}
+.tabs li.is-active a { 
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+}
 
 /* Tables: clearer header and row hover with subtle borders */
 .table thead th { color: var(--color-text); font-weight: 600; background: #f9fafb; }
