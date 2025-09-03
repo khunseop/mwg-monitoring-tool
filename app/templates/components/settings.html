@@ -49,16 +49,10 @@
 <!-- 리소스 설정 탭 -->
 <div id="resource-config" class="tab-panel" style="display: none;">
     <div class="box">
-        <div class="level">
-            <div class="level-left">
-                <div class="level-item">
-                    <h3 class="title is-4">리소스 수집 설정</h3>
-                </div>
-            </div>
-        </div>
+        <h3 class="title is-4">리소스 수집 설정</h3>
 
-        <div class="columns is-multiline">
-            <div class="column is-4">
+        <div class="columns">
+            <div class="column is-6">
                 <div class="field">
                     <label class="label">SNMP Community</label>
                     <div class="control">
@@ -66,56 +60,71 @@
                     </div>
                 </div>
             </div>
+            <div class="column is-6">
+                <div class="field">
+                    <label class="label">설정</label>
+                    <div class="control">
+                        <div class="buttons is-right">
+                            <button class="button is-link" onclick="saveResourceConfig()">저장</button>
+                            <span id="cfgStatus" class="tag is-light ml-2">로딩 중...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="columns is-multiline">
-            <div class="column is-4">
-                <div class="field">
-                    <label class="label is-small">cpu OID</label>
-                    <input class="input is-small" id="cfgOidCpu" placeholder="1.3.6.1.x">
+            <div class="column is-12">
+                <div class="accordion is-open">
+                    <div class="accordion-header"><h4>OID 설정</h4></div>
+                    <div class="accordion-body">
+                        <div class="columns is-multiline">
+                            <div class="column is-4">
+                                <div class="field">
+                                    <label class="label is-small">cpu OID</label>
+                                    <input class="input is-small" id="cfgOidCpu" placeholder="1.3.6.1.x">
+                                </div>
+                            </div>
+                            <div class="column is-4">
+                                <div class="field">
+                                    <label class="label is-small">mem OID</label>
+                                    <input class="input is-small" id="cfgOidMem" placeholder="1.3.6.1.x">
+                                </div>
+                            </div>
+                            <div class="column is-4">
+                                <div class="field">
+                                    <label class="label is-small">cc OID</label>
+                                    <input class="input is-small" id="cfgOidCc" placeholder="1.3.6.1.x">
+                                </div>
+                            </div>
+                            <div class="column is-4">
+                                <div class="field">
+                                    <label class="label is-small">cs OID</label>
+                                    <input class="input is-small" id="cfgOidCs" placeholder="1.3.6.1.x">
+                                </div>
+                            </div>
+                            <div class="column is-4">
+                                <div class="field">
+                                    <label class="label is-small">http OID (누적)</label>
+                                    <input class="input is-small" id="cfgOidHttp" placeholder="1.3.6.1.x">
+                                </div>
+                            </div>
+                            <div class="column is-4">
+                                <div class="field">
+                                    <label class="label is-small">https OID (누적)</label>
+                                    <input class="input is-small" id="cfgOidHttps" placeholder="1.3.6.1.x">
+                                </div>
+                            </div>
+                            <div class="column is-4">
+                                <div class="field">
+                                    <label class="label is-small">ftp OID (누적)</label>
+                                    <input class="input is-small" id="cfgOidFtp" placeholder="1.3.6.1.x">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="column is-4">
-                <div class="field">
-                    <label class="label is-small">mem OID</label>
-                    <input class="input is-small" id="cfgOidMem" placeholder="1.3.6.1.x">
-                </div>
-            </div>
-            <div class="column is-4">
-                <div class="field">
-                    <label class="label is-small">cc OID</label>
-                    <input class="input is-small" id="cfgOidCc" placeholder="1.3.6.1.x">
-                </div>
-            </div>
-            <div class="column is-4">
-                <div class="field">
-                    <label class="label is-small">cs OID</label>
-                    <input class="input is-small" id="cfgOidCs" placeholder="1.3.6.1.x">
-                </div>
-            </div>
-            <div class="column is-4">
-                <div class="field">
-                    <label class="label is-small">http OID (누적)</label>
-                    <input class="input is-small" id="cfgOidHttp" placeholder="1.3.6.1.x">
-                </div>
-            </div>
-            <div class="column is-4">
-                <div class="field">
-                    <label class="label is-small">https OID (누적)</label>
-                    <input class="input is-small" id="cfgOidHttps" placeholder="1.3.6.1.x">
-                </div>
-            </div>
-            <div class="column is-4">
-                <div class="field">
-                    <label class="label is-small">ftp OID (누적)</label>
-                    <input class="input is-small" id="cfgOidFtp" placeholder="1.3.6.1.x">
-                </div>
-            </div>
-        </div>
-
-        <div class="buttons">
-            <button class="button is-link" onclick="saveResourceConfig()">저장</button>
-            <span id="cfgStatus" class="tag is-light ml-2">로딩 중...</span>
         </div>
     </div>
 </div>

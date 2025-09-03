@@ -38,7 +38,7 @@
     --line-height-base: 1.55;
 }
 
-html { font-size: var(--font-size-base); }
+html { font-size: var(--font-size-base); height: 100%; }
 body {
     background: var(--color-bg);
     color: var(--color-text);
@@ -46,10 +46,11 @@ body {
     line-height: var(--line-height-base);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    min-height: 100%;
 }
 
 /* Container and section refinements */
-.section { padding-top: 2.25rem; padding-bottom: 2.25rem; }
+.section { padding-top: 2.25rem; padding-bottom: 2.25rem; background: var(--color-bg); }
 .container { max-width: 1200px; }
 
 /* Navbar: make light surface with subtle divider and premium hover */
@@ -58,11 +59,11 @@ body {
     box-shadow: 0 1px 0 var(--color-border);
 }
 .navbar.is-link .navbar-item,
-.navbar.is-link .navbar-brand .navbar-item {
-    color: var(--color-text);
-}
-.navbar.is-link .navbar-item:hover { background: transparent; color: var(--color-primary); }
-.navbar.is-link .navbar-item.is-active { color: var(--color-primary); }
+.navbar.is-link .navbar-link,
+.navbar.is-link .navbar-brand .navbar-item { color: var(--color-text) !important; }
+.navbar.is-link .navbar-item:hover { background: transparent; color: var(--color-primary) !important; }
+.navbar.is-link .navbar-item.is-active { color: var(--color-primary) !important; }
+.navbar-burger { color: var(--color-text); }
 
 /* Primary button remap to tokenized blue, with softer radius and shadow */
 .button.is-link {
@@ -141,4 +142,18 @@ body {
 /* Utility tweaks */
 .mt-4 { margin-top: 1.25rem !important; }
 .mb-3 { margin-bottom: 0.75rem !important; }
+
+/* Accordion */
+.accordion { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.accordion + .accordion { margin-top: 1rem; }
+.accordion .accordion-header { display: flex; justify-content: space-between; align-items: center; padding: 0.9rem 1rem; cursor: pointer; }
+.accordion .accordion-header h4 { margin: 0; font-size: 1rem; color: var(--color-text); font-weight: 600; }
+.accordion .accordion-header::after { content: '\25BC'; font-size: 0.9rem; color: var(--color-text-muted); transition: transform 0.15s ease; }
+.accordion.is-open .accordion-header::after { transform: rotate(180deg); }
+.accordion .accordion-body { display: none; padding: 0 1rem 1rem; }
+.accordion.is-open .accordion-body { display: block; }
+
+/* Session browser: prevent wrapping in created-at column (2nd column) */
+#sbTable td:nth-child(2), #sbTable th:nth-child(2) { white-space: nowrap; }
+.dt-nowrap { white-space: nowrap; }
 

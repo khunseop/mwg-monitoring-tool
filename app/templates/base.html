@@ -27,9 +27,14 @@
                 <a class="navbar-item has-text-weight-bold" href="/" style="letter-spacing: .2px;">
                     PPAT
                 </a>
+                <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false" data-target="mainNavbar">
+                    <span aria-hidden="true"></span>
+                    <span aria-hidden="true"></span>
+                    <span aria-hidden="true"></span>
+                </a>
             </div>
 
-            <div class="navbar-menu">
+            <div id="mainNavbar" class="navbar-menu">
                 <div class="navbar-end">
                     <a class="navbar-item {% if request.url.path.startswith('/resource') %}is-active{% endif %}" href="/resource">
                         자원사용률
@@ -53,7 +58,18 @@
 
     <script>
         $(document).ready(function() {
-            // base-level page currently doesn't require JS
+            // Navbar burger toggle
+            $(document).on('click', '.navbar-burger', function() {
+                const targetId = $(this).attr('data-target');
+                $(this).toggleClass('is-active');
+                $('#' + targetId).toggleClass('is-active');
+            });
+            // Simple accordion toggle
+            $(document).on('click', '.accordion .accordion-header', function(){
+                const $acc = $(this).closest('.accordion');
+                $acc.toggleClass('is-open');
+                $acc.find('.accordion-body').first().slideToggle(150);
+            });
         });
     </script>
 </body>
