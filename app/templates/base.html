@@ -50,11 +50,17 @@
         </div>
     </nav>
 
-    <section class="section">
+    <section class="section" style="padding-top: 1.25rem;">
         <div class="container">
             {% block content %}{% endblock %}
         </div>
     </section>
+
+    <footer class="section" style="padding-top: 1rem; padding-bottom: 2rem;">
+        <div class="container" style="text-align: center; color: var(--color-text-muted); font-size: 0.9rem;">
+            Built by hunseop.kim — © 2025
+        </div>
+    </footer>
 
     <script>
         $(document).ready(function() {
