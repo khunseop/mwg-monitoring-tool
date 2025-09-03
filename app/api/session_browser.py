@@ -23,7 +23,7 @@ from app.schemas.session_record import (
 )
 from app.schemas.session_browser_config import (
     SessionBrowserConfig as SessionBrowserConfigSchema,
-    SessionBrowserConfigBase,
+    SessionBrowserConfigUpdateSafe,
 )
 
 
@@ -316,11 +316,9 @@ def get_session_browser_config(db: Session = Depends(get_db)):
 
 
 @router.put("/session-browser/config", response_model=SessionBrowserConfigSchema)
-def update_session_browser_config(payload: SessionBrowserConfigBase, db: Session = Depends(get_db)):
+def update_session_browser_config(payload: SessionBrowserConfigUpdateSafe, db: Session = Depends(get_db)):
     cfg = _get_cfg(db)
     cfg.ssh_port = payload.ssh_port
-    cfg.command_path = payload.command_path
-    cfg.command_args = payload.command_args
     cfg.timeout_sec = payload.timeout_sec
     cfg.host_key_policy = payload.host_key_policy
     db.commit()
