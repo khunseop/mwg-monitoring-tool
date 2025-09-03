@@ -3,6 +3,12 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+import warnings
+try:
+    from cryptography.utils import CryptographyDeprecationWarning
+    warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
+except Exception:
+    pass
 import paramiko
 
 from app.database.database import get_db
@@ -46,6 +52,7 @@ def _exec_ssh_command(host: str, username: str, password: str | None, port: int,
             timeout=timeout_sec,
             auth_timeout=timeout_sec,
             banner_timeout=timeout_sec,
+            disabled_algorithms={"cipher": ["3des-cbc", "des-cbc"]},
         )
         stdin, stdout, stderr = client.exec_command(command, timeout=timeout_sec)
         stdout_str = stdout.read().decode(errors="ignore")
