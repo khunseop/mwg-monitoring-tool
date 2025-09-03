@@ -16,6 +16,7 @@
     unicode-range: U+AC00-D7A3, U+1100-11FF, U+3130-318F; /* Hangul */
 }
 
+/* Correct root scope for CSS variables */
 :root {
     --color-bg: #f7f8fa;
     --color-surface: #ffffff;
@@ -47,6 +48,8 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     min-height: 100%;
+    /* Prevent OS-level dark scheme from inverting Bulma defaults on some platforms */
+    color-scheme: light;
 }
 
 /* Basic layout */
@@ -277,6 +280,8 @@ body {
 .table thead th { color: var(--color-text); font-weight: 600; background: #f9fafb; }
 .table td, .table th { border-color: var(--color-border); }
 .table.is-hoverable tbody tr:hover { background-color: #f8fafc; }
+/* Ensure table body rows keep light background even if a dark UA stylesheet leaks in */
+table.table tbody tr { background-color: var(--color-surface); }
 
 /* Keep table width when empty: enforce min-width similar to filled state */
 #sbTable { min-width: 1200px; }
@@ -333,6 +338,22 @@ body {
 .accordion.is-open .accordion-header::after { transform: rotate(180deg); }
 .accordion .accordion-body { display: none; padding: 0 1rem 1rem; }
 .accordion.is-open .accordion-body { display: block; }
+
+/* Buttons: ensure neutral buttons are light by default */
+.button {
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+}
+.button:hover {
+    background-color: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface));
+}
+/* Static addon button (e.g., 주기(초)) should match light surface */
+.button.is-static {
+    background-color: #f3f4f6;
+    color: var(--color-text);
+    border-color: var(--color-border);
+}
 
 /* Session browser: prevent wrapping in created-at column (2nd column) */
 #sbTable td:nth-child(2), #sbTable th:nth-child(2) { white-space: nowrap; }
