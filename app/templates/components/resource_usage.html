@@ -76,23 +76,28 @@
         </div>
     </div>
 
-    <div class="table-container mt-4">
-        <table class="table is-fullwidth is-striped is-hoverable">
-            <thead>
-                <tr>
-                    <th>프록시</th>
-                    <th>수집시각</th>
-                    <th>CPU</th>
-                    <th>MEM</th>
-                    <th>CC</th>
-                    <th>CS</th>
-                    <th>HTTP Δ</th>
-                    <th>HTTPS Δ</th>
-                    <th>FTP Δ</th>
-                </tr>
-            </thead>
-            <tbody id="ruTableBody"></tbody>
-        </table>
+    <div class="mt-4">
+        <div id="ruEmptyState" class="box" style="display:none; text-align:center; color: var(--color-text-muted);">
+            현재 표시할 데이터가 없습니다. 상단에서 대상을 선택하고 "시작"을 클릭하세요.
+        </div>
+        <div class="table-container" id="ruTableWrap">
+            <table class="table is-fullwidth is-striped is-hoverable">
+                <thead>
+                    <tr>
+                        <th>프록시</th>
+                        <th>수집시각</th>
+                        <th>CPU</th>
+                        <th>MEM</th>
+                        <th>CC</th>
+                        <th>CS</th>
+                        <th>HTTP Δ</th>
+                        <th>HTTPS Δ</th>
+                        <th>FTP Δ</th>
+                    </tr>
+                </thead>
+                <tbody id="ruTableBody"></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -194,6 +199,7 @@
 
         function updateTable(items) {
             const $tbody = $('#ruTableBody');
+            $tbody.empty();
             items.forEach(row => {
                 const proxy = (ru.proxies || []).find(p => p.id === row.proxy_id);
                 const name = proxy ? `${proxy.host}:${proxy.port}` : `#${row.proxy_id}`;
@@ -235,6 +241,9 @@
                 const $existing = $(`#${trId}`);
                 if ($existing.length) { $existing.replaceWith(rowHtml); } else { $tbody.append(rowHtml); }
             });
+            // Toggle empty/table state
+            if (!items || items.length === 0) { $('#ruTableWrap').hide(); $('#ruEmptyState').show(); }
+            else { $('#ruEmptyState').hide(); $('#ruTableWrap').show(); }
         }
 
         function collectOnce() {
@@ -250,7 +259,7 @@
                 contentType: 'application/json',
                 data: JSON.stringify({ proxy_ids: proxyIds, community: community, oids: oids })
             }).then(res => {
-                if (res && res.items) { updateTable(res.items); }
+                if (res && Array.isArray(res.items)) { updateTable(res.items); } else { updateTable([]); }
                 if (res && Array.isArray(res.items)) { saveState(res.items); } else { saveState(undefined); }
                 if (res && res.failed && res.failed > 0) { showRuError('일부 프록시 수집에 실패했습니다.'); }
             }).catch(() => { showRuError('수집 요청 중 오류가 발생했습니다.'); });
@@ -284,6 +293,9 @@
         });
         $('#ruProxySelect').on('change', function() { saveState(undefined); });
 
+        // Show empty state initially
+        $('#ruTableWrap').hide();
+        $('#ruEmptyState').show();
         Promise.all([fetchGroups(), fetchProxies(), loadConfig()]).then(() => { restoreState(); });
     });
 </script>

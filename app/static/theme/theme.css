@@ -58,6 +58,9 @@ body {
     background: var(--color-surface);
     box-shadow: 0 1px 0 var(--color-border);
 }
+.navbar .container { max-width: 1200px; background: var(--color-surface); }
+.navbar .container::before,
+.navbar .container::after { content: none; }
 .navbar.is-link .navbar-item,
 .navbar.is-link .navbar-link,
 .navbar.is-link .navbar-brand .navbar-item {
