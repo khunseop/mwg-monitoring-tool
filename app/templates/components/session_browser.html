@@ -118,33 +118,66 @@ $(document).ready(function() {
 
     function initTable() {
         if (sb.dt) return;
-        sb.dt = new DataTable('#sbTable', {
-            paging: true,
-            searching: true,
-            ordering: true,
-            info: true,
-            responsive: true,
-            pageLength: 25,
-            language: {
-                search: '검색:',
-                lengthMenu: '_MENU_ 개씩 보기',
-                info: '총 _TOTAL_건 중 _START_–_END_',
-                infoEmpty: '표시할 항목 없음',
-                zeroRecords: '일치하는 항목이 없습니다.',
-                paginate: { first: '처음', last: '마지막', next: '다음', previous: '이전' }
-            },
-            columns: [
-                { title: '프록시' },
-                { title: '수집시각' },
-                { title: '트랜잭션' },
-                { title: '프로토콜' },
-                { title: '사용자' },
-                { title: '클라이언트 IP' },
-                { title: '서버 IP' },
-                { title: '상태' },
-                { title: 'URL' }
-            ]
-        });
+        try {
+            if (typeof DataTable === 'function') {
+                sb.dt = new DataTable('#sbTable', {
+                    paging: true,
+                    searching: true,
+                    ordering: true,
+                    info: true,
+                    responsive: true,
+                    pageLength: 25,
+                    language: {
+                        search: '검색:',
+                        lengthMenu: '_MENU_ 개씩 보기',
+                        info: '총 _TOTAL_건 중 _START_–_END_',
+                        infoEmpty: '표시할 항목 없음',
+                        zeroRecords: '일치하는 항목이 없습니다.',
+                        paginate: { first: '처음', last: '마지막', next: '다음', previous: '이전' }
+                    },
+                    columns: [
+                        { title: '프록시' },
+                        { title: '수집시각' },
+                        { title: '트랜잭션' },
+                        { title: '프로토콜' },
+                        { title: '사용자' },
+                        { title: '클라이언트 IP' },
+                        { title: '서버 IP' },
+                        { title: '상태' },
+                        { title: 'URL' }
+                    ]
+                });
+            } else if ($ && $.fn && $.fn.DataTable) {
+                sb.dt = $('#sbTable').DataTable({
+                    paging: true,
+                    searching: true,
+                    ordering: true,
+                    info: true,
+                    pageLength: 25,
+                    language: {
+                        search: '검색:',
+                        lengthMenu: '_MENU_ 개씩 보기',
+                        info: '총 _TOTAL_건 중 _START_–_END_',
+                        infoEmpty: '표시할 항목 없음',
+                        zeroRecords: '일치하는 항목이 없습니다.',
+                        paginate: { first: '처음', last: '마지막', next: '다음', previous: '이전' }
+                    },
+                    columns: [
+                        { title: '프록시' },
+                        { title: '수집시각' },
+                        { title: '트랜잭션' },
+                        { title: '프로토콜' },
+                        { title: '사용자' },
+                        { title: '클라이언트 IP' },
+                        { title: '서버 IP' },
+                        { title: '상태' },
+                        { title: 'URL' }
+                    ]
+                });
+            }
+        } catch (e) {
+            // Ignore DataTables init failures; selection UI will still work
+        }
     }
 
     function rowsFromItems(items) {
