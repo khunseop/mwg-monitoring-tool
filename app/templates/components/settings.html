@@ -1,14 +1,6 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="tabs">
-    <ul>
-        <li class="is-active" data-target="proxy-list"><a>프록시 목록</a></li>
-        <li data-target="proxy-groups"><a>프록시 그룹</a></li>
-        <li data-target="resource-config"><a>SNMP 설정</a></li>
-        <li data-target="session-config"><a>세션브라우저 설정</a></li>
-    </ul>
-</div>
 
 <!-- 프록시 목록 탭 -->
 <div id="proxy-list" class="tab-panel is-active">
@@ -46,10 +38,10 @@
     </div>
 </div>
 
-<!-- SNMP 설정 탭 -->
+<!-- 리소스 설정 탭 -->
 <div id="resource-config" class="tab-panel" style="display: none;">
     <div class="box">
-        <h3 class="title is-4">SNMP 설정</h3>
+        <h3 class="title is-4">리소스 설정</h3>
 
         <div class="level">
             <div class="level-left">
@@ -335,17 +327,28 @@ const utils = {
 };
 
 // 탭 관리
-document.querySelectorAll('.tabs li').forEach(tab => {
-    tab.addEventListener('click', () => {
-        document.querySelectorAll('.tabs li').forEach(t => t.classList.remove('is-active'));
-        tab.classList.add('is-active');
-        
-        const target = tab.dataset.target;
-        document.querySelectorAll('.tab-panel').forEach(panel => {
-            panel.style.display = 'none';
-        });
-        document.getElementById(target).style.display = 'block';
+function activateSettingsTab(targetId) {
+    document.querySelectorAll('.tabs li').forEach(t => {
+        if (t.dataset && t.dataset.target) {
+            t.classList.toggle('is-active', t.dataset.target === targetId);
+        }
     });
+    document.querySelectorAll('.tab-panel').forEach(panel => {
+        panel.style.display = 'none';
+    });
+    const targetEl = document.getElementById(targetId);
+    if (targetEl) targetEl.style.display = 'block';
+}
+
+// Clicks on navbar submenu are normal links to '/#<id>' so when we land here, sync by hash
+function initSettingsTabsFromHash() {
+    const hash = (window.location.hash || '#proxy-list').replace('#', '');
+    activateSettingsTab(hash);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    initSettingsTabsFromHash();
+    window.addEventListener('hashchange', initSettingsTabsFromHash);
 });
 
 // 모달 관리

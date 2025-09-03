@@ -72,6 +72,8 @@ body {
 .navbar {
     margin-bottom: 1.5rem;
     padding: 0.5rem 1rem;
+    overflow: hidden;
+    transition: height 200ms ease, box-shadow 200ms ease, padding 200ms ease;
 }
 
 .box {
@@ -92,6 +94,21 @@ body {
     padding: 0;
     background: transparent;
     height: 3.25rem;
+}
+
+/* Expandable navbar: base height matches brand/menu row; submenu reveals on expand */
+.navbar:not(.is-expanded) .navbar-submenu { opacity: 0; pointer-events: none; transform: translateY(-4px); height: 0; }
+.navbar .navbar-submenu { 
+    border-top: 1px solid var(--color-border);
+    margin-top: 0.5rem;
+    padding-top: 0.25rem;
+    transition: opacity 200ms ease, transform 200ms ease;
+}
+
+/* Use a fixed collapsed height and auto-expand via JS class */
+@media screen and (min-width: 1024px) {
+    .navbar { height: 4.25rem; }
+    .navbar.is-expanded { height: 7.25rem; }
 }
 
 .navbar-brand {
