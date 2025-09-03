@@ -73,28 +73,26 @@
                 $(this).toggleClass('is-active');
                 $('#' + targetId).toggleClass('is-active');
             });
-            // Navbar expandable (settings)
+            // Navbar expandable (hover-only for settings)
             const $navbar = $('.navbar');
-            const isSettingsPage = {{ 'true' if request.url.path == '/' else 'false' }};
+            let collapseTimer = null;
             function setNavbarExpanded(expanded) {
                 $navbar.toggleClass('is-expanded', !!expanded);
             }
-            if (isSettingsPage) {
-                setNavbarExpanded(true);
-            } else {
-                setNavbarExpanded(false);
-            }
-            $(document).on('mouseenter focusin', '#navSettings, .navbar-submenu', function() {
+            // start collapsed
+            setNavbarExpanded(false);
+            // open on hover over settings item or submenu
+            $(document).on('mouseenter', '#navSettings, .navbar-submenu', function() {
+                if (collapseTimer) { clearTimeout(collapseTimer); collapseTimer = null; }
                 setNavbarExpanded(true);
             });
-            $(document).on('mouseleave focusout', '.navbar', function(e) {
-                if (!isSettingsPage) {
-                    // Collapse only when pointer/focus left the navbar entirely
-                    const related = e.relatedTarget;
-                    if (!related || !$.contains(this, related)) {
-                        setNavbarExpanded(false);
-                    }
-                }
+            // close with a small delay when leaving entire navbar area
+            $(document).on('mouseleave', '.navbar', function(e) {
+                const self = this;
+                const related = e.relatedTarget;
+                if (related && $.contains(self, related)) return;
+                if (collapseTimer) clearTimeout(collapseTimer);
+                collapseTimer = setTimeout(() => setNavbarExpanded(false), 160);
             });
             // Simple accordion toggle
             // Ensure accordion initial state matches DOM classes
