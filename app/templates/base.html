@@ -30,13 +30,13 @@
 
             <div class="navbar-menu">
                 <div class="navbar-end">
-                    <a class="navbar-item tab-link" data-tab="resource">
+                    <a class="navbar-item" href="/resource">
                         자원사용률
                     </a>
-                    <a class="navbar-item tab-link" data-tab="sessions">
+                    <a class="navbar-item" href="#" style="pointer-events:none;opacity:.5;">
                         세션브라우저
                     </a>
-                    <a class="navbar-item tab-link is-active" data-tab="settings">
+                    <a class="navbar-item is-active" href="/">
                         설정
                     </a>
                 </div>
@@ -46,45 +46,13 @@
 
     <section class="section">
         <div class="container">
-            <div id="resource" class="tab-content">
-                <div class="notification is-info">
-                    자원사용률 모니터링 기능은 준비 중입니다.
-                </div>
-            </div>
-            <div id="sessions" class="tab-content">
-                <div class="notification is-info">
-                    세션브라우저 기능은 준비 중입니다.
-                </div>
-            </div>
-            <div id="settings" class="tab-content is-active">
-                {% block content %}{% endblock %}
-            </div>
+            {% block content %}{% endblock %}
         </div>
     </section>
 
     <script>
         $(document).ready(function() {
-            $('.tab-link').click(function(e) {
-                e.preventDefault();
-                const tabId = $(this).data('tab');
-                
-                // 탭 활성화 상태 변경
-                $('.tab-link').removeClass('is-active');
-                $(this).addClass('is-active');
-                
-                // 컨텐츠 표시/숨김
-                $('.tab-content').removeClass('is-active');
-                $(`#${tabId}`).addClass('is-active');
-
-                // URL 해시 업데이트
-                window.history.pushState(null, '', `#${tabId}`);
-            });
-
-            // 페이지 로드시 URL 해시에 따라 탭 활성화
-            const hash = window.location.hash.substring(1);
-            if (hash && ['resource', 'sessions', 'settings'].includes(hash)) {
-                $(`.tab-link[data-tab="${hash}"]`).click();
-            }
+            // base-level page currently doesn't require JS
         });
     </script>
 </body>
