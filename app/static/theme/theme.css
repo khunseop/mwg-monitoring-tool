@@ -98,12 +98,12 @@ body {
 }
 
 /* Expandable navbar: base height matches brand/menu row; submenu reveals on expand */
-.navbar:not(.is-expanded) .navbar-submenu { opacity: 0; pointer-events: none; transform: translateY(-4px); height: 0; }
+.navbar:not(.is-expanded) .navbar-submenu { pointer-events: none; transform: translateY(-4px); height: 0; }
 .navbar .navbar-submenu { 
     border-top: 0;
     margin-top: 0.25rem;
     padding-top: 0;
-    transition: opacity 200ms ease, transform 200ms ease;
+    transition: transform 220ms ease-in-out;
     width: 100%;
     flex: 0 0 100%;
 }
@@ -251,17 +251,14 @@ body {
 }
 .tabs li.is-active a { 
     color: var(--color-primary);
-    border-bottom-color: transparent; /* remove underline */
-    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 20%, transparent);
-    border-radius: 999px; /* pill */
+    border-bottom-color: currentColor; /* minimal underline only when active */
 }
 
 .navbar-submenu .tabs { margin-top: 0.25rem; }
-.navbar-submenu .tabs a { padding: 0.35rem 0.75rem; }
+.navbar-submenu .tabs a { padding: 0.25rem 0.5rem; }
 .navbar-submenu .tabs li a:hover {
-    background: color-mix(in srgb, var(--color-primary) 8%, transparent);
-    border-radius: 999px;
+    color: var(--color-text);
+    text-decoration: none;
 }
 
 /* Tables: clearer header and row hover with subtle borders */

@@ -92,7 +92,7 @@
                 const related = e.relatedTarget;
                 if (related && $.contains(self, related)) return;
                 if (collapseTimer) clearTimeout(collapseTimer);
-                collapseTimer = setTimeout(() => setNavbarExpanded(false), 160);
+                collapseTimer = setTimeout(() => setNavbarExpanded(false), 500);
             });
             // Simple accordion toggle
             // Ensure accordion initial state matches DOM classes
