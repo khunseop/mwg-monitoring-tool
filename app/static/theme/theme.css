@@ -72,6 +72,9 @@ body {
 .navbar {
     margin-bottom: 1.5rem;
     padding: 0.5rem 1rem;
+    overflow: hidden;
+    transition: height 220ms ease-in-out, box-shadow 220ms ease-in-out, padding 220ms ease-in-out;
+    flex-wrap: wrap;
 }
 
 .box {
@@ -84,7 +87,7 @@ body {
 }
 
 .tabs ul {
-    border-bottom-color: var(--color-border);
+    border-bottom: 0; /* remove long underline */
 }
 
 .navbar .container { 
@@ -92,6 +95,23 @@ body {
     padding: 0;
     background: transparent;
     height: 3.25rem;
+}
+
+/* Expandable navbar: base height matches brand/menu row; submenu reveals on expand */
+.navbar:not(.is-expanded) .navbar-submenu { pointer-events: none; transform: translateY(-4px); height: 0; }
+.navbar .navbar-submenu { 
+    border-top: 0;
+    margin-top: 0.25rem;
+    padding-top: 0;
+    transition: transform 220ms ease-in-out;
+    width: 100%;
+    flex: 0 0 100%;
+}
+
+/* Use a fixed collapsed height and auto-expand via JS class */
+@media screen and (min-width: 1024px) {
+    .navbar { height: 4.25rem; }
+    .navbar.is-expanded { height: 6.5rem; }
 }
 
 .navbar-brand {
@@ -226,11 +246,19 @@ body {
     margin-bottom: 1rem;
 }
 .tabs a { 
-    color: var(--color-text-muted); 
+    color: var(--color-text-muted);
+    font-size: 0.98rem; /* slightly larger */
 }
 .tabs li.is-active a { 
     color: var(--color-primary);
-    border-bottom-color: var(--color-primary);
+    border-bottom-color: currentColor; /* minimal underline only when active */
+}
+
+.navbar-submenu .tabs { margin-top: 0.25rem; }
+.navbar-submenu .tabs a { padding: 0.25rem 0.5rem; }
+.navbar-submenu .tabs li a:hover {
+    color: var(--color-text);
+    text-decoration: none;
 }
 
 /* Tables: clearer header and row hover with subtle borders */

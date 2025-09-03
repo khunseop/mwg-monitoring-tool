@@ -43,9 +43,20 @@
                         <a class="navbar-item {% if request.url.path.startswith('/session') %}is-active{% endif %}" href="/session">
                             세션브라우저
                         </a>
-                        <a class="navbar-item {% if request.url.path == '/' %}is-active{% endif %}" href="/">
+                        <a id="navSettings" class="navbar-item {% if request.url.path == '/' %}is-active{% endif %}" href="/">
                             설정
                         </a>
+                    </div>
+                </div>
+
+                <div class="navbar-submenu">
+                    <div class="tabs is-small">
+                        <ul>
+                            <li class="is-active" data-target="proxy-list"><a href="/#proxy-list">프록시 목록</a></li>
+                            <li data-target="proxy-groups"><a href="/#proxy-groups">프록시 그룹</a></li>
+                            <li data-target="resource-config"><a href="/#resource-config">리소스 설정</a></li>
+                            <li data-target="session-config"><a href="/#session-config">세션브라우저 설정</a></li>
+                        </ul>
                     </div>
                 </div>
             </nav>
@@ -61,6 +72,27 @@
                 const targetId = $(this).attr('data-target');
                 $(this).toggleClass('is-active');
                 $('#' + targetId).toggleClass('is-active');
+            });
+            // Navbar expandable (hover-only for settings)
+            const $navbar = $('.navbar');
+            let collapseTimer = null;
+            function setNavbarExpanded(expanded) {
+                $navbar.toggleClass('is-expanded', !!expanded);
+            }
+            // start collapsed
+            setNavbarExpanded(false);
+            // open on hover over settings item or submenu
+            $(document).on('mouseenter', '#navSettings, .navbar-submenu', function() {
+                if (collapseTimer) { clearTimeout(collapseTimer); collapseTimer = null; }
+                setNavbarExpanded(true);
+            });
+            // close with a small delay when leaving entire navbar area
+            $(document).on('mouseleave', '.navbar', function(e) {
+                const self = this;
+                const related = e.relatedTarget;
+                if (related && $.contains(self, related)) return;
+                if (collapseTimer) clearTimeout(collapseTimer);
+                collapseTimer = setTimeout(() => setNavbarExpanded(false), 500);
             });
             // Simple accordion toggle
             // Ensure accordion initial state matches DOM classes
