@@ -64,10 +64,12 @@ def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str) -> Tu
 async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(get_db)):
     if not payload.oids:
         raise HTTPException(status_code=400, detail="oids mapping is required")
+    if not payload.proxy_ids or len(payload.proxy_ids) == 0:
+        raise HTTPException(status_code=400, detail="proxy_ids is required and cannot be empty")
+    if not payload.community:
+        raise HTTPException(status_code=400, detail="community is required")
 
-    query = db.query(Proxy).filter(Proxy.is_active == True)
-    if payload.proxy_ids:
-        query = query.filter(Proxy.id.in_(payload.proxy_ids))
+    query = db.query(Proxy).filter(Proxy.is_active == True).filter(Proxy.id.in_(payload.proxy_ids))
     proxies: List[Proxy] = query.all()
 
     if not proxies:
@@ -78,7 +80,7 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         future_to_proxy = {
-            executor.submit(_collect_for_proxy, p, payload.oids, payload.community or "public"): p
+            executor.submit(_collect_for_proxy, p, payload.oids, payload.community): p
             for p in proxies
         }
         for future in as_completed(future_to_proxy):

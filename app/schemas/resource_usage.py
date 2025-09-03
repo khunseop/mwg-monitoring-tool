@@ -33,10 +33,11 @@ class ResourceUsageCreate(BaseModel):
 
 
 class CollectRequest(BaseModel):
-    # List of proxy IDs to collect. If empty, collect for all active proxies
-    proxy_ids: Optional[List[int]] = None
-    community: Optional[str] = Field(default="public")
-    # OIDs mapping (keys: cpu, mem, cc, cs, http, https, ftp)
+    # List of proxy IDs to collect (required)
+    proxy_ids: List[int]
+    # Community string (required)
+    community: str = Field(min_length=1)
+    # OIDs mapping (keys: cpu, mem, cc, cs, http, https, ftp) (required)
     oids: Dict[str, str]
 
 
