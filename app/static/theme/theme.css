@@ -106,6 +106,7 @@ body {
     transition: transform 220ms ease-in-out;
     width: 100%;
     flex: 0 0 100%;
+    overflow: hidden; /* ensure no content bleeds when collapsed */
 }
 
 /* Use a fixed collapsed height and auto-expand via JS class */
@@ -217,8 +218,16 @@ body {
         background: color-mix(in srgb, var(--color-primary) 10%, transparent) !important;
     }
 
-    /* Hide settings submenu entirely on mobile to avoid lingering below burger menu */
-    .navbar-submenu { display: none !important; }
+    /* Hide and fully collapse settings submenu on mobile */
+    .navbar-submenu {
+        display: none !important;
+        max-height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: 0 !important;
+        overflow: hidden !important;
+        transform: none !important;
+    }
 }
 
 /* Primary button remap to tokenized blue, with softer radius and shadow */
