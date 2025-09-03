@@ -74,6 +74,7 @@ body {
     padding: 0.5rem 1rem;
     overflow: hidden;
     transition: height 200ms ease, box-shadow 200ms ease, padding 200ms ease;
+    flex-wrap: wrap;
 }
 
 .box {
@@ -103,6 +104,8 @@ body {
     margin-top: 0.5rem;
     padding-top: 0.25rem;
     transition: opacity 200ms ease, transform 200ms ease;
+    width: 100%;
+    flex: 0 0 100%;
 }
 
 /* Use a fixed collapsed height and auto-expand via JS class */
