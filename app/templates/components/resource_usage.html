@@ -39,14 +39,6 @@
 
         <div class="column is-3">
             <div class="field">
-                <label class="label">SNMP Community</label>
-                <div class="control">
-                    <input class="input" id="ruCommunity" type="text" placeholder="public" value="public">
-                </div>
-            </div>
-        </div>
-        <div class="column is-3">
-            <div class="field">
                 <label class="label">주기(초)</label>
                 <div class="control has-icons-right">
                     <input class="input" id="ruIntervalSec" type="number" min="5" step="1" value="30">
@@ -55,53 +47,11 @@
             </div>
         </div>
         <div class="column is-6">
-            <div class="field">
-                <label class="label">OID 매핑 (비어있으면 해당 항목은 수집 안 함)</label>
-            </div>
-            <div class="columns is-multiline">
-                <div class="column is-4">
-                    <div class="field">
-                        <label class="label is-small">cpu</label>
-                        <input class="input is-small" id="oidCpu" placeholder="예: 1.3.6.1.x">
-                    </div>
+            <article class="message is-info">
+                <div class="message-body">
+                    SNMP Community와 OID 매핑은 설정 페이지의 "리소스 설정" 탭에서 관리합니다.
                 </div>
-                <div class="column is-4">
-                    <div class="field">
-                        <label class="label is-small">mem</label>
-                        <input class="input is-small" id="oidMem" placeholder="예: 1.3.6.1.x">
-                    </div>
-                </div>
-                <div class="column is-4">
-                    <div class="field">
-                        <label class="label is-small">cc</label>
-                        <input class="input is-small" id="oidCc" placeholder="예: 1.3.6.1.x">
-                    </div>
-                </div>
-                <div class="column is-4">
-                    <div class="field">
-                        <label class="label is-small">cs</label>
-                        <input class="input is-small" id="oidCs" placeholder="예: 1.3.6.1.x">
-                    </div>
-                </div>
-                <div class="column is-4">
-                    <div class="field">
-                        <label class="label is-small">http (누적)</label>
-                        <input class="input is-small" id="oidHttp" placeholder="예: 1.3.6.1.x">
-                    </div>
-                </div>
-                <div class="column is-4">
-                    <div class="field">
-                        <label class="label is-small">https (누적)</label>
-                        <input class="input is-small" id="oidHttps" placeholder="예: 1.3.6.1.x">
-                    </div>
-                </div>
-                <div class="column is-4">
-                    <div class="field">
-                        <label class="label is-small">ftp (누적)</label>
-                        <input class="input is-small" id="oidFtp" placeholder="예: 1.3.6.1.x">
-                    </div>
-                </div>
-            </div>
+            </article>
         </div>
 
         <div class="column is-12">
@@ -179,6 +129,7 @@
             const $sel = $('#ruProxySelect');
             $sel.empty();
             (ru.proxies || []).filter(p => {
+                if (!p.is_active) return false; // 활성 프록시만
                 if (!selectedGroupId) return true;
                 return String(p.group_id || '') === String(selectedGroupId);
             }).forEach(p => {
@@ -188,17 +139,9 @@
         }
 
         function getSelectedProxyIds() { return ($('#ruProxySelect').val() || []).map(v => parseInt(v, 10)); }
-        function buildOids() {
-            const map = {};
-            const addIf = (key, val) => { if (val && val.trim().length > 0) map[key] = val.trim(); };
-            addIf('cpu', $('#oidCpu').val());
-            addIf('mem', $('#oidMem').val());
-            addIf('cc', $('#oidCc').val());
-            addIf('cs', $('#oidCs').val());
-            addIf('http', $('#oidHttp').val());
-            addIf('https', $('#oidHttps').val());
-            addIf('ftp', $('#oidFtp').val());
-            return map;
+        let cachedConfig = null;
+        function loadConfig() {
+            return $.getJSON('/api/resource-config').then(cfg => { cachedConfig = cfg; });
         }
 
         function updateTable(items) {
@@ -250,9 +193,9 @@
             clearRuError();
             const proxyIds = getSelectedProxyIds();
             if (proxyIds.length === 0) { showRuError('프록시를 하나 이상 선택하세요.'); return; }
-            const community = ($('#ruCommunity').val() || 'public').toString();
-            const oids = buildOids();
-            if (Object.keys(oids).length === 0) { showRuError('최소 1개의 OID를 입력하세요.'); return; }
+            const community = (cachedConfig && cachedConfig.community) ? cachedConfig.community.toString() : 'public';
+            const oids = (cachedConfig && cachedConfig.oids) ? cachedConfig.oids : {};
+            if (Object.keys(oids).length === 0) { showRuError('설정된 OID가 없습니다. 설정 페이지를 확인하세요.'); return; }
             return $.ajax({
                 url: '/api/resource-usage/collect',
                 method: 'POST',
@@ -289,7 +232,7 @@
             $('#ruProxySelect option').prop('selected', checked);
         });
 
-        Promise.all([fetchGroups(), fetchProxies()]);
+        Promise.all([fetchGroups(), fetchProxies(), loadConfig()]);
     });
 </script>
 {% endblock %}
