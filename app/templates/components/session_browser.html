@@ -73,6 +73,7 @@
 <script>
 $(document).ready(function() {
     const sb = { proxies: [], groups: [], dt: null };
+    const STORAGE_KEY = 'sb_state_v1';
 
     function showErr(msg) { $('#sbError').text(msg).show(); }
     function clearErr() { $('#sbError').hide().text(''); }
@@ -115,6 +116,42 @@ $(document).ready(function() {
     }
 
     function getSelectedProxyIds() { return ($('#sbProxySelect').val() || []).map(v => parseInt(v, 10)); }
+
+    function saveState(itemsForSave) {
+        try {
+            const state = {
+                groupId: $('#sbGroupSelect').val() || '',
+                proxyIds: getSelectedProxyIds(),
+                items: Array.isArray(itemsForSave) ? itemsForSave : undefined,
+                savedAt: Date.now()
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (e) { /* ignore */ }
+    }
+
+    function restoreState() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return;
+            const state = JSON.parse(raw);
+            if (state.groupId !== undefined) {
+                $('#sbGroupSelect').val(state.groupId);
+                renderProxySelect();
+            }
+            if (Array.isArray(state.proxyIds)) {
+                const strIds = state.proxyIds.map(id => String(id));
+                $('#sbProxySelect option').each(function() {
+                    $(this).prop('selected', strIds.includes($(this).val()));
+                });
+            }
+            if (Array.isArray(state.items) && state.items.length > 0) {
+                initTable();
+                const rows = rowsFromItems(state.items);
+                if (sb.dt && sb.dt.clear) { sb.dt.clear().rows.add(rows).draw(false); }
+                setStatus('저장된 내역');
+            }
+        } catch (e) { /* ignore */ }
+    }
 
     function initTable() {
         if (sb.dt) return;
@@ -214,18 +251,22 @@ $(document).ready(function() {
             if (sb.dt) { sb.dt.clear().rows.add(rows).draw(); }
             if (res && res.failed && res.failed > 0) { showErr('일부 프록시 수집에 실패했습니다.'); }
             setStatus('완료');
+            // persist current state and items
+            if (res && Array.isArray(res.items)) { saveState(res.items); } else { saveState(undefined); }
         }).catch(() => { setStatus('오류', true); showErr('수집 요청 중 오류가 발생했습니다.'); });
     }
 
     $('#sbLoadBtn').on('click', function() { loadLatest(); });
-    $('#sbGroupSelect').on('change', function() { renderProxySelect(); });
+    $('#sbGroupSelect').on('change', function() { renderProxySelect(); saveState(undefined); });
     $('#sbSelectAll').on('change', function() {
         const checked = $(this).is(':checked');
         $('#sbProxySelect option').prop('selected', checked);
+        saveState(undefined);
     });
+    $('#sbProxySelect').on('change', function() { saveState(undefined); });
 
     initTable();
-    Promise.all([fetchGroups(), fetchProxies()]);
+    Promise.all([fetchGroups(), fetchProxies()]).then(() => { restoreState(); });
 });
 </script>
 {% endblock %}

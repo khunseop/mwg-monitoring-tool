@@ -92,6 +92,7 @@
             proxies: [],
             groups: [],
         };
+        const STORAGE_KEY = 'ru_state_v1';
 
         function showRuError(msg) { $('#ruError').text(msg).show(); }
         function clearRuError() { $('#ruError').hide().text(''); }
@@ -142,6 +143,41 @@
         let cachedConfig = null;
         function loadConfig() {
             return $.getJSON('/api/resource-config').then(cfg => { cachedConfig = cfg; });
+        }
+
+        function saveState(itemsForSave) {
+            try {
+                const state = {
+                    groupId: $('#ruGroupSelect').val() || '',
+                    proxyIds: getSelectedProxyIds(),
+                    items: Array.isArray(itemsForSave) ? itemsForSave : undefined,
+                    savedAt: Date.now()
+                };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            } catch (e) { /* ignore */ }
+        }
+
+        function restoreState() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (!raw) return;
+                const state = JSON.parse(raw);
+                if (state.groupId !== undefined) {
+                    $('#ruGroupSelect').val(state.groupId);
+                    renderProxySelect();
+                }
+                if (Array.isArray(state.proxyIds)) {
+                    const strIds = state.proxyIds.map(id => String(id));
+                    $('#ruProxySelect option').each(function() {
+                        $(this).prop('selected', strIds.includes($(this).val()));
+                    });
+                }
+                if (Array.isArray(state.items) && state.items.length > 0) {
+                    // Reset cumulative cache so deltas don't mislead on restore
+                    ru.lastCumulativeByProxy = {};
+                    updateTable(state.items);
+                }
+            } catch (e) { /* ignore */ }
         }
 
         function updateTable(items) {
@@ -203,6 +239,7 @@
                 data: JSON.stringify({ proxy_ids: proxyIds, community: community, oids: oids })
             }).then(res => {
                 if (res && res.items) { updateTable(res.items); }
+                if (res && Array.isArray(res.items)) { saveState(res.items); } else { saveState(undefined); }
                 if (res && res.failed && res.failed > 0) { showRuError('일부 프록시 수집에 실패했습니다.'); }
             }).catch(() => { showRuError('수집 요청 중 오류가 발생했습니다.'); });
         }
@@ -226,13 +263,16 @@
             renderProxySelect();
             ru.lastCumulativeByProxy = {};
             $('#ruTableBody').empty();
+            saveState(undefined);
         });
         $('#ruSelectAll').on('change', function() {
             const checked = $(this).is(':checked');
             $('#ruProxySelect option').prop('selected', checked);
+            saveState(undefined);
         });
+        $('#ruProxySelect').on('change', function() { saveState(undefined); });
 
-        Promise.all([fetchGroups(), fetchProxies(), loadConfig()]);
+        Promise.all([fetchGroups(), fetchProxies(), loadConfig()]).then(() => { restoreState(); });
     });
 </script>
 {% endblock %}
