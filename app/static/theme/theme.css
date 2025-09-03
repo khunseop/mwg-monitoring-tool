@@ -55,15 +55,15 @@ body {
 
 /* Navbar: make light surface with subtle divider and premium hover */
 .navbar.is-link {
-    background: var(--color-surface);
+    background: var(--color-primary);
     box-shadow: 0 1px 0 var(--color-border);
 }
 .navbar.is-link .navbar-item,
 .navbar.is-link .navbar-link,
-.navbar.is-link .navbar-brand .navbar-item { color: var(--color-text) !important; }
-.navbar.is-link .navbar-item:hover { background: transparent; color: var(--color-primary) !important; }
-.navbar.is-link .navbar-item.is-active { color: var(--color-primary) !important; }
-.navbar-burger { color: var(--color-text); }
+.navbar.is-link .navbar-brand .navbar-item { color: rgba(255,255,255,0.92) !important; }
+.navbar.is-link .navbar-item:hover { background: transparent; color: #ffffff !important; }
+.navbar.is-link .navbar-item.is-active { color: #ffffff !important; }
+.navbar-burger { color: #ffffff; }
 
 /* Primary button remap to tokenized blue, with softer radius and shadow */
 .button.is-link {
@@ -99,6 +99,9 @@ body {
 .table thead th { color: var(--color-text); font-weight: 600; background: #f9fafb; }
 .table td, .table th { border-color: var(--color-border); }
 .table.is-hoverable tbody tr:hover { background-color: #f8fafc; }
+
+/* Keep table width when empty: enforce min-width similar to filled state */
+#sbTable { min-width: 1200px; }
 
 /* Tags */
 .tag.is-light {

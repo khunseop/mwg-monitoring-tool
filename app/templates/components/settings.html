@@ -51,23 +51,30 @@
     <div class="box">
         <h3 class="title is-4">리소스 수집 설정</h3>
 
-        <div class="columns">
-            <div class="column is-6">
-                <div class="field">
-                    <label class="label">SNMP Community</label>
-                    <div class="control">
-                        <input class="input" id="cfgCommunity" type="text" placeholder="public" value="public">
+        <div class="level">
+            <div class="level-left">
+                <div class="level-item">
+                    <div class="box" style="padding: 0.75rem 1rem;">
+                        <div class="field is-horizontal" style="margin-bottom: 0;">
+                            <div class="field-label is-normal" style="min-width: 9rem;">
+                                <label class="label" style="margin-bottom: 0;">SNMP Community</label>
+                            </div>
+                            <div class="field-body">
+                                <div class="field" style="margin-bottom: 0;">
+                                    <div class="control">
+                                        <input class="input" id="cfgCommunity" type="text" placeholder="public" value="public">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="column is-6">
-                <div class="field">
-                    <label class="label">설정</label>
-                    <div class="control">
-                        <div class="buttons is-right">
-                            <button class="button is-link" onclick="saveResourceConfig()">저장</button>
-                            <span id="cfgStatus" class="tag is-light ml-2">로딩 중...</span>
-                        </div>
+            <div class="level-right">
+                <div class="level-item">
+                    <div class="buttons">
+                        <button class="button is-link" onclick="saveResourceConfig()">저장</button>
+                        <span id="cfgStatus" class="tag is-light ml-2">로딩 중...</span>
                     </div>
                 </div>
             </div>
@@ -172,9 +179,16 @@
             </div>
         </div>
 
-        <div class="buttons">
-            <button class="button is-link" onclick="saveSessionConfig()">저장</button>
-            <span id="sbCfgStatus" class="tag is-light ml-2">로딩 중...</span>
+        <div class="level">
+            <div class="level-left"></div>
+            <div class="level-right">
+                <div class="level-item">
+                    <div class="buttons">
+                        <button class="button is-link" onclick="saveSessionConfig()">저장</button>
+                        <span id="sbCfgStatus" class="tag is-light ml-2">로딩 중...</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

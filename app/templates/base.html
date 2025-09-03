@@ -65,10 +65,18 @@
                 $('#' + targetId).toggleClass('is-active');
             });
             // Simple accordion toggle
+            // Ensure accordion initial state matches DOM classes
+            $('.accordion').each(function(){
+                const $acc = $(this);
+                const isOpen = $acc.hasClass('is-open');
+                $acc.find('.accordion-body').toggle(isOpen);
+            });
             $(document).on('click', '.accordion .accordion-header', function(){
                 const $acc = $(this).closest('.accordion');
-                $acc.toggleClass('is-open');
-                $acc.find('.accordion-body').first().slideToggle(150);
+                const $body = $acc.find('.accordion-body').first();
+                const willOpen = !$acc.hasClass('is-open');
+                $acc.toggleClass('is-open', willOpen);
+                $body.stop(true, true).slideToggle(150);
             });
         });
     </script>
