@@ -1,0 +1,49 @@
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, List
+from datetime import datetime
+from .base import TimestampModel
+
+
+class ResourceUsageBase(BaseModel):
+    cpu: Optional[float] = None
+    mem: Optional[float] = None
+    cc: Optional[float] = None
+    cs: Optional[float] = None
+    http: Optional[float] = None
+    https: Optional[float] = None
+    ftp: Optional[float] = None
+
+
+class ResourceUsage(ResourceUsageBase, TimestampModel):
+    id: int
+    proxy_id: int
+    community: Optional[str] = None
+    oids_raw: Optional[str] = None
+    collected_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ResourceUsageCreate(BaseModel):
+    proxy_id: int
+    community: Optional[str] = Field(default="public")
+    # Map of metric key to OID string. Supported keys: cpu, mem, cc, cs, http, https, ftp
+    oids: Dict[str, str]
+
+
+class CollectRequest(BaseModel):
+    # List of proxy IDs to collect. If empty, collect for all active proxies
+    proxy_ids: Optional[List[int]] = None
+    community: Optional[str] = Field(default="public")
+    # OIDs mapping (keys: cpu, mem, cc, cs, http, https, ftp)
+    oids: Dict[str, str]
+
+
+class CollectResponse(BaseModel):
+    requested: int
+    succeeded: int
+    failed: int
+    errors: Dict[int, str] = {}
+    items: List[ResourceUsage]
+
