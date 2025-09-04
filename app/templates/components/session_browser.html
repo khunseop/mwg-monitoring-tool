@@ -206,15 +206,15 @@ $(document).ready(function() {
                 });
             }
             if (Array.isArray(state.items) && state.items.length > 0) {
+                // Show table before initializing to allow correct width calc
+                $('#sbEmptyState').hide();
+                $('#sbTableWrap').show();
                 initTable();
                 const rows = rowsFromItems(state.items);
                 if (sb.dt && sb.dt.clear) {
                     sb.dt.clear().rows.add(rows).draw(false);
                     try { if (sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {}
                 }
-                // Ensure table visible; avoid leaving empty state on top
-                $('#sbEmptyState').hide();
-                $('#sbTableWrap').show();
                 setStatus('저장된 내역');
             }
         } catch (e) { /* ignore */ }
@@ -254,7 +254,7 @@ $(document).ready(function() {
                         { targets: -1, visible: false, searchable: false },
                         { targets: 0, className: 'dt-nowrap' },
                         { targets: 1, className: 'dt-nowrap' },
-                        { targets: 6, className: 'dt-nowrap' }
+                        { targets: 6, className: 'dt-nowrap', width: '480px' }
                     ],
                     createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
                 });
@@ -287,7 +287,7 @@ $(document).ready(function() {
                         { title: 'URL' },
                         { title: 'id', visible: false }
                     ],
-                    columnDefs: [ { targets: -1, visible: false, searchable: false }, { targets: 0, className: 'dt-nowrap' }, { targets: 1, className: 'dt-nowrap' }, { targets: 6, className: 'dt-nowrap' } ],
+                    columnDefs: [ { targets: -1, visible: false, searchable: false }, { targets: 0, className: 'dt-nowrap' }, { targets: 1, className: 'dt-nowrap' }, { targets: 6, className: 'dt-nowrap', width: '480px' } ],
                     createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
                 });
                 // Adjust columns after initialization
