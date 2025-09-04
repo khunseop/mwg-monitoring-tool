@@ -48,6 +48,7 @@ if os.getenv("ENABLE_DOCS", "true").lower() in {"1", "true", "yes"}:
     StandaloneDocs(app)
     # expose version in app state for templates
 app.version = "1.0.0"
+app.github_url = os.getenv("GITHUB_URL")
 
 # 템플릿과 정적 파일 설정
 templates = Jinja2Templates(directory="app/templates")
