@@ -172,10 +172,18 @@ $(document).ready(function() {
 
     function saveState(itemsForSave) {
         try {
+            let prevItems;
+            try {
+                const prevRaw = localStorage.getItem(STORAGE_KEY);
+                if (prevRaw) {
+                    const prev = JSON.parse(prevRaw);
+                    prevItems = Array.isArray(prev.items) ? prev.items : undefined;
+                }
+            } catch (e) { /* ignore */ }
             const state = {
                 groupId: $('#sbGroupSelect').val() || '',
                 proxyIds: getSelectedProxyIds(),
-                items: Array.isArray(itemsForSave) ? itemsForSave : undefined,
+                items: Array.isArray(itemsForSave) ? itemsForSave : prevItems,
                 savedAt: Date.now()
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -239,7 +247,10 @@ $(document).ready(function() {
                     columnDefs: [
                         { targets: -1, visible: false, searchable: false },
                         { targets: 1, className: 'dt-nowrap' },
-                        { targets: 6, className: 'dt-nowrap' }
+                        { targets: 6, className: 'dt-nowrap' },
+                        { targets: 6, responsivePriority: 0 },
+                        { targets: 0, responsivePriority: 1 },
+                        { targets: 1, responsivePriority: 2 }
                     ],
                     createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
                 });
@@ -271,7 +282,7 @@ $(document).ready(function() {
                         { title: 'URL' },
                         { title: 'id', visible: false }
                     ],
-                    columnDefs: [ { targets: -1, visible: false, searchable: false }, { targets: 1, className: 'dt-nowrap' }, { targets: 6, className: 'dt-nowrap' } ],
+                    columnDefs: [ { targets: -1, visible: false, searchable: false }, { targets: 1, className: 'dt-nowrap' }, { targets: 6, className: 'dt-nowrap' }, { targets: 6, responsivePriority: 0 }, { targets: 0, responsivePriority: 1 }, { targets: 1, responsivePriority: 2 } ],
                     createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
                 });
                 // Adjust columns after initialization
