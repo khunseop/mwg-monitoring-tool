@@ -349,6 +349,18 @@ body {
     --bulma-modal-card-body-background-color: var(--bulma-scheme-main);
 }
 
+/* Force light tokens even when OS is dark */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bulma-scheme-brightness: light;
+        --bulma-scheme-main-l: 100%;
+        --bulma-background-l: 96%;
+        --bulma-text-l: 29%;
+        --bulma-modal-card-body-background-color: var(--bulma-scheme-main);
+    }
+    body { color-scheme: light; }
+}
+
 /* Bulma-first table text color */
 .table td { color: var(--bulma-text); }
 

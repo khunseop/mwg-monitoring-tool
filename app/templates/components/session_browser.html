@@ -236,6 +236,11 @@ $(document).ready(function() {
                         { title: 'URL' },
                         { title: 'id', visible: false }
                     ],
+                    columnDefs: [
+                        { targets: -1, visible: false, searchable: false },
+                        { targets: 1, className: 'dt-nowrap' },
+                        { targets: 6, className: 'dt-nowrap' }
+                    ],
                     createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
                 });
                 // Adjust columns after initialization
@@ -266,7 +271,7 @@ $(document).ready(function() {
                         { title: 'URL' },
                         { title: 'id', visible: false }
                     ],
-                    columnDefs: [ { targets: -1, visible: false, searchable: false }, { targets: 1, className: 'dt-nowrap' } ],
+                    columnDefs: [ { targets: -1, visible: false, searchable: false }, { targets: 1, className: 'dt-nowrap' }, { targets: 6, className: 'dt-nowrap' } ],
                     createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
                 });
                 // Adjust columns after initialization
@@ -323,8 +328,8 @@ $(document).ready(function() {
             else { $('#sbEmptyState').hide(); $('#sbTableWrap').show(); try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {} }
             if (res && res.failed && res.failed > 0) { showErr('일부 프록시 수집에 실패했습니다.'); }
             setStatus('완료');
-            // persist current state and items
-            if (res && Array.isArray(res.items)) { saveState(res.items); } else { saveState(undefined); }
+            // persist current state and items (do not clear items when empty)
+            if (res && Array.isArray(res.items)) { saveState(res.items); }
         }).catch(() => { setStatus('오류', true); showErr('수집 요청 중 오류가 발생했습니다.'); });
     }
 
@@ -333,6 +338,7 @@ $(document).ready(function() {
     $('#sbSelectAll').on('change', function() {
         const checked = $(this).is(':checked');
         $('#sbProxySelect option').prop('selected', checked);
+        // keep items; just persist selection/group
         saveState(undefined);
     });
     $('#sbProxySelect').on('change', function() { saveState(undefined); });
