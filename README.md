@@ -30,7 +30,6 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - 메인 설정 페이지: `/`
 - 자원 사용률 페이지: `/resource`
 - 세션 브라우저 페이지: `/session`
-- 헬스체크: `/healthz`
 - API 라우트 프리픽스: `/api`
 - API 문서: `ENABLE_DOCS=true` 상태에서 자동 제공
 
