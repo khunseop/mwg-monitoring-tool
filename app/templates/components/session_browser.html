@@ -75,18 +75,17 @@
         <div id="sbEmptyState" class="box" style="display:none; text-align:center; color: var(--color-text-muted);">
             현재 표시할 세션이 없습니다. 상단에서 대상을 선택하고 "세션 불러오기"를 클릭하세요.
         </div>
-        <div class="table-container sb-table-wrap" id="sbTableWrap" style="overflow-x:auto;">
+        <div class="table-container sb-table-wrap" id="sbTableWrap" style="overflow-x:auto; overflow-y:hidden; max-height:none;">
             <table id="sbTable" class="table is-fullwidth is-striped is-hoverable">
                 <thead>
                     <tr>
                         <th>프록시</th>
                         <th>생성시각</th>
-                        <th>트랜잭션</th>
-                        <th>프로토콜</th>
                         <th>사용자</th>
                         <th>클라이언트 IP</th>
                         <th>서버 IP</th>
-                        <th>상태</th>
+                        <th>CL 수신</th>
+                        <th>CL 송신</th>
                         <th>Age(s)</th>
                         <th>URL</th>
                     </tr>
@@ -175,10 +174,18 @@ $(document).ready(function() {
 
     function saveState(itemsForSave) {
         try {
+            let prevItems;
+            try {
+                const prevRaw = localStorage.getItem(STORAGE_KEY);
+                if (prevRaw) {
+                    const prev = JSON.parse(prevRaw);
+                    prevItems = Array.isArray(prev.items) ? prev.items : undefined;
+                }
+            } catch (e) { /* ignore */ }
             const state = {
                 groupId: $('#sbGroupSelect').val() || '',
                 proxyIds: getSelectedProxyIds(),
-                items: Array.isArray(itemsForSave) ? itemsForSave : undefined,
+                items: Array.isArray(itemsForSave) ? itemsForSave : prevItems,
                 savedAt: Date.now()
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -201,9 +208,15 @@ $(document).ready(function() {
                 });
             }
             if (Array.isArray(state.items) && state.items.length > 0) {
+                // Show table before initializing to allow correct width calc
+                $('#sbEmptyState').hide();
+                $('#sbTableWrap').show();
                 initTable();
                 const rows = rowsFromItems(state.items);
-                if (sb.dt && sb.dt.clear) { sb.dt.clear().rows.add(rows).draw(false); }
+                if (sb.dt && sb.dt.clear) {
+                    sb.dt.clear().rows.add(rows).draw(false);
+                    try { if (sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {}
+                }
                 setStatus('저장된 내역');
             }
         } catch (e) { /* ignore */ }
@@ -218,8 +231,10 @@ $(document).ready(function() {
                     searching: true,
                     ordering: true,
                     info: true,
-                    responsive: true,
+                    responsive: false,
                     scrollX: true,
+                    scrollY: 480,
+                    scrollCollapse: true,
                     pageLength: 25,
                     language: {
                         search: '검색:',
@@ -232,25 +247,35 @@ $(document).ready(function() {
                     columns: [
                         { title: '프록시' },
                         { title: '생성시각' },
-                        { title: '트랜잭션' },
-                        { title: '프로토콜' },
                         { title: '사용자' },
                         { title: '클라이언트 IP' },
                         { title: '서버 IP' },
-                        { title: '상태' },
+                        { title: 'CL 수신' },
+                        { title: 'CL 송신' },
                         { title: 'Age(s)' },
                         { title: 'URL' },
                         { title: 'id', visible: false }
                     ],
+                    columnDefs: [
+                        { targets: -1, visible: false, searchable: false },
+                        { targets: 0, className: 'dt-nowrap' },
+                        { targets: 1, className: 'dt-nowrap' },
+                        { targets: 8, className: 'dt-nowrap', width: '480px' }
+                    ],
                     createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
                 });
+                // Adjust columns after initialization
+                setTimeout(function(){ try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {} }, 0);
             } else if ($ && $.fn && $.fn.DataTable) {
                 sb.dt = $('#sbTable').DataTable({
                     paging: true,
                     searching: true,
                     ordering: true,
                     info: true,
+                    responsive: false,
                     scrollX: true,
+                    scrollY: 480,
+                    scrollCollapse: true,
                     pageLength: 25,
                     language: {
                         search: '검색:',
@@ -263,19 +288,20 @@ $(document).ready(function() {
                     columns: [
                         { title: '프록시' },
                         { title: '생성시각' },
-                        { title: '트랜잭션' },
-                        { title: '프로토콜' },
                         { title: '사용자' },
                         { title: '클라이언트 IP' },
                         { title: '서버 IP' },
-                        { title: '상태' },
+                        { title: 'CL 수신' },
+                        { title: 'CL 송신' },
                         { title: 'Age(s)' },
                         { title: 'URL' },
                         { title: 'id', visible: false }
                     ],
-                    columnDefs: [ { targets: -1, visible: false, searchable: false }, { targets: 1, className: 'dt-nowrap' } ],
+                    columnDefs: [ { targets: -1, visible: false, searchable: false }, { targets: 0, className: 'dt-nowrap' }, { targets: 1, className: 'dt-nowrap' }, { targets: 8, className: 'dt-nowrap', width: '480px' } ],
                     createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
                 });
+                // Adjust columns after initialization
+                setTimeout(function(){ try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {} }, 0);
             }
         } catch (e) {
             // Ignore DataTables init failures; selection UI will still work
@@ -290,18 +316,21 @@ $(document).ready(function() {
             const proxy = (sb.proxies || []).find(p => p.id === row.proxy_id);
             const name = proxy ? `${proxy.host}:${proxy.port}` : `#${row.proxy_id}`;
             const ctStr = row.creation_time ? new Date(row.creation_time).toLocaleString() : '';
+            const clRecv = (typeof row.cl_bytes_received === 'number') ? String(row.cl_bytes_received) : '';
+            const clSent = (typeof row.cl_bytes_sent === 'number') ? String(row.cl_bytes_sent) : '';
+            const urlFull = (row.url || '').toString();
+            const urlShort = urlFull.length > 100 ? (urlFull.slice(0, 100) + '…') : urlFull;
             const ageStr = (typeof row.age_seconds === 'number' && row.age_seconds >= 0) ? String(row.age_seconds) : '';
             return [
                 name,
                 ctStr,
-                row.transaction || '',
-                row.protocol || '',
                 row.user_name || '',
                 row.client_ip || '',
                 row.server_ip || '',
-                row.status || '',
+                clRecv,
+                clSent,
                 ageStr,
-                row.url || '',
+                urlShort,
                 row.id || ''
             ];
         });
@@ -324,14 +353,15 @@ $(document).ready(function() {
                 sb.dt.clear();
                 if (rows.length > 0) { sb.dt.rows.add(rows).draw(); }
                 else { sb.dt.draw(); }
+                try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {}
             }
             // Toggle empty/table state
             if (rows.length === 0) { $('#sbTableWrap').hide(); $('#sbEmptyState').show(); }
-            else { $('#sbEmptyState').hide(); $('#sbTableWrap').show(); }
+            else { $('#sbEmptyState').hide(); $('#sbTableWrap').show(); try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {} }
             if (res && res.failed && res.failed > 0) { showErr('일부 프록시 수집에 실패했습니다.'); }
             setStatus('완료');
-            // persist current state and items
-            if (res && Array.isArray(res.items)) { saveState(res.items); } else { saveState(undefined); }
+            // persist current state and items (do not clear items when empty)
+            if (res && Array.isArray(res.items)) { saveState(res.items); }
         }).catch(() => { setStatus('오류', true); showErr('수집 요청 중 오류가 발생했습니다.'); });
     }
 
@@ -340,6 +370,7 @@ $(document).ready(function() {
     $('#sbSelectAll').on('change', function() {
         const checked = $(this).is(':checked');
         $('#sbProxySelect option').prop('selected', checked);
+        // keep items; just persist selection/group
         saveState(undefined);
     });
     $('#sbProxySelect').on('change', function() { saveState(undefined); });
@@ -370,7 +401,7 @@ function fillDetailModal(item){
     rows.push(kv('생성시각', item.creation_time ? new Date(item.creation_time).toLocaleString() : ''));
     rows.push(kv('프로토콜', item.protocol));
     rows.push(kv('사용자', item.user_name));
-    rows.push(kv('고객ID', item.cust_id));
+    rows.push(kv('Cust ID', item.cust_id));
     rows.push(kv('클라이언트 IP', item.client_ip));
     rows.push(kv('Client-side MWG IP', item.client_side_mwg_ip));
     rows.push(kv('Server-side MWG IP', item.server_side_mwg_ip));

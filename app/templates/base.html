@@ -46,6 +46,11 @@
                         <a id="navSettings" class="navbar-item {% if request.url.path == '/' %}is-active{% endif %}" href="/">
                             설정
                         </a>
+                        <!-- Mobile-only direct links to settings subpages -->
+                        <a class="navbar-item is-hidden-desktop" href="/#proxy-list">설정: 프록시 목록</a>
+                        <a class="navbar-item is-hidden-desktop" href="/#proxy-groups">설정: 프록시 그룹</a>
+                        <a class="navbar-item is-hidden-desktop" href="/#resource-config">설정: 리소스 설정</a>
+                        <a class="navbar-item is-hidden-desktop" href="/#session-config">설정: 세션브라우저 설정</a>
                     </div>
                 </div>
 
@@ -111,6 +116,15 @@
                 if (related && $.contains(self, related)) return;
                 if (collapseTimer) clearTimeout(collapseTimer);
                 collapseTimer = setTimeout(() => setNavbarExpanded(false), 500);
+            });
+            // Auto-collapse burger menu after clicking any navbar-item (mobile)
+            $(document).on('click', '.navbar-item', function() {
+                if (desktopQuery.matches) return;
+                const $burger = $('.navbar-burger');
+                const targetId = $burger.attr('data-target');
+                if (!$burger.hasClass('is-active')) return;
+                $burger.removeClass('is-active').attr('aria-expanded', false);
+                $('#' + targetId).removeClass('is-active');
             });
             // Simple accordion toggle (avoid mixing inline display with CSS class)
             // Initialize: clear any inline display so CSS controls initial visibility
