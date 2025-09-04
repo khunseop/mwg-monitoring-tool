@@ -75,7 +75,7 @@
         <div id="sbEmptyState" class="box" style="display:none; text-align:center; color: var(--color-text-muted);">
             현재 표시할 세션이 없습니다. 상단에서 대상을 선택하고 "세션 불러오기"를 클릭하세요.
         </div>
-        <div class="table-container sb-table-wrap" id="sbTableWrap" style="overflow-x:auto;">
+        <div class="table-container sb-table-wrap" id="sbTableWrap" style="overflow-x:auto; overflow-y:hidden; max-height:none;">
             <table id="sbTable" class="table is-fullwidth is-striped is-hoverable">
                 <thead>
                     <tr>
@@ -231,6 +231,8 @@ $(document).ready(function() {
                     info: true,
                     responsive: false,
                     scrollX: true,
+                    scrollY: 480,
+                    scrollCollapse: true,
                     pageLength: 25,
                     language: {
                         search: '검색:',
@@ -268,6 +270,8 @@ $(document).ready(function() {
                     info: true,
                     responsive: false,
                     scrollX: true,
+                    scrollY: 480,
+                    scrollCollapse: true,
                     pageLength: 25,
                     language: {
                         search: '검색:',
