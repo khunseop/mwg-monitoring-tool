@@ -229,7 +229,7 @@ $(document).ready(function() {
                     searching: true,
                     ordering: true,
                     info: true,
-                    responsive: true,
+                    responsive: false,
                     scrollX: true,
                     pageLength: 25,
                     language: {
@@ -251,11 +251,10 @@ $(document).ready(function() {
                         { title: 'id', visible: false }
                     ],
                     columnDefs: [
-                        { targets: '_all', className: 'dt-nowrap' },
                         { targets: -1, visible: false, searchable: false },
-                        { targets: 6, responsivePriority: 0 },   // URL 가장 우선
-                        { targets: 0, responsivePriority: 1 },   // 프록시
-                        { targets: 3, responsivePriority: 2 }    // 클라이언트 IP
+                        { targets: 0, className: 'dt-nowrap' },
+                        { targets: 1, className: 'dt-nowrap' },
+                        { targets: 6, className: 'dt-nowrap' }
                     ],
                     createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
                 });
@@ -267,6 +266,7 @@ $(document).ready(function() {
                     searching: true,
                     ordering: true,
                     info: true,
+                    responsive: false,
                     scrollX: true,
                     pageLength: 25,
                     language: {
@@ -287,7 +287,7 @@ $(document).ready(function() {
                         { title: 'URL' },
                         { title: 'id', visible: false }
                     ],
-                    columnDefs: [ { targets: '_all', className: 'dt-nowrap' }, { targets: -1, visible: false, searchable: false }, { targets: 6, responsivePriority: 0 }, { targets: 0, responsivePriority: 1 }, { targets: 3, responsivePriority: 2 } ],
+                    columnDefs: [ { targets: -1, visible: false, searchable: false }, { targets: 0, className: 'dt-nowrap' }, { targets: 1, className: 'dt-nowrap' }, { targets: 6, className: 'dt-nowrap' } ],
                     createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
                 });
                 // Adjust columns after initialization
