@@ -45,6 +45,6 @@ class CollectResponse(BaseModel):
     requested: int
     succeeded: int
     failed: int
-    errors: Dict[int, str] = {}
+    errors: Dict[int, str] = Field(default_factory=dict)
     items: List[ResourceUsage]
 

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+from fastapi import Query
 
 from app.database.database import get_db
 from app.models.proxy_group import ProxyGroup
@@ -9,8 +10,17 @@ from app.schemas.proxy_group import ProxyGroupCreate, ProxyGroupUpdate, ProxyGro
 router = APIRouter()
 
 @router.get("/proxy-groups", response_model=List[ProxyGroupSchema])
-def get_proxy_groups(db: Session = Depends(get_db)):
-    return db.query(ProxyGroup).all()
+def get_proxy_groups(
+    db: Session = Depends(get_db),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    return (
+        db.query(ProxyGroup)
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
 
 @router.get("/proxy-groups/{group_id}", response_model=ProxyGroupSchema)
 def get_proxy_group(group_id: int, db: Session = Depends(get_db)):
