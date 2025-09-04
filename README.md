@@ -9,7 +9,7 @@ FastAPI 기반의 프록시 성능 분석/운영 도구입니다. 프록시/그�
 - SNMP 수집(aiosnmp), SSH 수집(paramiko)
 
 ### 빠른 시작
-1) Python 3.11+ 준비, 가상환경 권장
+1) Python 3.10+ 준비, 가상환경 권장
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
