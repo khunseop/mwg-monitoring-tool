@@ -16,17 +16,23 @@ class ProxyCreate(ProxyBase):
     pass
 
 class ProxyUpdate(BaseModel):
+    host: Optional[str] = None
+    port: Optional[conint(ge=1, le=65535)] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    is_active: Optional[bool] = None
+    group_id: Optional[int] = None
+    description: Optional[str] = None
+
+class ProxyOut(TimestampModel):
+    id: int
     host: str
     port: conint(ge=1, le=65535)
-    username: str
-    password: str | None = None  # 수정 시 비밀번호는 선택적
+    username: Optional[str] = None
     is_active: bool = True
-    group_id: int | None = None
-    description: str | None = None
-
-class Proxy(ProxyBase, TimestampModel):
-    id: int
-    group_name: Optional[str] = None  # 그룹 이름만 포함
+    group_id: Optional[int] = None
+    description: Optional[str] = None
+    group_name: Optional[str] = None
 
     class Config:
         from_attributes = True

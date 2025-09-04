@@ -1,25 +1,36 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+from fastapi import Query
 
 from app.database.database import get_db
 from app.models.proxy import Proxy
-from app.schemas.proxy import ProxyCreate, ProxyUpdate, Proxy as ProxySchema
+from app.schemas.proxy import ProxyCreate, ProxyUpdate, ProxyOut
 
 router = APIRouter()
 
-@router.get("/proxies", response_model=List[ProxySchema])
-def get_proxies(db: Session = Depends(get_db)):
-    return db.query(Proxy).join(Proxy.group, isouter=True).all()
+@router.get("/proxies", response_model=List[ProxyOut])
+def get_proxies(
+    db: Session = Depends(get_db),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    return (
+        db.query(Proxy)
+        .join(Proxy.group, isouter=True)
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
 
-@router.get("/proxies/{proxy_id}", response_model=ProxySchema)
+@router.get("/proxies/{proxy_id}", response_model=ProxyOut)
 def get_proxy(proxy_id: int, db: Session = Depends(get_db)):
     proxy = db.query(Proxy).join(Proxy.group, isouter=True).filter(Proxy.id == proxy_id).first()
     if not proxy:
         raise HTTPException(status_code=404, detail="Proxy not found")
     return proxy
 
-@router.post("/proxies", response_model=ProxySchema, status_code=status.HTTP_201_CREATED)
+@router.post("/proxies", response_model=ProxyOut, status_code=status.HTTP_201_CREATED)
 def create_proxy(proxy: ProxyCreate, db: Session = Depends(get_db)):
     db_proxy = Proxy(**proxy.model_dump())
     db.add(db_proxy)
@@ -27,7 +38,7 @@ def create_proxy(proxy: ProxyCreate, db: Session = Depends(get_db)):
     db.refresh(db_proxy)
     return db_proxy
 
-@router.put("/proxies/{proxy_id}", response_model=ProxySchema)
+@router.put("/proxies/{proxy_id}", response_model=ProxyOut)
 def update_proxy(proxy_id: int, proxy: ProxyUpdate, db: Session = Depends(get_db)):
     db_proxy = db.query(Proxy).filter(Proxy.id == proxy_id).first()
     if not db_proxy:

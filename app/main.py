@@ -1,4 +1,7 @@
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+import os
+from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from app.database.database import engine
@@ -11,8 +14,10 @@ from app.api import proxies, proxy_groups
 from app.api import resource_usage as resource_usage_api
 from app.api import resource_config as resource_config_api
 from app.api import session_browser as session_browser_api
-import os
 from fastapi_standalone_docs import StandaloneDocs
+
+# Load environment variables from .env
+load_dotenv(override=False)
 
 proxy.Base.metadata.create_all(bind=engine)
 resource_usage_model.Base.metadata.create_all(bind=engine)
@@ -25,11 +30,30 @@ app = FastAPI(
     description="Proxy Performance Analysis Tool",
     version="1.0.0"
 )
-StandaloneDocs(app)
+# Security/CORS middleware (configure via env)
+cors_origins = os.getenv("CORS_ALLOW_ORIGINS", "*")
+allow_origins = [o.strip() for o in cors_origins.split(",") if o.strip()]
+allow_credentials_env = os.getenv("CORS_ALLOW_CREDENTIALS", "false").lower() in {"1", "true", "yes"}
+# Starlette forbids wildcard origins with credentials; disable credentials if wildcard is present
+allow_credentials = False if ("*" in allow_origins and len(allow_origins) == 1) else allow_credentials_env
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allow_origins,
+    allow_credentials=allow_credentials,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+# Enable docs only when enabled via env (default true)
+if os.getenv("ENABLE_DOCS", "true").lower() in {"1", "true", "yes"}:
+    StandaloneDocs(app)
+    # expose version in app state for templates
+app.version = "1.0.0"
+app.github_url = os.getenv("GITHUB_URL")
 
 # 템플릿과 정적 파일 설정
 templates = Jinja2Templates(directory="app/templates")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app.mount("/docs-static", StaticFiles(directory="docs"), name="docs-static")
 
 # API 라우터
 app.include_router(proxies.router, prefix="/api", tags=["proxies"])
@@ -50,3 +74,19 @@ async def read_resource(request: Request):
 @app.get("/session")
 async def read_session(request: Request):
     return templates.TemplateResponse("components/session_browser.html", {"request": request})
+
+
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
+
+
+# Minimal security headers
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+    return response

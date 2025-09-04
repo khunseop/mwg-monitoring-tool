@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -42,8 +42,7 @@ def _get_cfg(db: Session) -> SessionBrowserConfigModel:
 
 def _exec_ssh_command(host: str, username: str, password: str | None, port: int, command: str, timeout_sec: int) -> str:
     client = paramiko.SSHClient()
-    # Host key policy: auto add per requirement (no verification)
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    # Host key policy will be set by caller
     try:
         client.connect(
             hostname=host,
@@ -184,15 +183,33 @@ def _collect_for_proxy(proxy: Proxy, cfg: SessionBrowserConfigModel) -> Tuple[in
         return proxy.id, None, "Proxy is missing SSH username"
     command = f"{cfg.command_path} {cfg.command_args}".strip()
     try:
-        output = _exec_ssh_command(
-            host=proxy.host,
-            username=proxy.username,
-            password=proxy.password,
-            port=cfg.ssh_port or 22,
-            command=command,
-            timeout_sec=cfg.timeout_sec or 10,
-        )
-        records = _parse_sessions(output)
+        client = paramiko.SSHClient()
+        if (cfg.host_key_policy or "auto_add").lower() == "reject":
+            client.set_missing_host_key_policy(paramiko.RejectPolicy())
+        else:
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            client.connect(
+                hostname=proxy.host,
+                port=cfg.ssh_port or 22,
+                username=proxy.username,
+                password=proxy.password,
+                timeout=cfg.timeout_sec or 10,
+                auth_timeout=cfg.timeout_sec or 10,
+                banner_timeout=cfg.timeout_sec or 10,
+                disabled_algorithms={"cipher": ["3des-cbc", "des-cbc"]},
+            )
+            stdin, stdout, stderr = client.exec_command(command, timeout=cfg.timeout_sec or 10)
+            stdout_str = stdout.read().decode(errors="ignore")
+            stderr_str = stderr.read().decode(errors="ignore")
+            if stderr_str and not stdout_str:
+                raise RuntimeError(stderr_str.strip())
+        finally:
+            try:
+                client.close()
+            except Exception:
+                pass
+        records = _parse_sessions(stdout_str)
         return proxy.id, records, None
     except Exception as e:
         return proxy.id, None, str(e)
@@ -270,11 +287,16 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
 
 
 @router.get("/session-browser", response_model=List[SessionRecordSchema])
-async def list_sessions(db: Session = Depends(get_db)):
+async def list_sessions(
+    db: Session = Depends(get_db),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+):
     rows = (
         db.query(SessionRecordModel)
         .order_by(SessionRecordModel.collected_at.desc())
-        .limit(500)
+        .offset(offset)
+        .limit(limit)
         .all()
     )
     return rows

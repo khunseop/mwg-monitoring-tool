@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Tuple
 import asyncio
@@ -109,11 +109,16 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
 
 
 @router.get("/resource-usage", response_model=List[ResourceUsageSchema])
-async def list_resource_usage(db: Session = Depends(get_db)):
+async def list_resource_usage(
+    db: Session = Depends(get_db),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+):
     rows = (
         db.query(ResourceUsageModel)
         .order_by(ResourceUsageModel.collected_at.desc())
-        .limit(500)
+        .offset(offset)
+        .limit(limit)
         .all()
     )
     return rows
