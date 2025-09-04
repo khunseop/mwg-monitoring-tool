@@ -349,6 +349,12 @@ body {
     --bulma-modal-card-body-background-color: var(--bulma-scheme-main);
 }
 
+/* Bulma-first table text color */
+.table td { color: var(--bulma-text); }
+
+/* DataTables: avoid dark hover overlay */
+:root { --dt-row-hover: 255, 255, 255; }
+
 /* Session browser: prevent wrapping in created-at column (2nd column) */
 #sbTable td:nth-child(2), #sbTable th:nth-child(2) { white-space: nowrap; }
 .dt-nowrap { white-space: nowrap; }

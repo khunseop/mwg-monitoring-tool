@@ -203,7 +203,7 @@ $(document).ready(function() {
             if (Array.isArray(state.items) && state.items.length > 0) {
                 initTable();
                 const rows = rowsFromItems(state.items);
-                if (sb.dt && sb.dt.clear) { sb.dt.clear().rows.add(rows).draw(false); }
+                if (sb.dt && sb.dt.clear) { sb.dt.clear().rows.add(rows).draw(false); try { if (sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {} }
                 setStatus('저장된 내역');
             }
         } catch (e) { /* ignore */ }
@@ -244,6 +244,8 @@ $(document).ready(function() {
                     ],
                     createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
                 });
+                // Adjust columns after initialization
+                setTimeout(function(){ try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {} }, 0);
             } else if ($ && $.fn && $.fn.DataTable) {
                 sb.dt = $('#sbTable').DataTable({
                     paging: true,
@@ -276,6 +278,8 @@ $(document).ready(function() {
                     columnDefs: [ { targets: -1, visible: false, searchable: false }, { targets: 1, className: 'dt-nowrap' } ],
                     createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
                 });
+                // Adjust columns after initialization
+                setTimeout(function(){ try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {} }, 0);
             }
         } catch (e) {
             // Ignore DataTables init failures; selection UI will still work
@@ -324,10 +328,11 @@ $(document).ready(function() {
                 sb.dt.clear();
                 if (rows.length > 0) { sb.dt.rows.add(rows).draw(); }
                 else { sb.dt.draw(); }
+                try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {}
             }
             // Toggle empty/table state
             if (rows.length === 0) { $('#sbTableWrap').hide(); $('#sbEmptyState').show(); }
-            else { $('#sbEmptyState').hide(); $('#sbTableWrap').show(); }
+            else { $('#sbEmptyState').hide(); $('#sbTableWrap').show(); try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {} }
             if (res && res.failed && res.failed > 0) { showErr('일부 프록시 수집에 실패했습니다.'); }
             setStatus('완료');
             // persist current state and items

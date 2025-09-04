@@ -46,6 +46,11 @@
                         <a id="navSettings" class="navbar-item {% if request.url.path == '/' %}is-active{% endif %}" href="/">
                             설정
                         </a>
+                        <!-- Mobile-only direct links to settings subpages -->
+                        <a class="navbar-item is-hidden-desktop" href="/#proxy-list">설정: 프록시 목록</a>
+                        <a class="navbar-item is-hidden-desktop" href="/#proxy-groups">설정: 프록시 그룹</a>
+                        <a class="navbar-item is-hidden-desktop" href="/#resource-config">설정: 리소스 설정</a>
+                        <a class="navbar-item is-hidden-desktop" href="/#session-config">설정: 세션브라우저 설정</a>
                     </div>
                 </div>
 
