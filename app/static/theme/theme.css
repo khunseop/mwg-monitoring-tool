@@ -371,3 +371,8 @@ body {
 #sbTable td:nth-child(2), #sbTable th:nth-child(2) { white-space: nowrap; }
 .dt-nowrap { white-space: nowrap; }
 
+/* Footer: align background with page background */
+.footer {
+    background: var(--color-bg);
+}
+
