@@ -208,7 +208,13 @@ $(document).ready(function() {
             if (Array.isArray(state.items) && state.items.length > 0) {
                 initTable();
                 const rows = rowsFromItems(state.items);
-                if (sb.dt && sb.dt.clear) { sb.dt.clear().rows.add(rows).draw(false); try { if (sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {} }
+                if (sb.dt && sb.dt.clear) {
+                    sb.dt.clear().rows.add(rows).draw(false);
+                    try { if (sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {}
+                }
+                // Ensure table visible; avoid leaving empty state on top
+                $('#sbEmptyState').hide();
+                $('#sbTableWrap').show();
                 setStatus('저장된 내역');
             }
         } catch (e) { /* ignore */ }
