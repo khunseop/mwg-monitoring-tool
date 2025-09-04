@@ -46,10 +46,13 @@ app.add_middleware(
 # Enable docs only when enabled via env (default true)
 if os.getenv("ENABLE_DOCS", "true").lower() in {"1", "true", "yes"}:
     StandaloneDocs(app)
+    # expose version in app state for templates
+app.version = "1.0.0"
 
 # 템플릿과 정적 파일 설정
 templates = Jinja2Templates(directory="app/templates")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app.mount("/docs-static", StaticFiles(directory="docs"), name="docs-static")
 
 # API 라우터
 app.include_router(proxies.router, prefix="/api", tags=["proxies"])
