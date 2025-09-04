@@ -81,12 +81,9 @@
                     <tr>
                         <th>프록시</th>
                         <th>생성시각</th>
-                        <th>트랜잭션</th>
-                        <th>프로토콜</th>
                         <th>사용자</th>
                         <th>클라이언트 IP</th>
                         <th>서버 IP</th>
-                        <th>상태</th>
                         <th>Age(s)</th>
                         <th>URL</th>
                     </tr>
@@ -232,12 +229,9 @@ $(document).ready(function() {
                     columns: [
                         { title: '프록시' },
                         { title: '생성시각' },
-                        { title: '트랜잭션' },
-                        { title: '프로토콜' },
                         { title: '사용자' },
                         { title: '클라이언트 IP' },
                         { title: '서버 IP' },
-                        { title: '상태' },
                         { title: 'Age(s)' },
                         { title: 'URL' },
                         { title: 'id', visible: false }
@@ -265,12 +259,9 @@ $(document).ready(function() {
                     columns: [
                         { title: '프록시' },
                         { title: '생성시각' },
-                        { title: '트랜잭션' },
-                        { title: '프로토콜' },
                         { title: '사용자' },
                         { title: '클라이언트 IP' },
                         { title: '서버 IP' },
-                        { title: '상태' },
                         { title: 'Age(s)' },
                         { title: 'URL' },
                         { title: 'id', visible: false }
@@ -298,12 +289,9 @@ $(document).ready(function() {
             return [
                 name,
                 ctStr,
-                row.transaction || '',
-                row.protocol || '',
                 row.user_name || '',
                 row.client_ip || '',
                 row.server_ip || '',
-                row.status || '',
                 ageStr,
                 row.url || '',
                 row.id || ''

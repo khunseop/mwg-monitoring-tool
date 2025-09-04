@@ -117,6 +117,15 @@
                 if (collapseTimer) clearTimeout(collapseTimer);
                 collapseTimer = setTimeout(() => setNavbarExpanded(false), 500);
             });
+            // Auto-collapse burger menu after clicking any navbar-item (mobile)
+            $(document).on('click', '.navbar-item', function() {
+                if (desktopQuery.matches) return;
+                const $burger = $('.navbar-burger');
+                const targetId = $burger.attr('data-target');
+                if (!$burger.hasClass('is-active')) return;
+                $burger.removeClass('is-active').attr('aria-expanded', false);
+                $('#' + targetId).removeClass('is-active');
+            });
             // Simple accordion toggle (avoid mixing inline display with CSS class)
             // Initialize: clear any inline display so CSS controls initial visibility
             $('.accordion').each(function(){
