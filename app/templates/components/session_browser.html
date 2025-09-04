@@ -389,7 +389,7 @@ function fillDetailModal(item){
     rows.push(kv('생성시각', item.creation_time ? new Date(item.creation_time).toLocaleString() : ''));
     rows.push(kv('프로토콜', item.protocol));
     rows.push(kv('사용자', item.user_name));
-    rows.push(kv('고객ID', item.cust_id));
+    rows.push(kv('Cust ID', item.cust_id));
     rows.push(kv('클라이언트 IP', item.client_ip));
     rows.push(kv('Client-side MWG IP', item.client_side_mwg_ip));
     rows.push(kv('Server-side MWG IP', item.server_side_mwg_ip));
