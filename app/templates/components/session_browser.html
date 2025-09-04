@@ -84,6 +84,8 @@
                         <th>사용자</th>
                         <th>클라이언트 IP</th>
                         <th>서버 IP</th>
+                        <th>CL 수신</th>
+                        <th>CL 송신</th>
                         <th>Age(s)</th>
                         <th>URL</th>
                     </tr>
@@ -248,6 +250,8 @@ $(document).ready(function() {
                         { title: '사용자' },
                         { title: '클라이언트 IP' },
                         { title: '서버 IP' },
+                        { title: 'CL 수신' },
+                        { title: 'CL 송신' },
                         { title: 'Age(s)' },
                         { title: 'URL' },
                         { title: 'id', visible: false }
@@ -256,7 +260,7 @@ $(document).ready(function() {
                         { targets: -1, visible: false, searchable: false },
                         { targets: 0, className: 'dt-nowrap' },
                         { targets: 1, className: 'dt-nowrap' },
-                        { targets: 6, className: 'dt-nowrap', width: '480px' }
+                        { targets: 8, className: 'dt-nowrap', width: '480px' }
                     ],
                     createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
                 });
@@ -287,11 +291,13 @@ $(document).ready(function() {
                         { title: '사용자' },
                         { title: '클라이언트 IP' },
                         { title: '서버 IP' },
+                        { title: 'CL 수신' },
+                        { title: 'CL 송신' },
                         { title: 'Age(s)' },
                         { title: 'URL' },
                         { title: 'id', visible: false }
                     ],
-                    columnDefs: [ { targets: -1, visible: false, searchable: false }, { targets: 0, className: 'dt-nowrap' }, { targets: 1, className: 'dt-nowrap' }, { targets: 6, className: 'dt-nowrap', width: '480px' } ],
+                    columnDefs: [ { targets: -1, visible: false, searchable: false }, { targets: 0, className: 'dt-nowrap' }, { targets: 1, className: 'dt-nowrap' }, { targets: 8, className: 'dt-nowrap', width: '480px' } ],
                     createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
                 });
                 // Adjust columns after initialization
@@ -310,6 +316,10 @@ $(document).ready(function() {
             const proxy = (sb.proxies || []).find(p => p.id === row.proxy_id);
             const name = proxy ? `${proxy.host}:${proxy.port}` : `#${row.proxy_id}`;
             const ctStr = row.creation_time ? new Date(row.creation_time).toLocaleString() : '';
+            const clRecv = (typeof row.cl_bytes_received === 'number') ? String(row.cl_bytes_received) : '';
+            const clSent = (typeof row.cl_bytes_sent === 'number') ? String(row.cl_bytes_sent) : '';
+            const urlFull = (row.url || '').toString();
+            const urlShort = urlFull.length > 100 ? (urlFull.slice(0, 100) + '…') : urlFull;
             const ageStr = (typeof row.age_seconds === 'number' && row.age_seconds >= 0) ? String(row.age_seconds) : '';
             return [
                 name,
@@ -317,8 +327,10 @@ $(document).ready(function() {
                 row.user_name || '',
                 row.client_ip || '',
                 row.server_ip || '',
+                clRecv,
+                clSent,
                 ageStr,
-                row.url || '',
+                urlShort,
                 row.id || ''
             ];
         });
