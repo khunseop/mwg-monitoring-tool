@@ -37,11 +37,19 @@ async def _snmp_get(host: str, port: int, community: str, oid: str, timeout_sec:
 
 async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str) -> Tuple[int, Dict[str, Any] | None, str | None]:
     result: Dict[str, Any] = {k: None for k in SUPPORTED_KEYS}
+    tasks: list = []
+    keys: list[str] = []
     for key, oid in oids.items():
         if key not in SUPPORTED_KEYS:
             continue
-        value = await _snmp_get(proxy.host, 161, community, oid)
-        result[key] = value
+        keys.append(key)
+        tasks.append(_snmp_get(proxy.host, 161, community, oid))
+
+    if tasks:
+        values = await asyncio.gather(*tasks, return_exceptions=True)
+        for key, value in zip(keys, values):
+            result[key] = None if isinstance(value, Exception) else value
+
     return proxy.id, result, None
 
 

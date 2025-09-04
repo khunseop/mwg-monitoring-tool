@@ -5,6 +5,7 @@ from fastapi import Query
 
 from app.database.database import get_db
 from app.models.proxy_group import ProxyGroup
+from sqlalchemy.orm import selectinload
 from app.schemas.proxy_group import ProxyGroupCreate, ProxyGroupUpdate, ProxyGroup as ProxyGroupSchema
 
 router = APIRouter()
@@ -17,6 +18,7 @@ def get_proxy_groups(
 ):
     return (
         db.query(ProxyGroup)
+        .options(selectinload(ProxyGroup.proxies))
         .offset(offset)
         .limit(limit)
         .all()
@@ -24,7 +26,12 @@ def get_proxy_groups(
 
 @router.get("/proxy-groups/{group_id}", response_model=ProxyGroupSchema)
 def get_proxy_group(group_id: int, db: Session = Depends(get_db)):
-    group = db.query(ProxyGroup).filter(ProxyGroup.id == group_id).first()
+    group = (
+        db.query(ProxyGroup)
+        .options(selectinload(ProxyGroup.proxies))
+        .filter(ProxyGroup.id == group_id)
+        .first()
+    )
     if not group:
         raise HTTPException(status_code=404, detail="Proxy group not found")
     return group
