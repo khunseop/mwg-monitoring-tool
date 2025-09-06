@@ -5,6 +5,7 @@ from fastapi import Query
 
 from app.database.database import get_db
 from app.models.proxy import Proxy
+from sqlalchemy.orm import joinedload
 from app.schemas.proxy import ProxyCreate, ProxyUpdate, ProxyOut
 
 router = APIRouter()
@@ -17,7 +18,7 @@ def get_proxies(
 ):
     return (
         db.query(Proxy)
-        .join(Proxy.group, isouter=True)
+        .options(joinedload(Proxy.group))
         .offset(offset)
         .limit(limit)
         .all()
@@ -25,7 +26,12 @@ def get_proxies(
 
 @router.get("/proxies/{proxy_id}", response_model=ProxyOut)
 def get_proxy(proxy_id: int, db: Session = Depends(get_db)):
-    proxy = db.query(Proxy).join(Proxy.group, isouter=True).filter(Proxy.id == proxy_id).first()
+    proxy = (
+        db.query(Proxy)
+        .options(joinedload(Proxy.group))
+        .filter(Proxy.id == proxy_id)
+        .first()
+    )
     if not proxy:
         raise HTTPException(status_code=404, detail="Proxy not found")
     return proxy
