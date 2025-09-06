@@ -283,6 +283,7 @@ body {
 
 /* Keep table width when empty: enforce min-width similar to filled state */
 #sbTable { min-width: 1200px; }
+#sbTable thead th { white-space: nowrap; }
 
 /* Tags */
 .tag.is-light {
@@ -375,4 +376,10 @@ body {
 .footer {
     background: var(--color-bg);
 }
+
+
+/* Inline styles moved from templates */
+.tab-content { display: none; }
+.tab-content.is-active { display: block; }
+.table-container { max-height: 600px; overflow-y: auto; }
 
