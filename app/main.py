@@ -28,7 +28,7 @@ session_browser_config_model.Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="PPAT",
     description="Proxy Performance Analysis Tool",
-    version="1.0.0"
+    version="1.1.0"
 )
 # Security/CORS middleware (configure via env)
 cors_origins = os.getenv("CORS_ALLOW_ORIGINS", "*")
@@ -47,7 +47,6 @@ app.add_middleware(
 if os.getenv("ENABLE_DOCS", "true").lower() in {"1", "true", "yes"}:
     StandaloneDocs(app)
     # expose version in app state for templates
-app.version = "1.0.0"
 app.github_url = os.getenv("GITHUB_URL")
 
 # 템플릿과 정적 파일 설정
