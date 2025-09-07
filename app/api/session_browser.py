@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+from app.utils.time import now_kst, KST_TZ
 import re
 import warnings
 try:
@@ -104,7 +105,7 @@ def _parse_sessions(output: str) -> List[Dict[str, Any]]:
         if creation_time_idx is not None:
             ct = parts[creation_time_idx]
             try:
-                creation_time = datetime.strptime(ct, "%Y-%m-%d %H:%M:%S")
+                creation_time = datetime.strptime(ct, "%Y-%m-%d %H:%M:%S").replace(tzinfo=KST_TZ)
             except Exception:
                 creation_time = None
 
@@ -266,7 +267,7 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
                         in_use=rec.get("in_use"),
                         url=rec.get("url"),
                         raw_line=rec.get("raw_line"),
-                        collected_at=datetime.utcnow(),
+                        collected_at=now_kst(),
                     )
                     db.add(model)
                     collected_models.append(model)

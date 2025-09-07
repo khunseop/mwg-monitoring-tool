@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.sql import func
 from app.database.database import Base
+from app.utils.time import now_kst
 
 
 class SessionBrowserConfig(Base):
@@ -14,6 +14,6 @@ class SessionBrowserConfig(Base):
     host_key_policy = Column(String, nullable=False, default="auto_add")  # auto_add | reject
     max_workers = Column(Integer, nullable=False, default=4)
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), default=now_kst)
+    updated_at = Column(DateTime(timezone=True), onupdate=now_kst, default=now_kst)
 

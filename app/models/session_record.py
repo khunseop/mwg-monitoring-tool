@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Index
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 from app.database.database import Base
+from app.utils.time import now_kst
 
 
 class SessionRecord(Base):
@@ -38,9 +38,9 @@ class SessionRecord(Base):
     # Raw line for debug/troubleshooting
     raw_line = Column(Text, nullable=True)
 
-    collected_at = Column(DateTime(timezone=True), server_default=func.now())
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+    collected_at = Column(DateTime(timezone=True), default=now_kst)
+    created_at = Column(DateTime(timezone=True), default=now_kst)
+    updated_at = Column(DateTime(timezone=True), onupdate=now_kst, default=now_kst)
 
     proxy = relationship("Proxy", backref="session_records")
 

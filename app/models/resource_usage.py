@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, Text
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 from app.database.database import Base
+from app.utils.time import now_kst
 
 
 class ResourceUsage(Base):
@@ -23,9 +23,9 @@ class ResourceUsage(Base):
     community = Column(String, nullable=True)
     oids_raw = Column(Text, nullable=True)  # json string of oid mapping used for collection
 
-    collected_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+    collected_at = Column(DateTime(timezone=True), default=now_kst, index=True)
+    created_at = Column(DateTime(timezone=True), default=now_kst)
+    updated_at = Column(DateTime(timezone=True), onupdate=now_kst, default=now_kst)
 
     proxy = relationship("Proxy", backref="resource_usages")
 

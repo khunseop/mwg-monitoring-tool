@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, Text
-from sqlalchemy.sql import func
 from app.database.database import Base
+from app.utils.time import now_kst
 
 class ProxyGroup(Base):
     __tablename__ = "proxy_groups"
@@ -8,8 +8,8 @@ class ProxyGroup(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), default=now_kst)
+    updated_at = Column(DateTime(timezone=True), onupdate=now_kst, default=now_kst)
 
     @property
     def proxies_count(self) -> int:
