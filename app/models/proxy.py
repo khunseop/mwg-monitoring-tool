@@ -8,7 +8,7 @@ class Proxy(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     host = Column(String, nullable=False, unique=True)
-    port = Column(Integer, nullable=False)
+    port = Column(Integer, nullable=False, default=22)
     username = Column(String, nullable=True)
     password = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)

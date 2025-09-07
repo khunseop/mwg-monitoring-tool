@@ -47,7 +47,7 @@ $(document).ready(function() {
             if (!selectedGroupId) return true;
             return String(p.group_id || '') === String(selectedGroupId);
         }).forEach(p => {
-            const label = `${p.host}:${p.port}${p.group_name ? ' ('+p.group_name+')' : ''}`;
+            const label = `${p.host}${p.group_name ? ' ('+p.group_name+')' : ''}`;
             $sel.append(`<option value="${p.id}">${label}</option>`);
         });
     }
@@ -98,7 +98,7 @@ $(document).ready(function() {
         $tbody.empty();
         items.forEach(row => {
             const proxy = (ru.proxies || []).find(p => p.id === row.proxy_id);
-            const name = proxy ? `${proxy.host}:${proxy.port}` : `#${row.proxy_id}`;
+            const name = proxy ? `${proxy.host}` : `#${row.proxy_id}`;
             const last = ru.lastCumulativeByProxy[row.proxy_id] || {};
             const deltas = { http: null, https: null, ftp: null };
             ['http','https','ftp'].forEach(k => {

@@ -10,7 +10,6 @@ HostnameOrIPv4 = constr(pattern=r"^([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])
 
 class ProxyBase(BaseModel):
     host: HostnameOrIPv4
-    port: conint(ge=1, le=65535)
     username: constr(min_length=1)
     password: str | None = None
     is_active: bool = True
@@ -18,13 +17,12 @@ class ProxyBase(BaseModel):
     description: str | None = None
 
 class ProxyCreate(ProxyBase):
-    pass
+    password: constr(min_length=1)
 
 class ProxyUpdate(BaseModel):
     host: Optional[HostnameOrIPv4] = None
-    port: Optional[conint(ge=1, le=65535)] = None
     username: Optional[constr(min_length=1)] = None
-    password: Optional[str] = None
+    password: Optional[constr(min_length=1)] = None
     is_active: Optional[bool] = None
     group_id: Optional[int] = None
     description: Optional[str] = None
@@ -32,7 +30,6 @@ class ProxyUpdate(BaseModel):
 class ProxyOut(TimestampModel):
     id: int
     host: str
-    port: conint(ge=1, le=65535)
     username: Optional[str] = None
     is_active: bool = True
     group_id: Optional[int] = None

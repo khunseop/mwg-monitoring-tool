@@ -55,7 +55,6 @@ function fillForm(type, data) {
     if (type === 'proxy') {
         $('#proxyId').val(data.id);
         $('#host').val(data.host);
-        $('#port').val(data.port);
         $('#username').val(data.username);
         $('#password').val('');
         $('#group_id').val(data.group_id || '');
@@ -79,7 +78,6 @@ function loadProxies() {
                 tbody.append(`
                     <tr>
                         <td>${proxy.host}</td>
-                        <td>${proxy.port}</td>
                         <td>${proxy.group_name || '-'}</td>
                         <td>${utils.formatTag(proxy.is_active)}</td>
                         <td>${proxy.description || ''}</td>
@@ -116,14 +114,19 @@ function saveProxy() {
     
     const data = {
         host: $('#host').val(),
-        port: parseInt($('#port').val()),
         username: $('#username').val(),
         is_active: $('#is_active').is(':checked'),
         group_id: $('#group_id').val() ? parseInt($('#group_id').val()) : null,
         description: $('#description').val() || null
     };
 
-    if (!proxyId || password) {
+    if (!proxyId) {
+        if (!password || password.length === 0) {
+            utils.showError('비밀번호는 필수입니다.');
+            return;
+        }
+        data.password = password;
+    } else if (password) {
         data.password = password;
     }
 
