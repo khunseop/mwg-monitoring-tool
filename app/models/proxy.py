@@ -7,7 +7,7 @@ class Proxy(Base):
     __tablename__ = "proxies"
 
     id = Column(Integer, primary_key=True, index=True)
-    host = Column(String, nullable=False)
+    host = Column(String, nullable=False, unique=True)
     port = Column(Integer, nullable=False)
     username = Column(String, nullable=True)
     password = Column(String, nullable=True)

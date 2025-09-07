@@ -7,6 +7,7 @@ from app.database.database import get_db
 from app.models.proxy import Proxy
 from sqlalchemy.orm import joinedload
 from app.schemas.proxy import ProxyCreate, ProxyUpdate, ProxyOut
+from sqlalchemy import func
 
 router = APIRouter()
 
@@ -38,6 +39,14 @@ def get_proxy(proxy_id: int, db: Session = Depends(get_db)):
 
 @router.post("/proxies", response_model=ProxyOut, status_code=status.HTTP_201_CREATED)
 def create_proxy(proxy: ProxyCreate, db: Session = Depends(get_db)):
+    # Duplicate host guard (case-insensitive)
+    existing = (
+        db.query(Proxy)
+        .filter(func.lower(Proxy.host) == func.lower(proxy.host))
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Proxy host already exists")
     db_proxy = Proxy(**proxy.model_dump())
     db.add(db_proxy)
     db.commit()
@@ -55,6 +64,17 @@ def update_proxy(proxy_id: int, proxy: ProxyUpdate, db: Session = Depends(get_db
     # 비밀번호가 제공되지 않은 경우 업데이트에서 제외
     if not update_data.get('password'):
         update_data.pop('password', None)
+
+    # If host is being updated, enforce uniqueness (case-insensitive)
+    if 'host' in update_data and update_data['host']:
+        dup = (
+            db.query(Proxy)
+            .filter(func.lower(Proxy.host) == func.lower(update_data['host']))
+            .filter(Proxy.id != proxy_id)
+            .first()
+        )
+        if dup:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Proxy host already exists")
     
     for key, value in update_data.items():
         setattr(db_proxy, key, value)
