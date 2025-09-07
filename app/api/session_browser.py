@@ -231,7 +231,7 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
     collected_models: List[SessionRecordModel] = []
     cleared_proxy_ids: set[int] = set()
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    with ThreadPoolExecutor(max_workers=cfg.max_workers or 4) as executor:
         future_to_proxy = {executor.submit(_collect_for_proxy, p, cfg): p for p in proxies}
         for future in as_completed(future_to_proxy):
             proxy = future_to_proxy[future]
@@ -332,6 +332,7 @@ def get_session_browser_config(db: Session = Depends(get_db)):
         command_args=cfg.command_args,
         timeout_sec=cfg.timeout_sec,
         host_key_policy=cfg.host_key_policy,
+        max_workers=cfg.max_workers,
         created_at=cfg.created_at,
         updated_at=cfg.updated_at,
     )
@@ -343,6 +344,7 @@ def update_session_browser_config(payload: SessionBrowserConfigUpdateSafe, db: S
     cfg.ssh_port = payload.ssh_port
     cfg.timeout_sec = payload.timeout_sec
     cfg.host_key_policy = payload.host_key_policy
+    cfg.max_workers = payload.max_workers
     db.commit()
     db.refresh(cfg)
     return SessionBrowserConfigSchema(
@@ -352,6 +354,7 @@ def update_session_browser_config(payload: SessionBrowserConfigUpdateSafe, db: S
         command_args=cfg.command_args,
         timeout_sec=cfg.timeout_sec,
         host_key_policy=cfg.host_key_policy,
+        max_workers=cfg.max_workers,
         created_at=cfg.created_at,
         updated_at=cfg.updated_at,
     )

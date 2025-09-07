@@ -37,7 +37,7 @@ $(document).ready(function() {
             if (!selectedGroupId) return true;
             return String(p.group_id || '') === String(selectedGroupId);
         }).forEach(p => {
-            const label = `${p.host}:${p.port}${p.group_name ? ' ('+p.group_name+')' : ''}`;
+            const label = `${p.host}${p.group_name ? ' ('+p.group_name+')' : ''}`;
             $sel.append(`<option value="${p.id}">${label}</option>`);
         });
     }
@@ -186,7 +186,7 @@ $(document).ready(function() {
         return (items || []).map(row => {
             if (row && typeof row.id !== 'undefined') { currentItemsById[String(row.id)] = row; }
             const proxy = (sb.proxies || []).find(p => p.id === row.proxy_id);
-            const name = proxy ? `${proxy.host}:${proxy.port}` : `#${row.proxy_id}`;
+            const name = proxy ? `${proxy.host}` : `#${row.proxy_id}`;
             const ctStr = row.creation_time ? new Date(row.creation_time).toLocaleString() : '';
             const clRecv = (typeof row.cl_bytes_received === 'number') ? String(row.cl_bytes_received) : '';
             const clSent = (typeof row.cl_bytes_sent === 'number') ? String(row.cl_bytes_sent) : '';

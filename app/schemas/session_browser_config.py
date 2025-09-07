@@ -10,6 +10,7 @@ class SessionBrowserConfigBase(BaseModel):
     command_args: str = "-S connections"
     timeout_sec: conint(ge=1, le=120) = 10
     host_key_policy: str = "auto_add"  # auto_add | reject
+    max_workers: conint(ge=1, le=64) = 4
 
 
 class SessionBrowserConfig(SessionBrowserConfigBase, TimestampModel):
@@ -23,4 +24,5 @@ class SessionBrowserConfigUpdateSafe(BaseModel):
     ssh_port: conint(ge=1, le=65535) = 22
     timeout_sec: conint(ge=1, le=120) = 10
     host_key_policy: str = "auto_add"
+    max_workers: conint(ge=1, le=64) = 4
 

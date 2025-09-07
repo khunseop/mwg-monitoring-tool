@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database.database import Base
@@ -6,6 +6,9 @@ from app.database.database import Base
 
 class SessionRecord(Base):
     __tablename__ = "session_records"
+    __table_args__ = (
+        Index("ix_session_records_proxy_collected", "proxy_id", "collected_at"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     proxy_id = Column(Integer, ForeignKey("proxies.id", ondelete="CASCADE"), nullable=False, index=True)
