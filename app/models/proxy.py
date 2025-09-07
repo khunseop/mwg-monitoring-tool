@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 from app.database.database import Base
+from app.utils.time import now_kst
 
 class Proxy(Base):
     __tablename__ = "proxies"
@@ -14,8 +14,8 @@ class Proxy(Base):
     is_active = Column(Boolean, default=True)
     group_id = Column(Integer, ForeignKey("proxy_groups.id", ondelete="SET NULL"), nullable=True)
     description = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), default=now_kst)
+    updated_at = Column(DateTime(timezone=True), onupdate=now_kst, default=now_kst)
 
     group = relationship("ProxyGroup", backref="proxies")
 

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Tuple
 import asyncio
 from datetime import datetime
+from app.utils.time import now_kst
 import json
 
 from app.database.database import get_db
@@ -100,7 +101,7 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
                 ftp=metrics.get("ftp"),
                 community=payload.community,
                 oids_raw=json.dumps(payload.oids),
-                collected_at=datetime.utcnow(),
+                collected_at=now_kst(),
             )
             db.add(model)
             collected_models.append(model)
