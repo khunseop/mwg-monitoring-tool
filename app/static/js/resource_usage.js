@@ -4,13 +4,17 @@ $(document).ready(function() {
         lastCumulativeByProxy: {},
         proxies: [],
         groups: [],
-        chart: { canvas: null, ctx: null, dpr: (window.devicePixelRatio || 1), chartJs: null },
+        charts: {}, // { [metricKey]: ChartJSInstance }
+        chartDpr: (window.devicePixelRatio || 1),
         // timeseries buffer: { [proxyId]: { metricKey: [{x:ms, y:number}] } }
         tsBuffer: {},
         bufferWindowMs: 60 * 60 * 1000, // last 1 hour
-        bufferMaxPoints: 600
+        bufferMaxPoints: 600,
+        timeBucketMs: 1000, // quantize to seconds to align x-axis across proxies
+        legendState: {} // { [metricKey]: { [proxyId]: hiddenBoolean } }
     };
     const STORAGE_KEY = 'ru_state_v1';
+    const LEGEND_STORAGE_KEY = 'ru_legend_v1';
 
     function showRuError(msg) { $('#ruError').text(msg).show(); }
     function clearRuError() { $('#ruError').hide().text(''); }
@@ -98,6 +102,18 @@ $(document).ready(function() {
         } catch (e) { /* ignore */ }
     }
 
+    function loadLegendState() {
+        try {
+            const raw = localStorage.getItem(LEGEND_STORAGE_KEY);
+            if (!raw) return {};
+            const obj = JSON.parse(raw);
+            return (obj && typeof obj === 'object') ? obj : {};
+        } catch (e) { return {}; }
+    }
+    function saveLegendState() {
+        try { localStorage.setItem(LEGEND_STORAGE_KEY, JSON.stringify(ru.legendState || {})); } catch (e) { /* ignore */ }
+    }
+
     function updateTable(items) {
         const $tbody = $('#ruTableBody');
         $tbody.empty();
@@ -169,12 +185,12 @@ $(document).ready(function() {
                 // filter invalid latest rows
                 const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
                 bufferAppendBatch(valid);
-                renderSeries();
+                renderAllCharts();
             }).catch(() => {
                 // fallback: use returned items
                 const valid = (items || []).filter(r => r && r.proxy_id && r.collected_at);
                 bufferAppendBatch(valid);
-                renderSeries();
+                renderAllCharts();
             });
         }).catch(() => { showRuError('수집 요청 중 오류가 발생했습니다.'); });
     }
@@ -225,12 +241,21 @@ $(document).ready(function() {
         const now = Date.now();
         (rows || []).forEach(row => {
             const proxyId = row.proxy_id;
-            const ts = row.collected_at ? new Date(row.collected_at).getTime() : now;
+            const rawTs = row.collected_at ? new Date(row.collected_at).getTime() : now;
+            // quantize to bucket to align across proxies in same cycle
+            const ts = Math.floor(rawTs / ru.timeBucketMs) * ru.timeBucketMs;
             ru.tsBuffer[proxyId] = ru.tsBuffer[proxyId] || { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [] };
             ['cpu','mem','cc','cs','http','https','ftp'].forEach(k => {
                 const v = row[k];
                 if (typeof v === 'number') {
-                    ru.tsBuffer[proxyId][k].push({ x: ts, y: v });
+                    const arr = ru.tsBuffer[proxyId][k];
+                    const last = arr[arr.length - 1];
+                    if (last && last.x === ts) {
+                        // replace last if same bucket to avoid duplicate labels
+                        arr[arr.length - 1] = { x: ts, y: v };
+                    } else {
+                        arr.push({ x: ts, y: v });
+                    }
                     if (ru.tsBuffer[proxyId][k].length > ru.bufferMaxPoints) {
                         ru.tsBuffer[proxyId][k].shift();
                     }
@@ -247,33 +272,28 @@ $(document).ready(function() {
         });
     }
 
-    function initChart() {
-        const canvas = document.getElementById('ruChartCanvas');
-        if (!canvas) return false;
-        ru.chart.canvas = canvas;
-        ru.chart.ctx = canvas.getContext('2d');
-        resizeChart();
-        window.addEventListener('resize', resizeChart);
+    function ensureChartsDom() {
+        const $wrap = $('#ruChartsWrap');
+        if ($wrap.length === 0) return false;
+        if ($wrap.data('initialized')) return true;
+        const metrics = ['cpu','mem','cc','cs','http','https','ftp'];
+        const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
+        $wrap.empty();
+        metrics.forEach(m => {
+            const panel = `
+                <div class="column is-12">
+                    <div class="ru-chart-panel" id="ruChartPanel-${m}" style="border:1px solid var(--border-color,#e5e7eb); border-radius:6px; padding:8px;">
+                        <div class="level" style="margin-bottom:6px;">
+                            <div class="level-left"><h5 class="title is-6" style="margin:0;">${titles[m]}</h5></div>
+                            <div class="level-right"><span class="tag is-light">프록시 토글: 범례 클릭</span></div>
+                        </div>
+                        <canvas id="ruChartCanvas-${m}" style="width:100%; height:260px;"></canvas>
+                    </div>
+                </div>`;
+            $wrap.append(panel);
+        });
+        $wrap.data('initialized', true);
         return true;
-    }
-
-    function resizeChart() {
-        const canvas = ru.chart.canvas;
-        if (!canvas) return;
-        const dpr = ru.chart.dpr;
-        const rect = canvas.getBoundingClientRect();
-        const width = Math.max(300, Math.floor(rect.width));
-        const height = 320;
-        canvas.style.width = width + 'px';
-        canvas.style.height = height + 'px';
-        canvas.width = Math.floor(width * dpr);
-        canvas.height = Math.floor(height * dpr);
-        renderSeries();
-    }
-
-    function getSelectedMetrics() {
-        const keys = ['cpu','mem','cc','cs','http','https','ftp'];
-        return keys.filter(k => $('#ruMetric-' + k).is(':checked'));
     }
 
     // raw timeseries only; no mode
@@ -289,13 +309,7 @@ $(document).ready(function() {
     function showSeriesError(msg) { /* noop */ }
     function clearSeriesError() { /* noop */ }
 
-    function fetchSeries() {
-        clearSeriesError();
-        const proxyIds = getSelectedProxyIds();
-        if (proxyIds.length === 0) { showSeriesError('그래프: 프록시를 하나 이상 선택하세요.'); return; }
-        // series API removed; this function is unused now
-        return Promise.resolve();
-    }
+    function fetchSeries() { return Promise.resolve(); }
 
     // Assign consistent colors per proxy (same color across metrics of a proxy)
     function colorForProxy(proxyId) {
@@ -314,14 +328,22 @@ $(document).ready(function() {
         return hex;
     }
 
-    function renderSeries() {
-        const canvas = ru.chart.canvas;
-        if (!canvas || !window.Chart) return;
-        const selectedMetrics = getSelectedMetrics();
-        // Build labels from union of all timestamps in buffer (sorted)
+    function renderAllCharts() {
+        if (!window.Chart) return;
+        ensureChartsDom();
+        const metrics = ['cpu','mem','cc','cs','http','https','ftp'];
+        metrics.forEach(m => renderMetricChart(m));
+    }
+
+    function renderMetricChart(metricKey) {
+        const canvas = document.getElementById(`ruChartCanvas-${metricKey}`);
+        if (!canvas) return;
+        const selectedProxyIds = getSelectedProxyIds();
+        // Build labels from union of all timestamps in buffer for this metric (sorted)
         const tsSet = new Set();
-        Object.values(ru.tsBuffer).forEach(byMetric => {
-            selectedMetrics.forEach(k => (byMetric[k] || []).forEach(p => { if (p && typeof p.x === 'number') tsSet.add(p.x); }));
+        selectedProxyIds.forEach(pid => {
+            const series = (ru.tsBuffer[pid] && ru.tsBuffer[pid][metricKey]) ? ru.tsBuffer[pid][metricKey] : [];
+            series.forEach(p => { if (p && typeof p.x === 'number') tsSet.add(p.x); });
         });
         const labelsMs = Array.from(tsSet).sort((a,b) => a-b);
         const labels = labelsMs.map(ms => {
@@ -334,85 +356,91 @@ $(document).ready(function() {
         const labelToIndex = new Map(labelsMs.map((ms, i) => [ms, i]));
 
         const datasets = [];
-        Object.entries(ru.tsBuffer).forEach(([proxyId, byMetric]) => {
-            selectedMetrics.forEach(metricKey => {
-                const color = colorForProxy(proxyId);
-                const data = new Array(labels.length).fill(null);
-                (byMetric[metricKey] || []).forEach(p => {
-                    if (!p || typeof p.x !== 'number') return;
-                    const idx = labelToIndex.get(p.x);
-                    if (idx !== undefined) data[idx] = (typeof p.y === 'number') ? p.y : null;
-                });
-                if (data.some(v => typeof v === 'number')) {
-                    const proxyMeta = (ru.proxies || []).find(p => String(p.id) === String(proxyId));
-                    const proxyLabel = proxyMeta ? proxyMeta.host : `#${proxyId}`;
-                    datasets.push({
-                        label: `${proxyLabel} ${metricKey.toUpperCase()}`,
-                        data,
-                        borderColor: color,
-                        backgroundColor: color,
-                        borderWidth: 2,
-                        pointRadius: 0,
-                        pointHitRadius: 6,
-                        tension: 0.2,
-                        spanGaps: true,
-                    });
-                }
+        ru.legendState[metricKey] = ru.legendState[metricKey] || {};
+        selectedProxyIds.forEach(proxyId => {
+            const byMetric = ru.tsBuffer[proxyId] || {};
+            const arr = byMetric[metricKey] || [];
+            const data = new Array(labels.length).fill(null);
+            arr.forEach(p => {
+                if (!p || typeof p.x !== 'number') return;
+                const idx = labelToIndex.get(p.x);
+                if (idx !== undefined) data[idx] = (typeof p.y === 'number') ? p.y : null;
             });
+            if (data.some(v => typeof v === 'number')) {
+                const proxyMeta = (ru.proxies || []).find(p => String(p.id) === String(proxyId));
+                const proxyLabel = proxyMeta ? proxyMeta.host : `#${proxyId}`;
+                const color = colorForProxy(proxyId);
+                const hidden = !!ru.legendState[metricKey][proxyId];
+                datasets.push({
+                    label: proxyLabel,
+                    data,
+                    borderColor: color,
+                    backgroundColor: color,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHitRadius: 6,
+                    tension: 0.2,
+                    spanGaps: true,
+                    hidden: hidden,
+                    _proxyId: proxyId
+                });
+            }
         });
 
-        if (labels.length === 0 || datasets.length === 0) {
-            if (ru.chart.chartJs) {
-                ru.chart.chartJs.data.labels = [];
-                ru.chart.chartJs.data.datasets = [];
-                ru.chart.chartJs.update('none');
-            }
-            return;
-        }
-
-        const cfg = {
-            type: 'line',
-            data: { labels, datasets },
-            options: {
-                animation: false,
-                normalized: true,
-                responsive: true,
-                maintainAspectRatio: false,
-                // Chart.js 4 primitive arrays are fine when labels are categories
-                scales: {
-                    x: {
-                        type: 'category',
-                        ticks: { autoSkip: true, maxTicksLimit: 8 },
-                        grid: { color: '#e5e7eb' }
-                    },
-                    y: {
-                        beginAtZero: false,
-                        ticks: { precision: 0 },
-                        grid: { color: '#e5e7eb' }
+        const options = {
+            animation: false,
+            normalized: true,
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { type: 'category', ticks: { autoSkip: true, maxTicksLimit: 8 }, grid: { color: '#e5e7eb' } },
+                y: { beginAtZero: false, ticks: { precision: 0 }, grid: { color: '#e5e7eb' } }
+            },
+            elements: { point: { radius: 0, hitRadius: 6, hoverRadius: 3 } },
+            plugins: {
+                legend: {
+                    display: true,
+                    labels: { boxWidth: 12 },
+                    onClick: (evt, legendItem, legend) => {
+                        const chart = legend.chart;
+                        const index = legendItem.datasetIndex;
+                        // use default toggle behavior first
+                        const defaultClick = Chart.defaults.plugins.legend.onClick;
+                        if (defaultClick) defaultClick.call(this, evt, legendItem, legend);
+                        // persist visibility by metric/proxy
+                        const ds = chart.data.datasets[index];
+                        const meta = chart.getDatasetMeta(index);
+                        const proxyId = ds && ds._proxyId;
+                        if (proxyId != null) {
+                            // hidden state is true when dataset not visible
+                            const hidden = meta.hidden === true || chart.isDatasetVisible(index) === false;
+                            ru.legendState[metricKey] = ru.legendState[metricKey] || {};
+                            ru.legendState[metricKey][proxyId] = hidden;
+                            saveLegendState();
+                        }
                     }
                 },
-                elements: { point: { radius: 0, hitRadius: 6, hoverRadius: 3 } },
-                plugins: {
-                    legend: { display: true, labels: { boxWidth: 12 } },
-                    tooltip: { mode: 'nearest', intersect: false }
-                }
+                tooltip: { mode: 'nearest', intersect: false },
+                title: { display: false }
             }
         };
 
-        if (ru.chart.chartJs) {
-            // update existing
-            ru.chart.chartJs.data.labels = cfg.data.labels;
-            ru.chart.chartJs.data.datasets = cfg.data.datasets;
-            ru.chart.chartJs.update('none');
+        if (!ru.charts[metricKey]) {
+            ru.charts[metricKey] = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: { labels, datasets },
+                options
+            });
         } else {
-            ru.chart.chartJs = new Chart(canvas.getContext('2d'), cfg);
+            const chart = ru.charts[metricKey];
+            chart.data.labels = labels;
+            chart.data.datasets = datasets;
+            chart.update('none');
         }
     }
 
-    // auto series refresh removed (chart updates on collect)
-
-    if (initChart()) {
-        $('#ruMetric-cpu, #ruMetric-mem, #ruMetric-cc, #ruMetric-cs, #ruMetric-http, #ruMetric-https, #ruMetric-ftp').on('change', function() { renderSeries(); });
-    }
+    // initialize DOM and legend state
+    ru.legendState = loadLegendState();
+    ensureChartsDom();
 });
 

@@ -83,24 +83,8 @@
     <div class="mt-4">
         <div class="box">
             <h4 class="title is-5">실시간 그래프</h4>
-            <div class="columns is-multiline">
-                <div class="column is-12">
-                    <div class="field is-grouped is-grouped-multiline">
-                        <div class="control"><label class="checkbox"><input type="checkbox" id="ruMetric-cpu" checked> CPU</label></div>
-                        <div class="control"><label class="checkbox"><input type="checkbox" id="ruMetric-mem" checked> MEM</label></div>
-                        <div class="control"><label class="checkbox"><input type="checkbox" id="ruMetric-cc"> CC</label></div>
-                        <div class="control"><label class="checkbox"><input type="checkbox" id="ruMetric-cs"> CS</label></div>
-                        <div class="control"><label class="checkbox"><input type="checkbox" id="ruMetric-http"> HTTP</label></div>
-                        <div class="control"><label class="checkbox"><input type="checkbox" id="ruMetric-https"> HTTPS</label></div>
-                        <div class="control"><label class="checkbox"><input type="checkbox" id="ruMetric-ftp"> FTP</label></div>
-                    </div>
-                </div>
-
-                <div class="column is-12">
-                    <div id="ruChartWrap" style="border:1px solid var(--border-color,#e5e7eb); border-radius:6px; padding:8px;">
-                        <canvas id="ruChartCanvas" style="width:100%; height:320px;"></canvas>
-                    </div>
-                </div>
+            <div id="ruChartsWrap" class="columns is-multiline" data-initialized="false">
+                <!-- Charts will be injected per metric by resource_usage.js -->
             </div>
         </div>
         <div id="ruEmptyState" class="box" style="display:none; text-align:center; color: var(--color-text-muted);">
