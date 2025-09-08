@@ -4,9 +4,11 @@ $(document).ready(function() {
         lastCumulativeByProxy: {},
         proxies: [],
         groups: [],
-        seriesTimerId: null,
-        lastSeries: null,
-        chart: { canvas: null, ctx: null, dpr: (window.devicePixelRatio || 1) }
+        chart: { canvas: null, ctx: null, dpr: (window.devicePixelRatio || 1), chartJs: null },
+        // timeseries buffer: { [proxyId]: { metricKey: [{x:ms, y:number}] } }
+        tsBuffer: {},
+        bufferWindowMs: 60 * 60 * 1000, // last 1 hour
+        bufferMaxPoints: 600
     };
     const STORAGE_KEY = 'ru_state_v1';
 
@@ -158,11 +160,13 @@ $(document).ready(function() {
             contentType: 'application/json',
             data: JSON.stringify({ proxy_ids: proxyIds, community: community, oids: oids })
         }).then(res => {
-            if (res && Array.isArray(res.items)) { updateTable(res.items); } else { updateTable([]); }
-            if (res && Array.isArray(res.items)) { saveState(res.items); } else { saveState(undefined); }
+            const items = (res && Array.isArray(res.items)) ? res.items : [];
+            updateTable(items);
+            if (Array.isArray(items)) { saveState(items); } else { saveState(undefined); }
             if (res && res.failed && res.failed > 0) { showRuError('일부 프록시 수집에 실패했습니다.'); }
-            // Also refresh chart using current start/end
-            fetchSeries();
+            // Push into local timeseries buffer and render
+            bufferAppendBatch(items);
+            renderSeries();
         }).catch(() => { showRuError('수집 요청 중 오류가 발생했습니다.'); });
     }
 
@@ -202,21 +206,30 @@ $(document).ready(function() {
     // =====================
     // Timeseries Graph UI
     // =====================
-    function formatDateLocalInput(d) {
-        const pad = n => String(n).padStart(2, '0');
-        const yyyy = d.getFullYear();
-        const MM = pad(d.getMonth() + 1);
-        const dd = pad(d.getDate());
-        const HH = pad(d.getHours());
-        const mm = pad(d.getMinutes());
-        return `${yyyy}-${MM}-${dd}T${HH}:${mm}`;
-    }
-
-    function initSeriesRangeDefaults() {
-        const end = new Date();
-        const start = new Date(end.getTime() - 3 * 60 * 60 * 1000);
-        $('#ruSeriesStart').val(formatDateLocalInput(start));
-        $('#ruSeriesEnd').val(formatDateLocalInput(end));
+    // timeseries buffer helpers
+    function bufferAppendBatch(rows) {
+        const now = Date.now();
+        (rows || []).forEach(row => {
+            const proxyId = row.proxy_id;
+            const ts = row.collected_at ? new Date(row.collected_at).getTime() : now;
+            ru.tsBuffer[proxyId] = ru.tsBuffer[proxyId] || { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [] };
+            ['cpu','mem','cc','cs','http','https','ftp'].forEach(k => {
+                const v = row[k];
+                if (typeof v === 'number') {
+                    ru.tsBuffer[proxyId][k].push({ x: ts, y: v });
+                    if (ru.tsBuffer[proxyId][k].length > ru.bufferMaxPoints) {
+                        ru.tsBuffer[proxyId][k].shift();
+                    }
+                }
+            });
+        });
+        // prune old points
+        const cutoff = now - ru.bufferWindowMs;
+        Object.values(ru.tsBuffer).forEach(byMetric => {
+            Object.keys(byMetric).forEach(k => {
+                byMetric[k] = (byMetric[k] || []).filter(p => p.x >= cutoff);
+            });
+        });
     }
 
     function initChart() {
@@ -296,59 +309,48 @@ $(document).ready(function() {
     }
 
     function renderSeries() {
+        // For now, still draw via Canvas. In next step we may switch to Chart.js.
         const canvas = ru.chart.canvas;
         const ctx = ru.chart.ctx;
         if (!canvas || !ctx) return;
         const dpr = ru.chart.dpr;
         ctx.save();
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const items = (ru.lastSeries && Array.isArray(ru.lastSeries.items)) ? ru.lastSeries.items : [];
         const selectedMetrics = getSelectedMetrics();
-        // raw timeseries
-        const padding = { left: 50 * dpr, right: 20 * dpr, top: 16 * dpr, bottom: 28 * dpr };
-        const W = canvas.width, H = canvas.height;
-        const plotW = Math.max(10, W - padding.left - padding.right);
-        const plotH = Math.max(10, H - padding.top - padding.bottom);
-
+        // Flatten buffer into series per proxy/metric
         const series = [];
         let xMin = null, xMax = null;
         let yMin = null, yMax = null;
         let sIdx = 0;
-        items.forEach(item => {
-            (item.points || []).forEach(pt => {
-                const t = new Date(pt.ts).getTime();
-                if (xMin === null || t < xMin) xMin = t;
-                if (xMax === null || t > xMax) xMax = t;
+        Object.entries(ru.tsBuffer).forEach(([proxyId, byMetric]) => {
+            selectedMetrics.forEach(metricKey => {
+                const pts = (byMetric[metricKey] || []);
+                if (pts.length > 0) {
+                    pts.forEach(p => {
+                        if (xMin === null || p.x < xMin) xMin = p.x;
+                        if (xMax === null || p.x > xMax) xMax = p.x;
+                        if (yMin === null || p.y < yMin) yMin = p.y;
+                        if (yMax === null || p.y > yMax) yMax = p.y;
+                    });
+                    series.push({ label: `${metricKey.toUpperCase()} #${proxyId}`, color: colorForSeries(metricKey, sIdx++), points: pts });
+                }
             });
         });
+
         if (xMin === null || xMax === null || xMin === xMax) {
             ctx.fillStyle = '#94a3b8';
             ctx.font = `${12 * dpr}px sans-serif`;
-            ctx.fillText('데이터가 없습니다. 범위/대상을 조정해보세요.', 12 * dpr, 20 * dpr);
+            ctx.fillText('데이터가 없습니다. 수집을 시작하세요.', 12 * dpr, 20 * dpr);
             ctx.restore();
             return;
         }
 
-        items.forEach(item => {
-            selectedMetrics.forEach(metricKey => {
-                const pts = [];
-                (item.points || []).forEach(pt => {
-                    const val = (pt && pt.hasOwnProperty(metricKey)) ? pt[metricKey] : null;
-                    if (typeof val === 'number') {
-                        const t = new Date(pt.ts).getTime();
-                        pts.push({ x: t, y: val });
-                        if (yMin === null || val < yMin) yMin = val;
-                        if (yMax === null || val > yMax) yMax = val;
-                    }
-                });
-                series.push({ label: `${metricKey.toUpperCase()} #${item.proxy_id}`, color: colorForSeries(metricKey, sIdx++), points: pts });
-            });
-        });
-
-        if (yMin === null || yMax === null || yMin === yMax) { yMin = 0; yMax = 1; }
+        const padding = { left: 50 * dpr, right: 20 * dpr, top: 16 * dpr, bottom: 28 * dpr };
+        const W = canvas.width, H = canvas.height;
+        const plotW = Math.max(10, W - padding.left - padding.right);
+        const plotH = Math.max(10, H - padding.top - padding.bottom);
         const yPad = (yMax - yMin) * 0.08;
         yMin -= yPad; yMax += yPad;
-
         function xToPx(x) { return padding.left + ((x - xMin) / (xMax - xMin)) * plotW; }
         function yToPx(y) { return padding.top + (1 - (y - yMin) / (yMax - yMin)) * plotH; }
 
@@ -365,13 +367,6 @@ $(document).ready(function() {
 
         ctx.fillStyle = '#64748b';
         ctx.font = `${11 * dpr}px sans-serif`;
-        for (let i = 0; i <= 5; i++) {
-            const yv = yMin + (i / 5) * (yMax - yMin);
-            const y = yToPx(yv);
-            const txt = (Math.round(yv * 100) / 100).toString();
-            ctx.fillText(txt, 6 * dpr, y + 3 * dpr);
-        }
-
         for (let i = 0; i <= 5; i++) {
             const xv = xMin + (i / 5) * (xMax - xMin);
             const x = xToPx(xv);

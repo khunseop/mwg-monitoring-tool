@@ -71,7 +71,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - 동시 수집 워커 수: DB 설정 `session_browser_config.max_workers`로 제어(기본 4)
 - 타임아웃/SSH 포트/호스트 키 정책은 `/api/session-browser/config`로 조회/수정
 
-### 자원 사용률 시계열 API 예시
+### 자원 사용률 시계열 API (선택)
 ```bash
 curl -X POST http://localhost:8000/api/resource-usage/series \
   -H 'Content-Type: application/json' \
@@ -83,7 +83,7 @@ curl -X POST http://localhost:8000/api/resource-usage/series \
 
 ### 자원 사용률 그래프 사용법
 - 페이지: `/resource`
-- 대상 선택: 그룹/프록시 다중 선택 후 그래프 섹션에서 시작 시각 설정(종료는 선택)
+- 대상 선택: 그룹/프록시 다중 선택
 - 표시 지표: CPU/MEM/CC/CS/HTTP/HTTPS/FTP 체크박스로 선택
-- 자동 새로고침: 체크 후 주기(초) 입력 시 연속 갱신
+- 그래프는 수집 주기에 맞춰 자동 갱신(별도 시간 설정 없이 최근 1시간 뷰)
 
