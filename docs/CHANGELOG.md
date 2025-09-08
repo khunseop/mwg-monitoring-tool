@@ -1,5 +1,21 @@
 # 릴리즈 노트
 
+## v1.2.1
+- 자원 사용률(UI)
+  - Chart.js 라인 차트로 전환(로컬 번들 `/static/vendor/chartjs/chart.umd.js`)
+  - 수집 주기에 맞춰 자동 갱신(최근 1시간 버퍼)
+- 자원 사용률(API)
+  - `POST /api/resource-usage/series` 제거(실시간 UI는 collect + latest로 동작)
+
+## v1.2.0
+- 자원 사용률(UI)
+  - 자원 사용률 페이지에 실시간 그래프 추가(다중 프록시/지표)
+  - UI는 수집 주기에 맞춰 자동 갱신(최근 1시간 뷰), 시간 컨트롤 제거
+- 자원 사용률(API)
+  - Breaking: `POST /api/resource-usage/series`를 원시 시계열(시작~종료 선택적) 응답으로 변경
+    - 요청: `proxy_ids`, `start`, `end(선택)`
+    - 응답: 프록시별 포인트 배열(`ts, cpu, mem, cc, cs, http, https, ftp`)
+
 ## v1.1.0
 - 프록시 관리
   - `proxies.host` 유니크 제약 추가(중복 등록 방지)

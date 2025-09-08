@@ -28,7 +28,7 @@ session_browser_config_model.Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="PPAT",
     description="Proxy Performance Analysis Tool",
-    version="1.1.0"
+    version="1.2.1"
 )
 # Security/CORS middleware (configure via env)
 cors_origins = os.getenv("CORS_ALLOW_ORIGINS", "*")

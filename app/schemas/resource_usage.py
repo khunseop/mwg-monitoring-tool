@@ -49,16 +49,19 @@ class CollectResponse(BaseModel):
     items: List[ResourceUsage]
 
 
-# Series/aggregation schemas
+"""
+Raw timeseries schemas (since start time). Points are raw collected rows, not aggregated.
+"""
+
 class SeriesPoint(BaseModel):
-    # bucket timestamp (start of bucket)
     ts: datetime
-    # averages per metric in this bucket
-    avg: Dict[str, Optional[float]]
-    # moving average (window) per metric
-    ma: Dict[str, Optional[float]]
-    # cumulative average up to this point per metric
-    cma: Dict[str, Optional[float]]
+    cpu: Optional[float] = None
+    mem: Optional[float] = None
+    cc: Optional[float] = None
+    cs: Optional[float] = None
+    http: Optional[float] = None
+    https: Optional[float] = None
+    ftp: Optional[float] = None
 
 
 class SeriesItem(BaseModel):
@@ -69,9 +72,7 @@ class SeriesItem(BaseModel):
 class SeriesRequest(BaseModel):
     proxy_ids: List[int]
     start: datetime
-    end: datetime
-    interval: Literal["minute", "hour", "day"] = "minute"
-    ma_window: int = Field(default=5, ge=1, le=500)
+    end: Optional[datetime] = None
 
 
 class SeriesResponse(BaseModel):

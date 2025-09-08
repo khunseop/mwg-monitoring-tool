@@ -4,6 +4,11 @@ $(document).ready(function() {
         lastCumulativeByProxy: {},
         proxies: [],
         groups: [],
+        chart: { canvas: null, ctx: null, dpr: (window.devicePixelRatio || 1), chartJs: null },
+        // timeseries buffer: { [proxyId]: { metricKey: [{x:ms, y:number}] } }
+        tsBuffer: {},
+        bufferWindowMs: 60 * 60 * 1000, // last 1 hour
+        bufferMaxPoints: 600
     };
     const STORAGE_KEY = 'ru_state_v1';
 
@@ -155,10 +160,28 @@ $(document).ready(function() {
             contentType: 'application/json',
             data: JSON.stringify({ proxy_ids: proxyIds, community: community, oids: oids })
         }).then(res => {
-            if (res && Array.isArray(res.items)) { updateTable(res.items); } else { updateTable([]); }
-            if (res && Array.isArray(res.items)) { saveState(res.items); } else { saveState(undefined); }
+            const items = (res && Array.isArray(res.items)) ? res.items : [];
+            updateTable(items);
+            if (Array.isArray(items)) { saveState(items); } else { saveState(undefined); }
             if (res && res.failed && res.failed > 0) { showRuError('일부 프록시 수집에 실패했습니다.'); }
+            // Fetch latest rows from DB to ensure consistency and append to buffer
+            fetchLatestForProxies(proxyIds).then(latestRows => {
+                // filter invalid latest rows
+                const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
+                bufferAppendBatch(valid);
+                renderSeries();
+            }).catch(() => {
+                // fallback: use returned items
+                const valid = (items || []).filter(r => r && r.proxy_id && r.collected_at);
+                bufferAppendBatch(valid);
+                renderSeries();
+            });
         }).catch(() => { showRuError('수집 요청 중 오류가 발생했습니다.'); });
+    }
+
+    function fetchLatestForProxies(proxyIds) {
+        const reqs = (proxyIds || []).map(id => $.getJSON(`/api/resource-usage/latest/${id}`).catch(() => null));
+        return Promise.all(reqs).then(rows => rows.filter(r => r && r.id));
     }
 
     function startPolling() {
@@ -193,5 +216,201 @@ $(document).ready(function() {
     $('#ruTableWrap').hide();
     $('#ruEmptyState').show();
     Promise.all([fetchGroups(), fetchProxies(), loadConfig()]).then(() => { restoreState(); });
+
+    // =====================
+    // Timeseries Graph UI
+    // =====================
+    // timeseries buffer helpers
+    function bufferAppendBatch(rows) {
+        const now = Date.now();
+        (rows || []).forEach(row => {
+            const proxyId = row.proxy_id;
+            const ts = row.collected_at ? new Date(row.collected_at).getTime() : now;
+            ru.tsBuffer[proxyId] = ru.tsBuffer[proxyId] || { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [] };
+            ['cpu','mem','cc','cs','http','https','ftp'].forEach(k => {
+                const v = row[k];
+                if (typeof v === 'number') {
+                    ru.tsBuffer[proxyId][k].push({ x: ts, y: v });
+                    if (ru.tsBuffer[proxyId][k].length > ru.bufferMaxPoints) {
+                        ru.tsBuffer[proxyId][k].shift();
+                    }
+                }
+            });
+        });
+        // prune old points (defensively skip null/invalid)
+        const cutoff = now - ru.bufferWindowMs;
+        Object.values(ru.tsBuffer).forEach(byMetric => {
+            Object.keys(byMetric).forEach(k => {
+                const arr = Array.isArray(byMetric[k]) ? byMetric[k] : [];
+                byMetric[k] = arr.filter(p => p && typeof p.x === 'number' && p.x >= cutoff);
+            });
+        });
+    }
+
+    function initChart() {
+        const canvas = document.getElementById('ruChartCanvas');
+        if (!canvas) return false;
+        ru.chart.canvas = canvas;
+        ru.chart.ctx = canvas.getContext('2d');
+        resizeChart();
+        window.addEventListener('resize', resizeChart);
+        return true;
+    }
+
+    function resizeChart() {
+        const canvas = ru.chart.canvas;
+        if (!canvas) return;
+        const dpr = ru.chart.dpr;
+        const rect = canvas.getBoundingClientRect();
+        const width = Math.max(300, Math.floor(rect.width));
+        const height = 320;
+        canvas.style.width = width + 'px';
+        canvas.style.height = height + 'px';
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        renderSeries();
+    }
+
+    function getSelectedMetrics() {
+        const keys = ['cpu','mem','cc','cs','http','https','ftp'];
+        return keys.filter(k => $('#ruMetric-' + k).is(':checked'));
+    }
+
+    // raw timeseries only; no mode
+
+    function toIsoOrNull(val) {
+        if (!val) return null;
+        const d = new Date(val);
+        if (isNaN(d.getTime())) return null;
+        return d.toISOString();
+    }
+
+    // no user-facing series error UI now
+    function showSeriesError(msg) { /* noop */ }
+    function clearSeriesError() { /* noop */ }
+
+    function fetchSeries() {
+        clearSeriesError();
+        const proxyIds = getSelectedProxyIds();
+        if (proxyIds.length === 0) { showSeriesError('그래프: 프록시를 하나 이상 선택하세요.'); return; }
+        // series API removed; this function is unused now
+        return Promise.resolve();
+    }
+
+    function colorForSeries(metricKey, seriesIdx) {
+        const base = {
+            cpu: [46, 204, 113],
+            mem: [52, 152, 219],
+            cc: [155, 89, 182],
+            cs: [241, 196, 15],
+            http: [231, 76, 60],
+            https: [230, 126, 34],
+            ftp: [26, 188, 156]
+        }[metricKey] || [100, 100, 100];
+        const lighten = Math.min(40, seriesIdx * 10);
+        const r = Math.max(0, Math.min(255, base[0] + lighten));
+        const g = Math.max(0, Math.min(255, base[1] + lighten));
+        const b = Math.max(0, Math.min(255, base[2] + lighten));
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    function renderSeries() {
+        const canvas = ru.chart.canvas;
+        if (!canvas || !window.Chart) return;
+        const selectedMetrics = getSelectedMetrics();
+        // Build labels from union of all timestamps in buffer (sorted)
+        const tsSet = new Set();
+        Object.values(ru.tsBuffer).forEach(byMetric => {
+            selectedMetrics.forEach(k => (byMetric[k] || []).forEach(p => { if (p && typeof p.x === 'number') tsSet.add(p.x); }));
+        });
+        const labelsMs = Array.from(tsSet).sort((a,b) => a-b);
+        const labels = labelsMs.map(ms => {
+            const d = new Date(ms);
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            const ss = String(d.getSeconds()).padStart(2, '0');
+            return `${hh}:${mm}:${ss}`;
+        });
+        const labelToIndex = new Map(labelsMs.map((ms, i) => [ms, i]));
+
+        const datasets = [];
+        let sIdx = 0;
+        Object.entries(ru.tsBuffer).forEach(([proxyId, byMetric]) => {
+            selectedMetrics.forEach(metricKey => {
+                const color = colorForSeries(metricKey, sIdx++);
+                const data = new Array(labels.length).fill(null);
+                (byMetric[metricKey] || []).forEach(p => {
+                    if (!p || typeof p.x !== 'number') return;
+                    const idx = labelToIndex.get(p.x);
+                    if (idx !== undefined) data[idx] = (typeof p.y === 'number') ? p.y : null;
+                });
+                if (data.some(v => typeof v === 'number')) {
+                    datasets.push({
+                        label: `${metricKey.toUpperCase()} #${proxyId}`,
+                        data,
+                        borderColor: color,
+                        backgroundColor: color,
+                        pointRadius: 0,
+                        pointHitRadius: 6,
+                        tension: 0.2,
+                        spanGaps: true,
+                    });
+                }
+            });
+        });
+
+        if (labels.length === 0 || datasets.length === 0) {
+            if (ru.chart.chartJs) {
+                ru.chart.chartJs.data.labels = [];
+                ru.chart.chartJs.data.datasets = [];
+                ru.chart.chartJs.update('none');
+            }
+            return;
+        }
+
+        const cfg = {
+            type: 'line',
+            data: { labels, datasets },
+            options: {
+                animation: false,
+                normalized: true,
+                responsive: true,
+                maintainAspectRatio: false,
+                // Chart.js 4 primitive arrays are fine when labels are categories
+                scales: {
+                    x: {
+                        type: 'category',
+                        ticks: { autoSkip: true, maxTicksLimit: 8 },
+                        grid: { color: '#e5e7eb' }
+                    },
+                    y: {
+                        beginAtZero: false,
+                        ticks: { precision: 0 },
+                        grid: { color: '#e5e7eb' }
+                    }
+                },
+                elements: { point: { radius: 0, hitRadius: 6, hoverRadius: 3 } },
+                plugins: {
+                    legend: { display: true, labels: { boxWidth: 12 } },
+                    tooltip: { mode: 'nearest', intersect: false }
+                }
+            }
+        };
+
+        if (ru.chart.chartJs) {
+            // update existing
+            ru.chart.chartJs.data.labels = cfg.data.labels;
+            ru.chart.chartJs.data.datasets = cfg.data.datasets;
+            ru.chart.chartJs.update('none');
+        } else {
+            ru.chart.chartJs = new Chart(canvas.getContext('2d'), cfg);
+        }
+    }
+
+    // auto series refresh removed (chart updates on collect)
+
+    if (initChart()) {
+        $('#ruMetric-cpu, #ruMetric-mem, #ruMetric-cc, #ruMetric-cs, #ruMetric-http, #ruMetric-https, #ruMetric-ftp').on('change', function() { renderSeries(); });
+    }
 });
 
