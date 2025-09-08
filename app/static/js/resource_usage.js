@@ -311,88 +311,76 @@ $(document).ready(function() {
     }
 
     function renderSeries() {
-        // For now, still draw via Canvas. In next step we may switch to Chart.js.
         const canvas = ru.chart.canvas;
-        const ctx = ru.chart.ctx;
-        if (!canvas || !ctx) return;
-        const dpr = ru.chart.dpr;
-        ctx.save();
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!canvas || !window.Chart) return;
         const selectedMetrics = getSelectedMetrics();
-        // Flatten buffer into series per proxy/metric
-        const series = [];
-        let xMin = null, xMax = null;
-        let yMin = null, yMax = null;
+        // Build labels from union of all timestamps in buffer (sorted)
+        const tsSet = new Set();
+        Object.values(ru.tsBuffer).forEach(byMetric => {
+            selectedMetrics.forEach(k => (byMetric[k] || []).forEach(p => tsSet.add(p.x)));
+        });
+        const labels = Array.from(tsSet).sort((a,b) => a-b).map(ms => new Date(ms));
+        const labelToIndex = new Map(labels.map((d, i) => [d.getTime(), i]));
+
+        const datasets = [];
         let sIdx = 0;
         Object.entries(ru.tsBuffer).forEach(([proxyId, byMetric]) => {
             selectedMetrics.forEach(metricKey => {
-                const pts = (byMetric[metricKey] || []);
-                if (pts.length > 0) {
-                    pts.forEach(p => {
-                        if (xMin === null || p.x < xMin) xMin = p.x;
-                        if (xMax === null || p.x > xMax) xMax = p.x;
-                        if (yMin === null || p.y < yMin) yMin = p.y;
-                        if (yMax === null || p.y > yMax) yMax = p.y;
-                    });
-                    series.push({ label: `${metricKey.toUpperCase()} #${proxyId}`, color: colorForSeries(metricKey, sIdx++), points: pts });
+                const color = colorForSeries(metricKey, sIdx++);
+                const data = new Array(labels.length).fill(null);
+                (byMetric[metricKey] || []).forEach(p => {
+                    const idx = labelToIndex.get(p.x);
+                    if (idx !== undefined) data[idx] = p.y;
+                });
+                datasets.push({
+                    label: `${metricKey.toUpperCase()} #${proxyId}`,
+                    data,
+                    borderColor: color,
+                    backgroundColor: color,
+                    pointRadius: 0,
+                    tension: 0.2,
+                    spanGaps: true,
+                });
+            });
+        });
+
+        const cfg = {
+            type: 'line',
+            data: { labels, datasets },
+            options: {
+                animation: false,
+                normalized: true,
+                responsive: true,
+                maintainAspectRatio: false,
+                parsing: false,
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: { unit: 'minute', tooltipFormat: 'HH:mm:ss' },
+                        ticks: { autoSkip: true, maxTicksLimit: 8 },
+                        grid: { color: '#e5e7eb' }
+                    },
+                    y: {
+                        beginAtZero: false,
+                        ticks: { precision: 0 },
+                        grid: { color: '#e5e7eb' }
+                    }
+                },
+                plugins: {
+                    legend: { display: true, labels: { boxWidth: 12 } },
+                    tooltip: { mode: 'nearest', intersect: false }
                 }
-            });
-        });
+            }
+        };
 
-        if (xMin === null || xMax === null || xMin === xMax) {
-            ctx.fillStyle = '#94a3b8';
-            ctx.font = `${12 * dpr}px sans-serif`;
-            ctx.fillText('데이터가 없습니다. 수집을 시작하세요.', 12 * dpr, 20 * dpr);
-            ctx.restore();
-            return;
+        if (ru.chart.chartJs) {
+            // update existing
+            ru.chart.chartJs.data.labels = cfg.data.labels;
+            ru.chart.chartJs.data.datasets = cfg.data.datasets;
+            ru.chart.chartJs.update('none');
+        } else {
+            ru.chart.chartJs = new Chart(canvas.getContext('2d'), cfg);
         }
-
-        const padding = { left: 50 * dpr, right: 20 * dpr, top: 16 * dpr, bottom: 28 * dpr };
-        const W = canvas.width, H = canvas.height;
-        const plotW = Math.max(10, W - padding.left - padding.right);
-        const plotH = Math.max(10, H - padding.top - padding.bottom);
-        const yPad = (yMax - yMin) * 0.08;
-        yMin -= yPad; yMax += yPad;
-        function xToPx(x) { return padding.left + ((x - xMin) / (xMax - xMin)) * plotW; }
-        function yToPx(y) { return padding.top + (1 - (y - yMin) / (yMax - yMin)) * plotH; }
-
-        ctx.strokeStyle = '#e5e7eb';
-        ctx.lineWidth = 1 * dpr;
-        ctx.beginPath();
-        for (let i = 0; i <= 5; i++) {
-            const yv = yMin + (i / 5) * (yMax - yMin);
-            const y = Math.round(yToPx(yv)) + 0.5;
-            ctx.moveTo(padding.left, y);
-            ctx.lineTo(W - padding.right, y);
-        }
-        ctx.stroke();
-
-        ctx.fillStyle = '#64748b';
-        ctx.font = `${11 * dpr}px sans-serif`;
-        for (let i = 0; i <= 5; i++) {
-            const xv = xMin + (i / 5) * (xMax - xMin);
-            const x = xToPx(xv);
-            const d = new Date(xv);
-            const hh = String(d.getHours()).padStart(2, '0');
-            const mm = String(d.getMinutes()).padStart(2, '0');
-            const label = `${hh}:${mm}`;
-            ctx.fillText(label, x - 12 * dpr, H - 8 * dpr);
-        }
-
-        series.forEach(s => {
-            if (!s.points || s.points.length === 0) return;
-            ctx.beginPath();
-            ctx.strokeStyle = s.color;
-            ctx.lineWidth = 2 * dpr;
-            s.points.forEach((p, idx) => {
-                const x = xToPx(p.x);
-                const y = yToPx(p.y);
-                if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-            });
-            ctx.stroke();
-        });
-
-        ctx.restore();
     }
 
     // auto series refresh removed (chart updates on collect)
