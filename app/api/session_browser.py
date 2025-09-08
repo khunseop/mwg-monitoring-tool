@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from app.utils.time import now_kst, KST_TZ
+from sqlalchemy import func, or_, asc, desc
 import re
 import warnings
 try:
@@ -359,4 +360,128 @@ def update_session_browser_config(payload: SessionBrowserConfigUpdateSafe, db: S
         created_at=cfg.created_at,
         updated_at=cfg.updated_at,
     )
+
+
+# DataTables server-side endpoint for large datasets
+@router.get("/session-browser/datatables")
+async def sessions_datatables(
+    request: Request,
+    db: Session = Depends(get_db),
+    start: int = Query(0, ge=0),
+    length: int = Query(25, ge=1, le=1000),
+    search: str | None = Query(None, alias="search[value]"),
+    order_col: int | None = Query(None, alias="order[0][column]"),
+    order_dir: str | None = Query(None, alias="order[0][dir]"),
+    group_id: int | None = Query(None),
+    proxy_ids: str | None = Query(None),  # comma-separated
+):
+    # Mapping DataTables column index -> (model column, default sort direction)
+    col_map: Dict[int, Any] = {
+        0: (Proxy.host, asc),
+        1: (SessionRecordModel.creation_time, desc),
+        2: (SessionRecordModel.user_name, asc),
+        3: (SessionRecordModel.client_ip, asc),
+        4: (SessionRecordModel.server_ip, asc),
+        5: (SessionRecordModel.cl_bytes_received, desc),
+        6: (SessionRecordModel.cl_bytes_sent, desc),
+        7: (SessionRecordModel.age_seconds, asc),
+        8: (SessionRecordModel.url, asc),
+        9: (SessionRecordModel.id, desc),
+    }
+
+    # Base query with join to proxy for filtering/sorting by host/group
+    base_q = db.query(SessionRecordModel, Proxy).join(Proxy, SessionRecordModel.proxy_id == Proxy.id)
+
+    # Total records (before filters)
+    records_total = db.query(func.count(SessionRecordModel.id)).scalar() or 0
+
+    # Apply filters
+    if group_id is not None:
+        base_q = base_q.filter(Proxy.group_id == group_id)
+    if proxy_ids:
+        try:
+            id_list = [int(x) for x in proxy_ids.split(",") if x.strip()]
+            if id_list:
+                base_q = base_q.filter(SessionRecordModel.proxy_id.in_(id_list))
+        except Exception:
+            pass
+
+    # Apply search across selected columns
+    if search:
+        s = f"%{search}%"
+        base_q = base_q.filter(
+            or_(
+                SessionRecordModel.transaction.ilike(s),
+                SessionRecordModel.user_name.ilike(s),
+                SessionRecordModel.client_ip.ilike(s),
+                SessionRecordModel.server_ip.ilike(s),
+                SessionRecordModel.protocol.ilike(s),
+                SessionRecordModel.status.ilike(s),
+                SessionRecordModel.url.ilike(s),
+                Proxy.host.ilike(s),
+            )
+        )
+
+    # records after filtering
+    records_filtered = base_q.with_entities(func.count(SessionRecordModel.id)).scalar() or 0
+
+    # Ordering
+    if order_col is not None and order_col in col_map:
+        col, default_dir = col_map[order_col]
+        if (order_dir or "").lower() == "desc":
+            base_q = base_q.order_by(desc(col))
+        elif (order_dir or "").lower() == "asc":
+            base_q = base_q.order_by(asc(col))
+        else:
+            base_q = base_q.order_by(default_dir(col))
+    else:
+        # Default order: newest collected first
+        base_q = base_q.order_by(SessionRecordModel.collected_at.desc(), SessionRecordModel.id.desc())
+
+    # Pagination
+    rows = base_q.offset(start).limit(length).all()
+
+    # Build DataTables row arrays matching UI columns
+    data: List[List[Any]] = []
+    for rec, proxy in rows:
+        host = proxy.host if proxy else f"#{rec.proxy_id}"
+        ct_str = rec.creation_time.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S") if rec.creation_time else ""
+        cl_recv = rec.cl_bytes_received if rec.cl_bytes_received is not None else ""
+        cl_sent = rec.cl_bytes_sent if rec.cl_bytes_sent is not None else ""
+        age_str = rec.age_seconds if rec.age_seconds is not None and rec.age_seconds >= 0 else ""
+        url_full = rec.url or ""
+        url_short = url_full[:100] + ("…" if len(url_full) > 100 else "")
+        data.append([
+            host,
+            ct_str,
+            rec.user_name or "",
+            rec.client_ip or "",
+            rec.server_ip or "",
+            str(cl_recv) if cl_recv != "" else "",
+            str(cl_sent) if cl_sent != "" else "",
+            str(age_str) if age_str != "" else "",
+            url_short,
+            rec.id,
+        ])
+
+    # DataTables draw counter (echo)
+    try:
+        draw = int(request.query_params.get("draw", "0"))
+    except Exception:
+        draw = 0
+
+    return {
+        "draw": draw,
+        "recordsTotal": records_total,
+        "recordsFiltered": records_filtered,
+        "data": data,
+    }
+
+
+@router.get("/session-browser/item/{record_id}", response_model=SessionRecordSchema)
+async def get_session_record(record_id: int, db: Session = Depends(get_db)):
+    row = db.query(SessionRecordModel).filter(SessionRecordModel.id == record_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return row
 
