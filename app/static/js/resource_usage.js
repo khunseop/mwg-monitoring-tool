@@ -297,21 +297,21 @@ $(document).ready(function() {
         return Promise.resolve();
     }
 
-    function colorForSeries(metricKey, seriesIdx) {
-        const base = {
-            cpu: [46, 204, 113],
-            mem: [52, 152, 219],
-            cc: [155, 89, 182],
-            cs: [241, 196, 15],
-            http: [231, 76, 60],
-            https: [230, 126, 34],
-            ftp: [26, 188, 156]
-        }[metricKey] || [100, 100, 100];
-        const lighten = Math.min(40, seriesIdx * 10);
-        const r = Math.max(0, Math.min(255, base[0] + lighten));
-        const g = Math.max(0, Math.min(255, base[1] + lighten));
-        const b = Math.max(0, Math.min(255, base[2] + lighten));
-        return `rgb(${r}, ${g}, ${b})`;
+    // Assign consistent colors per proxy (same color across metrics of a proxy)
+    function colorForProxy(proxyId) {
+        ru._proxyColorMap = ru._proxyColorMap || {};
+        if (ru._proxyColorMap[proxyId]) return ru._proxyColorMap[proxyId];
+        // High-contrast qualitative palette (Tableau 10 + few extras)
+        const palette = [
+            '#4E79A7', '#F28E2B', '#E15759', '#76B7B2', '#59A14F',
+            '#EDC948', '#B07AA1', '#FF9DA7', '#9C755F', '#BAB0AC',
+            '#1F77B4', '#2CA02C', '#D62728', '#9467BD', '#8C564B',
+            '#E377C2', '#7F7F7F', '#BCBD22', '#17BECF'
+        ];
+        const idx = Math.abs(parseInt(proxyId, 10) || 0) % palette.length;
+        const hex = palette[idx];
+        ru._proxyColorMap[proxyId] = hex;
+        return hex;
     }
 
     function renderSeries() {
@@ -334,10 +334,9 @@ $(document).ready(function() {
         const labelToIndex = new Map(labelsMs.map((ms, i) => [ms, i]));
 
         const datasets = [];
-        let sIdx = 0;
         Object.entries(ru.tsBuffer).forEach(([proxyId, byMetric]) => {
             selectedMetrics.forEach(metricKey => {
-                const color = colorForSeries(metricKey, sIdx++);
+                const color = colorForProxy(proxyId);
                 const data = new Array(labels.length).fill(null);
                 (byMetric[metricKey] || []).forEach(p => {
                     if (!p || typeof p.x !== 'number') return;
@@ -345,11 +344,14 @@ $(document).ready(function() {
                     if (idx !== undefined) data[idx] = (typeof p.y === 'number') ? p.y : null;
                 });
                 if (data.some(v => typeof v === 'number')) {
+                    const proxyMeta = (ru.proxies || []).find(p => String(p.id) === String(proxyId));
+                    const proxyLabel = proxyMeta ? proxyMeta.host : `#${proxyId}`;
                     datasets.push({
-                        label: `${metricKey.toUpperCase()} #${proxyId}`,
+                        label: `${proxyLabel} ${metricKey.toUpperCase()}`,
                         data,
                         borderColor: color,
                         backgroundColor: color,
+                        borderWidth: 2,
                         pointRadius: 0,
                         pointHitRadius: 6,
                         tension: 0.2,
