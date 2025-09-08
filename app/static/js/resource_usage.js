@@ -161,6 +161,8 @@ $(document).ready(function() {
             if (res && Array.isArray(res.items)) { updateTable(res.items); } else { updateTable([]); }
             if (res && Array.isArray(res.items)) { saveState(res.items); } else { saveState(undefined); }
             if (res && res.failed && res.failed > 0) { showRuError('일부 프록시 수집에 실패했습니다.'); }
+            // Also refresh chart using current start/end
+            fetchSeries();
         }).catch(() => { showRuError('수집 요청 중 오류가 발생했습니다.'); });
     }
 
@@ -246,10 +248,7 @@ $(document).ready(function() {
         return keys.filter(k => $('#ruMetric-' + k).is(':checked'));
     }
 
-    function getSeriesMode() {
-        const mode = ($('#ruSeriesMode').val() || 'avg');
-        return (mode === 'ma' || mode === 'cma') ? mode : 'avg';
-    }
+    // raw timeseries only; no mode
 
     function toIsoOrNull(val) {
         if (!val) return null;
@@ -268,13 +267,11 @@ $(document).ready(function() {
         const startIso = toIsoOrNull($('#ruSeriesStart').val());
         const endIso = toIsoOrNull($('#ruSeriesEnd').val());
         if (!startIso || !endIso) { showSeriesError('그래프: 유효한 시작/종료 시각을 입력하세요.'); return; }
-        const interval = $('#ruSeriesInterval').val() || 'minute';
-        const maWindow = parseInt($('#ruSeriesWindow').val(), 10) || 5;
         return $.ajax({
             url: '/api/resource-usage/series',
             method: 'POST',
             contentType: 'application/json',
-            data: JSON.stringify({ proxy_ids: proxyIds, start: startIso, end: endIso, interval: interval, ma_window: maWindow })
+            data: JSON.stringify(payload)
         }).then(res => {
             ru.lastSeries = res && res.items ? res : { items: [] };
             renderSeries();
@@ -307,7 +304,7 @@ $(document).ready(function() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         const items = (ru.lastSeries && Array.isArray(ru.lastSeries.items)) ? ru.lastSeries.items : [];
         const selectedMetrics = getSelectedMetrics();
-        const mode = getSeriesMode();
+        // raw timeseries
         const padding = { left: 50 * dpr, right: 20 * dpr, top: 16 * dpr, bottom: 28 * dpr };
         const W = canvas.width, H = canvas.height;
         const plotW = Math.max(10, W - padding.left - padding.right);
@@ -336,7 +333,7 @@ $(document).ready(function() {
             selectedMetrics.forEach(metricKey => {
                 const pts = [];
                 (item.points || []).forEach(pt => {
-                    const val = (pt && pt[mode]) ? pt[mode][metricKey] : null;
+                    const val = (pt && pt.hasOwnProperty(metricKey)) ? pt[metricKey] : null;
                     if (typeof val === 'number') {
                         const t = new Date(pt.ts).getTime();
                         pts.push({ x: t, y: val });
@@ -429,7 +426,7 @@ $(document).ready(function() {
         $('#ruSeriesRefreshBtn').on('click', function() { fetchSeries(); });
         $('#ruSeriesAuto').on('change', function() { if ($(this).is(':checked')) startSeriesAuto(); else stopSeriesAuto(); });
         $('#ruSeriesAutoSec').on('change', function() { if ($('#ruSeriesAuto').is(':checked')) startSeriesAuto(); });
-        $('#ruSeriesInterval, #ruSeriesWindow, #ruSeriesMode').on('change', function() { fetchSeries(); });
+        $('#ruSeriesStart, #ruSeriesEnd').on('change', function() { fetchSeries(); });
         $('#ruMetric-cpu, #ruMetric-mem, #ruMetric-cc, #ruMetric-cs, #ruMetric-http, #ruMetric-https, #ruMetric-ftp').on('change', function() { renderSeries(); });
     }
 });

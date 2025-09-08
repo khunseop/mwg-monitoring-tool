@@ -53,7 +53,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ### 최근 개선 사항(요약)
 - 프록시: `host` 중복 등록 방지(유니크), 생성/수정 시 409 처리, 입력 검증 강화(호스트 정규식, `username` 빈값 금지, 비밀번호 필수). UI에서 포트 제거.
 - 세션 브라우저: 동시 수집 `max_workers` 설정 추가 및 적용, 복합 인덱스(`proxy_id, collected_at`)로 조회 최적화
-- 자원 사용률: 시계열 그래프(UI) 추가 및 집계 API 연동(평균/이동평균/누적평균, 자동 새로고침)
+- 자원 사용률: 실시간 그래프(UI) 추가 및 원시 시계열 API 연동(자동 새로고침)
 - API 응답에서 프록시 비밀번호 제거, `ProxyUpdate` 부분 업데이트 허용
 - 목록 엔드포인트 페이지네이션 추가(`/api/proxies`, `/api/proxy-groups`, `/api/session-browser`, `/api/resource-usage`)
 - 세션 브라우저: 호스트 키 정책(`auto_add/reject`) 준수
@@ -71,23 +71,19 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - 동시 수집 워커 수: DB 설정 `session_browser_config.max_workers`로 제어(기본 4)
 - 타임아웃/SSH 포트/호스트 키 정책은 `/api/session-browser/config`로 조회/수정
 
-### 자원 사용률 집계 API 예시
+### 자원 사용률 시계열 API 예시
 ```bash
 curl -X POST http://localhost:8000/api/resource-usage/series \
   -H 'Content-Type: application/json' \
   -d '{
     "proxy_ids": [1,2],
-    "start": "2025-01-01T00:00:00Z",
-    "end": "2025-01-01T12:00:00Z",
-    "interval": "hour",
-    "ma_window": 5
+    "start": "2025-01-01T00:00:00Z"
   }'
 ```
 
 ### 자원 사용률 그래프 사용법
 - 페이지: `/resource`
-- 대상 선택: 그룹/프록시 다중 선택 후 그래프 섹션에서 기간/버킷/이동평균 윈도우 선택
+- 대상 선택: 그룹/프록시 다중 선택 후 그래프 섹션에서 시작 시각 설정(종료는 선택)
 - 표시 지표: CPU/MEM/CC/CS/HTTP/HTTPS/FTP 체크박스로 선택
-- 모드: 평균/이동평균/누적평균 토글
-- 자동 새로고침: 체크 후 주기(초) 입력하면 현재 범위를 유지한 채 갱신
+- 자동 새로고침: 체크 후 주기(초) 입력 시 연속 갱신
 

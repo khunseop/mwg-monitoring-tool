@@ -82,7 +82,7 @@
 
     <div class="mt-4">
         <div class="box">
-            <h4 class="title is-5">시계열 그래프</h4>
+            <h4 class="title is-5">실시간 그래프</h4>
             <div class="columns is-multiline">
                 <div class="column is-12">
                     <div class="level">
@@ -95,42 +95,8 @@
                             </div>
                             <div class="level-item">
                                 <div class="field has-addons">
-                                    <p class="control"><span class="button is-static">종료</span></p>
+                                    <p class="control"><span class="button is-static">종료(선택)</span></p>
                                     <p class="control"><input id="ruSeriesEnd" class="input" type="datetime-local"></p>
-                                </div>
-                            </div>
-                            <div class="level-item">
-                                <div class="field has-addons">
-                                    <p class="control"><span class="button is-static">버킷</span></p>
-                                    <p class="control">
-                                        <div class="select">
-                                            <select id="ruSeriesInterval">
-                                                <option value="minute">분</option>
-                                                <option value="hour">시간</option>
-                                                <option value="day">일</option>
-                                            </select>
-                                        </div>
-                                    </p>
-                                </div>
-                            </div>
-                            <div class="level-item">
-                                <div class="field has-addons">
-                                    <p class="control"><span class="button is-static">이동평균</span></p>
-                                    <p class="control"><input id="ruSeriesWindow" class="input" type="number" min="1" max="500" value="5" style="width:6rem"></p>
-                                </div>
-                            </div>
-                            <div class="level-item">
-                                <div class="field has-addons">
-                                    <p class="control"><span class="button is-static">표시</span></p>
-                                    <p class="control">
-                                        <div class="select">
-                                            <select id="ruSeriesMode">
-                                                <option value="avg">평균</option>
-                                                <option value="ma">이동평균</option>
-                                                <option value="cma">누적평균</option>
-                                            </select>
-                                        </div>
-                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -138,7 +104,7 @@
                             <div class="level-item">
                                 <div class="field has-addons">
                                     <p class="control"><label class="checkbox"><input id="ruSeriesAuto" type="checkbox"> 자동 새로고침</label></p>
-                                    <p class="control"><input id="ruSeriesAutoSec" class="input" type="number" min="10" value="60" style="width:6rem" title="초"></p>
+                                    <p class="control"><input id="ruSeriesAutoSec" class="input" type="number" min="5" value="30" style="width:6rem" title="초"></p>
                                 </div>
                             </div>
                             <div class="level-item">
