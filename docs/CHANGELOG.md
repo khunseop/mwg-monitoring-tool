@@ -1,6 +1,6 @@
 # 릴리즈 노트
 
-## v1.3.2
+## v1.2.1
 - 자원 사용률(UI)
   - Chart.js 라인 차트로 전환(로컬 번들 `/static/vendor/chartjs/chart.umd.js`)
   - 수집 주기에 맞춰 자동 갱신(최근 1시간 버퍼)
