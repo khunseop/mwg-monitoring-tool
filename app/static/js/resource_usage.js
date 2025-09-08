@@ -319,8 +319,15 @@ $(document).ready(function() {
         Object.values(ru.tsBuffer).forEach(byMetric => {
             selectedMetrics.forEach(k => (byMetric[k] || []).forEach(p => tsSet.add(p.x)));
         });
-        const labels = Array.from(tsSet).sort((a,b) => a-b).map(ms => new Date(ms));
-        const labelToIndex = new Map(labels.map((d, i) => [d.getTime(), i]));
+        const labelsMs = Array.from(tsSet).sort((a,b) => a-b);
+        const labels = labelsMs.map(ms => {
+            const d = new Date(ms);
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            const ss = String(d.getSeconds()).padStart(2, '0');
+            return `${hh}:${mm}:${ss}`;
+        });
+        const labelToIndex = new Map(labelsMs.map((ms, i) => [ms, i]));
 
         const datasets = [];
         let sIdx = 0;
@@ -355,8 +362,7 @@ $(document).ready(function() {
                 parsing: false,
                 scales: {
                     x: {
-                        type: 'time',
-                        time: { unit: 'minute', tooltipFormat: 'HH:mm:ss' },
+                        type: 'category',
                         ticks: { autoSkip: true, maxTicksLimit: 8 },
                         grid: { color: '#e5e7eb' }
                     },
