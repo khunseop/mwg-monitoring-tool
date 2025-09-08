@@ -4,13 +4,19 @@ $(document).ready(function() {
         lastCumulativeByProxy: {},
         proxies: [],
         groups: [],
-        chart: { canvas: null, ctx: null, dpr: (window.devicePixelRatio || 1), chartJs: null },
+        charts: {}, // { [metricKey]: ChartJSInstance }
+        chartDpr: (window.devicePixelRatio || 1),
         // timeseries buffer: { [proxyId]: { metricKey: [{x:ms, y:number}] } }
         tsBuffer: {},
         bufferWindowMs: 60 * 60 * 1000, // last 1 hour
-        bufferMaxPoints: 600
+        bufferMaxPoints: 600,
+        timeBucketMs: 1000, // quantize to seconds to align x-axis across proxies
+        legendState: {} // { [metricKey]: { [proxyId]: hiddenBoolean } }
     };
     const STORAGE_KEY = 'ru_state_v1';
+    const LEGEND_STORAGE_KEY = 'ru_legend_v1';
+    const BUFFER_STORAGE_KEY = 'ru_buffer_v1';
+    const RUN_STORAGE_KEY = 'ru_running_v1';
 
     function showRuError(msg) { $('#ruError').text(msg).show(); }
     function clearRuError() { $('#ruError').hide().text(''); }
@@ -24,6 +30,7 @@ $(document).ready(function() {
             $('#ruStopBtn').attr('disabled', true);
             $('#ruStatus').removeClass('is-success').removeClass('is-danger').addClass('is-light').text('정지됨');
         }
+        try { localStorage.setItem(RUN_STORAGE_KEY, running ? '1' : '0'); } catch (e) { /* ignore */ }
     }
 
     function fetchGroups() {
@@ -98,6 +105,56 @@ $(document).ready(function() {
         } catch (e) { /* ignore */ }
     }
 
+    function loadLegendState() {
+        try {
+            const raw = localStorage.getItem(LEGEND_STORAGE_KEY);
+            if (!raw) return {};
+            const obj = JSON.parse(raw);
+            return (obj && typeof obj === 'object') ? obj : {};
+        } catch (e) { return {}; }
+    }
+    function saveLegendState() {
+        try { localStorage.setItem(LEGEND_STORAGE_KEY, JSON.stringify(ru.legendState || {})); } catch (e) { /* ignore */ }
+    }
+
+    function loadBufferState() {
+        try {
+            const raw = localStorage.getItem(BUFFER_STORAGE_KEY);
+            if (!raw) return {};
+            const obj = JSON.parse(raw);
+            if (!obj || typeof obj !== 'object') return {};
+            // sanitize to expected structure
+            const out = {};
+            Object.keys(obj).forEach(pid => {
+                const byMetric = obj[pid] || {};
+                out[pid] = { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [] };
+                Object.keys(out[pid]).forEach(m => {
+                    const arr = Array.isArray(byMetric[m]) ? byMetric[m] : [];
+                    // keep within window and type-safe
+                    out[pid][m] = arr.filter(p => p && typeof p.x === 'number' && typeof p.y === 'number');
+                });
+            });
+            return out;
+        } catch (e) { return {}; }
+    }
+
+    function saveBufferState() {
+        try {
+            const out = {};
+            Object.keys(ru.tsBuffer || {}).forEach(pid => {
+                const byMetric = ru.tsBuffer[pid] || {};
+                out[pid] = {};
+                Object.keys(byMetric).forEach(m => {
+                    const arr = Array.isArray(byMetric[m]) ? byMetric[m] : [];
+                    // store a bounded slice to control size
+                    const tail = arr.slice(-ru.bufferMaxPoints);
+                    out[pid][m] = tail;
+                });
+            });
+            localStorage.setItem(BUFFER_STORAGE_KEY, JSON.stringify(out));
+        } catch (e) { /* ignore */ }
+    }
+
     function updateTable(items) {
         const $tbody = $('#ruTableBody');
         $tbody.empty();
@@ -169,12 +226,14 @@ $(document).ready(function() {
                 // filter invalid latest rows
                 const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
                 bufferAppendBatch(valid);
-                renderSeries();
+                saveBufferState();
+                renderAllCharts();
             }).catch(() => {
                 // fallback: use returned items
                 const valid = (items || []).filter(r => r && r.proxy_id && r.collected_at);
                 bufferAppendBatch(valid);
-                renderSeries();
+                saveBufferState();
+                renderAllCharts();
             });
         }).catch(() => { showRuError('수집 요청 중 오류가 발생했습니다.'); });
     }
@@ -225,12 +284,21 @@ $(document).ready(function() {
         const now = Date.now();
         (rows || []).forEach(row => {
             const proxyId = row.proxy_id;
-            const ts = row.collected_at ? new Date(row.collected_at).getTime() : now;
+            const rawTs = row.collected_at ? new Date(row.collected_at).getTime() : now;
+            // quantize to bucket to align across proxies in same cycle
+            const ts = Math.floor(rawTs / ru.timeBucketMs) * ru.timeBucketMs;
             ru.tsBuffer[proxyId] = ru.tsBuffer[proxyId] || { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [] };
             ['cpu','mem','cc','cs','http','https','ftp'].forEach(k => {
                 const v = row[k];
                 if (typeof v === 'number') {
-                    ru.tsBuffer[proxyId][k].push({ x: ts, y: v });
+                    const arr = ru.tsBuffer[proxyId][k];
+                    const last = arr[arr.length - 1];
+                    if (last && last.x === ts) {
+                        // replace last if same bucket to avoid duplicate labels
+                        arr[arr.length - 1] = { x: ts, y: v };
+                    } else {
+                        arr.push({ x: ts, y: v });
+                    }
                     if (ru.tsBuffer[proxyId][k].length > ru.bufferMaxPoints) {
                         ru.tsBuffer[proxyId][k].shift();
                     }
@@ -247,33 +315,27 @@ $(document).ready(function() {
         });
     }
 
-    function initChart() {
-        const canvas = document.getElementById('ruChartCanvas');
-        if (!canvas) return false;
-        ru.chart.canvas = canvas;
-        ru.chart.ctx = canvas.getContext('2d');
-        resizeChart();
-        window.addEventListener('resize', resizeChart);
+    function ensureChartsDom() {
+        const $wrap = $('#ruChartsWrap');
+        if ($wrap.length === 0) return false;
+        if ($wrap.data('initialized')) return true;
+        const metrics = ['cpu','mem','cc','cs','http','https','ftp'];
+        const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
+        $wrap.empty();
+        metrics.forEach(m => {
+            const panel = `
+                <div class="column is-4">
+                    <div class="ru-chart-panel" id="ruChartPanel-${m}" style="border:1px solid var(--border-color,#e5e7eb); border-radius:6px; padding:8px;">
+                        <div class="level" style="margin-bottom:6px;">
+                            <div class="level-left"><h5 class="title is-6" style="margin:0;">${titles[m]}</h5></div>
+                        </div>
+                        <canvas id="ruChartCanvas-${m}" style="width:100%; height:180px; max-height:180px;"></canvas>
+                    </div>
+                </div>`;
+            $wrap.append(panel);
+        });
+        $wrap.data('initialized', true);
         return true;
-    }
-
-    function resizeChart() {
-        const canvas = ru.chart.canvas;
-        if (!canvas) return;
-        const dpr = ru.chart.dpr;
-        const rect = canvas.getBoundingClientRect();
-        const width = Math.max(300, Math.floor(rect.width));
-        const height = 320;
-        canvas.style.width = width + 'px';
-        canvas.style.height = height + 'px';
-        canvas.width = Math.floor(width * dpr);
-        canvas.height = Math.floor(height * dpr);
-        renderSeries();
-    }
-
-    function getSelectedMetrics() {
-        const keys = ['cpu','mem','cc','cs','http','https','ftp'];
-        return keys.filter(k => $('#ruMetric-' + k).is(':checked'));
     }
 
     // raw timeseries only; no mode
@@ -289,39 +351,41 @@ $(document).ready(function() {
     function showSeriesError(msg) { /* noop */ }
     function clearSeriesError() { /* noop */ }
 
-    function fetchSeries() {
-        clearSeriesError();
-        const proxyIds = getSelectedProxyIds();
-        if (proxyIds.length === 0) { showSeriesError('그래프: 프록시를 하나 이상 선택하세요.'); return; }
-        // series API removed; this function is unused now
-        return Promise.resolve();
+    function fetchSeries() { return Promise.resolve(); }
+
+    // Assign consistent colors per proxy (same color across metrics of a proxy)
+    function colorForProxy(proxyId) {
+        ru._proxyColorMap = ru._proxyColorMap || {};
+        if (ru._proxyColorMap[proxyId]) return ru._proxyColorMap[proxyId];
+        // High-contrast qualitative palette (Tableau 10 + few extras)
+        const palette = [
+            '#4E79A7', '#F28E2B', '#E15759', '#76B7B2', '#59A14F',
+            '#EDC948', '#B07AA1', '#FF9DA7', '#9C755F', '#BAB0AC',
+            '#1F77B4', '#2CA02C', '#D62728', '#9467BD', '#8C564B',
+            '#E377C2', '#7F7F7F', '#BCBD22', '#17BECF'
+        ];
+        const idx = Math.abs(parseInt(proxyId, 10) || 0) % palette.length;
+        const hex = palette[idx];
+        ru._proxyColorMap[proxyId] = hex;
+        return hex;
     }
 
-    function colorForSeries(metricKey, seriesIdx) {
-        const base = {
-            cpu: [46, 204, 113],
-            mem: [52, 152, 219],
-            cc: [155, 89, 182],
-            cs: [241, 196, 15],
-            http: [231, 76, 60],
-            https: [230, 126, 34],
-            ftp: [26, 188, 156]
-        }[metricKey] || [100, 100, 100];
-        const lighten = Math.min(40, seriesIdx * 10);
-        const r = Math.max(0, Math.min(255, base[0] + lighten));
-        const g = Math.max(0, Math.min(255, base[1] + lighten));
-        const b = Math.max(0, Math.min(255, base[2] + lighten));
-        return `rgb(${r}, ${g}, ${b})`;
+    function renderAllCharts() {
+        if (!window.Chart) return;
+        ensureChartsDom();
+        const metrics = ['cpu','mem','cc','cs','http','https','ftp'];
+        metrics.forEach(m => renderMetricChart(m));
     }
 
-    function renderSeries() {
-        const canvas = ru.chart.canvas;
-        if (!canvas || !window.Chart) return;
-        const selectedMetrics = getSelectedMetrics();
-        // Build labels from union of all timestamps in buffer (sorted)
+    function renderMetricChart(metricKey) {
+        const canvas = document.getElementById(`ruChartCanvas-${metricKey}`);
+        if (!canvas) return;
+        const selectedProxyIds = getSelectedProxyIds();
+        // Build labels from union of all timestamps in buffer for this metric (sorted)
         const tsSet = new Set();
-        Object.values(ru.tsBuffer).forEach(byMetric => {
-            selectedMetrics.forEach(k => (byMetric[k] || []).forEach(p => { if (p && typeof p.x === 'number') tsSet.add(p.x); }));
+        selectedProxyIds.forEach(pid => {
+            const series = (ru.tsBuffer[pid] && ru.tsBuffer[pid][metricKey]) ? ru.tsBuffer[pid][metricKey] : [];
+            series.forEach(p => { if (p && typeof p.x === 'number') tsSet.add(p.x); });
         });
         const labelsMs = Array.from(tsSet).sort((a,b) => a-b);
         const labels = labelsMs.map(ms => {
@@ -334,83 +398,111 @@ $(document).ready(function() {
         const labelToIndex = new Map(labelsMs.map((ms, i) => [ms, i]));
 
         const datasets = [];
-        let sIdx = 0;
-        Object.entries(ru.tsBuffer).forEach(([proxyId, byMetric]) => {
-            selectedMetrics.forEach(metricKey => {
-                const color = colorForSeries(metricKey, sIdx++);
-                const data = new Array(labels.length).fill(null);
-                (byMetric[metricKey] || []).forEach(p => {
-                    if (!p || typeof p.x !== 'number') return;
-                    const idx = labelToIndex.get(p.x);
-                    if (idx !== undefined) data[idx] = (typeof p.y === 'number') ? p.y : null;
-                });
-                if (data.some(v => typeof v === 'number')) {
-                    datasets.push({
-                        label: `${metricKey.toUpperCase()} #${proxyId}`,
-                        data,
-                        borderColor: color,
-                        backgroundColor: color,
-                        pointRadius: 0,
-                        pointHitRadius: 6,
-                        tension: 0.2,
-                        spanGaps: true,
-                    });
-                }
+        ru.legendState[metricKey] = ru.legendState[metricKey] || {};
+        selectedProxyIds.forEach(proxyId => {
+            const byMetric = ru.tsBuffer[proxyId] || {};
+            const arr = byMetric[metricKey] || [];
+            const data = new Array(labels.length).fill(null);
+            arr.forEach(p => {
+                if (!p || typeof p.x !== 'number') return;
+                const idx = labelToIndex.get(p.x);
+                if (idx !== undefined) data[idx] = (typeof p.y === 'number') ? p.y : null;
             });
+            // Convert cumulative counters to delta per interval for http/https/ftp
+            if (metricKey === 'http' || metricKey === 'https' || metricKey === 'ftp') {
+                let prev = null;
+                for (let i = 0; i < data.length; i++) {
+                    const v = data[i];
+                    if (typeof v === 'number' && typeof prev === 'number') {
+                        const d = v - prev;
+                        data[i] = (d >= 0) ? d : null;
+                    } else {
+                        data[i] = null;
+                    }
+                    if (typeof v === 'number') prev = v;
+                }
+            }
+            if (data.some(v => typeof v === 'number')) {
+                const proxyMeta = (ru.proxies || []).find(p => String(p.id) === String(proxyId));
+                const proxyLabel = proxyMeta ? proxyMeta.host : `#${proxyId}`;
+                const color = colorForProxy(proxyId);
+                const hidden = !!ru.legendState[metricKey][proxyId];
+                datasets.push({
+                    label: proxyLabel,
+                    data,
+                    borderColor: color,
+                    backgroundColor: color,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHitRadius: 6,
+                    tension: 0.2,
+                    spanGaps: true,
+                    hidden: hidden,
+                    _proxyId: proxyId
+                });
+            }
         });
 
-        if (labels.length === 0 || datasets.length === 0) {
-            if (ru.chart.chartJs) {
-                ru.chart.chartJs.data.labels = [];
-                ru.chart.chartJs.data.datasets = [];
-                ru.chart.chartJs.update('none');
-            }
-            return;
-        }
-
-        const cfg = {
-            type: 'line',
-            data: { labels, datasets },
-            options: {
-                animation: false,
-                normalized: true,
-                responsive: true,
-                maintainAspectRatio: false,
-                // Chart.js 4 primitive arrays are fine when labels are categories
-                scales: {
-                    x: {
-                        type: 'category',
-                        ticks: { autoSkip: true, maxTicksLimit: 8 },
-                        grid: { color: '#e5e7eb' }
-                    },
-                    y: {
-                        beginAtZero: false,
-                        ticks: { precision: 0 },
-                        grid: { color: '#e5e7eb' }
+        const options = {
+            animation: false,
+            normalized: true,
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { type: 'category', ticks: { autoSkip: true, maxTicksLimit: 8 }, grid: { color: '#e5e7eb' } },
+                y: { beginAtZero: false, ticks: { precision: 0 }, grid: { color: '#e5e7eb' } }
+            },
+            elements: { point: { radius: 0, hitRadius: 6, hoverRadius: 3 } },
+            plugins: {
+                legend: {
+                    display: true,
+                    labels: { boxWidth: 12 },
+                    onClick: (evt, legendItem, legend) => {
+                        const chart = legend.chart;
+                        const index = legendItem.datasetIndex;
+                        // use default toggle behavior first
+                        const defaultClick = Chart.defaults.plugins.legend.onClick;
+                        if (defaultClick) defaultClick.call(this, evt, legendItem, legend);
+                        // persist visibility by metric/proxy
+                        const ds = chart.data.datasets[index];
+                        const meta = chart.getDatasetMeta(index);
+                        const proxyId = ds && ds._proxyId;
+                        if (proxyId != null) {
+                            // hidden state is true when dataset not visible
+                            const hidden = meta.hidden === true || chart.isDatasetVisible(index) === false;
+                            ru.legendState[metricKey] = ru.legendState[metricKey] || {};
+                            ru.legendState[metricKey][proxyId] = hidden;
+                            saveLegendState();
+                        }
                     }
                 },
-                elements: { point: { radius: 0, hitRadius: 6, hoverRadius: 3 } },
-                plugins: {
-                    legend: { display: true, labels: { boxWidth: 12 } },
-                    tooltip: { mode: 'nearest', intersect: false }
-                }
+                tooltip: { mode: 'nearest', intersect: false },
+                title: { display: false }
             }
         };
 
-        if (ru.chart.chartJs) {
-            // update existing
-            ru.chart.chartJs.data.labels = cfg.data.labels;
-            ru.chart.chartJs.data.datasets = cfg.data.datasets;
-            ru.chart.chartJs.update('none');
+        if (!ru.charts[metricKey]) {
+            ru.charts[metricKey] = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: { labels, datasets },
+                options
+            });
         } else {
-            ru.chart.chartJs = new Chart(canvas.getContext('2d'), cfg);
+            const chart = ru.charts[metricKey];
+            chart.data.labels = labels;
+            chart.data.datasets = datasets;
+            chart.update('none');
         }
     }
 
-    // auto series refresh removed (chart updates on collect)
-
-    if (initChart()) {
-        $('#ruMetric-cpu, #ruMetric-mem, #ruMetric-cc, #ruMetric-cs, #ruMetric-http, #ruMetric-https, #ruMetric-ftp').on('change', function() { renderSeries(); });
-    }
+    // initialize DOM, legend and buffer state
+    ru.legendState = loadLegendState();
+    ru.tsBuffer = loadBufferState();
+    ensureChartsDom();
+    // auto-restore running state and render charts from buffer
+    try {
+        const running = localStorage.getItem(RUN_STORAGE_KEY) === '1';
+        if (running) { startPolling(); } else { renderAllCharts(); }
+    } catch (e) { renderAllCharts(); }
 });
 

@@ -53,7 +53,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ### 최근 개선 사항(요약)
 - 프록시: `host` 중복 등록 방지(유니크), 생성/수정 시 409 처리, 입력 검증 강화(호스트 정규식, `username` 빈값 금지, 비밀번호 필수). UI에서 포트 제거.
 - 세션 브라우저: 동시 수집 `max_workers` 설정 추가 및 적용, 복합 인덱스(`proxy_id, collected_at`)로 조회 최적화
-- 자원 사용률: 실시간 그래프(UI) Chart.js 라인 차트로 전환(로컬 번들)
+- 자원 사용률: 실시간 그래프(UI) Chart.js 라인 차트로 전환 및 개선(프록시별 색상, 초 단위 정렬, 지표별 3열 멀티 차트, HTTP/HTTPS/FTP Δ표시, 실행/그래프 상태 유지)
 - API 응답에서 프록시 비밀번호 제거, `ProxyUpdate` 부분 업데이트 허용
 - 목록 엔드포인트 페이지네이션 추가(`/api/proxies`, `/api/proxy-groups`, `/api/session-browser`, `/api/resource-usage`)
 - 세션 브라우저: 호스트 키 정책(`auto_add/reject`) 준수
