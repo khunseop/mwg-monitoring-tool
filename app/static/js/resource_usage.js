@@ -344,17 +344,29 @@ $(document).ready(function() {
                     const idx = labelToIndex.get(p.x);
                     if (idx !== undefined) data[idx] = (typeof p.y === 'number') ? p.y : null;
                 });
-                datasets.push({
-                    label: `${metricKey.toUpperCase()} #${proxyId}`,
-                    data,
-                    borderColor: color,
-                    backgroundColor: color,
-                    pointRadius: 0,
-                    tension: 0.2,
-                    spanGaps: true,
-                });
+                if (data.some(v => typeof v === 'number')) {
+                    datasets.push({
+                        label: `${metricKey.toUpperCase()} #${proxyId}`,
+                        data,
+                        borderColor: color,
+                        backgroundColor: color,
+                        pointRadius: 0,
+                        pointHitRadius: 6,
+                        tension: 0.2,
+                        spanGaps: true,
+                    });
+                }
             });
         });
+
+        if (labels.length === 0 || datasets.length === 0) {
+            if (ru.chart.chartJs) {
+                ru.chart.chartJs.data.labels = [];
+                ru.chart.chartJs.data.datasets = [];
+                ru.chart.chartJs.update('none');
+            }
+            return;
+        }
 
         const cfg = {
             type: 'line',
@@ -364,7 +376,7 @@ $(document).ready(function() {
                 normalized: true,
                 responsive: true,
                 maintainAspectRatio: false,
-                parsing: false,
+                // Chart.js 4 primitive arrays are fine when labels are categories
                 scales: {
                     x: {
                         type: 'category',
@@ -377,6 +389,7 @@ $(document).ready(function() {
                         grid: { color: '#e5e7eb' }
                     }
                 },
+                elements: { point: { radius: 0, hitRadius: 6, hoverRadius: 3 } },
                 plugins: {
                     legend: { display: true, labels: { boxWidth: 12 } },
                     tooltip: { mode: 'nearest', intersect: false }
