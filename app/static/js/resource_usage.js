@@ -281,13 +281,13 @@ $(document).ready(function() {
         $wrap.empty();
         metrics.forEach(m => {
             const panel = `
-                <div class="column is-12">
+                <div class="column is-4">
                     <div class="ru-chart-panel" id="ruChartPanel-${m}" style="border:1px solid var(--border-color,#e5e7eb); border-radius:6px; padding:8px;">
                         <div class="level" style="margin-bottom:6px;">
                             <div class="level-left"><h5 class="title is-6" style="margin:0;">${titles[m]}</h5></div>
-                            <div class="level-right"><span class="tag is-light">프록시 토글: 범례 클릭</span></div>
+                            <div class="level-right"><span class="tag is-light">범례 클릭으로 토글</span></div>
                         </div>
-                        <canvas id="ruChartCanvas-${m}" style="width:100%; height:260px;"></canvas>
+                        <canvas id="ruChartCanvas-${m}" style="width:100%; height:180px; max-height:180px;"></canvas>
                     </div>
                 </div>`;
             $wrap.append(panel);
