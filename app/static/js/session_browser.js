@@ -2,6 +2,68 @@ $(document).ready(function() {
     const sb = { proxies: [], groups: [], dt: null };
     const STORAGE_KEY = 'sb_state_v1';
 
+    // Helpers for robust localStorage persistence
+    function sanitizeItemsForStorage(items) {
+        // Drop heavy fields and bound array length to avoid quota errors
+        const MAX_ITEMS = 250; // keep most recent up to 250
+        const trimmed = Array.isArray(items) ? items.slice(0, MAX_ITEMS) : [];
+        return trimmed.map(function(it) {
+            if (!it || typeof it !== 'object') return {};
+            const out = {
+                id: it.id,
+                proxy_id: it.proxy_id,
+                creation_time: it.creation_time,
+                user_name: it.user_name,
+                client_ip: it.client_ip,
+                server_ip: it.server_ip,
+                cl_bytes_received: it.cl_bytes_received,
+                cl_bytes_sent: it.cl_bytes_sent,
+                age_seconds: it.age_seconds,
+                url: (typeof it.url === 'string') ? (it.url.length > 1000 ? it.url.slice(0, 1000) + '…' : it.url) : it.url,
+                collected_at: it.collected_at,
+                transaction: it.transaction,
+                protocol: it.protocol,
+                cust_id: it.cust_id,
+                client_side_mwg_ip: it.client_side_mwg_ip,
+                server_side_mwg_ip: it.server_side_mwg_ip,
+                srv_bytes_received: it.srv_bytes_received,
+                srv_bytes_sent: it.srv_bytes_sent,
+                trxn_index: it.trxn_index,
+                status: it.status,
+                in_use: it.in_use
+            };
+            return out;
+        });
+    }
+
+    function tryWriteState(state) {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function persistState(state) {
+        // Attempt to persist; if it fails due to quota, progressively reduce items size
+        if (tryWriteState(state)) return true;
+        if (!state || !Array.isArray(state.items) || state.items.length === 0) return false;
+        // First, sanitize items by dropping heavy fields
+        var reduced = sanitizeItemsForStorage(state.items);
+        var temp = Object.assign({}, state, { items: reduced });
+        if (tryWriteState(temp)) return true;
+        // If still failing, aggressively reduce count
+        var count = Math.min(reduced.length, 120);
+        while (count > 0) {
+            var slice = reduced.slice(0, count);
+            temp = Object.assign({}, state, { items: slice });
+            if (tryWriteState(temp)) return true;
+            count = Math.floor(count / 2);
+        }
+        return false;
+    }
+
     function showErr(msg) { $('#sbError').text(msg).show(); }
     function clearErr() { $('#sbError').hide().text(''); }
     function setStatus(text, isError) {
@@ -45,23 +107,27 @@ $(document).ready(function() {
     function getSelectedProxyIds() { return ($('#sbProxySelect').val() || []).map(v => parseInt(v, 10)); }
 
     function saveState(itemsForSave) {
+        var prevItems;
         try {
-            let prevItems;
-            try {
-                const prevRaw = localStorage.getItem(STORAGE_KEY);
-                if (prevRaw) {
-                    const prev = JSON.parse(prevRaw);
-                    prevItems = Array.isArray(prev.items) ? prev.items : undefined;
-                }
-            } catch (e) { /* ignore */ }
-            const state = {
-                groupId: $('#sbGroupSelect').val() || '',
-                proxyIds: getSelectedProxyIds(),
-                items: Array.isArray(itemsForSave) ? itemsForSave : prevItems,
-                savedAt: Date.now()
-            };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            var prevRaw = localStorage.getItem(STORAGE_KEY);
+            if (prevRaw) {
+                var prev = JSON.parse(prevRaw);
+                prevItems = Array.isArray(prev.items) ? prev.items : undefined;
+            }
         } catch (e) { /* ignore */ }
+        var items = Array.isArray(itemsForSave) ? itemsForSave : prevItems;
+        // If provided an empty array explicitly, keep previous items instead of erasing
+        if (Array.isArray(itemsForSave) && itemsForSave.length === 0 && Array.isArray(prevItems) && prevItems.length > 0) {
+            items = prevItems;
+        }
+        var state = {
+            groupId: $('#sbGroupSelect').val() || '',
+            proxyIds: getSelectedProxyIds(),
+            items: items,
+            savedAt: Date.now()
+        };
+        var ok = persistState(state);
+        if (!ok) { try { setStatus('로컬 저장 실패', true); } catch (e) { /* ignore */ } }
     }
 
     function restoreState() {
@@ -262,6 +328,16 @@ $(document).ready(function() {
     $('#sbTableWrap').hide();
     $('#sbEmptyState').show();
     Promise.all([fetchGroups(), fetchProxies()]).then(() => { restoreState(); });
+
+    // Cross-tab sync: update UI when other tabs modify stored state
+    try {
+        window.addEventListener('storage', function(e) {
+            if (!e) return;
+            if (e.key === STORAGE_KEY) {
+                restoreState();
+            }
+        });
+    } catch (e) { /* ignore */ }
 });
 
 function openSbModal(){ $('#sbDetailModal').addClass('is-active'); }
