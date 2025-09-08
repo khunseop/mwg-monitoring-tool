@@ -1,5 +1,12 @@
 # 릴리즈 노트
 
+## v1.3.2
+- 자원 사용률(UI)
+  - Chart.js 라인 차트로 전환(로컬 번들 `/static/vendor/chartjs/chart.umd.js`)
+  - 수집 주기에 맞춰 자동 갱신(최근 1시간 버퍼)
+- 자원 사용률(API)
+  - `POST /api/resource-usage/series` 제거(실시간 UI는 collect + latest로 동작)
+
 ## v1.2.0
 - 자원 사용률(UI)
   - 자원 사용률 페이지에 실시간 그래프 추가(다중 프록시/지표)

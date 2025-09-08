@@ -89,8 +89,8 @@
 - 그룹/프록시 복수 선택, 최근/즐겨찾기, 빈 선택 방지
 
 3) [기능] 그래프 구현 (1차 완료: 실시간/자동)
-- API: `/api/resource-usage/series` 원시 시계열(시작~종료 선택적) 연동
-- UI: 실시간 라인 그래프(다중 프록시/지표), 수집 주기에 맞춰 자동 갱신(최근 1시간)
+- API: 시계열 집계 없이 `collect + latest`로 실시간 갱신
+- UI: Chart.js 라인 그래프(다중 프록시/지표), 수집 주기에 맞춰 자동 갱신(최근 1시간)
 - 다음 단계: 임계치 라인/색상, 헤더 고정, 범례/툴팁 고도화
 - AC: 1분 주기 리프레시 시 UI 60fps 유지, 서버 응답 1초 내
 
@@ -112,7 +112,7 @@
 - 목록 API 페이지네이션 도입(`/api/proxies`, `/api/proxy-groups`, `/api/session-browser`, `/api/resource-usage`)
 - 세션 브라우저 SSH 호스트키 정책 준수(`auto_add`/`reject`)
 - CORS/보안 헤더/헬스체크 추가, 문서 노출 환경변수화, `.env` 로딩
-- 자원 사용률: 시계열 그래프(UI) 및 집계 API 연동(평균/이동평균/누적평균, 자동 새로고침)
+- 자원 사용률: Chart.js 실시간 그래프(UI), 집계 API 제거
 - DB 연결 개선: `DATABASE_URL` 지원, `pool_pre_ping`
 - Pydantic 기본값 안전화: 가변 기본값에 `default_factory`
 
