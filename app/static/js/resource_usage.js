@@ -164,10 +164,21 @@ $(document).ready(function() {
             updateTable(items);
             if (Array.isArray(items)) { saveState(items); } else { saveState(undefined); }
             if (res && res.failed && res.failed > 0) { showRuError('일부 프록시 수집에 실패했습니다.'); }
-            // Push into local timeseries buffer and render
-            bufferAppendBatch(items);
-            renderSeries();
+            // Fetch latest rows from DB to ensure consistency and append to buffer
+            fetchLatestForProxies(proxyIds).then(latestRows => {
+                bufferAppendBatch(latestRows);
+                renderSeries();
+            }).catch(() => {
+                // fallback: use returned items
+                bufferAppendBatch(items);
+                renderSeries();
+            });
         }).catch(() => { showRuError('수집 요청 중 오류가 발생했습니다.'); });
+    }
+
+    function fetchLatestForProxies(proxyIds) {
+        const reqs = (proxyIds || []).map(id => $.getJSON(`/api/resource-usage/latest/${id}`).catch(() => null));
+        return Promise.all(reqs).then(rows => rows.filter(r => r && r.id));
     }
 
     function startPolling() {
@@ -270,25 +281,16 @@ $(document).ready(function() {
         return d.toISOString();
     }
 
-    function showSeriesError(msg) { $('#ruSeriesError').text(msg).show(); }
-    function clearSeriesError() { $('#ruSeriesError').hide().text(''); }
+    // no user-facing series error UI now
+    function showSeriesError(msg) { /* noop */ }
+    function clearSeriesError() { /* noop */ }
 
     function fetchSeries() {
         clearSeriesError();
         const proxyIds = getSelectedProxyIds();
         if (proxyIds.length === 0) { showSeriesError('그래프: 프록시를 하나 이상 선택하세요.'); return; }
-        const startIso = toIsoOrNull($('#ruSeriesStart').val());
-        const endIso = toIsoOrNull($('#ruSeriesEnd').val());
-        if (!startIso || !endIso) { showSeriesError('그래프: 유효한 시작/종료 시각을 입력하세요.'); return; }
-        return $.ajax({
-            url: '/api/resource-usage/series',
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify(payload)
-        }).then(res => {
-            ru.lastSeries = res && res.items ? res : { items: [] };
-            renderSeries();
-        }).catch(() => { showSeriesError('그래프 데이터를 불러오는 중 오류가 발생했습니다.'); });
+        // series API removed; this function is unused now
+        return Promise.resolve();
     }
 
     function colorForSeries(metricKey, seriesIdx) {
@@ -393,35 +395,9 @@ $(document).ready(function() {
         ctx.restore();
     }
 
-    function stopSeriesAuto() {
-        if (ru.seriesTimerId) { clearInterval(ru.seriesTimerId); ru.seriesTimerId = null; }
-    }
-
-    function startSeriesAuto() {
-        stopSeriesAuto();
-        const sec = Math.max(10, parseInt($('#ruSeriesAutoSec').val(), 10) || 60);
-        ru.seriesTimerId = setInterval(() => {
-            const startVal = $('#ruSeriesStart').val();
-            const endVal = $('#ruSeriesEnd').val();
-            const start = new Date(startVal);
-            const end = new Date(endVal);
-            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-                const duration = Math.max(60 * 1000, end.getTime() - start.getTime());
-                const newEnd = new Date();
-                const newStart = new Date(newEnd.getTime() - duration);
-                $('#ruSeriesStart').val(formatDateLocalInput(newStart));
-                $('#ruSeriesEnd').val(formatDateLocalInput(newEnd));
-            }
-            fetchSeries();
-        }, sec * 1000);
-    }
+    // auto series refresh removed (chart updates on collect)
 
     if (initChart()) {
-        initSeriesRangeDefaults();
-        $('#ruSeriesRefreshBtn').on('click', function() { fetchSeries(); });
-        $('#ruSeriesAuto').on('change', function() { if ($(this).is(':checked')) startSeriesAuto(); else stopSeriesAuto(); });
-        $('#ruSeriesAutoSec').on('change', function() { if ($('#ruSeriesAuto').is(':checked')) startSeriesAuto(); });
-        $('#ruSeriesStart, #ruSeriesEnd').on('change', function() { fetchSeries(); });
         $('#ruMetric-cpu, #ruMetric-mem, #ruMetric-cc, #ruMetric-cs, #ruMetric-http, #ruMetric-https, #ruMetric-ftp').on('change', function() { renderSeries(); });
     }
 });

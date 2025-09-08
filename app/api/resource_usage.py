@@ -13,10 +13,6 @@ from app.schemas.resource_usage import (
     ResourceUsage as ResourceUsageSchema,
     CollectRequest,
     CollectResponse,
-    SeriesRequest,
-    SeriesResponse,
-    SeriesPoint,
-    SeriesItem,
 )
 
 # aiosnmp import for SNMP operations
@@ -150,56 +146,5 @@ async def latest_resource_usage(proxy_id: int, db: Session = Depends(get_db)):
     return row
 
 
-def _floor_dt(dt: datetime, interval: str) -> datetime:
-    if interval == "minute":
-        return dt.replace(second=0, microsecond=0)
-    if interval == "hour":
-        return dt.replace(minute=0, second=0, microsecond=0)
-    if interval == "day":
-        return dt.replace(hour=0, minute=0, second=0, microsecond=0)
-    return dt
-
-
-@router.post("/resource-usage/series", response_model=SeriesResponse)
-async def series_resource_usage(payload: SeriesRequest, db: Session = Depends(get_db)):
-    if not payload.proxy_ids:
-        raise HTTPException(status_code=400, detail="proxy_ids is required")
-    if payload.end is not None and payload.start >= payload.end:
-        raise HTTPException(status_code=400, detail="start must be before end")
-
-    q = (
-        db.query(ResourceUsageModel)
-        .filter(ResourceUsageModel.proxy_id.in_(payload.proxy_ids))
-        .filter(ResourceUsageModel.collected_at >= payload.start)
-    )
-    if payload.end is not None:
-        q = q.filter(ResourceUsageModel.collected_at < payload.end)
-    rows = (
-        q.order_by(ResourceUsageModel.proxy_id.asc(), ResourceUsageModel.collected_at.asc())
-        .all()
-    )
-
-    by_proxy: Dict[int, List[ResourceUsageModel]] = {}
-    for r in rows:
-        by_proxy.setdefault(r.proxy_id, []).append(r)
-
-    items: List[SeriesItem] = []
-    for proxy_id, records in by_proxy.items():
-        points: List[SeriesPoint] = []
-        for r in records:
-            points.append(
-                SeriesPoint(
-                    ts=r.collected_at,
-                    cpu=r.cpu,
-                    mem=r.mem,
-                    cc=r.cc,
-                    cs=r.cs,
-                    http=r.http,
-                    https=r.https,
-                    ftp=r.ftp,
-                )
-            )
-        items.append(SeriesItem(proxy_id=proxy_id, points=points))
-
-    return SeriesResponse(items=items)
+# series endpoint removed; UI uses collect + latest buffering
 
