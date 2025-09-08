@@ -166,11 +166,14 @@ $(document).ready(function() {
             if (res && res.failed && res.failed > 0) { showRuError('일부 프록시 수집에 실패했습니다.'); }
             // Fetch latest rows from DB to ensure consistency and append to buffer
             fetchLatestForProxies(proxyIds).then(latestRows => {
-                bufferAppendBatch(latestRows);
+                // filter invalid latest rows
+                const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
+                bufferAppendBatch(valid);
                 renderSeries();
             }).catch(() => {
                 // fallback: use returned items
-                bufferAppendBatch(items);
+                const valid = (items || []).filter(r => r && r.proxy_id && r.collected_at);
+                bufferAppendBatch(valid);
                 renderSeries();
             });
         }).catch(() => { showRuError('수집 요청 중 오류가 발생했습니다.'); });
@@ -234,11 +237,12 @@ $(document).ready(function() {
                 }
             });
         });
-        // prune old points
+        // prune old points (defensively skip null/invalid)
         const cutoff = now - ru.bufferWindowMs;
         Object.values(ru.tsBuffer).forEach(byMetric => {
             Object.keys(byMetric).forEach(k => {
-                byMetric[k] = (byMetric[k] || []).filter(p => p.x >= cutoff);
+                const arr = Array.isArray(byMetric[k]) ? byMetric[k] : [];
+                byMetric[k] = arr.filter(p => p && typeof p.x === 'number' && p.x >= cutoff);
             });
         });
     }
@@ -317,7 +321,7 @@ $(document).ready(function() {
         // Build labels from union of all timestamps in buffer (sorted)
         const tsSet = new Set();
         Object.values(ru.tsBuffer).forEach(byMetric => {
-            selectedMetrics.forEach(k => (byMetric[k] || []).forEach(p => tsSet.add(p.x)));
+            selectedMetrics.forEach(k => (byMetric[k] || []).forEach(p => { if (p && typeof p.x === 'number') tsSet.add(p.x); }));
         });
         const labelsMs = Array.from(tsSet).sort((a,b) => a-b);
         const labels = labelsMs.map(ms => {
@@ -336,8 +340,9 @@ $(document).ready(function() {
                 const color = colorForSeries(metricKey, sIdx++);
                 const data = new Array(labels.length).fill(null);
                 (byMetric[metricKey] || []).forEach(p => {
+                    if (!p || typeof p.x !== 'number') return;
                     const idx = labelToIndex.get(p.x);
-                    if (idx !== undefined) data[idx] = p.y;
+                    if (idx !== undefined) data[idx] = (typeof p.y === 'number') ? p.y : null;
                 });
                 datasets.push({
                     label: `${metricKey.toUpperCase()} #${proxyId}`,
