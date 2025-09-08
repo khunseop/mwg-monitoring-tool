@@ -15,6 +15,8 @@ $(document).ready(function() {
     };
     const STORAGE_KEY = 'ru_state_v1';
     const LEGEND_STORAGE_KEY = 'ru_legend_v1';
+    const BUFFER_STORAGE_KEY = 'ru_buffer_v1';
+    const RUN_STORAGE_KEY = 'ru_running_v1';
 
     function showRuError(msg) { $('#ruError').text(msg).show(); }
     function clearRuError() { $('#ruError').hide().text(''); }
@@ -28,6 +30,7 @@ $(document).ready(function() {
             $('#ruStopBtn').attr('disabled', true);
             $('#ruStatus').removeClass('is-success').removeClass('is-danger').addClass('is-light').text('정지됨');
         }
+        try { localStorage.setItem(RUN_STORAGE_KEY, running ? '1' : '0'); } catch (e) { /* ignore */ }
     }
 
     function fetchGroups() {
@@ -114,6 +117,44 @@ $(document).ready(function() {
         try { localStorage.setItem(LEGEND_STORAGE_KEY, JSON.stringify(ru.legendState || {})); } catch (e) { /* ignore */ }
     }
 
+    function loadBufferState() {
+        try {
+            const raw = localStorage.getItem(BUFFER_STORAGE_KEY);
+            if (!raw) return {};
+            const obj = JSON.parse(raw);
+            if (!obj || typeof obj !== 'object') return {};
+            // sanitize to expected structure
+            const out = {};
+            Object.keys(obj).forEach(pid => {
+                const byMetric = obj[pid] || {};
+                out[pid] = { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [] };
+                Object.keys(out[pid]).forEach(m => {
+                    const arr = Array.isArray(byMetric[m]) ? byMetric[m] : [];
+                    // keep within window and type-safe
+                    out[pid][m] = arr.filter(p => p && typeof p.x === 'number' && typeof p.y === 'number');
+                });
+            });
+            return out;
+        } catch (e) { return {}; }
+    }
+
+    function saveBufferState() {
+        try {
+            const out = {};
+            Object.keys(ru.tsBuffer || {}).forEach(pid => {
+                const byMetric = ru.tsBuffer[pid] || {};
+                out[pid] = {};
+                Object.keys(byMetric).forEach(m => {
+                    const arr = Array.isArray(byMetric[m]) ? byMetric[m] : [];
+                    // store a bounded slice to control size
+                    const tail = arr.slice(-ru.bufferMaxPoints);
+                    out[pid][m] = tail;
+                });
+            });
+            localStorage.setItem(BUFFER_STORAGE_KEY, JSON.stringify(out));
+        } catch (e) { /* ignore */ }
+    }
+
     function updateTable(items) {
         const $tbody = $('#ruTableBody');
         $tbody.empty();
@@ -185,11 +226,13 @@ $(document).ready(function() {
                 // filter invalid latest rows
                 const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
                 bufferAppendBatch(valid);
+                saveBufferState();
                 renderAllCharts();
             }).catch(() => {
                 // fallback: use returned items
                 const valid = (items || []).filter(r => r && r.proxy_id && r.collected_at);
                 bufferAppendBatch(valid);
+                saveBufferState();
                 renderAllCharts();
             });
         }).catch(() => { showRuError('수집 요청 중 오류가 발생했습니다.'); });
@@ -285,7 +328,6 @@ $(document).ready(function() {
                     <div class="ru-chart-panel" id="ruChartPanel-${m}" style="border:1px solid var(--border-color,#e5e7eb); border-radius:6px; padding:8px;">
                         <div class="level" style="margin-bottom:6px;">
                             <div class="level-left"><h5 class="title is-6" style="margin:0;">${titles[m]}</h5></div>
-                            <div class="level-right"><span class="tag is-light">범례 클릭으로 토글</span></div>
                         </div>
                         <canvas id="ruChartCanvas-${m}" style="width:100%; height:180px; max-height:180px;"></canvas>
                     </div>
@@ -366,6 +408,20 @@ $(document).ready(function() {
                 const idx = labelToIndex.get(p.x);
                 if (idx !== undefined) data[idx] = (typeof p.y === 'number') ? p.y : null;
             });
+            // Convert cumulative counters to delta per interval for http/https/ftp
+            if (metricKey === 'http' || metricKey === 'https' || metricKey === 'ftp') {
+                let prev = null;
+                for (let i = 0; i < data.length; i++) {
+                    const v = data[i];
+                    if (typeof v === 'number' && typeof prev === 'number') {
+                        const d = v - prev;
+                        data[i] = (d >= 0) ? d : null;
+                    } else {
+                        data[i] = null;
+                    }
+                    if (typeof v === 'number') prev = v;
+                }
+            }
             if (data.some(v => typeof v === 'number')) {
                 const proxyMeta = (ru.proxies || []).find(p => String(p.id) === String(proxyId));
                 const proxyLabel = proxyMeta ? proxyMeta.host : `#${proxyId}`;
@@ -439,8 +495,14 @@ $(document).ready(function() {
         }
     }
 
-    // initialize DOM and legend state
+    // initialize DOM, legend and buffer state
     ru.legendState = loadLegendState();
+    ru.tsBuffer = loadBufferState();
     ensureChartsDom();
+    // auto-restore running state and render charts from buffer
+    try {
+        const running = localStorage.getItem(RUN_STORAGE_KEY) === '1';
+        if (running) { startPolling(); } else { renderAllCharts(); }
+    } catch (e) { renderAllCharts(); }
 });
 
