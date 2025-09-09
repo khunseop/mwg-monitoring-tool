@@ -41,6 +41,67 @@ def _get_cfg(db: Session) -> SessionBrowserConfigModel:
         db.commit()
         db.refresh(cfg)
     return cfg
+def _sessions_col_map() -> Dict[int, Any]:
+    # DataTables column index -> model column for sorting
+    return {
+        0: Proxy.host,
+        1: SessionRecordModel.creation_time,
+        2: SessionRecordModel.user_name,
+        3: SessionRecordModel.client_ip,
+        4: SessionRecordModel.server_ip,
+        5: SessionRecordModel.cl_bytes_received,
+        6: SessionRecordModel.cl_bytes_sent,
+        7: SessionRecordModel.age_seconds,
+        8: SessionRecordModel.url,
+        9: SessionRecordModel.id,
+    }
+
+
+def _base_sessions_query(db: Session):
+    return db.query(SessionRecordModel, Proxy).join(Proxy, SessionRecordModel.proxy_id == Proxy.id)
+
+
+def _apply_sessions_filters(base_q, group_id: int | None, proxy_ids_csv: str | None, search: str | None):
+    q = base_q
+    if group_id is not None:
+        q = q.filter(Proxy.group_id == group_id)
+    if proxy_ids_csv:
+        try:
+            id_list = [int(x) for x in proxy_ids_csv.split(",") if x.strip()]
+            if id_list:
+                q = q.filter(SessionRecordModel.proxy_id.in_(id_list))
+        except Exception:
+            pass
+    if search:
+        s = f"%{search}%"
+        q = q.filter(
+            or_(
+                SessionRecordModel.transaction.ilike(s),
+                SessionRecordModel.user_name.ilike(s),
+                SessionRecordModel.client_ip.ilike(s),
+                SessionRecordModel.server_ip.ilike(s),
+                SessionRecordModel.protocol.ilike(s),
+                SessionRecordModel.status.ilike(s),
+                SessionRecordModel.url.ilike(s),
+                Proxy.host.ilike(s),
+            )
+        )
+    return q
+
+
+def _apply_sessions_order(q, order_col: int | None, order_dir: str | None):
+    col_map = _sessions_col_map()
+    if order_col is not None and order_col in col_map:
+        col = col_map[order_col]
+        if (order_dir or "").lower() == "desc":
+            return q.order_by(desc(col))
+        elif (order_dir or "").lower() == "asc":
+            return q.order_by(asc(col))
+        else:
+            return q.order_by(desc(col))
+    # default order: newest first
+    return q.order_by(SessionRecordModel.collected_at.desc(), SessionRecordModel.id.desc())
+
 
 
 def _exec_ssh_command(host: str, username: str, password: str | None, port: int, command: str, timeout_sec: int) -> str:
@@ -377,67 +438,20 @@ async def sessions_datatables(
     proxy_ids: str | None = Query(None),  # comma-separated
 ):
     # Mapping DataTables column index -> (model column, default sort direction)
-    col_map: Dict[int, Any] = {
-        0: (Proxy.host, asc),
-        1: (SessionRecordModel.creation_time, desc),
-        2: (SessionRecordModel.user_name, asc),
-        3: (SessionRecordModel.client_ip, asc),
-        4: (SessionRecordModel.server_ip, asc),
-        5: (SessionRecordModel.cl_bytes_received, desc),
-        6: (SessionRecordModel.cl_bytes_sent, desc),
-        7: (SessionRecordModel.age_seconds, asc),
-        8: (SessionRecordModel.url, asc),
-        9: (SessionRecordModel.id, desc),
-    }
-
     # Base query with join to proxy for filtering/sorting by host/group
-    base_q = db.query(SessionRecordModel, Proxy).join(Proxy, SessionRecordModel.proxy_id == Proxy.id)
+    base_q = _base_sessions_query(db)
 
     # Total records (before filters)
     records_total = db.query(func.count(SessionRecordModel.id)).scalar() or 0
 
     # Apply filters
-    if group_id is not None:
-        base_q = base_q.filter(Proxy.group_id == group_id)
-    if proxy_ids:
-        try:
-            id_list = [int(x) for x in proxy_ids.split(",") if x.strip()]
-            if id_list:
-                base_q = base_q.filter(SessionRecordModel.proxy_id.in_(id_list))
-        except Exception:
-            pass
-
-    # Apply search across selected columns
-    if search:
-        s = f"%{search}%"
-        base_q = base_q.filter(
-            or_(
-                SessionRecordModel.transaction.ilike(s),
-                SessionRecordModel.user_name.ilike(s),
-                SessionRecordModel.client_ip.ilike(s),
-                SessionRecordModel.server_ip.ilike(s),
-                SessionRecordModel.protocol.ilike(s),
-                SessionRecordModel.status.ilike(s),
-                SessionRecordModel.url.ilike(s),
-                Proxy.host.ilike(s),
-            )
-        )
+    base_q = _apply_sessions_filters(base_q, group_id, proxy_ids, search)
 
     # records after filtering
     records_filtered = base_q.with_entities(func.count(SessionRecordModel.id)).scalar() or 0
 
     # Ordering
-    if order_col is not None and order_col in col_map:
-        col, default_dir = col_map[order_col]
-        if (order_dir or "").lower() == "desc":
-            base_q = base_q.order_by(desc(col))
-        elif (order_dir or "").lower() == "asc":
-            base_q = base_q.order_by(asc(col))
-        else:
-            base_q = base_q.order_by(default_dir(col))
-    else:
-        # Default order: newest collected first
-        base_q = base_q.order_by(SessionRecordModel.collected_at.desc(), SessionRecordModel.id.desc())
+    base_q = _apply_sessions_order(base_q, order_col, order_dir)
 
     # Pagination
     rows = base_q.offset(start).limit(length).all()
@@ -496,70 +510,37 @@ async def sessions_export(
     group_id: int | None = Query(None),
     proxy_ids: str | None = Query(None),  # comma-separated
 ):
-    col_map: Dict[int, Any] = {
-        0: (Proxy.host, asc),
-        1: (SessionRecordModel.creation_time, desc),
-        2: (SessionRecordModel.user_name, asc),
-        3: (SessionRecordModel.client_ip, asc),
-        4: (SessionRecordModel.server_ip, asc),
-        5: (SessionRecordModel.cl_bytes_received, desc),
-        6: (SessionRecordModel.cl_bytes_sent, desc),
-        7: (SessionRecordModel.age_seconds, asc),
-        8: (SessionRecordModel.url, asc),
-        9: (SessionRecordModel.id, desc),
-    }
-
-    base_q = db.query(SessionRecordModel, Proxy).join(Proxy, SessionRecordModel.proxy_id == Proxy.id)
-    if group_id is not None:
-        base_q = base_q.filter(Proxy.group_id == group_id)
-    if proxy_ids:
-        try:
-            id_list = [int(x) for x in proxy_ids.split(",") if x.strip()]
-            if id_list:
-                base_q = base_q.filter(SessionRecordModel.proxy_id.in_(id_list))
-        except Exception:
-            pass
-    if search:
-        s = f"%{search}%"
-        base_q = base_q.filter(
-            or_(
-                SessionRecordModel.transaction.ilike(s),
-                SessionRecordModel.user_name.ilike(s),
-                SessionRecordModel.client_ip.ilike(s),
-                SessionRecordModel.server_ip.ilike(s),
-                SessionRecordModel.protocol.ilike(s),
-                SessionRecordModel.status.ilike(s),
-                SessionRecordModel.url.ilike(s),
-                Proxy.host.ilike(s),
-            )
-        )
-
-    if order_col is not None and order_col in col_map:
-        col, default_dir = col_map[order_col]
-        if (order_dir or "").lower() == "desc":
-            base_q = base_q.order_by(desc(col))
-        elif (order_dir or "").lower() == "asc":
-            base_q = base_q.order_by(asc(col))
-        else:
-            base_q = base_q.order_by(default_dir(col))
-    else:
-        base_q = base_q.order_by(SessionRecordModel.collected_at.desc(), SessionRecordModel.id.desc())
+    base_q = _base_sessions_query(db)
+    base_q = _apply_sessions_filters(base_q, group_id, proxy_ids, search)
+    base_q = _apply_sessions_order(base_q, order_col, order_dir)
 
     def row_iter() -> Iterable[str]:
         # Write UTF-8 BOM for Excel compatibility
         yield "\ufeff"
         # Header (Korean labels to match UI)
         headers = [
+            "id",
             "프록시",
+            "수집시각",
+            "트랜잭션",
             "생성시각",
+            "프로토콜",
+            "Cust ID",
             "사용자",
             "클라이언트 IP",
+            "Client-side MWG IP",
+            "Server-side MWG IP",
             "서버 IP",
-            "CL 수신",
-            "CL 송신",
+            "CL 수신(Bytes)",
+            "CL 송신(Bytes)",
+            "서버 수신(Bytes)",
+            "서버 송신(Bytes)",
+            "Trxn Index",
             "Age(s)",
+            "상태",
+            "In Use",
             "URL",
-            "id",
+            "원본",
         ]
         yield ",".join(headers) + "\n"
 
@@ -571,11 +552,8 @@ async def sessions_export(
                 break
             for rec, proxy in batch:
                 host = proxy.host if proxy else f"#{rec.proxy_id}"
-                ct_str = rec.creation_time.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S") if rec.creation_time else ""
-                cl_recv = rec.cl_bytes_received if rec.cl_bytes_received is not None else ""
-                cl_sent = rec.cl_bytes_sent if rec.cl_bytes_sent is not None else ""
-                age_val = rec.age_seconds if rec.age_seconds is not None and rec.age_seconds >= 0 else ""
-                url = rec.url or ""
+                collected_str = rec.collected_at.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S") if rec.collected_at else ""
+                creation_str = rec.creation_time.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S") if rec.creation_time else ""
                 # simple CSV escaping
                 def esc(v: Any) -> str:
                     s = "" if v is None else str(v)
@@ -583,16 +561,28 @@ async def sessions_export(
                         s = '"' + s.replace('"', '""') + '"'
                     return s
                 row = [
+                    esc(rec.id),
                     esc(host),
-                    esc(ct_str),
+                    esc(collected_str),
+                    esc(rec.transaction or ""),
+                    esc(creation_str),
+                    esc(rec.protocol or ""),
+                    esc(rec.cust_id or ""),
                     esc(rec.user_name or ""),
                     esc(rec.client_ip or ""),
+                    esc(rec.client_side_mwg_ip or ""),
+                    esc(rec.server_side_mwg_ip or ""),
                     esc(rec.server_ip or ""),
-                    esc(cl_recv),
-                    esc(cl_sent),
-                    esc(age_val),
-                    esc(url),
-                    esc(rec.id),
+                    esc(rec.cl_bytes_received),
+                    esc(rec.cl_bytes_sent),
+                    esc(rec.srv_bytes_received),
+                    esc(rec.srv_bytes_sent),
+                    esc(rec.trxn_index),
+                    esc(rec.age_seconds),
+                    esc(rec.status or ""),
+                    esc(rec.in_use),
+                    esc(rec.url or ""),
+                    esc(rec.raw_line or ""),
                 ]
                 yield ",".join(row) + "\n"
             offset += chunk
