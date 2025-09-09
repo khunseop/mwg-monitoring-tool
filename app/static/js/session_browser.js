@@ -336,6 +336,27 @@ $(document).ready(function() {
     }
 
     $('#sbLoadBtn').on('click', function() { loadLatest(); });
+    $('#sbExportBtn').on('click', function() {
+        const params = {};
+        const g = $('#sbGroupSelect').val();
+        if (g) params.group_id = g;
+        const pids = ($('#sbProxySelect').val() || []).join(',');
+        if (pids) params.proxy_ids = pids;
+        const searchVal = (sb.dt && sb.dt.search) ? (typeof sb.dt.search === 'function' ? sb.dt.search() : '') : '';
+        if (searchVal) params['search[value]'] = searchVal;
+        // carry over ordering
+        try {
+            const order = sb.dt && sb.dt.order ? (typeof sb.dt.order === 'function' ? sb.dt.order() : []) : [];
+            if (order && order.length > 0) {
+                params['order[0][column]'] = order[0][0];
+                params['order[0][dir]'] = order[0][1];
+            }
+        } catch (e) {}
+        const qs = $.param(params);
+        const url = '/api/session-browser/export' + (qs ? ('?' + qs) : '');
+        // open in new tab to trigger download without blocking UI
+        window.open(url, '_blank');
+    });
     $('#sbGroupSelect').on('change', function() { renderProxySelect(); saveState(undefined); });
     $('#sbSelectAll').on('change', function() {
         const checked = $(this).is(':checked');

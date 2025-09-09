@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from app.utils.time import now_kst, KST_TZ
@@ -484,4 +485,120 @@ async def get_session_record(record_id: int, db: Session = Depends(get_db)):
     if not row:
         raise HTTPException(status_code=404, detail="Record not found")
     return row
+
+
+@router.get("/session-browser/export")
+async def sessions_export(
+    db: Session = Depends(get_db),
+    search: str | None = Query(None, alias="search[value]"),
+    order_col: int | None = Query(None, alias="order[0][column]"),
+    order_dir: str | None = Query(None, alias="order[0][dir]"),
+    group_id: int | None = Query(None),
+    proxy_ids: str | None = Query(None),  # comma-separated
+):
+    col_map: Dict[int, Any] = {
+        0: (Proxy.host, asc),
+        1: (SessionRecordModel.creation_time, desc),
+        2: (SessionRecordModel.user_name, asc),
+        3: (SessionRecordModel.client_ip, asc),
+        4: (SessionRecordModel.server_ip, asc),
+        5: (SessionRecordModel.cl_bytes_received, desc),
+        6: (SessionRecordModel.cl_bytes_sent, desc),
+        7: (SessionRecordModel.age_seconds, asc),
+        8: (SessionRecordModel.url, asc),
+        9: (SessionRecordModel.id, desc),
+    }
+
+    base_q = db.query(SessionRecordModel, Proxy).join(Proxy, SessionRecordModel.proxy_id == Proxy.id)
+    if group_id is not None:
+        base_q = base_q.filter(Proxy.group_id == group_id)
+    if proxy_ids:
+        try:
+            id_list = [int(x) for x in proxy_ids.split(",") if x.strip()]
+            if id_list:
+                base_q = base_q.filter(SessionRecordModel.proxy_id.in_(id_list))
+        except Exception:
+            pass
+    if search:
+        s = f"%{search}%"
+        base_q = base_q.filter(
+            or_(
+                SessionRecordModel.transaction.ilike(s),
+                SessionRecordModel.user_name.ilike(s),
+                SessionRecordModel.client_ip.ilike(s),
+                SessionRecordModel.server_ip.ilike(s),
+                SessionRecordModel.protocol.ilike(s),
+                SessionRecordModel.status.ilike(s),
+                SessionRecordModel.url.ilike(s),
+                Proxy.host.ilike(s),
+            )
+        )
+
+    if order_col is not None and order_col in col_map:
+        col, default_dir = col_map[order_col]
+        if (order_dir or "").lower() == "desc":
+            base_q = base_q.order_by(desc(col))
+        elif (order_dir or "").lower() == "asc":
+            base_q = base_q.order_by(asc(col))
+        else:
+            base_q = base_q.order_by(default_dir(col))
+    else:
+        base_q = base_q.order_by(SessionRecordModel.collected_at.desc(), SessionRecordModel.id.desc())
+
+    def row_iter() -> Iterable[str]:
+        # Write UTF-8 BOM for Excel compatibility
+        yield "\ufeff"
+        # Header (Korean labels to match UI)
+        headers = [
+            "프록시",
+            "생성시각",
+            "사용자",
+            "클라이언트 IP",
+            "서버 IP",
+            "CL 수신",
+            "CL 송신",
+            "Age(s)",
+            "URL",
+            "id",
+        ]
+        yield ",".join(headers) + "\n"
+
+        chunk = 2000
+        offset = 0
+        while True:
+            batch = base_q.offset(offset).limit(chunk).all()
+            if not batch:
+                break
+            for rec, proxy in batch:
+                host = proxy.host if proxy else f"#{rec.proxy_id}"
+                ct_str = rec.creation_time.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S") if rec.creation_time else ""
+                cl_recv = rec.cl_bytes_received if rec.cl_bytes_received is not None else ""
+                cl_sent = rec.cl_bytes_sent if rec.cl_bytes_sent is not None else ""
+                age_val = rec.age_seconds if rec.age_seconds is not None and rec.age_seconds >= 0 else ""
+                url = rec.url or ""
+                # simple CSV escaping
+                def esc(v: Any) -> str:
+                    s = "" if v is None else str(v)
+                    if '"' in s or "," in s or "\n" in s or "\r" in s:
+                        s = '"' + s.replace('"', '""') + '"'
+                    return s
+                row = [
+                    esc(host),
+                    esc(ct_str),
+                    esc(rec.user_name or ""),
+                    esc(rec.client_ip or ""),
+                    esc(rec.server_ip or ""),
+                    esc(cl_recv),
+                    esc(cl_sent),
+                    esc(age_val),
+                    esc(url),
+                    esc(rec.id),
+                ]
+                yield ",".join(row) + "\n"
+            offset += chunk
+
+    filename = f"sessions_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}\.csv"
+    return StreamingResponse(row_iter(), media_type="text/csv", headers={
+        "Content-Disposition": f"attachment; filename={filename}"
+    })
 
