@@ -4,7 +4,8 @@ $(document).ready(function() {
         lastCumulativeByProxy: {},
         proxies: [],
         groups: [],
-        charts: {}, // { [metricKey]: ChartJSInstance }
+        charts: {}, // { [metricKey]: ApexChartsInstance }
+        seriesMap: {}, // { [metricKey]: proxyId[] in series order }
         chartDpr: (window.devicePixelRatio || 1),
         // timeseries buffer: { [proxyId]: { metricKey: [{x:ms, y:number}] } }
         tsBuffer: {},
@@ -423,7 +424,7 @@ $(document).ready(function() {
         });
     }
 
-    function ensureChartsDom() {
+    function ensureApexChartsDom() {
         const $wrap = $('#ruChartsWrap');
         if ($wrap.length === 0) return false;
         if ($wrap.data('initialized')) return true;
@@ -432,12 +433,12 @@ $(document).ready(function() {
         $wrap.empty();
         metrics.forEach(m => {
             const panel = `
-                <div class="column is-4">
+                <div class="column is-12">
                     <div class="ru-chart-panel" id="ruChartPanel-${m}" style="border:1px solid var(--border-color,#e5e7eb); border-radius:6px; padding:8px;">
                         <div class="level" style="margin-bottom:6px;">
                             <div class="level-left"><h5 class="title is-6" style="margin:0;">${titles[m]}</h5></div>
                         </div>
-                        <canvas id="ruChartCanvas-${m}" style="width:100%; height:180px; max-height:180px;"></canvas>
+                        <div id="ruApex-${m}" style="width:100%; height:200px;"></div>
                     </div>
                 </div>`;
             $wrap.append(panel);
@@ -479,127 +480,102 @@ $(document).ready(function() {
     }
 
     function renderAllCharts() {
-        if (!window.Chart) return;
-        ensureChartsDom();
+        if (!window.ApexCharts) return;
+        ensureApexChartsDom();
         const metrics = ['cpu','mem','cc','cs','http','https','ftp'];
         metrics.forEach(m => renderMetricChart(m));
     }
 
     function renderMetricChart(metricKey) {
-        const canvas = document.getElementById(`ruChartCanvas-${metricKey}`);
-        if (!canvas) return;
+        const el = document.getElementById(`ruApex-${metricKey}`);
+        if (!el) return;
         const selectedProxyIds = getSelectedProxyIds();
-        // Build labels from union of all timestamps in buffer for this metric (sorted)
+        // Build union of timestamps
         const tsSet = new Set();
         selectedProxyIds.forEach(pid => {
             const series = (ru.tsBuffer[pid] && ru.tsBuffer[pid][metricKey]) ? ru.tsBuffer[pid][metricKey] : [];
             series.forEach(p => { if (p && typeof p.x === 'number') tsSet.add(p.x); });
         });
         const labelsMs = Array.from(tsSet).sort((a,b) => a-b);
-        const labels = labelsMs.map(ms => {
-            const d = new Date(ms);
-            const hh = String(d.getHours()).padStart(2, '0');
-            const mm = String(d.getMinutes()).padStart(2, '0');
-            const ss = String(d.getSeconds()).padStart(2, '0');
-            return `${hh}:${mm}:${ss}`;
-        });
         const labelToIndex = new Map(labelsMs.map((ms, i) => [ms, i]));
 
-        const datasets = [];
         ru.legendState[metricKey] = ru.legendState[metricKey] || {};
+        const series = [];
+        const seriesProxyMap = [];
         selectedProxyIds.forEach(proxyId => {
             const byMetric = ru.tsBuffer[proxyId] || {};
             const arr = byMetric[metricKey] || [];
-            const data = new Array(labels.length).fill(null);
+            const values = new Array(labelsMs.length).fill(null);
             arr.forEach(p => {
                 if (!p || typeof p.x !== 'number') return;
                 const idx = labelToIndex.get(p.x);
-                if (idx !== undefined) data[idx] = (typeof p.y === 'number') ? p.y : null;
+                if (idx !== undefined) values[idx] = (typeof p.y === 'number') ? p.y : null;
             });
-            // Convert cumulative counters to delta per interval for http/https/ftp
             if (metricKey === 'http' || metricKey === 'https' || metricKey === 'ftp') {
                 let prev = null;
-                for (let i = 0; i < data.length; i++) {
-                    const v = data[i];
+                for (let i = 0; i < values.length; i++) {
+                    const v = values[i];
                     if (typeof v === 'number' && typeof prev === 'number') {
                         const d = v - prev;
-                        data[i] = (d >= 0) ? d : null;
+                        values[i] = (d >= 0) ? d : null;
                     } else {
-                        data[i] = null;
+                        values[i] = null;
                     }
                     if (typeof v === 'number') prev = v;
                 }
             }
-            if (data.some(v => typeof v === 'number')) {
+            if (values.some(v => typeof v === 'number')) {
                 const proxyMeta = (ru.proxies || []).find(p => String(p.id) === String(proxyId));
                 const proxyLabel = proxyMeta ? proxyMeta.host : `#${proxyId}`;
-                const color = colorForProxy(proxyId);
-                const hidden = !!ru.legendState[metricKey][proxyId];
-                datasets.push({
-                    label: proxyLabel,
-                    data,
-                    borderColor: color,
-                    backgroundColor: color,
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    pointHitRadius: 6,
-                    tension: 0.2,
-                    spanGaps: true,
-                    hidden: hidden,
-                    _proxyId: proxyId
-                });
+                const paired = labelsMs.map((ms, i) => ({ x: ms, y: values[i] }));
+                series.push({ name: proxyLabel, data: paired });
+                seriesProxyMap.push(proxyId);
             }
         });
 
+        // deterministic colors based on proxy order
+        const colors = seriesProxyMap.map(pid => colorForProxy(pid));
+        ru.seriesMap[metricKey] = seriesProxyMap;
+
         const options = {
-            animation: false,
-            normalized: true,
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: { type: 'category', ticks: { autoSkip: true, maxTicksLimit: 8 }, grid: { color: '#e5e7eb' } },
-                y: { beginAtZero: false, ticks: { precision: 0 }, grid: { color: '#e5e7eb' } }
-            },
-            elements: { point: { radius: 0, hitRadius: 6, hoverRadius: 3 } },
-            plugins: {
-                legend: {
-                    display: true,
-                    labels: { boxWidth: 12 },
-                    onClick: (evt, legendItem, legend) => {
-                        const chart = legend.chart;
-                        const index = legendItem.datasetIndex;
-                        // use default toggle behavior first
-                        const defaultClick = Chart.defaults.plugins.legend.onClick;
-                        if (defaultClick) defaultClick.call(this, evt, legendItem, legend);
-                        // persist visibility by metric/proxy
-                        const ds = chart.data.datasets[index];
-                        const meta = chart.getDatasetMeta(index);
-                        const proxyId = ds && ds._proxyId;
+            chart: {
+                type: 'line', height: 200, animations: { enabled: false }, toolbar: { show: false },
+                events: {
+                    legendClick: function(chartContext, seriesIndex, config) {
+                        const proxyId = ru.seriesMap[metricKey] && ru.seriesMap[metricKey][seriesIndex];
                         if (proxyId != null) {
-                            // hidden state is true when dataset not visible
-                            const hidden = meta.hidden === true || chart.isDatasetVisible(index) === false;
+                            // Toggle persists inside Apex; we flip our state for persistence across reloads
+                            const prev = !!(ru.legendState[metricKey] && ru.legendState[metricKey][proxyId]);
                             ru.legendState[metricKey] = ru.legendState[metricKey] || {};
-                            ru.legendState[metricKey][proxyId] = hidden;
+                            ru.legendState[metricKey][proxyId] = !prev;
                             saveLegendState();
                         }
                     }
-                },
-                tooltip: { mode: 'nearest', intersect: false },
-                title: { display: false }
-            }
+                }
+            },
+            colors: colors,
+            stroke: { width: 2, curve: 'smooth' },
+            markers: { size: 0 },
+            dataLabels: { enabled: false },
+            xaxis: { type: 'datetime', labels: { datetimeUTC: false } },
+            yaxis: { decimalsInFloat: 0 },
+            tooltip: { shared: true, x: { format: 'HH:mm:ss' } },
+            legend: { show: true }
         };
 
         if (!ru.charts[metricKey]) {
-            ru.charts[metricKey] = new Chart(canvas.getContext('2d'), {
-                type: 'line',
-                data: { labels, datasets },
-                options
+            ru.charts[metricKey] = new ApexCharts(el, { ...options, series });
+            ru.charts[metricKey].render().then(() => {
+                // apply hidden state persistence
+                (ru.seriesMap[metricKey] || []).forEach((pid, i) => {
+                    if (ru.legendState[metricKey] && ru.legendState[metricKey][pid]) {
+                        try { ru.charts[metricKey].toggleSeries(series[i].name); } catch (e) {}
+                    }
+                });
             });
         } else {
-            const chart = ru.charts[metricKey];
-            chart.data.labels = labels;
-            chart.data.datasets = datasets;
-            chart.update('none');
+            ru.charts[metricKey].updateOptions({ colors }, false, true);
+            ru.charts[metricKey].updateSeries(series, true);
         }
     }
 
