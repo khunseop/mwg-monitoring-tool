@@ -240,18 +240,45 @@ $(document).ready(function() {
         if (!el) return;
         if (!window.ApexCharts) return;
 
+        // Build per-column scaling using thresholds when provided
+        const thr = (cachedConfig && cachedConfig.thresholds) ? cachedConfig.thresholds : {};
+        function baseKeyFor(metricKey) {
+            if (metricKey === 'httpd') return 'http';
+            if (metricKey === 'httpsd') return 'https';
+            if (metricKey === 'ftpd') return 'ftp';
+            return metricKey;
+        }
+        const scaleForCol = metrics.map(m => {
+            const baseKey = baseKeyFor(m.key);
+            const t = (typeof thr[baseKey] === 'number' && isFinite(thr[baseKey]) && thr[baseKey] > 0) ? thr[baseKey] : (maxByMetric[m.key] || 1);
+            return function(v) {
+                if (typeof v !== 'number' || !isFinite(v)) return null;
+                const scaled = (v / t) * 100;
+                return Math.max(0, Math.min(150, Math.round(scaled)));
+            };
+        });
+
+        // Preserve raw values separately for labels/tooltips
+        ru._heatRaw = yCategories.map(() => new Array(xCategories.length).fill(null));
+
         const seriesData = yCategories.map((rowLabel, rowIdx) => {
             const dataPoints = xCategories.map((colLabel, colIdx) => {
                 const point = data.find(d => d.value[0] === colIdx && d.value[1] === rowIdx);
                 const raw = point ? point.raw : null;
-                return { x: colLabel, y: raw == null ? null : Math.round(raw) };
+                ru._heatRaw[rowIdx][colIdx] = (typeof raw === 'number' && isFinite(raw)) ? raw : null;
+                const scaled = (typeof raw === 'number' && isFinite(raw)) ? scaleForCol[colIdx](raw) : null;
+                return { x: colLabel, y: scaled };
             });
             return { name: rowLabel, data: dataPoints };
         });
 
         const options = {
             chart: { type: 'heatmap', height: 460, animations: { enabled: false }, toolbar: { show: false } },
-            dataLabels: { enabled: true, style: { colors: ['#111827'] }, formatter: function(val, opts) { return val == null ? '' : val; } },
+            dataLabels: { enabled: true, style: { colors: ['#111827'] }, formatter: function(val, opts) {
+                const y = opts.seriesIndex; const x = opts.dataPointIndex;
+                const raw = (ru._heatRaw && ru._heatRaw[y]) ? ru._heatRaw[y][x] : null;
+                return raw == null ? '' : String(Math.round(raw));
+            } },
             colors: ["#12824C"],
             plotOptions: {
                 heatmap: {
@@ -260,20 +287,21 @@ $(document).ready(function() {
                     enableShades: true,
                     colorScale: {
                         ranges: [
-                            { from: 0, to: 0, color: '#f3f4f6', name: 'N/A' },
-                            { from: 0, to: 1, color: '#e8f7e1' },
-                            { from: 2, to: 10, color: '#cdeeb4' },
-                            { from: 11, to: 30, color: '#a3d977' },
-                            { from: 31, to: 60, color: '#f2c94c' },
-                            { from: 61, to: 85, color: '#e67e22' },
-                            { from: 86, to: 999999999, color: '#eb5757' }
+                            { from: -1, to: -0.1, color: '#f3f4f6', name: 'N/A' },
+                            { from: 0, to: 50, color: '#a3d977' },
+                            { from: 50, to: 90, color: '#f2c94c' },
+                            { from: 90, to: 110, color: '#e67e22' },
+                            { from: 110, to: 1000, color: '#eb5757' }
                         ]
                     }
                 }
             },
             xaxis: { type: 'category', categories: xCategories },
             yaxis: { labels: { style: { fontSize: '11px' } } },
-            tooltip: { y: { formatter: function(val) { return val == null ? 'N/A' : String(val); } } },
+            tooltip: { y: { formatter: function(val, { seriesIndex, dataPointIndex }) {
+                const raw = (ru._heatRaw && ru._heatRaw[seriesIndex]) ? ru._heatRaw[seriesIndex][dataPointIndex] : null;
+                return raw == null ? 'N/A' : String(raw);
+            } } },
             series: seriesData
         };
 

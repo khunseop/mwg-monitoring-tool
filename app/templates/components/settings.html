@@ -123,6 +123,58 @@
                     </div>
                 </div>
             </div>
+            <div class="column is-12">
+                <div class="accordion">
+                    <div class="accordion-header"><h4>임계치 설정</h4></div>
+                    <div class="accordion-body">
+                        <p class="mb-3" style="color: var(--color-text-muted);">각 항목의 경고 임계치를 설정합니다. 비워두면 자동 스케일링만 사용합니다.</p>
+                        <div class="columns is-multiline">
+                            <div class="column is-3">
+                                <div class="field">
+                                    <label class="label is-small">CPU 임계치</label>
+                                    <input class="input is-small" id="cfgThrCpu" type="number" step="1" min="0" placeholder="예: 80">
+                                </div>
+                            </div>
+                            <div class="column is-3">
+                                <div class="field">
+                                    <label class="label is-small">MEM 임계치</label>
+                                    <input class="input is-small" id="cfgThrMem" type="number" step="1" min="0" placeholder="예: 80">
+                                </div>
+                            </div>
+                            <div class="column is-3">
+                                <div class="field">
+                                    <label class="label is-small">CC 임계치</label>
+                                    <input class="input is-small" id="cfgThrCc" type="number" step="1" min="0" placeholder="숫자">
+                                </div>
+                            </div>
+                            <div class="column is-3">
+                                <div class="field">
+                                    <label class="label is-small">CS 임계치</label>
+                                    <input class="input is-small" id="cfgThrCs" type="number" step="1" min="0" placeholder="숫자">
+                                </div>
+                            </div>
+                            <div class="column is-3">
+                                <div class="field">
+                                    <label class="label is-small">HTTP Δ 임계치</label>
+                                    <input class="input is-small" id="cfgThrHttp" type="number" step="1" min="0" placeholder="초당 요청 수">
+                                </div>
+                            </div>
+                            <div class="column is-3">
+                                <div class="field">
+                                    <label class="label is-small">HTTPS Δ 임계치</label>
+                                    <input class="input is-small" id="cfgThrHttps" type="number" step="1" min="0" placeholder="초당 요청 수">
+                                </div>
+                            </div>
+                            <div class="column is-3">
+                                <div class="field">
+                                    <label class="label is-small">FTP Δ 임계치</label>
+                                    <input class="input is-small" id="cfgThrFtp" type="number" step="1" min="0" placeholder="초당 요청 수">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

@@ -19,7 +19,7 @@ def get_resource_config(db: Session = Depends(get_db)):
     cfg = _get_singleton(db)
     if not cfg:
         # create default
-        cfg = ResourceConfigModel(community="public", oids_json='{}')
+        cfg = ResourceConfigModel(community="public", oids_json='{}', thresholds_json='{}')
         db.add(cfg)
         db.commit()
         db.refresh(cfg)
@@ -27,6 +27,7 @@ def get_resource_config(db: Session = Depends(get_db)):
         id=cfg.id,
         community=cfg.community,
         oids=json.loads(cfg.oids_json or '{}'),
+        thresholds=json.loads(getattr(cfg, 'thresholds_json', '{}') or '{}'),
         created_at=cfg.created_at,
         updated_at=cfg.updated_at,
     )
@@ -40,12 +41,18 @@ def update_resource_config(payload: ResourceConfigBase, db: Session = Depends(ge
         db.add(cfg)
     cfg.community = payload.community
     cfg.oids_json = json.dumps(payload.oids or {})
+    # thresholds optional
+    try:
+        cfg.thresholds_json = json.dumps(payload.thresholds or {})
+    except Exception:
+        cfg.thresholds_json = json.dumps({})
     db.commit()
     db.refresh(cfg)
     return ResourceConfigSchema(
         id=cfg.id,
         community=cfg.community,
         oids=json.loads(cfg.oids_json or '{}'),
+        thresholds=json.loads(getattr(cfg, 'thresholds_json', '{}') or '{}'),
         created_at=cfg.created_at,
         updated_at=cfg.updated_at,
     )
