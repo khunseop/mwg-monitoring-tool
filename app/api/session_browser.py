@@ -540,7 +540,6 @@ async def sessions_export(
             "상태",
             "In Use",
             "URL",
-            "원본",
         ]
         yield ",".join(headers) + "\n"
 
@@ -582,7 +581,6 @@ async def sessions_export(
                     esc(rec.status or ""),
                     esc(rec.in_use),
                     esc(rec.url or ""),
-                    esc(rec.raw_line or ""),
                 ]
                 yield ",".join(row) + "\n"
             offset += chunk
