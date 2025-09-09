@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from app.utils.time import now_kst, KST_TZ
+from sqlalchemy import func, or_, asc, desc
 import re
 import warnings
 try:
@@ -39,6 +41,67 @@ def _get_cfg(db: Session) -> SessionBrowserConfigModel:
         db.commit()
         db.refresh(cfg)
     return cfg
+def _sessions_col_map() -> Dict[int, Any]:
+    # DataTables column index -> model column for sorting
+    return {
+        0: Proxy.host,
+        1: SessionRecordModel.creation_time,
+        2: SessionRecordModel.user_name,
+        3: SessionRecordModel.client_ip,
+        4: SessionRecordModel.server_ip,
+        5: SessionRecordModel.cl_bytes_received,
+        6: SessionRecordModel.cl_bytes_sent,
+        7: SessionRecordModel.age_seconds,
+        8: SessionRecordModel.url,
+        9: SessionRecordModel.id,
+    }
+
+
+def _base_sessions_query(db: Session):
+    return db.query(SessionRecordModel, Proxy).join(Proxy, SessionRecordModel.proxy_id == Proxy.id)
+
+
+def _apply_sessions_filters(base_q, group_id: int | None, proxy_ids_csv: str | None, search: str | None):
+    q = base_q
+    if group_id is not None:
+        q = q.filter(Proxy.group_id == group_id)
+    if proxy_ids_csv:
+        try:
+            id_list = [int(x) for x in proxy_ids_csv.split(",") if x.strip()]
+            if id_list:
+                q = q.filter(SessionRecordModel.proxy_id.in_(id_list))
+        except Exception:
+            pass
+    if search:
+        s = f"%{search}%"
+        q = q.filter(
+            or_(
+                SessionRecordModel.transaction.ilike(s),
+                SessionRecordModel.user_name.ilike(s),
+                SessionRecordModel.client_ip.ilike(s),
+                SessionRecordModel.server_ip.ilike(s),
+                SessionRecordModel.protocol.ilike(s),
+                SessionRecordModel.status.ilike(s),
+                SessionRecordModel.url.ilike(s),
+                Proxy.host.ilike(s),
+            )
+        )
+    return q
+
+
+def _apply_sessions_order(q, order_col: int | None, order_dir: str | None):
+    col_map = _sessions_col_map()
+    if order_col is not None and order_col in col_map:
+        col = col_map[order_col]
+        if (order_dir or "").lower() == "desc":
+            return q.order_by(desc(col))
+        elif (order_dir or "").lower() == "asc":
+            return q.order_by(asc(col))
+        else:
+            return q.order_by(desc(col))
+    # default order: newest first
+    return q.order_by(SessionRecordModel.collected_at.desc(), SessionRecordModel.id.desc())
+
 
 
 def _exec_ssh_command(host: str, username: str, password: str | None, port: int, command: str, timeout_sec: int) -> str:
@@ -359,4 +422,171 @@ def update_session_browser_config(payload: SessionBrowserConfigUpdateSafe, db: S
         created_at=cfg.created_at,
         updated_at=cfg.updated_at,
     )
+
+
+# DataTables server-side endpoint for large datasets
+@router.get("/session-browser/datatables")
+async def sessions_datatables(
+    request: Request,
+    db: Session = Depends(get_db),
+    start: int = Query(0, ge=0),
+    length: int = Query(25, ge=1, le=1000),
+    search: str | None = Query(None, alias="search[value]"),
+    order_col: int | None = Query(None, alias="order[0][column]"),
+    order_dir: str | None = Query(None, alias="order[0][dir]"),
+    group_id: int | None = Query(None),
+    proxy_ids: str | None = Query(None),  # comma-separated
+):
+    # Mapping DataTables column index -> (model column, default sort direction)
+    # Base query with join to proxy for filtering/sorting by host/group
+    base_q = _base_sessions_query(db)
+
+    # Total records (before filters)
+    records_total = db.query(func.count(SessionRecordModel.id)).scalar() or 0
+
+    # Apply filters
+    base_q = _apply_sessions_filters(base_q, group_id, proxy_ids, search)
+
+    # records after filtering
+    records_filtered = base_q.with_entities(func.count(SessionRecordModel.id)).scalar() or 0
+
+    # Ordering
+    base_q = _apply_sessions_order(base_q, order_col, order_dir)
+
+    # Pagination
+    rows = base_q.offset(start).limit(length).all()
+
+    # Build DataTables row arrays matching UI columns
+    data: List[List[Any]] = []
+    for rec, proxy in rows:
+        host = proxy.host if proxy else f"#{rec.proxy_id}"
+        ct_str = rec.creation_time.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S") if rec.creation_time else ""
+        cl_recv = rec.cl_bytes_received if rec.cl_bytes_received is not None else ""
+        cl_sent = rec.cl_bytes_sent if rec.cl_bytes_sent is not None else ""
+        age_str = rec.age_seconds if rec.age_seconds is not None and rec.age_seconds >= 0 else ""
+        url_full = rec.url or ""
+        url_short = url_full[:100] + ("…" if len(url_full) > 100 else "")
+        data.append([
+            host,
+            ct_str,
+            rec.user_name or "",
+            rec.client_ip or "",
+            rec.server_ip or "",
+            str(cl_recv) if cl_recv != "" else "",
+            str(cl_sent) if cl_sent != "" else "",
+            str(age_str) if age_str != "" else "",
+            url_short,
+            rec.id,
+        ])
+
+    # DataTables draw counter (echo)
+    try:
+        draw = int(request.query_params.get("draw", "0"))
+    except Exception:
+        draw = 0
+
+    return {
+        "draw": draw,
+        "recordsTotal": records_total,
+        "recordsFiltered": records_filtered,
+        "data": data,
+    }
+
+
+@router.get("/session-browser/item/{record_id}", response_model=SessionRecordSchema)
+async def get_session_record(record_id: int, db: Session = Depends(get_db)):
+    row = db.query(SessionRecordModel).filter(SessionRecordModel.id == record_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return row
+
+
+@router.get("/session-browser/export")
+async def sessions_export(
+    db: Session = Depends(get_db),
+    search: str | None = Query(None, alias="search[value]"),
+    order_col: int | None = Query(None, alias="order[0][column]"),
+    order_dir: str | None = Query(None, alias="order[0][dir]"),
+    group_id: int | None = Query(None),
+    proxy_ids: str | None = Query(None),  # comma-separated
+):
+    base_q = _base_sessions_query(db)
+    base_q = _apply_sessions_filters(base_q, group_id, proxy_ids, search)
+    base_q = _apply_sessions_order(base_q, order_col, order_dir)
+
+    def row_iter() -> Iterable[str]:
+        # Write UTF-8 BOM for Excel compatibility
+        yield "\ufeff"
+        # Header (Korean labels to match UI)
+        headers = [
+            "id",
+            "프록시",
+            "수집시각",
+            "트랜잭션",
+            "생성시각",
+            "프로토콜",
+            "Cust ID",
+            "사용자",
+            "클라이언트 IP",
+            "Client-side MWG IP",
+            "Server-side MWG IP",
+            "서버 IP",
+            "CL 수신(Bytes)",
+            "CL 송신(Bytes)",
+            "서버 수신(Bytes)",
+            "서버 송신(Bytes)",
+            "Trxn Index",
+            "Age(s)",
+            "상태",
+            "In Use",
+            "URL",
+        ]
+        yield ",".join(headers) + "\n"
+
+        chunk = 2000
+        offset = 0
+        while True:
+            batch = base_q.offset(offset).limit(chunk).all()
+            if not batch:
+                break
+            for rec, proxy in batch:
+                host = proxy.host if proxy else f"#{rec.proxy_id}"
+                collected_str = rec.collected_at.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S") if rec.collected_at else ""
+                creation_str = rec.creation_time.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S") if rec.creation_time else ""
+                # simple CSV escaping
+                def esc(v: Any) -> str:
+                    s = "" if v is None else str(v)
+                    if '"' in s or "," in s or "\n" in s or "\r" in s:
+                        s = '"' + s.replace('"', '""') + '"'
+                    return s
+                row = [
+                    esc(rec.id),
+                    esc(host),
+                    esc(collected_str),
+                    esc(rec.transaction or ""),
+                    esc(creation_str),
+                    esc(rec.protocol or ""),
+                    esc(rec.cust_id or ""),
+                    esc(rec.user_name or ""),
+                    esc(rec.client_ip or ""),
+                    esc(rec.client_side_mwg_ip or ""),
+                    esc(rec.server_side_mwg_ip or ""),
+                    esc(rec.server_ip or ""),
+                    esc(rec.cl_bytes_received),
+                    esc(rec.cl_bytes_sent),
+                    esc(rec.srv_bytes_received),
+                    esc(rec.srv_bytes_sent),
+                    esc(rec.trxn_index),
+                    esc(rec.age_seconds),
+                    esc(rec.status or ""),
+                    esc(rec.in_use),
+                    esc(rec.url or ""),
+                ]
+                yield ",".join(row) + "\n"
+            offset += chunk
+
+    filename = f"sessions_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}\.csv"
+    return StreamingResponse(row_iter(), media_type="text/csv", headers={
+        "Content-Disposition": f"attachment; filename={filename}"
+    })
 
