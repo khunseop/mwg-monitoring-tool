@@ -106,6 +106,16 @@ $(document).ready(function() {
 
     function getSelectedProxyIds() { return ($('#sbProxySelect').val() || []).map(v => parseInt(v, 10)); }
 
+    function updateTableVisibility() {
+        try {
+            var $tbody = $('#sbTable tbody');
+            var rowCount = $tbody.find('tr').length;
+            var isEmpty = rowCount === 0 || ($tbody.find('td').first().hasClass('dataTables_empty'));
+            if (isEmpty) { $('#sbTableWrap').hide(); $('#sbEmptyState').show(); }
+            else { $('#sbEmptyState').hide(); $('#sbTableWrap').show(); try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {} }
+        } catch (e) { /* ignore */ }
+    }
+
     function saveState(itemsForSave) {
         var prevItems;
         try {
@@ -200,6 +210,7 @@ $(document).ready(function() {
                     scrollCollapse: true,
                     pageLength: 25,
                     ajax: ajaxFn,
+                    drawCallback: function(){ updateTableVisibility(); },
                     language: {
                         search: '검색:',
                         lengthMenu: '_MENU_ 개씩 보기',
@@ -243,6 +254,7 @@ $(document).ready(function() {
                     scrollCollapse: true,
                     pageLength: 25,
                     ajax: function(data, callback) { ajaxFn(data, callback); },
+                    drawCallback: function(){ updateTableVisibility(); },
                     language: {
                         search: '검색:',
                         lengthMenu: '_MENU_ 개씩 보기',
@@ -355,6 +367,7 @@ $(document).ready(function() {
             if (!e) return;
             if (e.key === STORAGE_KEY) {
                 restoreState();
+                if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, false);
             }
         });
     } catch (e) { /* ignore */ }
