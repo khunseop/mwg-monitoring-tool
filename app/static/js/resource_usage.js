@@ -158,9 +158,10 @@ $(document).ready(function() {
     function updateTable(items) {
         const $tbody = $('#ruTableBody');
         $tbody.empty();
-        items.forEach(row => {
-            const proxy = (ru.proxies || []).find(p => p.id === row.proxy_id);
-            const name = proxy ? `${proxy.host}` : `#${row.proxy_id}`;
+
+        // Build working list with computed deltas for counter metrics
+        const rows = [];
+        (items || []).forEach(row => {
             const last = ru.lastCumulativeByProxy[row.proxy_id] || {};
             const deltas = { http: null, https: null, ftp: null };
             ['http','https','ftp'].forEach(k => {
@@ -175,30 +176,87 @@ $(document).ready(function() {
                 https: typeof row.https === 'number' ? row.https : last.https,
                 ftp: typeof row.ftp === 'number' ? row.ftp : last.ftp,
             };
-            const trId = `ru-row-${row.proxy_id}`;
-            const cpuStr = (row.cpu ?? '').toString();
-            const memStr = (row.mem ?? '').toString();
-            const ccStr = (row.cc ?? '').toString();
-            const csStr = (row.cs ?? '').toString();
-            const httpStr = (deltas.http ?? '').toString();
-            const httpsStr = (deltas.https ?? '').toString();
-            const ftpStr = (deltas.ftp ?? '').toString();
-            const timeStr = row.collected_at ? new Date(row.collected_at).toLocaleString() : '';
+            rows.push({
+                proxy_id: row.proxy_id,
+                cpu: typeof row.cpu === 'number' ? row.cpu : null,
+                mem: typeof row.mem === 'number' ? row.mem : null,
+                cc: typeof row.cc === 'number' ? row.cc : null,
+                cs: typeof row.cs === 'number' ? row.cs : null,
+                httpd: deltas.http,
+                httpsd: deltas.https,
+                ftpd: deltas.ftp,
+            });
+        });
+
+        // Sort by proxy host label for stable order
+        rows.sort((a, b) => {
+            const pa = (ru.proxies || []).find(p => p.id === a.proxy_id);
+            const pb = (ru.proxies || []).find(p => p.id === b.proxy_id);
+            const na = pa ? pa.host : String(a.proxy_id);
+            const nb = pb ? pb.host : String(b.proxy_id);
+            return na.localeCompare(nb);
+        });
+
+        // Compute per-metric max for scaling (ignoring null)
+        const metrics = [
+            { key: 'cpu', title: 'CPU' },
+            { key: 'mem', title: 'MEM' },
+            { key: 'cc', title: 'CC' },
+            { key: 'cs', title: 'CS' },
+            { key: 'httpd', title: 'HTTP Δ' },
+            { key: 'httpsd', title: 'HTTPS Δ' },
+            { key: 'ftpd', title: 'FTP Δ' },
+        ];
+        const maxByMetric = {};
+        metrics.forEach(m => {
+            let max = 0;
+            rows.forEach(r => {
+                const v = r[m.key];
+                if (typeof v === 'number' && isFinite(v) && v >= 0) { if (v > max) max = v; }
+            });
+            // For cpu/mem treat 100 as natural cap if max < 100 (percentage scale)
+            if ((m.key === 'cpu' || m.key === 'mem') && max < 100) max = 100;
+            maxByMetric[m.key] = max || 1;
+        });
+
+        function heatColor(ratio) {
+            const r = Math.max(0, Math.min(1, ratio));
+            // 120 (green) -> 0 (red)
+            const hue = 120 * (1 - r);
+            const light = 92 - (r * 42); // 92% -> 50%
+            const sat = 85; // vivid
+            return `hsl(${hue}, ${sat}%, ${light}%)`;
+        }
+
+        function textColorForRatio(ratio) {
+            return ratio > 0.6 ? '#ffffff' : '#0f172a';
+        }
+
+        rows.forEach(r => {
+            const proxy = (ru.proxies || []).find(p => p.id === r.proxy_id);
+            const name = proxy ? `${proxy.host}` : `#${r.proxy_id}`;
+            const trId = `ru-row-${r.proxy_id}`;
+
+            const tds = metrics.map(m => {
+                const v = r[m.key];
+                const isNum = typeof v === 'number' && isFinite(v);
+                const ratio = isNum ? (v <= 0 ? 0 : v / (maxByMetric[m.key] || 1)) : 0;
+                const bg = isNum ? heatColor(ratio) : 'transparent';
+                const color = isNum ? textColorForRatio(ratio) : 'inherit';
+                const display = isNum ? (m.key === 'cpu' || m.key === 'mem' ? Math.round(v) : Math.round(v)).toString() : '—';
+                const title = `${m.title}: ${isNum ? v : 'N/A'}`;
+                return `<td class="ru-heat-td"><div class="ru-heat-cell" title="${title}" style="background:${bg}; color:${color};">${display}</div></td>`;
+            }).join('');
+
             const rowHtml = `
-                <tr id="${trId}">
-                    <td>${name}</td>
-                    <td>${timeStr}</td>
-                    <td>${cpuStr}</td>
-                    <td>${memStr}</td>
-                    <td>${ccStr}</td>
-                    <td>${csStr}</td>
-                    <td>${httpStr}</td>
-                    <td>${httpsStr}</td>
-                    <td>${ftpStr}</td>
+                <tr id="${trId}" class="ru-heat-row">
+                    <td class="ru-heat-proxy">${name}</td>
+                    ${tds}
                 </tr>`;
             const $existing = $(`#${trId}`);
             if ($existing.length) { $existing.replaceWith(rowHtml); } else { $tbody.append(rowHtml); }
         });
+
         // Toggle empty/table state
         if (!items || items.length === 0) { $('#ruTableWrap').hide(); $('#ruEmptyState').show(); }
         else { $('#ruEmptyState').hide(); $('#ruTableWrap').show(); }
