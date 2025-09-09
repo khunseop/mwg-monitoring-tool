@@ -57,6 +57,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - API 응답에서 프록시 비밀번호 제거, `ProxyUpdate` 부분 업데이트 허용
 - 목록 엔드포인트 페이지네이션 추가(`/api/proxies`, `/api/proxy-groups`, `/api/session-browser`, `/api/resource-usage`)
 - 세션 브라우저: 호스트 키 정책(`auto_add/reject`) 준수
+- 세션 브라우저: 서버사이드 데이터테이블 도입으로 대용량(3만+) 페이지네이션/검색/정렬 지원
+- 세션 브라우저: 전체 컬럼 엑셀(CSV) 내보내기 버튼 추가(현재 필터/검색/정렬 반영)
 - CORS/보안 헤더/건강 체크(`/healthz`), `.env` 로딩 추가, 문서 노출 환경변수화(`ENABLE_DOCS`)
 - DB 설정 개선: `DATABASE_URL` 지원, `pool_pre_ping` 활성화
 - Pydantic 기본값 안전화: `default_factory` 적용(에러 맵 등)
@@ -70,6 +72,12 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ### 세션 브라우저 설정
 - 동시 수집 워커 수: DB 설정 `session_browser_config.max_workers`로 제어(기본 4)
 - 타임아웃/SSH 포트/호스트 키 정책은 `/api/session-browser/config`로 조회/수정
+
+### 세션 브라우저 사용법
+- 페이지: `/session`
+- 대상 선택: 그룹/프록시 다중 선택 → "세션 불러오기"
+- 테이블: 서버사이드 페이징/검색/정렬(대량 데이터에서도 빠른 응답)
+- 엑셀 내보내기: 우측 상단 "엑셀 내보내기" 버튼 → 현재 조건 그대로 CSV 다운로드(Excel 호환)
 
 ### 자원 사용률 그래프(Chart.js)
 - 로컬 번들 경로: `/static/vendor/chartjs/chart.umd.js`

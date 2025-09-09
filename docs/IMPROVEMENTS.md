@@ -15,7 +15,7 @@
 - 자원사용률: 임계치별 색상 구현 및 헤더 고정
 
 **3순위 (기타 개선)**
-- 세션 브라우저: 세션 엑셀 저장
+- 세션 브라우저: 세션 엑셀 저장(완료: 서버사이드 CSV 스트리밍, 전체 컬럼 지원)
 - 프록시 서버/그룹 관리: 삭제 팝업 개선 및 포트 값 제거
 - 자원사용률: 대상 선택 로직 개선
 
@@ -110,6 +110,8 @@
 ### 3. 현재 반영된 개선(코드 레벨)
 - 프록시 응답 스키마 분리(`ProxyOut`)로 비밀번호 비노출, `ProxyUpdate` 부분 업데이트 허용
 - 목록 API 페이지네이션 도입(`/api/proxies`, `/api/proxy-groups`, `/api/session-browser`, `/api/resource-usage`)
+- 세션 브라우저: DataTables 서버사이드 엔드포인트(`/api/session-browser/datatables`) 추가, 필터/검색/정렬/페이징
+- 세션 브라우저: 전체 컬럼 CSV 내보내기(`/api/session-browser/export`) 추가, 필터/검색/정렬 반영
 - 세션 브라우저 SSH 호스트키 정책 준수(`auto_add`/`reject`)
 - CORS/보안 헤더/헬스체크 추가, 문서 노출 환경변수화, `.env` 로딩
 - 자원 사용률: Chart.js 실시간 그래프(UI), 집계 API 제거
