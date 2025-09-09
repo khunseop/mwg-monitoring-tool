@@ -209,11 +209,15 @@ $(document).ready(function() {
         ];
         const maxByMetric = {};
         metrics.forEach(m => {
+            const vals = rows
+                .map(r => r[m.key])
+                .filter(v => typeof v === 'number' && isFinite(v) && v >= 0)
+                .sort((a, b) => a - b);
             let max = 0;
-            rows.forEach(r => {
-                const v = r[m.key];
-                if (typeof v === 'number' && isFinite(v) && v >= 0) { if (v > max) max = v; }
-            });
+            if (vals.length > 0) {
+                const idx = Math.max(0, Math.floor(vals.length * 0.95) - 1);
+                max = vals[idx];
+            }
             // For cpu/mem treat 100 as natural cap if max < 100 (percentage scale)
             if ((m.key === 'cpu' || m.key === 'mem') && max < 100) max = 100;
             maxByMetric[m.key] = max || 1;
@@ -223,13 +227,13 @@ $(document).ready(function() {
             const r = Math.max(0, Math.min(1, ratio));
             // 120 (green) -> 0 (red)
             const hue = 120 * (1 - r);
-            const light = 92 - (r * 42); // 92% -> 50%
-            const sat = 85; // vivid
+            const light = 94 - (r * 48); // 94% -> 46%
+            const sat = 88; // vivid
             return `hsl(${hue}, ${sat}%, ${light}%)`;
         }
 
         function textColorForRatio(ratio) {
-            return ratio > 0.6 ? '#ffffff' : '#0f172a';
+            return ratio > 0.65 ? '#ffffff' : '#0f172a';
         }
 
         rows.forEach(r => {
