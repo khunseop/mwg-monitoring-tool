@@ -156,10 +156,6 @@ $(document).ready(function() {
     }
 
     function updateTable(items) {
-        const $tbody = $('#ruTableBody');
-        $tbody.empty();
-
-        // Build working list with computed deltas for counter metrics
         const rows = [];
         (items || []).forEach(row => {
             const last = ru.lastCumulativeByProxy[row.proxy_id] || {};
@@ -188,7 +184,6 @@ $(document).ready(function() {
             });
         });
 
-        // Sort by proxy host label for stable order
         rows.sort((a, b) => {
             const pa = (ru.proxies || []).find(p => p.id === a.proxy_id);
             const pb = (ru.proxies || []).find(p => p.id === b.proxy_id);
@@ -197,7 +192,6 @@ $(document).ready(function() {
             return na.localeCompare(nb);
         });
 
-        // Compute per-metric max for scaling (ignoring null)
         const metrics = [
             { key: 'cpu', title: 'CPU' },
             { key: 'mem', title: 'MEM' },
@@ -207,6 +201,7 @@ $(document).ready(function() {
             { key: 'httpsd', title: 'HTTPS Δ' },
             { key: 'ftpd', title: 'FTP Δ' },
         ];
+
         const maxByMetric = {};
         metrics.forEach(m => {
             const vals = rows
@@ -218,52 +213,72 @@ $(document).ready(function() {
                 const idx = Math.max(0, Math.floor(vals.length * 0.95) - 1);
                 max = vals[idx];
             }
-            // For cpu/mem treat 100 as natural cap if max < 100 (percentage scale)
             if ((m.key === 'cpu' || m.key === 'mem') && max < 100) max = 100;
             maxByMetric[m.key] = max || 1;
         });
 
-        function heatColor(ratio) {
-            const r = Math.max(0, Math.min(1, ratio));
-            // 120 (green) -> 0 (red)
-            const hue = 120 * (1 - r);
-            const light = 94 - (r * 48); // 94% -> 46%
-            const sat = 88; // vivid
-            return `hsl(${hue}, ${sat}%, ${light}%)`;
-        }
-
-        function textColorForRatio(ratio) {
-            return ratio > 0.65 ? '#ffffff' : '#0f172a';
-        }
-
-        rows.forEach(r => {
+        const xCategories = metrics.map(m => m.title);
+        const yCategories = rows.map(r => {
             const proxy = (ru.proxies || []).find(p => p.id === r.proxy_id);
-            const name = proxy ? `${proxy.host}` : `#${r.proxy_id}`;
-            const trId = `ru-row-${r.proxy_id}`;
-
-            const tds = metrics.map(m => {
-                const v = r[m.key];
-                const isNum = typeof v === 'number' && isFinite(v);
-                const ratio = isNum ? (v <= 0 ? 0 : v / (maxByMetric[m.key] || 1)) : 0;
-                const bg = isNum ? heatColor(ratio) : 'transparent';
-                const color = isNum ? textColorForRatio(ratio) : 'inherit';
-                const display = isNum ? (m.key === 'cpu' || m.key === 'mem' ? Math.round(v) : Math.round(v)).toString() : '—';
-                const title = `${m.title}: ${isNum ? v : 'N/A'}`;
-                return `<td class="ru-heat-td"><div class="ru-heat-cell" title="${title}" style="background:${bg}; color:${color};">${display}</div></td>`;
-            }).join('');
-
-            const rowHtml = `
-                <tr id="${trId}" class="ru-heat-row">
-                    <td class="ru-heat-proxy">${name}</td>
-                    ${tds}
-                </tr>`;
-            const $existing = $(`#${trId}`);
-            if ($existing.length) { $existing.replaceWith(rowHtml); } else { $tbody.append(rowHtml); }
+            return proxy ? proxy.host : `#${r.proxy_id}`;
         });
 
-        // Toggle empty/table state
-        if (!items || items.length === 0) { $('#ruTableWrap').hide(); $('#ruEmptyState').show(); }
-        else { $('#ruEmptyState').hide(); $('#ruTableWrap').show(); }
+        const data = [];
+        rows.forEach((r, y) => {
+            metrics.forEach((m, x) => {
+                const raw = r[m.key];
+                if (typeof raw === 'number' && isFinite(raw)) {
+                    const ratio = raw <= 0 ? 0 : raw / (maxByMetric[m.key] || 1);
+                    data.push({ value: [x, y, ratio], raw: raw });
+                } else {
+                    data.push({ value: [x, y, null], raw: null });
+                }
+            });
+        });
+
+        const el = document.getElementById('ruHeatmapEl');
+        if (!el) return;
+        if (!ru.echart) {
+            if (!window.echarts) return;
+            ru.echart = echarts.init(el, null, { devicePixelRatio: ru.chartDpr });
+            window.addEventListener('resize', () => { try { ru.echart && ru.echart.resize(); } catch (e) {} });
+        }
+
+        const option = {
+            tooltip: {
+                position: 'top',
+                formatter: function(p) {
+                    const xi = p.value && p.value[0];
+                    const yi = p.value && p.value[1];
+                    const raw = (p.data && typeof p.data.raw === 'number') ? p.data.raw : null;
+                    const xv = (typeof xi === 'number') ? xCategories[xi] : '';
+                    const yv = (typeof yi === 'number') ? yCategories[yi] : '';
+                    return `${yv} • ${xv}<br/>${raw != null ? raw : 'N/A'}`;
+                }
+            },
+            grid: { height: '80%', top: 28, left: 140, right: 24, bottom: 18 },
+            xAxis: { type: 'category', data: xCategories, splitArea: { show: false }, axisLabel: { interval: 0 } },
+            yAxis: { type: 'category', data: yCategories, splitArea: { show: false } },
+            visualMap: {
+                min: 0, max: 1, calculable: false, orient: 'vertical', right: 0, top: 28,
+                inRange: { color: ['#e8f7e1', '#a3d977', '#f2c94c', '#e67e22', '#eb5757'] }
+            },
+            series: [{
+                name: 'Usage', type: 'heatmap', data: data,
+                label: {
+                    show: true,
+                    formatter: function(p) {
+                        const raw = (p.data && typeof p.data.raw === 'number') ? p.data.raw : null;
+                        return raw != null ? Math.round(raw).toString() : '';
+                    }
+                },
+                emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.2)' } }
+            }]
+        };
+        ru.echart.setOption(option, true);
+
+        if (!items || items.length === 0) { $('#ruHeatmapWrap').hide(); $('#ruEmptyState').show(); }
+        else { $('#ruEmptyState').hide(); $('#ruHeatmapWrap').show(); }
     }
 
     function collectOnce() {
@@ -334,7 +349,7 @@ $(document).ready(function() {
     $('#ruProxySelect').on('change', function() { saveState(undefined); });
 
     // Show empty state initially
-    $('#ruTableWrap').hide();
+    $('#ruHeatmapWrap').hide();
     $('#ruEmptyState').show();
     Promise.all([fetchGroups(), fetchProxies(), loadConfig()]).then(() => { restoreState(); });
 
