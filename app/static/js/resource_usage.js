@@ -238,44 +238,47 @@ $(document).ready(function() {
 
         const el = document.getElementById('ruHeatmapEl');
         if (!el) return;
-        if (!ru.echart) {
-            if (!window.echarts) return;
-            ru.echart = echarts.init(el, null, { devicePixelRatio: ru.chartDpr });
-            window.addEventListener('resize', () => { try { ru.echart && ru.echart.resize(); } catch (e) {} });
-        }
+        if (!window.ApexCharts) return;
 
-        const option = {
-            tooltip: {
-                position: 'top',
-                formatter: function(p) {
-                    const xi = p.value && p.value[0];
-                    const yi = p.value && p.value[1];
-                    const raw = (p.data && typeof p.data.raw === 'number') ? p.data.raw : null;
-                    const xv = (typeof xi === 'number') ? xCategories[xi] : '';
-                    const yv = (typeof yi === 'number') ? yCategories[yi] : '';
-                    return `${yv} • ${xv}<br/>${raw != null ? raw : 'N/A'}`;
+        const seriesData = yCategories.map((rowLabel, rowIdx) => {
+            const dataPoints = xCategories.map((colLabel, colIdx) => {
+                const point = data.find(d => d.value[0] === colIdx && d.value[1] === rowIdx);
+                const raw = point ? point.raw : null;
+                return { x: colLabel, y: raw == null ? null : Math.round(raw) };
+            });
+            return { name: rowLabel, data: dataPoints };
+        });
+
+        const options = {
+            chart: { type: 'heatmap', height: 460, animations: { enabled: false }, toolbar: { show: false } },
+            dataLabels: { enabled: true, style: { colors: ['#111827'] }, formatter: function(val, opts) { return val == null ? '' : val; } },
+            colors: ["#12824C"],
+            plotOptions: {
+                heatmap: {
+                    shadeIntensity: 0.5,
+                    radius: 2,
+                    enableShades: true,
+                    colorScale: {
+                        ranges: [
+                            { from: 0, to: 0, color: '#f3f4f6', name: 'N/A' },
+                            { from: 0, to: 1, color: '#e8f7e1' },
+                            { from: 2, to: 10, color: '#cdeeb4' },
+                            { from: 11, to: 30, color: '#a3d977' },
+                            { from: 31, to: 60, color: '#f2c94c' },
+                            { from: 61, to: 85, color: '#e67e22' },
+                            { from: 86, to: 999999999, color: '#eb5757' }
+                        ]
+                    }
                 }
             },
-            grid: { height: '80%', top: 28, left: 140, right: 24, bottom: 18 },
-            xAxis: { type: 'category', data: xCategories, splitArea: { show: false }, axisLabel: { interval: 0 } },
-            yAxis: { type: 'category', data: yCategories, splitArea: { show: false } },
-            visualMap: {
-                min: 0, max: 1, calculable: false, orient: 'vertical', right: 0, top: 28,
-                inRange: { color: ['#e8f7e1', '#a3d977', '#f2c94c', '#e67e22', '#eb5757'] }
-            },
-            series: [{
-                name: 'Usage', type: 'heatmap', data: data,
-                label: {
-                    show: true,
-                    formatter: function(p) {
-                        const raw = (p.data && typeof p.data.raw === 'number') ? p.data.raw : null;
-                        return raw != null ? Math.round(raw).toString() : '';
-                    }
-                },
-                emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.2)' } }
-            }]
+            xaxis: { type: 'category', categories: xCategories },
+            yaxis: { labels: { style: { fontSize: '11px' } } },
+            tooltip: { y: { formatter: function(val) { return val == null ? 'N/A' : String(val); } } },
+            series: seriesData
         };
-        ru.echart.setOption(option, true);
+
+        if (ru.apex) { ru.apex.updateOptions(options, true, true); }
+        else { ru.apex = new ApexCharts(el, options); ru.apex.render(); }
 
         if (!items || items.length === 0) { $('#ruHeatmapWrap').hide(); $('#ruEmptyState').show(); }
         else { $('#ruEmptyState').hide(); $('#ruHeatmapWrap').show(); }

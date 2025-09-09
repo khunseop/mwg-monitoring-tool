@@ -372,12 +372,8 @@ body {
 #sbTable td:nth-child(2), #sbTable th:nth-child(2) { white-space: nowrap; }
 .dt-nowrap { white-space: nowrap; }
 .ru-heat-row td { padding: 0.15rem; }
-#ruHeatTable { table-layout: fixed; border-collapse: separate; border-spacing: 2px; }
-#ruHeatTable th, #ruHeatTable td { white-space: nowrap; }
-#ruHeatTable th:not(:first-child), #ruHeatTable td:not(:first-child) { width: 64px; }
-#ruHeatTable thead th { position: sticky; top: 0; z-index: 2; background: #f9fafb; }
-.ru-heat-proxy { position: sticky; left: 0; background: var(--color-surface); z-index: 3; }
-.ru-heat-cell { width: 100%; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 3px; font-size: 0.82rem; line-height: 1; padding: 0 4px; }
+/* Heatmap container sizing */
+#ruHeatmapWrap { width: 100%; }
 
 /* Footer: align background with page background */
 .footer {
