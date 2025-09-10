@@ -223,16 +223,24 @@ function saveResourceConfig() {
     function numOrUndef(selector) {
         const raw = ($(selector).val() || '').toString().trim();
         if (raw.length === 0) return undefined;
-        // Normalize common locale inputs: remove thousands separators, handle comma decimal
-        let normalized = raw;
-        if (raw.indexOf(',') >= 0 && raw.indexOf('.') < 0) {
-            // Treat single comma as decimal separator
-            normalized = raw.replace(',', '.');
+        // Allow inputs like "80", "80%", "80 %", "1,5", "1.5", "1,234.5"
+        let s = raw.replace(/\s|%/g, '');
+        // Keep only digits, comma, dot, and optional leading minus
+        s = s.replace(/(?!^-)[^0-9.,-]/g, '');
+        // Decide decimal separator: if dot exists, remove grouping commas; else convert single comma to dot
+        if (s.indexOf('.') >= 0) {
+            s = s.replace(/,/g, '');
+        } else if (s.indexOf(',') >= 0) {
+            // if multiple commas, remove all but last as thousands
+            const last = s.lastIndexOf(',');
+            s = s.replace(/,/g, (m, idx) => (idx === last ? '.' : ''));
         }
-        // Remove any remaining thousands separators
-        normalized = normalized.replace(/\s/g, '').replace(/,(?=\d{3}(\D|$))/g, '');
-        const n = Number(normalized);
-        return Number.isFinite(n) ? n : undefined;
+        // Remove any remaining stray characters
+        s = s.replace(/[^0-9.-]/g, '');
+        const n = Number(s);
+        if (!Number.isFinite(n)) return undefined;
+        // Clamp to >= 0 since thresholds are non-negative
+        return n < 0 ? 0 : n;
     }
 
     const payload = {
