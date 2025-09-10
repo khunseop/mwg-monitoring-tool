@@ -116,7 +116,7 @@ function saveProxy() {
     const data = {
         host: $('#host').val(),
         username: $('#username').val(),
-        traffic_log_path: ($('#traffic_log_path').val() || '').trim() || null,
+        traffic_log_path: ($('#traffic_log_path').val() || '').trim(),
         is_active: $('#is_active').is(':checked'),
         group_id: $('#group_id').val() ? parseInt($('#group_id').val()) : null,
         description: $('#description').val() || null
