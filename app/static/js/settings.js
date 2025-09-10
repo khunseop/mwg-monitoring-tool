@@ -204,6 +204,14 @@ function loadResourceConfig() {
             $('#cfgOidHttp').val(oids.http || '');
             $('#cfgOidHttps').val(oids.https || '');
             $('#cfgOidFtp').val(oids.ftp || '');
+            const th = cfg.thresholds || {};
+            $('#cfgThrCpu').val(th.cpu ?? '');
+            $('#cfgThrMem').val(th.mem ?? '');
+            $('#cfgThrCc').val(th.cc ?? '');
+            $('#cfgThrCs').val(th.cs ?? '');
+            $('#cfgThrHttp').val(th.http ?? '');
+            $('#cfgThrHttps').val(th.https ?? '');
+            $('#cfgThrFtp').val(th.ftp ?? '');
             $('#cfgStatus').removeClass('is-danger').addClass('is-success').text('불러오기 완료');
         })
         .fail(() => {
@@ -212,6 +220,30 @@ function loadResourceConfig() {
 }
 
 function saveResourceConfig() {
+    try { if (document && document.activeElement) { document.activeElement.blur(); } } catch (e) {}
+    function numOrUndef(selector) {
+        const raw = ($(selector).val() || '').toString().trim();
+        if (raw.length === 0) return undefined;
+        // Allow inputs like "80", "80%", "80 %", "1,5", "1.5", "1,234.5"
+        let s = raw.replace(/\s|%/g, '');
+        // Keep only digits, comma, dot, and optional leading minus
+        s = s.replace(/(?!^-)[^0-9.,-]/g, '');
+        // Decide decimal separator: if dot exists, remove grouping commas; else convert single comma to dot
+        if (s.indexOf('.') >= 0) {
+            s = s.replace(/,/g, '');
+        } else if (s.indexOf(',') >= 0) {
+            // if multiple commas, remove all but last as thousands
+            const last = s.lastIndexOf(',');
+            s = s.replace(/,/g, (m, idx) => (idx === last ? '.' : ''));
+        }
+        // Remove any remaining stray characters
+        s = s.replace(/[^0-9.-]/g, '');
+        const n = Number(s);
+        if (!Number.isFinite(n)) return undefined;
+        // Clamp to >= 0 since thresholds are non-negative
+        return n < 0 ? 0 : n;
+    }
+
     const payload = {
         community: ($('#cfgCommunity').val() || 'public').toString(),
         oids: {
@@ -222,10 +254,20 @@ function saveResourceConfig() {
             http: $('#cfgOidHttp').val() || undefined,
             https: $('#cfgOidHttps').val() || undefined,
             ftp: $('#cfgOidFtp').val() || undefined,
+        },
+        thresholds: {
+            cpu: numOrUndef('#cfgThrCpu'),
+            mem: numOrUndef('#cfgThrMem'),
+            cc: numOrUndef('#cfgThrCc'),
+            cs: numOrUndef('#cfgThrCs'),
+            http: numOrUndef('#cfgThrHttp'),
+            https: numOrUndef('#cfgThrHttps'),
+            ftp: numOrUndef('#cfgThrFtp'),
         }
     };
     // remove undefined keys
     Object.keys(payload.oids).forEach(k => { if (!payload.oids[k]) delete payload.oids[k]; });
+    Object.keys(payload.thresholds).forEach(k => { if (payload.thresholds[k] == null || !Number.isFinite(payload.thresholds[k])) delete payload.thresholds[k]; });
 
     $.ajax({
         url: '/api/resource-config',
@@ -321,4 +363,7 @@ $(document).ready(() => {
     loadResourceConfig();
     loadSessionConfig();
 });
+
+// Expose functions for inline onclick handlers
+window.saveResourceConfig = saveResourceConfig;
 
