@@ -14,6 +14,7 @@ from app.api import proxies, proxy_groups
 from app.api import resource_usage as resource_usage_api
 from app.api import resource_config as resource_config_api
 from app.api import session_browser as session_browser_api
+from app.api import traffic_logs as traffic_logs_api
 from fastapi_standalone_docs import StandaloneDocs
 import warnings
 from sqlalchemy import text
@@ -68,6 +69,7 @@ app.include_router(proxy_groups.router, prefix="/api", tags=["proxy-groups"])
 app.include_router(resource_usage_api.router, prefix="/api", tags=["resource-usage"])
 app.include_router(resource_config_api.router, prefix="/api", tags=["resource-config"])
 app.include_router(session_browser_api.router, prefix="/api", tags=["session-browser"])
+app.include_router(traffic_logs_api.router, prefix="/api", tags=["traffic-logs"])
 
 # 페이지 라우터
 @app.get("/")
