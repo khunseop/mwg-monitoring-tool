@@ -23,6 +23,17 @@
 
 	function clearError(){ $('#tlError').hide().text(''); }
 
+	function showDetail(record){
+		const $body = $('#tlDetailBody');
+		$body.empty();
+		COLS.forEach(c => {
+			let v = record[c];
+			if(v === null || v === undefined) v = '';
+			$body.append(`<tr><th style="width: 220px;">${c}</th><td>${String(v)}</td></tr>`);
+		});
+		$('#tlDetailModal').addClass('is-active');
+	}
+
 	async function fetchProxies(){
 		const res = await fetch(`${API_BASE}/proxies?limit=500&offset=0`);
 		if(!res.ok){ throw new Error('프록시 목록을 불러오지 못했습니다'); }
@@ -57,30 +68,60 @@
 		const $head = $('#tlTableHead');
 		COLS.forEach(c => { $head.append(`<th>${c}</th>`); });
 		const $body = $('#tlTableBody');
-		records.forEach(r => {
+		records.forEach((r, idx) => {
 			const tds = COLS.map(c => {
 				let v = r[c];
 				if (v === null || v === undefined) v = '';
-				return `<td>${String(v)}</td>`;
+				return `<td data-col="${c}">${String(v)}</td>`;
 			}).join('');
-			$body.append(`<tr>${tds}</tr>`);
+			$body.append(`<tr data-row="${idx}">${tds}</tr>`);
 		});
 		if($.fn.DataTable){
-			$('#tlTable').DataTable({
+			const dt = $('#tlTable').DataTable({
 				scrollX: true,
 				pageLength: 25,
 				lengthMenu: [ [25, 50, 100], [25, 50, 100] ],
-				order: []
+				order: [],
+				dom: 'Bfrtip',
+				buttons: [
+					{
+						extend: 'csv',
+						text: 'CSV 내보내기',
+						title: 'traffic_logs'
+					},
+					{
+						text: '컬럼 토글',
+						action: function () {
+							// Toggle columns with a simple prompt list
+							const current = COLS.map((c, i) => `${i}:${c}[${dt.column(i).visible() ? 'on' : 'off'}]`).join('\n');
+							const ask = prompt('토글할 컬럼 인덱스 (쉼표 구분)\n' + current, '');
+							if(!ask) return;
+							ask.split(',').map(s => s.trim()).forEach(idxStr => {
+								const i = parseInt(idxStr, 10);
+								if(Number.isFinite(i) && i >= 0 && i < COLS.length){
+									dt.column(i).visible(!dt.column(i).visible());
+								}
+							});
+						}
+					}
+				]
+			});
+			$('#tlTable tbody').on('click', 'tr', function(){
+				const rowIdx = $(this).data('row');
+				if(rowIdx == null) return;
+				showDetail(records[rowIdx] || {});
 			});
 		}
 		$('#tlResultParsed').show();
 		$('#tlResultRaw').hide();
+		$('#tlEmptyState').toggle(records.length === 0);
 	}
 
 	function renderRaw(lines){
 		$('#tlRawPre').text(lines.join('\n'));
 		$('#tlResultRaw').show();
 		$('#tlResultParsed').hide();
+		$('#tlEmptyState').toggle(lines.length === 0);
 	}
 
 	async function loadLogs(){
