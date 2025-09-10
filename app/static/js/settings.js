@@ -205,13 +205,13 @@ function loadResourceConfig() {
             $('#cfgOidHttps').val(oids.https || '');
             $('#cfgOidFtp').val(oids.ftp || '');
             const th = cfg.thresholds || {};
-            $('#cfgThrCpu').val(th.cpu || '');
-            $('#cfgThrMem').val(th.mem || '');
-            $('#cfgThrCc').val(th.cc || '');
-            $('#cfgThrCs').val(th.cs || '');
-            $('#cfgThrHttp').val(th.http || '');
-            $('#cfgThrHttps').val(th.https || '');
-            $('#cfgThrFtp').val(th.ftp || '');
+            $('#cfgThrCpu').val(th.cpu ?? '');
+            $('#cfgThrMem').val(th.mem ?? '');
+            $('#cfgThrCc').val(th.cc ?? '');
+            $('#cfgThrCs').val(th.cs ?? '');
+            $('#cfgThrHttp').val(th.http ?? '');
+            $('#cfgThrHttps').val(th.https ?? '');
+            $('#cfgThrFtp').val(th.ftp ?? '');
             $('#cfgStatus').removeClass('is-danger').addClass('is-success').text('불러오기 완료');
         })
         .fail(() => {
@@ -220,6 +220,13 @@ function loadResourceConfig() {
 }
 
 function saveResourceConfig() {
+    function numOrUndef(selector) {
+        const raw = ($(selector).val() || '').toString().trim();
+        if (raw.length === 0) return undefined;
+        const n = Number(raw);
+        return Number.isFinite(n) ? n : undefined;
+    }
+
     const payload = {
         community: ($('#cfgCommunity').val() || 'public').toString(),
         oids: {
@@ -232,18 +239,18 @@ function saveResourceConfig() {
             ftp: $('#cfgOidFtp').val() || undefined,
         },
         thresholds: {
-            cpu: $('#cfgThrCpu').val() ? parseFloat($('#cfgThrCpu').val()) : undefined,
-            mem: $('#cfgThrMem').val() ? parseFloat($('#cfgThrMem').val()) : undefined,
-            cc: $('#cfgThrCc').val() ? parseFloat($('#cfgThrCc').val()) : undefined,
-            cs: $('#cfgThrCs').val() ? parseFloat($('#cfgThrCs').val()) : undefined,
-            http: $('#cfgThrHttp').val() ? parseFloat($('#cfgThrHttp').val()) : undefined,
-            https: $('#cfgThrHttps').val() ? parseFloat($('#cfgThrHttps').val()) : undefined,
-            ftp: $('#cfgThrFtp').val() ? parseFloat($('#cfgThrFtp').val()) : undefined,
+            cpu: numOrUndef('#cfgThrCpu'),
+            mem: numOrUndef('#cfgThrMem'),
+            cc: numOrUndef('#cfgThrCc'),
+            cs: numOrUndef('#cfgThrCs'),
+            http: numOrUndef('#cfgThrHttp'),
+            https: numOrUndef('#cfgThrHttps'),
+            ftp: numOrUndef('#cfgThrFtp'),
         }
     };
     // remove undefined keys
     Object.keys(payload.oids).forEach(k => { if (!payload.oids[k]) delete payload.oids[k]; });
-    Object.keys(payload.thresholds).forEach(k => { if (payload.thresholds[k] == null || isNaN(payload.thresholds[k])) delete payload.thresholds[k]; });
+    Object.keys(payload.thresholds).forEach(k => { if (payload.thresholds[k] == null || !Number.isFinite(payload.thresholds[k])) delete payload.thresholds[k]; });
 
     $.ajax({
         url: '/api/resource-config',
