@@ -223,7 +223,15 @@ function saveResourceConfig() {
     function numOrUndef(selector) {
         const raw = ($(selector).val() || '').toString().trim();
         if (raw.length === 0) return undefined;
-        const n = Number(raw);
+        // Normalize common locale inputs: remove thousands separators, handle comma decimal
+        let normalized = raw;
+        if (raw.indexOf(',') >= 0 && raw.indexOf('.') < 0) {
+            // Treat single comma as decimal separator
+            normalized = raw.replace(',', '.');
+        }
+        // Remove any remaining thousands separators
+        normalized = normalized.replace(/\s/g, '').replace(/,(?=\d{3}(\D|$))/g, '');
+        const n = Number(normalized);
         return Number.isFinite(n) ? n : undefined;
     }
 
