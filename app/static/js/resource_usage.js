@@ -287,12 +287,13 @@ $(document).ready(function() {
                     radius: 2,
                     enableShades: true,
                     colorScale: {
+                        // Show percentage of threshold in legend ranges
                         ranges: [
                             { from: -1, to: -0.1, color: '#f3f4f6', name: 'N/A' },
-                            { from: 0, to: 50, color: '#a3d977' },
-                            { from: 50, to: 90, color: '#f2c94c' },
-                            { from: 90, to: 110, color: '#e67e22' },
-                            { from: 110, to: 1000, color: '#eb5757' }
+                            { from: 0, to: 50, color: '#a3d977', name: '0–50% of threshold' },
+                            { from: 50, to: 90, color: '#f2c94c', name: '50–90%' },
+                            { from: 90, to: 110, color: '#e67e22', name: '90–110%' },
+                            { from: 110, to: 1000, color: '#eb5757', name: '>110%' }
                         ]
                     }
                 }
@@ -301,7 +302,9 @@ $(document).ready(function() {
             yaxis: { labels: { style: { fontSize: '11px' } } },
             tooltip: { y: { formatter: function(val, { seriesIndex, dataPointIndex }) {
                 const raw = (ru._heatRaw && ru._heatRaw[seriesIndex]) ? ru._heatRaw[seriesIndex][dataPointIndex] : null;
-                return raw == null ? 'N/A' : String(raw);
+                if (raw == null) return 'N/A';
+                const percent = (val == null || val < 0) ? null : Math.round(val) + '% of threshold';
+                return percent ? `${raw} (${percent})` : String(raw);
             } } },
             series: seriesData
         };
