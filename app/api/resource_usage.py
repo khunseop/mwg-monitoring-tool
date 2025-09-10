@@ -5,6 +5,8 @@ import asyncio
 from datetime import datetime
 from app.utils.time import now_kst
 import json
+import paramiko
+from time import monotonic
 
 from app.database.database import get_db
 from app.models.proxy import Proxy
@@ -36,6 +38,88 @@ async def _snmp_get(host: str, port: int, community: str, oid: str, timeout_sec:
         return None
 
 
+# =============================
+# SSH-based memory collection
+# =============================
+DEFAULT_MEM_CMD = "awk '/MemTotal/ {total=$2} /MemAvailable/ {available=$2} END {printf \"%.0f\", 100 - (available / total * 100)}' /proc/meminfo"
+_MEM_CACHE: dict[tuple[str, int, str, str], tuple[float, float]] = {}
+_MEM_CACHE_TTL_SEC = 5.0
+
+
+def _ssh_exec_and_parse_mem(host: str, port: int, username: str, password: str | None, command: str, timeout_sec: int) -> float | None:
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        client.connect(
+            hostname=host,
+            port=port or 22,
+            username=username,
+            password=password,
+            timeout=timeout_sec,
+            auth_timeout=timeout_sec,
+            banner_timeout=timeout_sec,
+            disabled_algorithms={"cipher": ["3des-cbc", "des-cbc"]},
+        )
+        stdin, stdout, stderr = client.exec_command(command, timeout=timeout_sec)
+        stdout_str = stdout.read().decode(errors="ignore").strip()
+        stderr_str = stderr.read().decode(errors="ignore").strip()
+        if not stdout_str and stderr_str:
+            return None
+        # take first numeric token
+        first_line = stdout_str.splitlines()[0] if stdout_str else ""
+        token = first_line.strip().split()[0] if first_line else ""
+        try:
+            val = float(token)
+            # clamp to [0, 1000] to avoid absurd values
+            if val < 0:
+                return 0.0
+            if val > 1000:
+                return 1000.0
+            return val
+        except Exception:
+            return None
+    except Exception:
+        return None
+    finally:
+        try:
+            client.close()
+        except Exception:
+            pass
+
+
+async def _ssh_get_mem_percent(proxy: Proxy, spec: str, timeout_sec: int = 5) -> float | None:
+    # spec formats: 'ssh' or 'ssh:<command>'
+    if not proxy or not proxy.host or not proxy.username:
+        return None
+    cmd = DEFAULT_MEM_CMD
+    s = (spec or "").strip()
+    if ":" in s:
+        _, after = s.split(":", 1)
+        after = after.strip()
+        if after:
+            cmd = after
+    key = (proxy.host, getattr(proxy, "port", 22) or 22, proxy.username or "", cmd)
+    now = monotonic()
+    cached = _MEM_CACHE.get(key)
+    if cached and cached[1] > now:
+        return cached[0]
+    loop = asyncio.get_running_loop()
+    value = await loop.run_in_executor(
+        None,
+        lambda: _ssh_exec_and_parse_mem(
+            proxy.host,
+            getattr(proxy, "port", 22) or 22,
+            proxy.username,
+            getattr(proxy, "password", None),
+            cmd,
+            timeout_sec,
+        ),
+    )
+    if value is not None:
+        _MEM_CACHE[key] = (value, now + _MEM_CACHE_TTL_SEC)
+    return value
+
+
 async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str) -> Tuple[int, Dict[str, Any] | None, str | None]:
     result: Dict[str, Any] = {k: None for k in SUPPORTED_KEYS}
     tasks: list = []
@@ -43,8 +127,13 @@ async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str)
     for key, oid in oids.items():
         if key not in SUPPORTED_KEYS:
             continue
-        keys.append(key)
-        tasks.append(_snmp_get(proxy.host, 161, community, oid))
+        # Special handling for memory via SSH
+        if key == "mem" and isinstance(oid, str) and oid.lower().strip().startswith("ssh"):
+            keys.append(key)
+            tasks.append(_ssh_get_mem_percent(proxy, oid))
+        else:
+            keys.append(key)
+            tasks.append(_snmp_get(proxy.host, 161, community, oid))
 
     if tasks:
         values = await asyncio.gather(*tasks, return_exceptions=True)
