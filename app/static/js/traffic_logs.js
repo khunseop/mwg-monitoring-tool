@@ -1,5 +1,6 @@
 (function(){
 	const API_BASE = '/api';
+	let PROXIES = [];
 	const COLS = [
 		"datetime","username","client_ip","url_destination_ip","timeintransaction",
 		"response_statuscode","cache_status","comm_name","url_protocol","url_host",
@@ -31,12 +32,12 @@
 	function populateProxySelect(proxies){
 		const $sel = $('#tlProxySelect');
 		$sel.find('option:not([value=""])').remove();
-		proxies
-			.filter(p => p.is_active && p.traffic_log_path)
-			.forEach(p => {
-				const label = p.group_name ? `${p.host} (${p.group_name})` : p.host;
-				$sel.append(`<option value="${p.id}">${label}</option>`);
-			});
+		const active = proxies.filter(p => p.is_active);
+		active.forEach(p => {
+			const labelBase = p.group_name ? `${p.host} (${p.group_name})` : p.host;
+			const label = p.traffic_log_path ? labelBase : `${labelBase} · 경로 미설정`;
+			$sel.append(`<option value="${p.id}">${label}</option>`);
+		});
 		if($sel.find('option').length === 1){
 			$sel.append('<option disabled>활성화된 프록시가 없습니다</option>');
 		}
@@ -86,6 +87,12 @@
 		clearError();
 		const proxyId = $('#tlProxySelect').val();
 		if(!proxyId){ showError('프록시를 선택하세요'); return; }
+		const selected = PROXIES.find(p => String(p.id) === String(proxyId));
+		if(!selected){ showError('프록시 정보를 찾을 수 없습니다'); return; }
+		if(!selected.traffic_log_path){
+			showError('선택한 프록시에 트래픽 로그 경로가 설정되어 있지 않습니다. 설정 > 프록시 수정에서 경로를 지정하세요.');
+			return;
+		}
 		const q = ($('#tlQuery').val() || '').trim();
 		const limit = Math.max(1, Math.min(1000, parseInt($('#tlLimit').val() || '200', 10)));
 		const direction = $('#tlDirection').val();
@@ -125,7 +132,8 @@
 		try{
 			setStatus('프록시 목록 로딩...', 'is-light');
 			const proxies = await fetchProxies();
-			populateProxySelect(proxies);
+			PROXIES = Array.isArray(proxies) ? proxies : [];
+			populateProxySelect(PROXIES);
 			setStatus('대기', 'is-light');
 		}catch(e){
 			showError('프록시 목록 로딩 실패');
