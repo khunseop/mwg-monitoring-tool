@@ -1,5 +1,15 @@
 # 릴리즈 노트
 
+## v1.3.0
+- 자원 사용률(API)
+  - 메모리 수집을 SSH 기반으로 선택적으로 지원(`mem` OID를 `ssh` 또는 `ssh:<command>`로 설정)
+  - 기본 명령: `/proc/meminfo`에서 `MemTotal`/`MemAvailable`로 사용률(%) 계산
+  - 동시성 제한과 타임아웃 도입: `RU_SSH_MAX_CONCURRENCY`(기본 8), `RU_SSH_TIMEOUT_SEC`(기본 5)
+  - 5초 TTL 캐시로 반복 호출 시 지연 감소
+  - DEBUG 로그로 SSH 경로 사용 및 실행 시간 확인 가능
+- 문서
+  - README에 SSH 메모리 수집 사용법과 환경변수 추가
+
 ## v1.2.3
 - 자원 사용률(UI)
   - 자원사용률 테이블을 Heatmap chart로 변경
