@@ -17,7 +17,7 @@ from app.api import session_browser as session_browser_api
 from app.api import traffic_logs as traffic_logs_api
 from fastapi_standalone_docs import StandaloneDocs
 import warnings
-from sqlalchemy import text
+from sqlalchemy import text, inspect
 from sqlalchemy.exc import OperationalError
 try:
     from cryptography.utils import CryptographyDeprecationWarning
@@ -106,28 +106,22 @@ async def add_security_headers(request: Request, call_next):
     return response
 
 
-# Lightweight startup migration: add traffic_log_path column if missing (SQLite/MySQL/Postgres tolerant)
+"""
+Startup migration: ensure 'traffic_log_path' column exists on 'proxies'.
+Uses SQLAlchemy inspector and an explicit transaction to be reliable across DBs.
+"""
 try:
-    with engine.connect() as conn:
-        try:
-            # SQLite pragma works on sqlite; for others, the try/except will handle
-            res = conn.execute(text("SELECT 1 FROM proxies LIMIT 1"))
-        except OperationalError:
-            # Table may not exist yet (first run). SQLAlchemy create_all above will create it with the column.
-            pass
-        else:
-            # Probe column existence in a generic way
-            has_column = False
-            try:
-                conn.execute(text("SELECT traffic_log_path FROM proxies LIMIT 1"))
-                has_column = True
-            except Exception:
-                has_column = False
-            if not has_column:
+    with engine.begin() as conn:
+        inspector = inspect(conn)
+        tables = inspector.get_table_names()
+        if "proxies" in tables:
+            column_names = {col["name"] for col in inspector.get_columns("proxies")}
+            if "traffic_log_path" not in column_names:
                 try:
                     conn.execute(text("ALTER TABLE proxies ADD COLUMN traffic_log_path VARCHAR(255)"))
                 except Exception:
-                    # ignore if unsupported or race
+                    # Some DBs may require IF NOT EXISTS or different DDL; ignore if already added by another process
                     pass
 except Exception:
+    # Don't block app start on migration issues
     pass
