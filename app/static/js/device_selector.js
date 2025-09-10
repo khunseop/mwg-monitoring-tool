@@ -73,6 +73,29 @@
 				}
 			}
 
+			function enhanceGroupSelect() {
+				if (!$group || $group.length === 0) return;
+				if (window.TomSelect) {
+					try {
+						// Single-select Tom Select for group dropdown
+						var gts = new TomSelect($group[0], {
+							create: false,
+							persist: true,
+							maxItems: 1,
+							allowEmptyOption: true,
+							dropdownParent: 'body',
+							render: {
+								option: function(data, escape) { return '<div style="white-space:nowrap;">' + (data.text || '') + '</div>'; },
+								item: function(data, escape) { return '<div style="white-space:nowrap;">' + (data.text || '') + '</div>'; }
+							},
+							onInitialize: function() { $group[0]._tom = this; },
+							onChange: function() { try { $group.trigger('change'); } catch (e) { /* ignore */ } }
+						});
+						state.gts = gts;
+					} catch (e) { /* ignore */ }
+				}
+			}
+
 			function bindEvents() {
 				if ($group && $group.length) {
 					$group.off('.devicesel').on('change.devicesel', function() {
@@ -101,6 +124,7 @@
 			var p2 = $.getJSON(apiProxies).then(function(data) { state.proxies = Array.isArray(data) ? data : []; });
 			return Promise.all([p1, p2]).then(function() { 
 				populateProxies(); 
+				enhanceGroupSelect();
 				enhanceMultiSelect(); 
 				bindEvents(); 
 				try { if (typeof options.onData === 'function') { options.onData({ groups: state.groups, proxies: state.proxies }); } } catch (e) { /* ignore */ }
