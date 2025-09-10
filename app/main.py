@@ -16,6 +16,8 @@ from app.api import resource_config as resource_config_api
 from app.api import session_browser as session_browser_api
 from fastapi_standalone_docs import StandaloneDocs
 import warnings
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 try:
     from cryptography.utils import CryptographyDeprecationWarning
     warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
@@ -95,3 +97,30 @@ async def add_security_headers(request: Request, call_next):
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
     return response
+
+
+# Lightweight startup migration: add traffic_log_path column if missing (SQLite/MySQL/Postgres tolerant)
+try:
+    with engine.connect() as conn:
+        try:
+            # SQLite pragma works on sqlite; for others, the try/except will handle
+            res = conn.execute(text("SELECT 1 FROM proxies LIMIT 1"))
+        except OperationalError:
+            # Table may not exist yet (first run). SQLAlchemy create_all above will create it with the column.
+            pass
+        else:
+            # Probe column existence in a generic way
+            has_column = False
+            try:
+                conn.execute(text("SELECT traffic_log_path FROM proxies LIMIT 1"))
+                has_column = True
+            except Exception:
+                has_column = False
+            if not has_column:
+                try:
+                    conn.execute(text("ALTER TABLE proxies ADD COLUMN traffic_log_path VARCHAR(255)"))
+                except Exception:
+                    # ignore if unsupported or race
+                    pass
+except Exception:
+    pass

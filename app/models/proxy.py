@@ -11,6 +11,7 @@ class Proxy(Base):
     port = Column(Integer, nullable=False, default=22)
     username = Column(String, nullable=True)
     password = Column(String, nullable=True)
+    traffic_log_path = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     group_id = Column(Integer, ForeignKey("proxy_groups.id", ondelete="SET NULL"), nullable=True)
     description = Column(Text, nullable=True)
