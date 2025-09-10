@@ -2,9 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Tuple
 import asyncio
+from asyncio import Semaphore
 from datetime import datetime
 from app.utils.time import now_kst
 import json
+import os
+import logging
 import paramiko
 from time import monotonic
 
@@ -22,6 +25,7 @@ from aiosnmp import Snmp
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 SUPPORTED_KEYS = {"cpu", "mem", "cc", "cs", "http", "https", "ftp"}
@@ -44,6 +48,9 @@ async def _snmp_get(host: str, port: int, community: str, oid: str, timeout_sec:
 DEFAULT_MEM_CMD = "awk '/MemTotal/ {total=$2} /MemAvailable/ {available=$2} END {printf \"%.0f\", 100 - (available / total * 100)}' /proc/meminfo"
 _MEM_CACHE: dict[tuple[str, int, str, str], tuple[float, float]] = {}
 _MEM_CACHE_TTL_SEC = 5.0
+_SSH_MAX_CONCURRENCY = max(1, int(os.getenv("RU_SSH_MAX_CONCURRENCY", "8")))
+_SSH_SEMAPHORE = Semaphore(_SSH_MAX_CONCURRENCY)
+_SSH_TIMEOUT_SEC = max(1, int(os.getenv("RU_SSH_TIMEOUT_SEC", "5")))
 
 
 def _ssh_exec_and_parse_mem(host: str, port: int, username: str, password: str | None, command: str, timeout_sec: int) -> float | None:
@@ -58,6 +65,9 @@ def _ssh_exec_and_parse_mem(host: str, port: int, username: str, password: str |
             timeout=timeout_sec,
             auth_timeout=timeout_sec,
             banner_timeout=timeout_sec,
+            allow_agent=False,
+            look_for_keys=False,
+            compress=False,
             disabled_algorithms={"cipher": ["3des-cbc", "des-cbc"]},
         )
         stdin, stdout, stderr = client.exec_command(command, timeout=timeout_sec)
@@ -87,7 +97,7 @@ def _ssh_exec_and_parse_mem(host: str, port: int, username: str, password: str |
             pass
 
 
-async def _ssh_get_mem_percent(proxy: Proxy, spec: str, timeout_sec: int = 5) -> float | None:
+async def _ssh_get_mem_percent(proxy: Proxy, spec: str, timeout_sec: int = _SSH_TIMEOUT_SEC) -> float | None:
     # spec formats: 'ssh' or 'ssh:<command>'
     if not proxy or not proxy.host or not proxy.username:
         return None
@@ -104,17 +114,24 @@ async def _ssh_get_mem_percent(proxy: Proxy, spec: str, timeout_sec: int = 5) ->
     if cached and cached[1] > now:
         return cached[0]
     loop = asyncio.get_running_loop()
-    value = await loop.run_in_executor(
-        None,
-        lambda: _ssh_exec_and_parse_mem(
-            proxy.host,
-            getattr(proxy, "port", 22) or 22,
-            proxy.username,
-            getattr(proxy, "password", None),
-            cmd,
-            timeout_sec,
-        ),
-    )
+    async with _SSH_SEMAPHORE:
+        t0 = monotonic()
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"[resource_usage] SSH mem start host={proxy.host} port={getattr(proxy, 'port', 22)} user={proxy.username} cmd={cmd}")
+        value = await loop.run_in_executor(
+            None,
+            lambda: _ssh_exec_and_parse_mem(
+                proxy.host,
+                getattr(proxy, "port", 22) or 22,
+                proxy.username,
+                getattr(proxy, "password", None),
+                cmd,
+                timeout_sec,
+            ),
+        )
+        t1 = monotonic()
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"[resource_usage] SSH mem end host={proxy.host} ms={(t1 - t0) * 1000:.1f} value={value}")
     if value is not None:
         _MEM_CACHE[key] = (value, now + _MEM_CACHE_TTL_SEC)
     return value
@@ -129,6 +146,8 @@ async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str)
             continue
         # Special handling for memory via SSH
         if key == "mem" and isinstance(oid, str) and oid.lower().strip().startswith("ssh"):
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"[resource_usage] Using SSH mem for host={proxy.host} oidSpec={oid}")
             keys.append(key)
             tasks.append(_ssh_get_mem_percent(proxy, oid))
         else:
