@@ -4,8 +4,11 @@
 <div class="box">
     <h3 class="title is-4">자원사용률 모니터링</h3>
 
-    <div class="columns is-multiline">
-        <div class="column is-12">
+    <div class="accordion" id="ruSelectAccordion">
+        <div class="accordion-header">
+            <h4>대상 선택</h4>
+        </div>
+        <div class="accordion-body">
             <div class="columns is-multiline">
                 <div class="column is-4">
                     <div class="field">
@@ -42,33 +45,33 @@
                 </div>
             </div>
         </div>
+    </div>
 
-        <div class="column is-12">
-            <div class="level">
-                <div class="level-left">
-                    <div class="level-item">
-                        <div class="field has-addons">
-                            <p class="control">
-                                <span class="button is-static">주기(초)</span>
-                            </p>
-                            <p class="control">
-                                <input class="input" id="ruIntervalSec" type="number" min="5" step="1" value="30">
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                <div class="level-right">
-                    <div class="level-item">
-                        <div class="buttons">
-                            <button class="button is-success" id="ruStartBtn">시작</button>
-                            <button class="button is-danger" id="ruStopBtn" disabled>중지</button>
-                            <span id="ruStatus" class="tag is-light ml-2">정지됨</span>
-                        </div>
+    <div class="column is-12">
+        <div class="level">
+            <div class="level-left">
+                <div class="level-item">
+                    <div class="field has-addons">
+                        <p class="control">
+                            <span class="button is-static">주기(초)</span>
+                        </p>
+                        <p class="control">
+                            <input class="input" id="ruIntervalSec" type="number" min="5" step="1" value="30">
+                        </p>
                     </div>
                 </div>
             </div>
-            <p id="ruError" class="help is-danger" style="display:none;"></p>
+            <div class="level-right">
+                <div class="level-item">
+                    <div class="buttons">
+                        <button class="button is-success" id="ruStartBtn">시작</button>
+                        <button class="button is-danger" id="ruStopBtn" disabled>중지</button>
+                        <span id="ruStatus" class="tag is-light ml-2">정지됨</span>
+                    </div>
+                </div>
+            </div>
         </div>
+        <p id="ruError" class="help is-danger" style="display:none;"></p>
     </div>
 
     <div class="mt-4">
