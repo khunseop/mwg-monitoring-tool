@@ -268,6 +268,9 @@ function saveResourceConfig() {
     Object.keys(payload.oids).forEach(k => { if (!payload.oids[k]) delete payload.oids[k]; });
     Object.keys(payload.thresholds).forEach(k => { if (payload.thresholds[k] == null || !Number.isFinite(payload.thresholds[k])) delete payload.thresholds[k]; });
 
+    // Debug: ensure payload includes thresholds
+    try { console.debug('Saving resource-config payload', payload); } catch (e) {}
+
     $.ajax({
         url: '/api/resource-config',
         method: 'PUT',
@@ -362,4 +365,7 @@ $(document).ready(() => {
     loadResourceConfig();
     loadSessionConfig();
 });
+
+// Expose functions for inline onclick handlers
+window.saveResourceConfig = saveResourceConfig;
 
