@@ -221,11 +221,6 @@ function loadResourceConfig() {
 
 function saveResourceConfig() {
     try { if (document && document.activeElement) { document.activeElement.blur(); } } catch (e) {}
-    try {
-        console.debug('Threshold inputs (raw):', {
-            cpu: $('#cfgThrCpu').val(), mem: $('#cfgThrMem').val(), cc: $('#cfgThrCc').val(), cs: $('#cfgThrCs').val(), http: $('#cfgThrHttp').val(), https: $('#cfgThrHttps').val(), ftp: $('#cfgThrFtp').val()
-        });
-    } catch (e) {}
     function numOrUndef(selector) {
         const raw = ($(selector).val() || '').toString().trim();
         if (raw.length === 0) return undefined;
@@ -273,9 +268,6 @@ function saveResourceConfig() {
     // remove undefined keys
     Object.keys(payload.oids).forEach(k => { if (!payload.oids[k]) delete payload.oids[k]; });
     Object.keys(payload.thresholds).forEach(k => { if (payload.thresholds[k] == null || !Number.isFinite(payload.thresholds[k])) delete payload.thresholds[k]; });
-
-    // Debug: ensure payload includes thresholds
-    try { console.debug('Saving resource-config payload', payload); } catch (e) {}
 
     $.ajax({
         url: '/api/resource-config',

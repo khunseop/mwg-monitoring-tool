@@ -23,14 +23,10 @@ def get_resource_config(db: Session = Depends(get_db)):
         db.add(cfg)
         db.commit()
         db.refresh(cfg)
-    # parse oids and embedded thresholds fallback
+    # parse oids and embedded thresholds
     oids = json.loads(cfg.oids_json or '{}')
     thresholds = {}
-    try:
-        thresholds = json.loads(getattr(cfg, 'thresholds_json', '{}') or '{}')
-    except Exception:
-        thresholds = {}
-    if not thresholds and isinstance(oids, dict) and isinstance(oids.get('__thresholds__'), dict):
+    if isinstance(oids, dict) and isinstance(oids.get('__thresholds__'), dict):
         thresholds = oids.get('__thresholds__') or {}
     # filter out embedded key when returning oids
     if isinstance(oids, dict) and '__thresholds__' in oids:
@@ -52,7 +48,7 @@ def update_resource_config(payload: ResourceConfigBase, db: Session = Depends(ge
         cfg = ResourceConfigModel()
         db.add(cfg)
     cfg.community = payload.community
-    # Store oids; also embed thresholds for backward/compat (to avoid DB migrations)
+    # Store oids; also embed thresholds (single source of truth)
     oids = payload.oids or {}
     thresholds = payload.thresholds or {}
     # Preserve previous thresholds when client sends an empty dict

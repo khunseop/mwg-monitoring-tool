@@ -450,20 +450,7 @@ $(document).ready(function() {
         return true;
     }
 
-    // raw timeseries only; no mode
-
-    function toIsoOrNull(val) {
-        if (!val) return null;
-        const d = new Date(val);
-        if (isNaN(d.getTime())) return null;
-        return d.toISOString();
-    }
-
-    // no user-facing series error UI now
-    function showSeriesError(msg) { /* noop */ }
-    function clearSeriesError() { /* noop */ }
-
-    function fetchSeries() { return Promise.resolve(); }
+    // raw timeseries only; no mode (helper removed)
 
     // Assign consistent colors per proxy (same color across metrics of a proxy)
     function colorForProxy(proxyId) {
@@ -585,7 +572,8 @@ $(document).ready(function() {
     // initialize DOM, legend and buffer state
     ru.legendState = loadLegendState();
     ru.tsBuffer = loadBufferState();
-    ensureChartsDom();
+    // initialize charts DOM for ApexCharts
+    ensureApexChartsDom();
     // auto-restore running state and render charts from buffer
     try {
         const running = localStorage.getItem(RUN_STORAGE_KEY) === '1';
