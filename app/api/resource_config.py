@@ -55,6 +55,14 @@ def update_resource_config(payload: ResourceConfigBase, db: Session = Depends(ge
     # Store oids; also embed thresholds for backward/compat (to avoid DB migrations)
     oids = payload.oids or {}
     thresholds = payload.thresholds or {}
+    # Preserve previous thresholds when client sends an empty dict
+    if not thresholds:
+        try:
+            current = json.loads(cfg.oids_json or '{}')
+            if isinstance(current, dict) and isinstance(current.get('__thresholds__'), dict):
+                thresholds = current.get('__thresholds__') or {}
+        except Exception:
+            thresholds = {}
     merged = dict(oids)
     # always embed thresholds (may be empty dict) to ensure persistence in oids_json
     merged['__thresholds__'] = thresholds
