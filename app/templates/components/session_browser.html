@@ -6,45 +6,38 @@
 
     <div class="columns is-multiline">
         <div class="column is-12">
-            <div class="accordion" id="sbSelectAccordion">
-                <div class="accordion-header">
-                    <h4>대상 선택</h4>
+            <div class="columns is-multiline">
+                <div class="column is-4">
+                    <div class="field">
+                        <label class="label">그룹</label>
+                        <div class="control">
+                            <div class="select is-fullwidth">
+                                <select id="sbGroupSelect">
+                                    <option value="">전체</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="accordion-body">
-                    <div class="columns is-multiline">
-                        <div class="column is-4">
-                            <div class="field">
-                                <label class="label">그룹</label>
-                                <div class="control">
-                                    <div class="select is-fullwidth">
-                                        <select id="sbGroupSelect">
-                                            <option value="">전체</option>
-                                        </select>
-                                    </div>
+                <div class="column is-8">
+                    <div class="field">
+                        <div class="level" style="margin-bottom: 0.5rem;">
+                            <div class="level-left">
+                                <div class="level-item">
+                                    <label class="label" style="margin-bottom: 0;">프록시 선택</label>
+                                </div>
+                            </div>
+                            <div class="level-right">
+                                <div class="level-item">
+                                    <label class="checkbox">
+                                        <input type="checkbox" id="sbSelectAll"> 모두 선택
+                                    </label>
                                 </div>
                             </div>
                         </div>
-                        <div class="column is-8">
-                            <div class="field">
-                                <div class="level" style="margin-bottom: 0.5rem;">
-                                    <div class="level-left">
-                                        <div class="level-item">
-                                            <label class="label" style="margin-bottom: 0;">프록시 선택</label>
-                                        </div>
-                                    </div>
-                                    <div class="level-right">
-                                        <div class="level-item">
-                                            <label class="checkbox">
-                                                <input type="checkbox" id="sbSelectAll"> 모두 선택
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="control">
-                                    <div class="select is-multiple is-fullwidth">
-                                        <select id="sbProxySelect" multiple size="6"></select>
-                                    </div>
-                                </div>
+                        <div class="control">
+                            <div class="select is-multiple is-fullwidth">
+                                <select id="sbProxySelect" multiple size="6"></select>
                             </div>
                         </div>
                     </div>

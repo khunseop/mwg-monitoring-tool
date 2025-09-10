@@ -73,36 +73,7 @@ $(document).ready(function() {
         if (isError) $t.addClass('is-danger'); else $t.addClass(text ? 'is-success' : 'is-light');
     }
 
-    function fetchGroups() {
-        return $.getJSON('/api/proxy-groups').then(data => {
-            sb.groups = data || [];
-            const $sel = $('#sbGroupSelect');
-            $sel.empty();
-            $sel.append('<option value="">전체</option>');
-            sb.groups.forEach(g => { $sel.append(`<option value="${g.id}">${g.name}</option>`); });
-        }).catch(() => { showErr('그룹 목록을 불러오지 못했습니다.'); });
-    }
-
-    function fetchProxies() {
-        return $.getJSON('/api/proxies').then(data => {
-            sb.proxies = data || [];
-            renderProxySelect();
-        }).catch(() => { showErr('프록시 목록을 불러오지 못했습니다.'); });
-    }
-
-    function renderProxySelect() {
-        const selectedGroupId = $('#sbGroupSelect').val();
-        const $sel = $('#sbProxySelect');
-        $sel.empty();
-        (sb.proxies || []).filter(p => {
-            if (!p.is_active) return false;
-            if (!selectedGroupId) return true;
-            return String(p.group_id || '') === String(selectedGroupId);
-        }).forEach(p => {
-            const label = `${p.host}${p.group_name ? ' ('+p.group_name+')' : ''}`;
-            $sel.append(`<option value="${p.id}">${label}</option>`);
-        });
-    }
+    // Selection UI is now handled by shared DeviceSelector
 
     function getSelectedProxyIds() { return ($('#sbProxySelect').val() || []).map(v => parseInt(v, 10)); }
 
@@ -357,13 +328,7 @@ $(document).ready(function() {
         // open in new tab to trigger download without blocking UI
         window.open(url, '_blank');
     });
-    $('#sbGroupSelect').on('change', function() { renderProxySelect(); saveState(undefined); });
-    $('#sbSelectAll').on('change', function() {
-        const checked = $(this).is(':checked');
-        $('#sbProxySelect option').prop('selected', checked);
-        // keep items; just persist selection/group
-        saveState(undefined);
-    });
+    $('#sbGroupSelect').on('change', function() { saveState(undefined); if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true); });
     $('#sbProxySelect').on('change', function() { saveState(undefined); if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true); });
 
     // Row click -> open detail modal
@@ -380,7 +345,12 @@ $(document).ready(function() {
     // Show empty state initially
     $('#sbTableWrap').hide();
     $('#sbEmptyState').show();
-    Promise.all([fetchGroups(), fetchProxies()]).then(() => { restoreState(); if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true); });
+    DeviceSelector.init({ 
+        groupSelect: '#sbGroupSelect', 
+        proxySelect: '#sbProxySelect', 
+        selectAll: '#sbSelectAll',
+        onData: function(data){ sb.groups = data.groups || []; sb.proxies = data.proxies || []; }
+    }).then(function(){ restoreState(); if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true); });
 
     // Cross-tab sync: update UI when other tabs modify stored state
     try {
