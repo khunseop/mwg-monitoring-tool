@@ -220,6 +220,12 @@ function loadResourceConfig() {
 }
 
 function saveResourceConfig() {
+    try { if (document && document.activeElement) { document.activeElement.blur(); } } catch (e) {}
+    try {
+        console.debug('Threshold inputs (raw):', {
+            cpu: $('#cfgThrCpu').val(), mem: $('#cfgThrMem').val(), cc: $('#cfgThrCc').val(), cs: $('#cfgThrCs').val(), http: $('#cfgThrHttp').val(), https: $('#cfgThrHttps').val(), ftp: $('#cfgThrFtp').val()
+        });
+    } catch (e) {}
     function numOrUndef(selector) {
         const raw = ($(selector).val() || '').toString().trim();
         if (raw.length === 0) return undefined;
