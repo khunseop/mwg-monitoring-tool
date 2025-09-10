@@ -327,11 +327,11 @@ body {
 /* Tom Select: align with Bulma input look & feel */
 .ts-control, .ts-control input, .ts-dropdown {
     font-family: var(--font-sans);
-    font-size: 0.98rem;
+    font-size: 0.95rem;
 }
 
 /* Ensure group dropdown uses the site default font */
-#sbGroupSelect, #ruGroupSelect { font-family: var(--font-sans); font-size: 0.98rem; }
+#sbGroupSelect, #ruGroupSelect { font-family: var(--font-sans); font-size: 0.95rem; }
 .ts-control {
     border: 1px solid var(--color-border) !important;
     border-radius: var(--radius-sm) !important;
@@ -374,7 +374,7 @@ body {
 #ruProxySelect + .ts-wrapper .ts-control,
 #sbGroupSelect + .ts-wrapper .ts-control,
 #ruGroupSelect + .ts-wrapper .ts-control {
-    font-size: 1rem;
+    font-size: 0.96rem;
 }
 
 /* Utility tweaks */
