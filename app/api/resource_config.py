@@ -56,9 +56,8 @@ def update_resource_config(payload: ResourceConfigBase, db: Session = Depends(ge
     oids = payload.oids or {}
     thresholds = payload.thresholds or {}
     merged = dict(oids)
-    # only embed when not empty
-    if thresholds:
-        merged['__thresholds__'] = thresholds
+    # always embed thresholds (may be empty dict) to ensure persistence in oids_json
+    merged['__thresholds__'] = thresholds
     cfg.oids_json = json.dumps(merged)
     db.commit()
     db.refresh(cfg)
