@@ -76,16 +76,12 @@
 			function bindEvents() {
 				if ($group && $group.length) {
 					$group.off('.devicesel').on('change.devicesel', function() {
-						var prev = ($proxy.val() || []).slice();
 						populateProxies();
+						// Auto-select all proxies in the currently filtered group
+						var allVals = $proxy.find('option').map(function() { return $(this).val(); }).get();
 						try {
-							if (state.ts) {
-								var still = prev.filter(function(v) { return $proxy.find('option[value="' + v + '"]').length > 0; });
-								state.ts.setValue(still, true);
-							} else {
-								$proxy.val(prev.filter(function(v) { return $proxy.find('option[value="' + v + '"]').length > 0; }));
-								$proxy.trigger('change');
-							}
+							if (state.ts) { state.ts.setValue(allVals, true); }
+							else { $proxy.find('option').prop('selected', true); $proxy.trigger('change'); }
 						} catch (e) { /* ignore */ }
 					});
 				}
