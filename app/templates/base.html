@@ -31,6 +31,9 @@
                         <a class="navbar-item {% if request.url.path.startswith('/resource') %}is-active{% endif %}" href="/resource">
                             자원사용률
                         </a>
+                        <a class="navbar-item {% if request.url.path.startswith('/traffic-logs') %}is-active{% endif %}" href="/traffic-logs">
+                            트래픽 로그
+                        </a>
                         <a class="navbar-item {% if request.url.path.startswith('/session') %}is-active{% endif %}" href="/session">
                             세션브라우저
                         </a>
