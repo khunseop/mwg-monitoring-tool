@@ -59,9 +59,11 @@
 							maxOptions: 10000,
 							closeAfterSelect: false,
 							hideSelected: true,
+							maxItems: null,
+							dropdownParent: 'body',
 							render: {
-								option: function(data, escape) { return '<div>' + (data.text || '') + '</div>'; },
-								item: function(data, escape) { return '<div>' + (data.text || '') + '</div>'; }
+								option: function(data, escape) { return '<div style="white-space:nowrap;">' + (data.text || '') + '</div>'; },
+								item: function(data, escape) { return '<div style="white-space:nowrap;">' + (data.text || '') + '</div>'; }
 							},
 							onInitialize: function() { $proxy[0]._tom = this; },
 							onChange: function() { try { $proxy.trigger('change'); } catch (e) { /* ignore */ } }
