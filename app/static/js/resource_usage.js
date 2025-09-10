@@ -34,36 +34,7 @@ $(document).ready(function() {
         try { localStorage.setItem(RUN_STORAGE_KEY, running ? '1' : '0'); } catch (e) { /* ignore */ }
     }
 
-    function fetchGroups() {
-        return $.getJSON('/api/proxy-groups').then(data => {
-            ru.groups = data || [];
-            const $sel = $('#ruGroupSelect');
-            $sel.empty();
-            $sel.append('<option value="">전체</option>');
-            ru.groups.forEach(g => { $sel.append(`<option value="${g.id}">${g.name}</option>`); });
-        }).catch(() => { showRuError('그룹 목록을 불러오지 못했습니다.'); });
-    }
-
-    function fetchProxies() {
-        return $.getJSON('/api/proxies').then(data => {
-            ru.proxies = data || [];
-            renderProxySelect();
-        }).catch(() => { showRuError('프록시 목록을 불러오지 못했습니다.'); });
-    }
-
-    function renderProxySelect() {
-        const selectedGroupId = $('#ruGroupSelect').val();
-        const $sel = $('#ruProxySelect');
-        $sel.empty();
-        (ru.proxies || []).filter(p => {
-            if (!p.is_active) return false; // 활성 프록시만
-            if (!selectedGroupId) return true;
-            return String(p.group_id || '') === String(selectedGroupId);
-        }).forEach(p => {
-            const label = `${p.host}${p.group_name ? ' ('+p.group_name+')' : ''}`;
-            $sel.append(`<option value="${p.id}">${label}</option>`);
-        });
-    }
+    // Selection UI is now handled by shared DeviceSelector
 
     function getSelectedProxyIds() { return ($('#ruProxySelect').val() || []).map(v => parseInt(v, 10)); }
     let cachedConfig = null;
@@ -371,14 +342,8 @@ $(document).ready(function() {
     $('#ruStartBtn').on('click', function() { startPolling(); });
     $('#ruStopBtn').on('click', function() { stopPolling(); });
     $('#ruGroupSelect').on('change', function() {
-        renderProxySelect();
         ru.lastCumulativeByProxy = {};
         $('#ruTableBody').empty();
-        saveState(undefined);
-    });
-    $('#ruSelectAll').on('change', function() {
-        const checked = $(this).is(':checked');
-        $('#ruProxySelect option').prop('selected', checked);
         saveState(undefined);
     });
     $('#ruProxySelect').on('change', function() { saveState(undefined); });
@@ -386,7 +351,15 @@ $(document).ready(function() {
     // Show empty state initially
     $('#ruHeatmapWrap').hide();
     $('#ruEmptyState').show();
-    Promise.all([fetchGroups(), fetchProxies(), loadConfig()]).then(() => { restoreState(); });
+    Promise.all([
+        DeviceSelector.init({ 
+            groupSelect: '#ruGroupSelect', 
+            proxySelect: '#ruProxySelect', 
+            selectAll: '#ruSelectAll',
+            onData: function(data){ ru.groups = data.groups || []; ru.proxies = data.proxies || []; }
+        }), 
+        loadConfig()
+    ]).then(function(){ restoreState(); });
 
     // =====================
     // Timeseries Graph UI
