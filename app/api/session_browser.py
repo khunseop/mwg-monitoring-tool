@@ -8,6 +8,8 @@ from app.utils.time import now_kst, KST_TZ
 from sqlalchemy import func, or_, asc, desc
 import re
 import warnings
+import time
+import logging
 try:
     from cryptography.utils import CryptographyDeprecationWarning
     warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
@@ -31,6 +33,7 @@ from app.schemas.session_browser_config import (
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _get_cfg(db: Session) -> SessionBrowserConfigModel:
@@ -292,9 +295,19 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
         return CollectResponse(requested=0, succeeded=0, failed=0, errors={}, items=[])
 
     errors: Dict[int, str] = {}
-    collected_models: List[SessionRecordModel] = []
-    cleared_proxy_ids: set[int] = set()
 
+    # Replacement semantics: clear existing session records so subsequent searches use only fresh data
+    t_overall_start = time.perf_counter()
+    try:
+        db.query(SessionRecordModel).delete(synchronize_session=False)
+    except Exception as e:
+        logger.exception("Failed to clear previous session records before collect: %s", e)
+        # proceed anyway to attempt fresh insert
+
+    collected_at_ts = now_kst()
+    insert_mappings: List[Dict[str, Any]] = []
+
+    t_fetch_parse_start = time.perf_counter()
     with ThreadPoolExecutor(max_workers=cfg.max_workers or 4) as executor:
         future_to_proxy = {executor.submit(_collect_for_proxy, p, cfg): p for p in proxies}
         for future in as_completed(future_to_proxy):
@@ -304,49 +317,65 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
                 if err:
                     errors[proxy_id] = err
                     continue
-                # Clear previous records for this proxy once before inserting new batch
-                if proxy_id not in cleared_proxy_ids:
-                    db.query(SessionRecordModel).filter(SessionRecordModel.proxy_id == proxy_id).delete(synchronize_session=False)
-                    cleared_proxy_ids.add(proxy_id)
                 for rec in records or []:
-                    model = SessionRecordModel(
-                        proxy_id=proxy_id,
-                        transaction=rec.get("transaction"),
-                        creation_time=rec.get("creation_time"),
-                        protocol=rec.get("protocol"),
-                        cust_id=rec.get("cust_id"),
-                        user_name=rec.get("user_name"),
-                        client_ip=rec.get("client_ip"),
-                        client_side_mwg_ip=rec.get("client_side_mwg_ip"),
-                        server_side_mwg_ip=rec.get("server_side_mwg_ip"),
-                        server_ip=rec.get("server_ip"),
-                        cl_bytes_received=rec.get("cl_bytes_received"),
-                        cl_bytes_sent=rec.get("cl_bytes_sent"),
-                        srv_bytes_received=rec.get("srv_bytes_received"),
-                        srv_bytes_sent=rec.get("srv_bytes_sent"),
-                        trxn_index=rec.get("trxn_index"),
-                        age_seconds=rec.get("age_seconds"),
-                        status=rec.get("status"),
-                        in_use=rec.get("in_use"),
-                        url=rec.get("url"),
-                        raw_line=rec.get("raw_line"),
-                        collected_at=now_kst(),
-                    )
-                    db.add(model)
-                    collected_models.append(model)
+                    insert_mappings.append({
+                        "proxy_id": proxy_id,
+                        "transaction": rec.get("transaction"),
+                        "creation_time": rec.get("creation_time"),
+                        "protocol": rec.get("protocol"),
+                        "cust_id": rec.get("cust_id"),
+                        "user_name": rec.get("user_name"),
+                        "client_ip": rec.get("client_ip"),
+                        "client_side_mwg_ip": rec.get("client_side_mwg_ip"),
+                        "server_side_mwg_ip": rec.get("server_side_mwg_ip"),
+                        "server_ip": rec.get("server_ip"),
+                        "cl_bytes_received": rec.get("cl_bytes_received"),
+                        "cl_bytes_sent": rec.get("cl_bytes_sent"),
+                        "srv_bytes_received": rec.get("srv_bytes_received"),
+                        "srv_bytes_sent": rec.get("srv_bytes_sent"),
+                        "trxn_index": rec.get("trxn_index"),
+                        "age_seconds": rec.get("age_seconds"),
+                        "status": rec.get("status"),
+                        "in_use": rec.get("in_use"),
+                        "url": rec.get("url"),
+                        "raw_line": rec.get("raw_line"),
+                        "collected_at": collected_at_ts,
+                    })
             except Exception as e:
                 errors[proxy.id] = str(e)
 
+    t_fetch_parse_end = time.perf_counter()
+
+    # Bulk insert for speed
+    t_db_insert_start = time.perf_counter()
+    if insert_mappings:
+        try:
+            db.bulk_insert_mappings(SessionRecordModel, insert_mappings)
+        except Exception as e:
+            logger.exception("Bulk insert failed; falling back to row-by-row: %s", e)
+            for row in insert_mappings:
+                db.add(SessionRecordModel(**row))
     db.commit()
-    for model in collected_models:
-        db.refresh(model)
+    t_db_insert_end = time.perf_counter()
+
+    logger.info(
+        "session-collect: proxies=%d ok=%d fail=%d records=%d fetch_parse_ms=%.1f db_insert_ms=%.1f total_ms=%.1f",
+        len(proxies),
+        len(proxies) - len(errors),
+        len(errors),
+        len(insert_mappings),
+        (t_fetch_parse_end - t_fetch_parse_start) * 1000.0,
+        (t_db_insert_end - t_db_insert_start) * 1000.0,
+        (time.perf_counter() - t_overall_start) * 1000.0,
+    )
 
     return CollectResponse(
         requested=len(proxies),
-        succeeded=len(collected_models),
+        succeeded=len(proxies) - len(errors),
         failed=len(errors),
         errors=errors,
-        items=collected_models,  # Pydantic converts with from_attributes
+        # Keep payload light; UI reloads from server-side table anyway
+        items=[],
     )
 
 
