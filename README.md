@@ -36,4 +36,17 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ### 주요 기능
 - 프록시/그룹 CRUD
 - 세션 브라우저 수집(SSH) 및 파싱 저장
-- 자원 사용률 수집(SNMP) 및 저장/조회
+- 자원 사용률 수집(SNMP 기본, 메모리는 선택적으로 SSH) 및 저장/조회
+
+### 자원 사용률(SSH 메모리)
+- OID 설정에서 `mem` 값을 `ssh` 또는 `ssh:<command>`로 지정하면 SSH로 메모리 사용률(%)을 수집합니다.
+  - 기본 명령은 다음과 같습니다:
+```bash
+awk '/MemTotal/ {total=$2} /MemAvailable/ {available=$2} END {printf "%.0f", 100 - (available / total * 100)}' /proc/meminfo
+```
+- 성능/타임아웃 환경변수:
+  - `RU_SSH_MAX_CONCURRENCY`: 동시 SSH 수집 개수(기본 8)
+  - `RU_SSH_TIMEOUT_SEC`: SSH 접속/명령 타임아웃 초(기본 5)
+- 검증(디버깅): 로그 레벨을 DEBUG로 올리면 다음 로그가 출력됩니다.
+  - `Using SSH mem for host=... oidSpec=ssh...`
+  - `SSH mem start host=...` / `SSH mem end host=... ms=... value=...`
