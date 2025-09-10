@@ -90,6 +90,11 @@ def healthz():
     return {"status": "ok"}
 
 
+@app.get("/traffic-logs")
+async def read_traffic_logs_page(request: Request):
+    return templates.TemplateResponse("components/traffic_logs.html", {"request": request})
+
+
 # Minimal security headers
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):

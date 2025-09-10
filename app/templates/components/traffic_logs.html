@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="box">
+	<h3 class="title is-4">트래픽 로그</h3>
+
+	<div class="columns is-multiline">
+		<div class="column is-3">
+			<div class="field">
+				<label class="label">프록시</label>
+				<div class="control">
+					<div class="select is-fullwidth">
+						<select id="tlProxySelect">
+							<option value="">프록시 선택</option>
+						</select>
+					</div>
+				</div>
+				<p class="help">단일 장비만 조회됩니다.</p>
+			</div>
+		</div>
+
+	<div class="columns is-multiline">
+		<div class="column is-4">
+			<div class="field">
+				<label class="label">검색어 (고정문자열)</label>
+				<input class="input" id="tlQuery" maxlength="256" placeholder="예: login">
+			</div>
+		</div>
+		<div class="column is-2">
+			<div class="field">
+				<label class="label">라인 제한</label>
+				<input class="input" id="tlLimit" type="number" min="1" max="1000" value="200">
+			</div>
+		</div>
+		<div class="column is-2">
+			<div class="field">
+				<label class="label">방향</label>
+				<div class="select is-fullwidth">
+					<select id="tlDirection">
+						<option value="tail" selected>tail</option>
+						<option value="head">head</option>
+					</select>
+				</div>
+			</div>
+		</div>
+		<div class="column is-2">
+			<div class="field">
+				<label class="label">파싱</label>
+				<label class="checkbox" style="display:block; padding-top: 0.5rem;">
+					<input type="checkbox" id="tlParsed"> parsed JSON
+				</label>
+			</div>
+		</div>
+		<div class="column is-2">
+			<div class="field">
+				<label class="label">&nbsp;</label>
+				<button class="button is-link is-fullwidth" id="tlLoadBtn">로그 불러오기</button>
+			</div>
+		</div>
+	</div>
+
+	<div class="level">
+		<div class="level-left">
+			<div class="level-item">
+				<span id="tlStatus" class="tag is-light">대기</span>
+			</div>
+		</div>
+		<div class="level-right">
+			<div class="level-item">
+				<p id="tlError" class="help is-danger" style="display:none;"></p>
+			</div>
+		</div>
+	</div>
+
+	<div id="tlResultRaw" class="box" style="display:none;">
+		<pre id="tlRawPre" style="max-height: 60vh; overflow:auto; white-space: pre-wrap; word-break: break-all;"></pre>
+	</div>
+
+	<div id="tlResultParsed" class="table-container" style="display:none; overflow-x:auto;">
+		<table id="tlTable" class="table is-fullwidth is-striped is-hoverable">
+			<thead>
+				<tr id="tlTableHead"></tr>
+			</thead>
+			<tbody id="tlTableBody"></tbody>
+		</table>
+	</div>
+</div>
+
+<!-- DataTables (local) -->
+<link rel="stylesheet" href="/static/vendor/datatables/datatables.min.css">
+<script src="/static/vendor/datatables/datatables.min.js"></script>
+
+<script src="/static/js/traffic_logs.js"></script>
+{% endblock %}
+
