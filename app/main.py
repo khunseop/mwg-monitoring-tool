@@ -15,6 +15,12 @@ from app.api import resource_usage as resource_usage_api
 from app.api import resource_config as resource_config_api
 from app.api import session_browser as session_browser_api
 from fastapi_standalone_docs import StandaloneDocs
+import warnings
+try:
+    from cryptography.utils import CryptographyDeprecationWarning
+    warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
+except Exception:
+    pass
 
 # Load environment variables from .env
 load_dotenv(override=False)

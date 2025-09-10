@@ -9,6 +9,12 @@ import os
 import logging
 import paramiko
 from time import monotonic
+import warnings
+try:
+    from cryptography.utils import CryptographyDeprecationWarning
+    warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
+except Exception:
+    pass
 
 from app.database.database import get_db
 from app.models.proxy import Proxy
