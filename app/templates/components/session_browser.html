@@ -24,10 +24,10 @@
                 </div>
                 <div class="column is-10">
                     <div class="field">
-                        <div class="level" style="margin-bottom: 0.5rem;">
+                        <div class="level mb-3">
                             <div class="level-left">
                                 <div class="level-item">
-                                    <label class="label" style="margin-bottom: 0;">프록시 선택</label>
+                                    <label class="label mb-0">프록시 선택</label>
                                 </div>
                             </div>
                             <div class="level-right">
@@ -39,7 +39,7 @@
                             </div>
                         </div>
                         <div class="control">
-                            <select id="sbProxySelect" multiple style="width:100%;"></select>
+                            <select id="sbProxySelect" multiple class="ts-fullwidth"></select>
                         </div>
                     </div>
                 </div>
@@ -52,7 +52,7 @@
             <div class="level-left">
                 <div class="level-item">
                     <div class="buttons">
-                        <button class="button is-link" id="sbLoadBtn">세션 불러오기</button>
+                        <button class="button is-primary" id="sbLoadBtn">세션 불러오기</button>
                         <span id="sbStatus" class="tag is-light ml-2">대기</span>
                     </div>
                 </div>
@@ -60,7 +60,7 @@
             <div class="level-right">
                 <div class="level-item">
                     <div class="buttons">
-                        <button class="button is-primary" id="sbExportBtn">엑셀 내보내기</button>
+                        <button class="button is-secondary" id="sbExportBtn">엑셀 내보내기</button>
                     </div>
                 </div>
                 <div class="level-item">
@@ -71,10 +71,10 @@
     </div>
 
     <div class="mt-4">
-        <div id="sbEmptyState" class="box" style="display:none; text-align:center; color: var(--color-text-muted);">
+        <div id="sbEmptyState" class="box empty-state" style="display:none;">
             현재 표시할 세션이 없습니다. 상단에서 대상을 선택하고 "세션 불러오기"를 클릭하세요.
         </div>
-        <div class="table-container sb-table-wrap" id="sbTableWrap" style="overflow-x:auto; overflow-y:hidden; max-height:none;">
+        <div class="table-container sb-table-wrap" id="sbTableWrap">
             <table id="sbTable" class="table is-fullwidth is-striped is-hoverable">
                 <thead>
                     <tr>
@@ -104,7 +104,7 @@
 <!-- 상세 모달 -->
 <div class="modal" id="sbDetailModal">
     <div class="modal-background"></div>
-    <div class="modal-card" style="max-width: 960px; width: 90%; border-radius: var(--radius-lg);">
+    <div class="modal-card is-wide">
         <header class="modal-card-head">
             <p class="modal-card-title">세션 상세</p>
             <button class="delete" aria-label="close" onclick="(function(){ $('#sbDetailModal').removeClass('is-active'); })()"></button>

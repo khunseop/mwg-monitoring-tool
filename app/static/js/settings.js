@@ -1,12 +1,3 @@
-// 공통 유틸리티 함수
-const utils = {
-    showError: (message) => alert(message || '오류가 발생했습니다.'),
-    formatTag: (isActive) => isActive ? 
-        '<span class="tag is-success">활성</span>' : 
-        '<span class="tag is-danger">비활성</span>',
-    resetForm: (formId) => document.getElementById(formId).reset()
-};
-
 // 탭 관리
 function activateSettingsTab(targetId) {
     document.querySelectorAll('.tabs li').forEach(t => {
@@ -15,10 +6,8 @@ function activateSettingsTab(targetId) {
         }
     });
     document.querySelectorAll('.tab-panel').forEach(panel => {
-        panel.style.display = 'none';
+        panel.classList.toggle('is-active', panel.id === targetId);
     });
-    const targetEl = document.getElementById(targetId);
-    if (targetEl) targetEl.style.display = 'block';
 }
 
 // Clicks on navbar submenu are normal links to '/#<id>' so when we land here, sync by hash
@@ -39,9 +28,9 @@ function openModal(type, id = null) {
         const endpoint = type === 'proxy' ? 'proxies' : 'proxy-groups';
         $.get(`/api/${endpoint}/${id}`)
             .done(data => fillForm(type, data))
-            .fail(() => utils.showError('데이터를 불러오는데 실패했습니다.'));
+            .fail(() => (window.AppUtils && AppUtils.showError('데이터를 불러오는데 실패했습니다.')));
     } else {
-        utils.resetForm(`${type}Form`);
+        try { document.getElementById(`${type}Form`).reset(); } catch (e) {}
         $(`#${type}Id`).val('');
     }
     $(`#${modalId}`).addClass('is-active');
@@ -80,23 +69,19 @@ function loadProxies() {
                     <tr>
                         <td>${proxy.host}</td>
                         <td>${proxy.group_name || '-'}</td>
-                        <td>${utils.formatTag(proxy.is_active)}</td>
+                        <td>${proxy.is_active ? '<span class="tag is-success">활성</span>' : '<span class="tag is-danger">비활성</span>'}</td>
                         <td>${proxy.description || ''}</td>
                         <td>
-                            <div class="buttons are-small">
-                                <button class="button is-link is-light" onclick="openModal('proxy', ${proxy.id})">
-                                    수정
-                                </button>
-                                <button class="button is-danger is-light" onclick="deleteProxy(${proxy.id})">
-                                    삭제
-                                </button>
+                            <div class="buttons">
+                                <button class="button is-secondary is-light" onclick="openModal('proxy', ${proxy.id})">수정</button>
+                                <button class="button is-danger is-light" onclick="deleteProxy(${proxy.id})">삭제</button>
                             </div>
                         </td>
                     </tr>
                 `);
             });
         })
-        .fail(() => utils.showError('프록시 목록을 불러오는데 실패했습니다.'));
+        .fail(() => (window.AppUtils && AppUtils.showError('프록시 목록을 불러오는데 실패했습니다.')));
 
     // 그룹 선택 옵션 업데이트
     $.get('/api/proxy-groups')
@@ -124,7 +109,7 @@ function saveProxy() {
 
     if (!proxyId) {
         if (!password || password.length === 0) {
-            utils.showError('비밀번호는 필수입니다.');
+            if (window.AppUtils) AppUtils.showError('비밀번호는 필수입니다.');
             return;
         }
         data.password = password;
@@ -144,7 +129,7 @@ function saveProxy() {
             loadProxies();
             closeModal('proxy');
         },
-        error: (xhr) => utils.showError(xhr.responseText)
+        error: (xhr) => (window.AppUtils && AppUtils.showError(xhr.responseText))
     });
 }
 
@@ -154,7 +139,7 @@ function deleteProxy(id) {
             url: `/api/proxies/${id}`,
             method: 'DELETE',
             success: loadProxies,
-            error: (xhr) => utils.showError(xhr.responseText)
+            error: (xhr) => (window.AppUtils && AppUtils.showError(xhr.responseText))
         });
     }
 }
@@ -174,13 +159,9 @@ function loadGroups() {
                         <td>${group.description || ''}</td>
                         <td>${group.proxies_count}</td>
                         <td>
-                            <div class="buttons are-small">
-                                <button class="button is-link is-light" onclick="openModal('group', ${group.id})">
-                                    수정
-                                </button>
-                                <button class="button is-danger is-light" onclick="deleteGroup(${group.id})">
-                                    삭제
-                                </button>
+                            <div class="buttons">
+                                <button class="button is-secondary is-light" onclick="openModal('group', ${group.id})">수정</button>
+                                <button class="button is-danger is-light" onclick="deleteGroup(${group.id})">삭제</button>
                             </div>
                         </td>
                     </tr>
@@ -189,7 +170,7 @@ function loadGroups() {
         })
         .fail((xhr) => {
             console.error('Failed to load groups:', xhr);  // 디버깅용
-            utils.showError('그룹 목록을 불러오는데 실패했습니다.');
+            if (window.AppUtils) AppUtils.showError('그룹 목록을 불러오는데 실패했습니다.');
         });
 }
 
@@ -226,23 +207,16 @@ function saveResourceConfig() {
     function numOrUndef(selector) {
         const raw = ($(selector).val() || '').toString().trim();
         if (raw.length === 0) return undefined;
-        // Allow inputs like "80", "80%", "80 %", "1,5", "1.5", "1,234.5"
         let s = raw.replace(/\s|%/g, '');
-        // Keep only digits, comma, dot, and optional leading minus
         s = s.replace(/(?!^-)[^0-9.,-]/g, '');
-        // Decide decimal separator: if dot exists, remove grouping commas; else convert single comma to dot
-        if (s.indexOf('.') >= 0) {
-            s = s.replace(/,/g, '');
-        } else if (s.indexOf(',') >= 0) {
-            // if multiple commas, remove all but last as thousands
+        if (s.indexOf('.') >= 0) { s = s.replace(/,/g, ''); }
+        else if (s.indexOf(',') >= 0) {
             const last = s.lastIndexOf(',');
             s = s.replace(/,/g, (m, idx) => (idx === last ? '.' : ''));
         }
-        // Remove any remaining stray characters
         s = s.replace(/[^0-9.-]/g, '');
         const n = Number(s);
         if (!Number.isFinite(n)) return undefined;
-        // Clamp to >= 0 since thresholds are non-negative
         return n < 0 ? 0 : n;
     }
 
@@ -267,7 +241,6 @@ function saveResourceConfig() {
             ftp: numOrUndef('#cfgThrFtp'),
         }
     };
-    // remove undefined keys
     Object.keys(payload.oids).forEach(k => { if (!payload.oids[k]) delete payload.oids[k]; });
     Object.keys(payload.thresholds).forEach(k => { if (payload.thresholds[k] == null || !Number.isFinite(payload.thresholds[k])) delete payload.thresholds[k]; });
 
@@ -340,7 +313,7 @@ function saveGroup() {
             loadProxies();
             closeModal('group');
         },
-        error: (xhr) => utils.showError(xhr.responseText)
+        error: (xhr) => (window.AppUtils && AppUtils.showError(xhr.responseText))
     });
 }
 
@@ -353,7 +326,7 @@ function deleteGroup(id) {
                 loadGroups();
                 loadProxies();
             },
-            error: (xhr) => utils.showError(xhr.responseText)
+            error: (xhr) => (window.AppUtils && AppUtils.showError(xhr.responseText))
         });
     }
 }
