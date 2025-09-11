@@ -76,22 +76,12 @@
 			}).join('');
 			$body.append(`<tr data-row="${idx}">${tds}</tr>`);
 		});
-		if($.fn.DataTable){
-			const dt = $('#tlTable').DataTable({
-				scrollX: true,
-				scrollY: 480,
-				scrollCollapse: true,
-				pageLength: 25,
-				lengthMenu: [ [25, 50, 100], [25, 50, 100] ],
-				order: [],
-				dom: 'frtip'
-			});
-			$('#tlTable tbody').on('click', 'tr', function(){
-				const rowIdx = $(this).data('row');
-				if(rowIdx == null) return;
-				showDetail(records[rowIdx] || {});
-			});
-		}
+		// Static table click handler for details
+		$('#tlTable tbody').on('click', 'tr', function(){
+			const rowIdx = $(this).data('row');
+			if(rowIdx == null) return;
+			showDetail(records[rowIdx] || {});
+		});
 		$('#tlResultParsed').show();
 		$('#tlResultRaw').hide();
 		$('#tlEmptyState').toggle(records.length === 0);
@@ -117,7 +107,7 @@
 		const q = ($('#tlQuery').val() || '').trim();
 		const limit = Math.max(1, Math.min(1000, parseInt($('#tlLimit').val() || '200', 10)));
 		const direction = $('#tlDirection').val();
-		const parsed = $('#tlParsed').is(':checked');
+		const parsed = true;
 
 		setStatus('조회 중...', 'is-info');
 		$('#tlLoadBtn').addClass('is-loading').prop('disabled', true);
@@ -134,11 +124,7 @@
 				throw new Error(err.detail || '조회 실패');
 			}
 			const data = await res.json();
-			if(parsed){
-				renderParsed(data.records || []);
-			}else{
-				renderRaw(data.lines || []);
-			}
+			renderParsed(data.records || []);
 			const suffix = data.truncated ? ' (truncated)' : '';
 			setStatus(`완료 - ${data.count} 라인${suffix}`, 'is-success');
 		}catch(e){
