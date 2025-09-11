@@ -460,7 +460,7 @@ body {
 }
 
 .dataTables_wrapper .dataTables_paginate {
-    text-align: right;
+    text-align: center;
     padding-top: 0.5rem;
 }
 .dataTables_wrapper .dataTables_paginate .paginate_button {
@@ -518,6 +518,15 @@ table.dataTable thead th.sorting_desc::after { content: '\25BE'; color: var(--co
 
 /* Session Browser: constrain URL column by default */
 #sbTable td:nth-child(9), #sbTable th:nth-child(9) { max-width: 420px; }
+
+/* Traffic Logs: constrain long text columns */
+#tlTable td[data-col="url_path"],
+#tlTable td[data-col="url_parametersstring"],
+#tlTable td[data-col="referer"],
+#tlTable td[data-col="url_host"],
+#tlTable td[data-col="user_agent"] {
+    max-width: 420px;
+}
 
 .ru-heat-row td { padding: 0.15rem; }
 /* Heatmap container sizing */

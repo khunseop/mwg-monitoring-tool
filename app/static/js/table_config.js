@@ -36,7 +36,7 @@
 		scrollCollapse: true,
 		pageLength: 25,
 		lengthMenu: [[25, 50, 100], [25, 50, 100]],
-		dom: 'frtip',
+		dom: 'lfrtip',
 		language: LANGUAGE_KO
 	};
 
