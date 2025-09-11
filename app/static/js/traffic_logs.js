@@ -73,8 +73,9 @@
 				let v = r[c];
 				if (v === null || v === undefined) v = '';
 				const isUrlish = (c === 'url_path' || c === 'url_parametersstring' || c === 'referer' || c === 'url_host' || c === 'user_agent');
-				const cls = isUrlish ? 'dt-nowrap dt-ellipsis' : 'dt-nowrap';
-				return `<td class="${cls}" data-col="${c}">${String(v)}</td>`;
+				const cls = 'dt-nowrap';
+				const content = isUrlish ? `<div class="dt-ellipsis">${String(v)}</div>` : String(v);
+				return `<td class="${cls}" data-col="${c}">${content}</td>`;
 			}).join('');
 			$body.append(`<tr data-row="${idx}">${tds}</tr>`);
 		});
