@@ -57,6 +57,7 @@ function fillForm(type, data) {
         $('#host').val(data.host);
         $('#username').val(data.username);
         $('#password').val('');
+        $('#traffic_log_path').val(data.traffic_log_path || '');
         $('#group_id').val(data.group_id || '');
         $('#description').val(data.description || '');
         $('#is_active').prop('checked', data.is_active);
@@ -115,6 +116,7 @@ function saveProxy() {
     const data = {
         host: $('#host').val(),
         username: $('#username').val(),
+        traffic_log_path: ($('#traffic_log_path').val() || '').trim(),
         is_active: $('#is_active').is(':checked'),
         group_id: $('#group_id').val() ? parseInt($('#group_id').val()) : null,
         description: $('#description').val() || null

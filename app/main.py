@@ -14,8 +14,11 @@ from app.api import proxies, proxy_groups
 from app.api import resource_usage as resource_usage_api
 from app.api import resource_config as resource_config_api
 from app.api import session_browser as session_browser_api
+from app.api import traffic_logs as traffic_logs_api
 from fastapi_standalone_docs import StandaloneDocs
 import warnings
+from sqlalchemy import text, inspect
+from sqlalchemy.exc import OperationalError
 try:
     from cryptography.utils import CryptographyDeprecationWarning
     warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
@@ -66,6 +69,7 @@ app.include_router(proxy_groups.router, prefix="/api", tags=["proxy-groups"])
 app.include_router(resource_usage_api.router, prefix="/api", tags=["resource-usage"])
 app.include_router(resource_config_api.router, prefix="/api", tags=["resource-config"])
 app.include_router(session_browser_api.router, prefix="/api", tags=["session-browser"])
+app.include_router(traffic_logs_api.router, prefix="/api", tags=["traffic-logs"])
 
 # 페이지 라우터
 @app.get("/")
@@ -86,6 +90,11 @@ def healthz():
     return {"status": "ok"}
 
 
+@app.get("/traffic-logs")
+async def read_traffic_logs_page(request: Request):
+    return templates.TemplateResponse("components/traffic_logs.html", {"request": request})
+
+
 # Minimal security headers
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
@@ -95,3 +104,24 @@ async def add_security_headers(request: Request, call_next):
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
     return response
+
+
+"""
+Startup migration: ensure 'traffic_log_path' column exists on 'proxies'.
+Uses SQLAlchemy inspector and an explicit transaction to be reliable across DBs.
+"""
+try:
+    with engine.begin() as conn:
+        inspector = inspect(conn)
+        tables = inspector.get_table_names()
+        if "proxies" in tables:
+            column_names = {col["name"] for col in inspector.get_columns("proxies")}
+            if "traffic_log_path" not in column_names:
+                try:
+                    conn.execute(text("ALTER TABLE proxies ADD COLUMN traffic_log_path VARCHAR(255)"))
+                except Exception:
+                    # Some DBs may require IF NOT EXISTS or different DDL; ignore if already added by another process
+                    pass
+except Exception:
+    # Don't block app start on migration issues
+    pass

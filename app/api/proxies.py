@@ -93,4 +93,3 @@ def delete_proxy(proxy_id: int, db: Session = Depends(get_db)):
     db.commit()
     return None
 
-# 테스트 기능 제거됨
