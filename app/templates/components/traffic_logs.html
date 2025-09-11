@@ -41,11 +41,11 @@
 			</div>
 		</div>
 		<div class="column is-2">
-			<div class="field" style="margin-top: 1.6rem;">
-				<button class="button is-link is-fullwidth" id="tlLoadBtn">조회</button>
-				<div style="margin-top: 0.5rem;">
+			<div class="field">
+				<button class="button is-link is-fullwidth" id="tlLoadBtn" style="margin-top: 1.6rem;">조회</button>
+				<div class="mt-4">
 					<span id="tlStatus" class="tag is-light">대기</span>
-					<p id="tlError" class="help is-danger" style="display:none; margin-top: 0.25rem;"></p>
+					<p id="tlError" class="help is-danger" style="display:none;"></p>
 				</div>
 			</div>
 		</div>
@@ -53,7 +53,7 @@
 
 
 	<div id="tlResultRaw" class="box" style="display:none;">
-		<pre id="tlRawPre" style="max-height: 60vh; overflow:auto; white-space: pre;"></pre>
+		<pre id="tlRawPre"></pre>
 	</div>
 
 
@@ -63,7 +63,7 @@
 	</div>
 </div>
 
-<div id="tlResultParsed" class="table-container sb-table-wrap" style="display:none; overflow-x:auto; overflow-y:hidden; max-height:none;">
+<div id="tlResultParsed" class="table-container sb-table-wrap" style="display:none;">
 	<table id="tlTable" class="table is-fullwidth is-striped is-hoverable">
 		<thead>
 			<tr id="tlTableHead"></tr>
@@ -81,7 +81,7 @@
 <!-- 상세 모달 -->
 <div class="modal" id="tlDetailModal">
 	<div class="modal-background"></div>
-	<div class="modal-card" style="max-width: 960px; width: 90%; border-radius: var(--radius-lg);">
+	<div class="modal-card is-wide">
 		<header class="modal-card-head">
 			<p class="modal-card-title">로그 상세</p>
 			<button class="delete" aria-label="close" onclick="(function(){ $('#tlDetailModal').removeClass('is-active'); })()"></button>

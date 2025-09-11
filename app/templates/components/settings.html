@@ -38,20 +38,20 @@
 </div>
 
 <!-- 리소스 설정 탭 -->
-<div id="resource-config" class="tab-panel" style="display: none;">
+<div id="resource-config" class="tab-panel">
     <div class="box">
         <h3 class="title is-4">리소스 설정</h3>
 
         <div class="level">
             <div class="level-left">
                 <div class="level-item">
-                    <div class="box" style="padding: 0.75rem 1rem;">
-                        <div class="field is-horizontal" style="margin-bottom: 0;">
+                    <div class="box is-compact">
+                        <div class="field is-horizontal mb-0">
                             <div class="field-label is-normal" style="min-width: 9rem;">
-                                <label class="label" style="margin-bottom: 0;">Community String</label>
+                                <label class="label mb-0">Community String</label>
                             </div>
                             <div class="field-body">
-                                <div class="field" style="margin-bottom: 0;">
+                                <div class="field mb-0">
                                     <div class="control">
                                         <input class="input" id="cfgCommunity" type="text" placeholder="public" value="public">
                                     </div>
@@ -179,7 +179,7 @@
     </div>
 </div>
 <!-- 세션브라우저 설정 탭 -->
-<div id="session-config" class="tab-panel" style="display: none;">
+<div id="session-config" class="tab-panel">
     <div class="box">
         <div class="level">
             <div class="level-left">
@@ -236,7 +236,7 @@
     </div>
 </div>
 <!-- 프록시 그룹 탭 -->
-<div id="proxy-groups" class="tab-panel" style="display: none;">
+<div id="proxy-groups" class="tab-panel">
     <div class="box">
         <div class="level">
             <div class="level-left">
@@ -272,7 +272,7 @@
 <!-- 프록시 추가/수정 모달 -->
 <div class="modal" id="proxyModal">
     <div class="modal-background"></div>
-    <div class="modal-card" style="border-radius: var(--radius-lg);">
+    <div class="modal-card">
         <header class="modal-card-head">
             <p class="modal-card-title">프록시 서버</p>
             <button class="delete" aria-label="close" onclick="closeModal('proxy')"></button>
@@ -340,7 +340,7 @@
 <!-- 그룹 추가/수정 모달 -->
 <div class="modal" id="groupModal">
     <div class="modal-background"></div>
-    <div class="modal-card" style="border-radius: var(--radius-lg);">
+    <div class="modal-card">
         <header class="modal-card-head">
             <p class="modal-card-title">프록시 그룹</p>
             <button class="delete" aria-label="close" onclick="closeModal('group')"></button>

@@ -15,10 +15,8 @@ function activateSettingsTab(targetId) {
         }
     });
     document.querySelectorAll('.tab-panel').forEach(panel => {
-        panel.style.display = 'none';
+        panel.classList.toggle('is-active', panel.id === targetId);
     });
-    const targetEl = document.getElementById(targetId);
-    if (targetEl) targetEl.style.display = 'block';
 }
 
 // Clicks on navbar submenu are normal links to '/#<id>' so when we land here, sync by hash

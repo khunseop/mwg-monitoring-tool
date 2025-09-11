@@ -49,6 +49,7 @@
                     </div>
                 </div>
 
+                {% if request.url.path == '/' %}
                 <div class="navbar-submenu">
                     <div class="tabs is-small">
                         <ul>
@@ -59,6 +60,7 @@
                         </ul>
                     </div>
                 </div>
+                {% endif %}
             </nav>
 
             {% block content %}{% endblock %}
