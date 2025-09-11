@@ -89,3 +89,46 @@ $(document).ready(function() {
     });
 });
 
+document.addEventListener("DOMContentLoaded", () => {
+    // 모든 모달 열기 버튼
+    const openModalButtons = document.querySelectorAll(".modal-open");
+    // 모든 모달 닫기 트리거 (.delete, .modal-background, .modal-close)
+    const closeModalTriggers = document.querySelectorAll(".modal .delete, .modal .modal-background, .modal .modal-close");
+  
+    function openModal(modal) {
+      modal.classList.add("is-active");
+    }
+  
+    function closeModal(modal) {
+      modal.classList.remove("is-active");
+    }
+  
+    function closeAllModals() {
+      document.querySelectorAll(".modal.is-active")
+        .forEach(m => m.classList.remove("is-active"));
+    }
+  
+    // 열기 버튼 클릭 → 해당 모달 열기
+    openModalButtons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const target = btn.dataset.target;
+        const modal = document.getElementById(target);
+        if (modal) openModal(modal);
+      });
+    });
+  
+    // 닫기 트리거 클릭 → 모달 닫기
+    closeModalTriggers.forEach(trigger => {
+      trigger.addEventListener("click", () => {
+        const modal = trigger.closest(".modal");
+        closeModal(modal);
+      });
+    });
+  
+    // ESC 키 → 모든 모달 닫기
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") {
+        closeAllModals();
+      }
+    });
+  });
