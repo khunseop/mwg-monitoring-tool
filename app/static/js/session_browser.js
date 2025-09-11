@@ -166,91 +166,31 @@ $(document).ready(function() {
                     .done(function(res){ callback(res); })
                     .fail(function(){ callback({ draw: data.draw, recordsTotal: 0, recordsFiltered: 0, data: [] }); });
             };
-
-            if (typeof DataTable === 'function') {
-                sb.dt = new DataTable('#sbTable', {
-                    serverSide: true,
-                    processing: true,
-                    paging: true,
-                    searching: true,
-                    ordering: true,
-                    info: true,
-                    responsive: false,
-                    scrollX: true,
-                    scrollY: 480,
-                    scrollCollapse: true,
-                    pageLength: 25,
-                    ajax: ajaxFn,
-                    drawCallback: function(){ updateTableVisibility(); },
-                    language: {
-                        search: '검색:',
-                        lengthMenu: '_MENU_ 개씩 보기',
-                        info: '총 _TOTAL_건 중 _START_–_END_',
-                        infoEmpty: '표시할 항목 없음',
-                        zeroRecords: '일치하는 항목이 없습니다.',
-                        paginate: { first: '처음', last: '마지막', next: '다음', previous: '이전' }
-                    },
-                    columns: [
-                        { title: '프록시' },
-                        { title: '생성시각' },
-                        { title: '사용자' },
-                        { title: '클라이언트 IP' },
-                        { title: '서버 IP' },
-                        { title: 'CL 수신' },
-                        { title: 'CL 송신' },
-                        { title: 'Age(s)' },
-                        { title: 'URL' },
-                        { title: 'id', visible: false }
-                    ],
-                    columnDefs: [
-                        { targets: -1, visible: false, searchable: false },
-                        { targets: 0, className: 'dt-nowrap' },
-                        { targets: 1, className: 'dt-nowrap' },
-                        { targets: 8, className: 'dt-nowrap', width: '480px' }
-                    ],
-                    createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
-                });
-                setTimeout(function(){ try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {} }, 0);
-            } else if ($ && $.fn && $.fn.DataTable) {
-                sb.dt = $('#sbTable').DataTable({
-                    serverSide: true,
-                    processing: true,
-                    paging: true,
-                    searching: true,
-                    ordering: true,
-                    info: true,
-                    responsive: false,
-                    scrollX: true,
-                    scrollY: 480,
-                    scrollCollapse: true,
-                    pageLength: 25,
-                    ajax: function(data, callback) { ajaxFn(data, callback); },
-                    drawCallback: function(){ updateTableVisibility(); },
-                    language: {
-                        search: '검색:',
-                        lengthMenu: '_MENU_ 개씩 보기',
-                        info: '총 _TOTAL_건 중 _START_–_END_',
-                        infoEmpty: '표시할 항목 없음',
-                        zeroRecords: '일치하는 항목이 없습니다.',
-                        paginate: { first: '처음', last: '마지막', next: '다음', previous: '이전' }
-                    },
-                    columns: [
-                        { title: '프록시' },
-                        { title: '생성시각' },
-                        { title: '사용자' },
-                        { title: '클라이언트 IP' },
-                        { title: '서버 IP' },
-                        { title: 'CL 수신' },
-                        { title: 'CL 송신' },
-                        { title: 'Age(s)' },
-                        { title: 'URL' },
-                        { title: 'id', visible: false }
-                    ],
-                    columnDefs: [ { targets: -1, visible: false, searchable: false }, { targets: 0, className: 'dt-nowrap' }, { targets: 1, className: 'dt-nowrap' }, { targets: 8, className: 'dt-nowrap', width: '480px' } ],
-                    createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
-                });
-                setTimeout(function(){ try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {} }, 0);
-            }
+            sb.dt = TableConfig.init('#sbTable', {
+                serverSide: true,
+                ajax: function(data, callback){ ajaxFn(data, callback); },
+                drawCallback: function(){ updateTableVisibility(); },
+                columns: [
+                    { title: '프록시' },
+                    { title: '생성시각' },
+                    { title: '사용자' },
+                    { title: '클라이언트 IP' },
+                    { title: '서버 IP' },
+                    { title: 'CL 수신' },
+                    { title: 'CL 송신' },
+                    { title: 'Age(s)' },
+                    { title: 'URL' },
+                    { title: 'id', visible: false }
+                ],
+                columnDefs: [
+                    { targets: -1, visible: false, searchable: false },
+                    { targets: 0, className: 'dt-nowrap' },
+                    { targets: 1, className: 'dt-nowrap' },
+                    { targets: 8, className: 'dt-nowrap dt-ellipsis', width: '480px' }
+                ],
+                createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
+            });
+            setTimeout(function(){ TableConfig.adjustColumns(sb.dt); }, 0);
         } catch (e) {
             // Ignore DataTables init failures; selection UI will still work
         }

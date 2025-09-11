@@ -421,9 +421,113 @@ body {
 /* DataTables: avoid dark hover overlay */
 :root { --dt-row-hover: 255, 255, 255; }
 
+/* DataTables x Bulma: control alignment and Bulma-like controls */
+.dataTables_wrapper {
+    font-size: 0.95rem;
+}
+.dataTables_wrapper .dataTables_filter {
+    float: right;
+    margin-bottom: 0.5rem;
+}
+.dataTables_wrapper .dataTables_filter label { color: var(--color-text-muted); }
+.dataTables_wrapper .dataTables_filter input {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 0.5em 0.75em;
+    height: 2.25em;
+    line-height: 1.2;
+}
+.dataTables_wrapper .dataTables_filter input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 0.15rem color-mix(in srgb, var(--color-primary) 15%, transparent);
+}
+
+.dataTables_wrapper .dataTables_length {
+    float: left;
+    margin-bottom: 0.5rem;
+}
+.dataTables_wrapper .dataTables_length label { color: var(--color-text-muted); }
+.dataTables_wrapper .dataTables_length select {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 0.25em 0.5em;
+}
+
+.dataTables_wrapper .dataTables_info {
+    color: var(--color-text-muted);
+    padding-top: 0.75rem;
+}
+
+.dataTables_wrapper .dataTables_paginate {
+    text-align: center;
+    padding-top: 0.5rem;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text);
+    margin: 0 2px;
+    padding: 0.25rem 0.5rem;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button.current,
+.dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+    background: color-mix(in srgb, var(--color-primary) 12%, white);
+    border-color: color-mix(in srgb, var(--color-primary) 25%, white);
+    color: var(--color-primary);
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background: #f8fafc;
+}
+
+/* Sorting icons: replace images with CSS arrows aligned to Bulma tone */
+table.dataTable thead .sorting,
+table.dataTable thead .sorting_asc,
+table.dataTable thead .sorting_desc {
+    background-image: none !important;
+    position: relative;
+    cursor: pointer;
+}
+table.dataTable thead th.sorting::after,
+table.dataTable thead th.sorting_asc::after,
+table.dataTable thead th.sorting_desc::after {
+    content: '\25B4\25BE';
+    color: var(--color-text-muted);
+    font-size: 0.7rem;
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    letter-spacing: 1px;
+}
+table.dataTable thead th.sorting_asc::after { content: '\25B4'; color: var(--color-primary); }
+table.dataTable thead th.sorting_desc::after { content: '\25BE'; color: var(--color-primary); }
+
 /* Session browser: prevent wrapping in created-at column (2nd column) */
 #sbTable td:nth-child(2), #sbTable th:nth-child(2) { white-space: nowrap; }
 .dt-nowrap { white-space: nowrap; }
+
+/* Generic ellipsis utility for table cells */
+.dt-ellipsis { 
+    max-width: var(--dt-ellipsis-max, 420px);
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+    white-space: nowrap; 
+}
+
+/* Session Browser: constrain URL column by default */
+#sbTable td:nth-child(9), #sbTable th:nth-child(9) { max-width: 420px; }
+
+/* Traffic Logs: constrain long text columns */
+#tlTable td[data-col="url_path"],
+#tlTable td[data-col="url_parametersstring"],
+#tlTable td[data-col="referer"],
+#tlTable td[data-col="url_host"],
+#tlTable td[data-col="user_agent"] {
+    max-width: 420px;
+}
+
 .ru-heat-row td { padding: 0.15rem; }
 /* Heatmap container sizing */
 #ruHeatmapWrap { width: 100%; }
