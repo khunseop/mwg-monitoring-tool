@@ -72,13 +72,9 @@ function loadProxies() {
                         <td>${proxy.is_active ? '<span class="tag is-success">활성</span>' : '<span class="tag is-danger">비활성</span>'}</td>
                         <td>${proxy.description || ''}</td>
                         <td>
-                            <div class="buttons are-small">
-                                <button class="button is-link is-light" onclick="openModal('proxy', ${proxy.id})">
-                                    수정
-                                </button>
-                                <button class="button is-danger is-light" onclick="deleteProxy(${proxy.id})">
-                                    삭제
-                                </button>
+                            <div class="buttons">
+                                <button class="button is-secondary is-light" onclick="openModal('proxy', ${proxy.id})">수정</button>
+                                <button class="button is-danger is-light" onclick="deleteProxy(${proxy.id})">삭제</button>
                             </div>
                         </td>
                     </tr>
@@ -163,13 +159,9 @@ function loadGroups() {
                         <td>${group.description || ''}</td>
                         <td>${group.proxies_count}</td>
                         <td>
-                            <div class="buttons are-small">
-                                <button class="button is-link is-light" onclick="openModal('group', ${group.id})">
-                                    수정
-                                </button>
-                                <button class="button is-danger is-light" onclick="deleteGroup(${group.id})">
-                                    삭제
-                                </button>
+                            <div class="buttons">
+                                <button class="button is-secondary is-light" onclick="openModal('group', ${group.id})">수정</button>
+                                <button class="button is-danger is-light" onclick="deleteGroup(${group.id})">삭제</button>
                             </div>
                         </td>
                     </tr>
