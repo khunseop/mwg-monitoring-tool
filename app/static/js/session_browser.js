@@ -186,7 +186,7 @@ $(document).ready(function() {
                     { targets: -1, visible: false, searchable: false },
                     { targets: 0, className: 'dt-nowrap' },
                     { targets: 1, className: 'dt-nowrap' },
-                    { targets: 8, className: 'dt-nowrap', width: '480px' }
+                    { targets: 8, className: 'dt-nowrap dt-ellipsis', width: '480px' }
                 ],
                 createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
             });

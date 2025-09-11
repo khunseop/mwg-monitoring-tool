@@ -72,7 +72,9 @@
 			const tds = COLS.map(c => {
 				let v = r[c];
 				if (v === null || v === undefined) v = '';
-				return `<td class="dt-nowrap" data-col="${c}">${String(v)}</td>`;
+				const isUrlish = (c === 'url_path' || c === 'url_parametersstring' || c === 'referer' || c === 'url_host');
+				const cls = isUrlish ? 'dt-nowrap dt-ellipsis' : 'dt-nowrap';
+				return `<td class="${cls}" data-col="${c}">${String(v)}</td>`;
 			}).join('');
 			$body.append(`<tr data-row="${idx}">${tds}</tr>`);
 		});
