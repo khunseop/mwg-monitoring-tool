@@ -63,7 +63,41 @@
 	</div>
 </div>
 
+<div id="tlResultParsed" class="table-container sb-table-wrap" style="display:none; overflow-x:auto; overflow-y:hidden; max-height:none;">
+	<table id="tlTable" class="table is-fullwidth is-striped is-hoverable">
+		<thead>
+			<tr id="tlTableHead"></tr>
+		</thead>
+		<tbody id="tlTableBody"></tbody>
+	</table>
+</div>
+
+<!-- DataTables (local) -->
+<link rel="stylesheet" href="/static/vendor/datatables/datatables.min.css">
+<script src="/static/vendor/datatables/datatables.min.js"></script>
+
 <script src="/static/js/traffic_logs.js?v={{ request.app.version }}"></script>
+
+<!-- 상세 모달 -->
+<div class="modal" id="tlDetailModal">
+	<div class="modal-background"></div>
+	<div class="modal-card" style="max-width: 960px; width: 90%; border-radius: var(--radius-lg);">
+		<header class="modal-card-head">
+			<p class="modal-card-title">로그 상세</p>
+			<button class="delete" aria-label="close" onclick="(function(){ $('#tlDetailModal').removeClass('is-active'); })()"></button>
+		</header>
+		<section class="modal-card-body">
+			<div class="content">
+				<table class="table is-fullwidth is-striped is-narrow">
+					<tbody id="tlDetailBody"></tbody>
+				</table>
+			</div>
+		</section>
+		<footer class="modal-card-foot">
+			<button class="button" onclick="(function(){ $('#tlDetailModal').removeClass('is-active'); })()">닫기</button>
+		</footer>
+	</div>
+</div>
 
 {% endblock %}
 
