@@ -76,10 +76,22 @@
 			}).join('');
 			$body.append(`<tr data-row="${idx}">${tds}</tr>`);
 		});
-		// Static table click handler for details
-		$('#tlTable tbody').on('click', 'tr', function(){
+		// Initialize DataTables for search/pagination (no column toggle)
+		if ($ && $.fn && $.fn.DataTable) {
+			$('#tlTable').DataTable({
+				scrollX: true,
+				scrollY: 480,
+				scrollCollapse: true,
+				pageLength: 25,
+				lengthMenu: [[25, 50, 100], [25, 50, 100]],
+				order: [],
+				dom: 'frtip'
+			});
+		}
+		// Row click opens detail modal
+		$('#tlTable tbody').off('click', 'tr').on('click', 'tr', function(){
 			const rowIdx = $(this).data('row');
-			if(rowIdx == null) return;
+			if (rowIdx == null) return;
 			showDetail(records[rowIdx] || {});
 		});
 		$('#tlResultParsed').show();
