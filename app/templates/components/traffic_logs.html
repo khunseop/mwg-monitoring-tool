@@ -17,9 +17,6 @@
 				</div>
 				<p class="help">단일 장비만 조회됩니다.</p>
 			</div>
-		</div>
-
-	<div class="columns is-multiline">
 		<div class="column is-4">
 			<div class="field">
 				<label class="label">검색어 (고정문자열)</label>
@@ -43,11 +40,11 @@
 				</div>
 			</div>
 		</div>
-		<div class="column is-2">
+		<div class="column is-1">
 			<div class="field">
 				<label class="label">파싱</label>
 				<label class="checkbox" style="display:block; padding-top: 0.5rem;">
-					<input type="checkbox" id="tlParsed"> parsed JSON
+					<input type="checkbox" id="tlParsed"> JSON
 				</label>
 			</div>
 		</div>
@@ -76,7 +73,7 @@
 		<pre id="tlRawPre" style="max-height: 60vh; overflow:auto; white-space: pre-wrap; word-break: break-all;"></pre>
 	</div>
 
-	<div id="tlResultParsed" class="table-container" style="display:none; overflow-x:auto;">
+	<div id="tlResultParsed" class="table-container sb-table-wrap" style="display:none; overflow-x:auto; overflow-y:hidden; max-height:none;">
 		<table id="tlTable" class="table is-fullwidth is-striped is-hoverable">
 			<thead>
 				<tr id="tlTableHead"></tr>

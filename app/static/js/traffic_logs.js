@@ -72,39 +72,19 @@
 			const tds = COLS.map(c => {
 				let v = r[c];
 				if (v === null || v === undefined) v = '';
-				return `<td data-col="${c}">${String(v)}</td>`;
+				return `<td class="dt-nowrap" data-col="${c}">${String(v)}</td>`;
 			}).join('');
 			$body.append(`<tr data-row="${idx}">${tds}</tr>`);
 		});
 		if($.fn.DataTable){
 			const dt = $('#tlTable').DataTable({
 				scrollX: true,
+				scrollY: 480,
+				scrollCollapse: true,
 				pageLength: 25,
 				lengthMenu: [ [25, 50, 100], [25, 50, 100] ],
 				order: [],
-				dom: 'Bfrtip',
-				buttons: [
-					{
-						extend: 'csv',
-						text: 'CSV 내보내기',
-						title: 'traffic_logs'
-					},
-					{
-						text: '컬럼 토글',
-						action: function () {
-							// Toggle columns with a simple prompt list
-							const current = COLS.map((c, i) => `${i}:${c}[${dt.column(i).visible() ? 'on' : 'off'}]`).join('\n');
-							const ask = prompt('토글할 컬럼 인덱스 (쉼표 구분)\n' + current, '');
-							if(!ask) return;
-							ask.split(',').map(s => s.trim()).forEach(idxStr => {
-								const i = parseInt(idxStr, 10);
-								if(Number.isFinite(i) && i >= 0 && i < COLS.length){
-									dt.column(i).visible(!dt.column(i).visible());
-								}
-							});
-						}
-					}
-				]
+				dom: 'frtip'
 			});
 			$('#tlTable tbody').on('click', 'tr', function(){
 				const rowIdx = $(this).data('row');
