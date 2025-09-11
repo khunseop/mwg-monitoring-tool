@@ -4,7 +4,7 @@
 <div class="box">
 	<h3 class="title is-4">트래픽 로그</h3>
 
-	<div class="columns is-multiline">
+	<div class="columns is-vcentered">
 		<div class="column is-3">
 			<div class="field">
 				<label class="label">프록시</label>
@@ -17,6 +17,7 @@
 				</div>
 				<p class="help">단일 장비만 조회됩니다.</p>
 			</div>
+		</div>
 		<div class="column is-4">
 			<div class="field">
 				<label class="label">검색어 (고정문자열)</label>
@@ -29,7 +30,7 @@
 				<input class="input" id="tlLimit" type="number" min="1" max="1000" value="200">
 			</div>
 		</div>
-		<div class="column is-2">
+		<div class="column is-1">
 			<div class="field">
 				<label class="label">방향</label>
 				<div class="select is-fullwidth">
@@ -48,10 +49,9 @@
 				</label>
 			</div>
 		</div>
-		<div class="column is-2">
-			<div class="field">
-				<label class="label">&nbsp;</label>
-				<button class="button is-link is-fullwidth" id="tlLoadBtn">로그 불러오기</button>
+		<div class="column is-1">
+			<div class="field" style="margin-top: 1.6rem;">
+				<button class="button is-link is-fullwidth" id="tlLoadBtn">조회</button>
 			</div>
 		</div>
 	</div>
