@@ -104,24 +104,3 @@ async def add_security_headers(request: Request, call_next):
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
     return response
-
-
-"""
-Startup migration: ensure 'traffic_log_path' column exists on 'proxies'.
-Uses SQLAlchemy inspector and an explicit transaction to be reliable across DBs.
-"""
-try:
-    with engine.begin() as conn:
-        inspector = inspect(conn)
-        tables = inspector.get_table_names()
-        if "proxies" in tables:
-            column_names = {col["name"] for col in inspector.get_columns("proxies")}
-            if "traffic_log_path" not in column_names:
-                try:
-                    conn.execute(text("ALTER TABLE proxies ADD COLUMN traffic_log_path VARCHAR(255)"))
-                except Exception:
-                    # Some DBs may require IF NOT EXISTS or different DDL; ignore if already added by another process
-                    pass
-except Exception:
-    # Don't block app start on migration issues
-    pass
