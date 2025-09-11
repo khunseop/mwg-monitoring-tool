@@ -52,7 +52,7 @@
             <div class="level-left">
                 <div class="level-item">
                     <div class="buttons">
-                        <button class="button is-link" id="sbLoadBtn">세션 불러오기</button>
+                        <button class="button is-primary" id="sbLoadBtn">세션 불러오기</button>
                         <span id="sbStatus" class="tag is-light ml-2">대기</span>
                     </div>
                 </div>
@@ -60,7 +60,7 @@
             <div class="level-right">
                 <div class="level-item">
                     <div class="buttons">
-                        <button class="button is-primary" id="sbExportBtn">엑셀 내보내기</button>
+                        <button class="button is-secondary" id="sbExportBtn">엑셀 내보내기</button>
                     </div>
                 </div>
                 <div class="level-item">
@@ -71,7 +71,7 @@
     </div>
 
     <div class="mt-4">
-        <div id="sbEmptyState" class="box" style="display:none; text-align:center; color: var(--color-text-muted);">
+        <div id="sbEmptyState" class="box empty-state" style="display:none;">
             현재 표시할 세션이 없습니다. 상단에서 대상을 선택하고 "세션 불러오기"를 클릭하세요.
         </div>
         <div class="table-container sb-table-wrap" id="sbTableWrap">
