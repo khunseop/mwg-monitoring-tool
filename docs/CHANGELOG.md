@@ -1,5 +1,14 @@
 # 릴리즈 노트
 
+## v1.3.1
+- 테이블 공통화 및 UI 정렬
+  - 공통 JS 모듈 `TableConfig` 추가: DataTables 기본 옵션/한국어/초기화 통합
+  - DOM 기본값을 `lfrtip`으로 지정해 "n개씩 보기" 복원
+  - DataTables 컨트롤을 Bulma 스타일과 일관되게 오버라이드(검색창/길이선택/페이지네이션/정렬아이콘)
+  - 페이지네이션 중앙 정렬
+  - 긴 텍스트(트래픽 로그 URL/Host/Referer/User-Agent) 말줄임 처리 강화: 셀 내부 래퍼 `.dt-ellipsis` 적용
+  - 세션브라우저/트래픽로그 모두 공통 초기화로 이관
+
 ## v1.3.0
 - 자원 사용률(API)
   - 메모리 수집을 SSH 기반으로 선택적으로 지원(`mem` OID를 `ssh` 또는 `ssh:<command>`로 설정)
