@@ -34,6 +34,7 @@
 		scrollX: true,
 		scrollY: 480,
 		scrollCollapse: true,
+		orderCellsTop: true,
 		pageLength: 25,
 		lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
 		// Place length + filter in top row, info + pagination in bottom row (Bulma 'level' containers)

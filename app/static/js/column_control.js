@@ -12,7 +12,7 @@
 	}
 
 	var ColumnControl = {
-		attach: function(dt, options){
+		_attachOnce: function(dt, options){
 			options = options || {};
 			try{
 				var $ = window.jQuery;
@@ -21,8 +21,11 @@
 				var container = table ? table.container() : null;
 				var node = table ? table.node() : null;
 				if(!$ || !node) return;
+				var $container = $(container);
 				var $table = $(node);
-				var $thead = $table.find('thead');
+				// With scrollX/scrollY, DataTables renders a cloned THEAD inside scrollHead
+				var $thead = $container.find('div.dataTables_scrollHead thead');
+				if($thead.length === 0){ $thead = $table.find('thead'); }
 				if($thead.length === 0) return;
 				$thead.find('tr.cc-filters').remove();
 
@@ -71,6 +74,17 @@
 					if (select.length){ select.on('change', function(){ apply(this.value || ''); }); }
 				});
 			}catch(err){ /* ignore */ }
+		},
+		attach: function(dt, options){
+			ColumnControl._attachOnce(dt, options);
+		},
+		bind: function(dt, options){
+			try{
+				ColumnControl._attachOnce(dt, options);
+				if (dt && dt.on){
+					dt.on('draw', function(){ ColumnControl._attachOnce(dt, options); });
+				}
+			}catch(e){ /* ignore */ }
 		}
 	};
 

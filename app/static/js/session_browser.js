@@ -180,7 +180,7 @@ $(document).ready(function() {
                         var api = this.api ? this.api() : (sb.dt && sb.dt.columns ? sb.dt : null);
                         if(!api || !window.ColumnControl) return;
                         // Skip hidden id(last col)
-                        window.ColumnControl.attach(api, { skipColumns: [api.columns().count() - 1] });
+                        window.ColumnControl.bind(api, { skipColumns: [api.columns().count() - 1] });
                     }catch(e){ /* ignore */ }
                 }
             });
