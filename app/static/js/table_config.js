@@ -35,8 +35,9 @@
 		scrollY: 480,
 		scrollCollapse: true,
 		pageLength: 25,
-		lengthMenu: [[25, 50, 100], [25, 50, 100]],
-		dom: 'lfrtip',
+		lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+		// Place length + filter in top row, info + pagination in bottom row (Bulma 'level' containers)
+		dom: "<'dt-top level is-mobile is-align-items-center is-justify-content-space-between'lf>t<'dt-bottom level is-mobile is-align-items-center is-justify-content-space-between'ip>",
 		language: LANGUAGE_KO
 	};
 

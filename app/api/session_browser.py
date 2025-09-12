@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Tuple, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from app.utils.time import now_kst, KST_TZ
-from sqlalchemy import func, or_, asc, desc
+from sqlalchemy import func, or_, asc, desc, String as SAString
 import re
 import warnings
 import time
@@ -104,6 +104,40 @@ def _apply_sessions_order(q, order_col: int | None, order_dir: str | None):
             return q.order_by(desc(col))
     # default order: newest first
     return q.order_by(SessionRecordModel.collected_at.desc(), SessionRecordModel.id.desc())
+
+
+def _apply_column_searches(q, col_searches: Dict[int, str]):
+    if not col_searches:
+        return q
+    conds = []
+    for idx, term in col_searches.items():
+        if not term:
+            continue
+        s = f"%{term}%"
+        try:
+            if idx == 0:
+                conds.append(Proxy.host.ilike(s))
+            elif idx == 1:
+                conds.append(func.cast(SessionRecordModel.creation_time, SAString).ilike(s))
+            elif idx == 2:
+                conds.append(SessionRecordModel.user_name.ilike(s))
+            elif idx == 3:
+                conds.append(SessionRecordModel.client_ip.ilike(s))
+            elif idx == 4:
+                conds.append(SessionRecordModel.server_ip.ilike(s))
+            elif idx == 5:
+                conds.append(func.cast(SessionRecordModel.cl_bytes_received, SAString).ilike(s))
+            elif idx == 6:
+                conds.append(func.cast(SessionRecordModel.cl_bytes_sent, SAString).ilike(s))
+            elif idx == 7:
+                conds.append(func.cast(SessionRecordModel.age_seconds, SAString).ilike(s))
+            elif idx == 8:
+                conds.append(SessionRecordModel.url.ilike(s))
+        except Exception:
+            pass
+    if conds:
+        q = q.filter(*conds)
+    return q
 
 
 
@@ -496,6 +530,18 @@ async def sessions_datatables(
 
     # Apply filters
     base_q = _apply_sessions_filters(base_q, group_id, proxy_ids, search)
+    # Per-column filters from DataTables
+    col_searches: Dict[int, str] = {}
+    try:
+        # Expect up to 10 columns (including hidden id)
+        for i in range(0, 10):
+            key = f"columns[{i}][search][value]"
+            val = request.query_params.get(key)
+            if val:
+                col_searches[i] = val
+    except Exception:
+        pass
+    base_q = _apply_column_searches(base_q, col_searches)
 
     # records after filtering
     records_filtered = base_q.with_entities(func.count(SessionRecordModel.id)).scalar() or 0

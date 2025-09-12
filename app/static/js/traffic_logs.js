@@ -172,6 +172,25 @@
 		// Initialize DataTables via shared config
 		const dt = TableConfig.init('#tlTable', { order: [] });
 		setTimeout(function(){ TableConfig.adjustColumns(dt); }, 0);
+		// Header filters
+		try{
+			const $thead = $('#tlTable thead');
+			$thead.find('tr.tl-filters').remove();
+			const $filterTr = $('<tr class="tl-filters"></tr>');
+			COLS.forEach(function(){ $filterTr.append('<th><input type="text" class="input is-small" placeholder="필터"></th>'); });
+			$thead.append($filterTr);
+			const api = (dt && dt.columns) ? dt : null;
+			if(api){
+				api.columns().every(function(colIdx){
+					var th = $filterTr.find('th').eq(colIdx);
+					var input = th.find('input');
+					input.on('keyup change', function(){
+						var val = this.value || '';
+						api.column(colIdx).search(val).draw();
+					});
+				});
+			}
+		}catch(e){ /* ignore */ }
 		// Row click opens detail modal
 		$('#tlTable tbody').off('click', 'tr').on('click', 'tr', function(){
 			const rowIdx = $(this).data('row');
