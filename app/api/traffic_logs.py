@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
+from datetime import datetime
 import shlex
 import paramiko
 
 from app.database.database import get_db
 from app.models.proxy import Proxy
-from app.schemas.traffic_log import TrafficLogResponse, TrafficLogRecord
+from app.schemas.traffic_log import TrafficLogResponse, TrafficLogRecord, TrafficLogDB
+from app.models.traffic_log import TrafficLog as TrafficLogModel
 from app.utils.traffic_log_parser import parse_log_line
 
 
@@ -103,11 +105,39 @@ def get_proxy_traffic_logs(
 		return TrafficLogResponse(proxy_id=proxy_id, lines=lines, records=None, truncated=truncated, count=len(lines))
 
 	records: List[TrafficLogRecord] = []
+	to_insert: List[Dict[str, Any]] = []
+	collected_ts = datetime.utcnow()
 	for ln in lines:
 		try:
 			rec_dict = parse_log_line(ln)
 			records.append(TrafficLogRecord(**rec_dict))
+			row = {
+				"proxy_id": proxy_id,
+				"collected_at": collected_ts,
+			}
+			row.update(rec_dict)
+			to_insert.append(row)
 		except Exception:
 			records.append(TrafficLogRecord(url_path=ln))
+	# Optional replacement semantics per request scope: if head/tail fetch is used, we choose to append current snapshot.
+	# For analysis and detail view, we persist snapshot rows.
+	if to_insert:
+		try:
+			# Use bulk insert for performance
+			db.bulk_insert_mappings(TrafficLogModel, to_insert)
+			db.commit()
+		except Exception:
+			# Fallback to row-by-row on error
+			for r in to_insert:
+				db.add(TrafficLogModel(**r))
+			db.commit()
 	return TrafficLogResponse(proxy_id=proxy_id, lines=None, records=records, truncated=truncated, count=len(records))
+
+
+@router.get("/traffic-logs/item/{record_id}", response_model=TrafficLogDB)
+def get_traffic_log_detail(record_id: int, db: Session = Depends(get_db)):
+    row = db.query(TrafficLogModel).filter(TrafficLogModel.id == record_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return row
 
