@@ -96,11 +96,8 @@ $(document).ready(function() {
                 prevItems = Array.isArray(prev.items) ? prev.items : undefined;
             }
         } catch (e) { /* ignore */ }
-        var items = Array.isArray(itemsForSave) ? itemsForSave : prevItems;
-        // If provided an empty array explicitly, keep previous items instead of erasing
-        if (Array.isArray(itemsForSave) && itemsForSave.length === 0 && Array.isArray(prevItems) && prevItems.length > 0) {
-            items = prevItems;
-        }
+        // If itemsForSave is provided, use it as-is (including empty array to CLEAR)
+        var items = (itemsForSave !== undefined) ? (Array.isArray(itemsForSave) ? itemsForSave : undefined) : prevItems;
         var state = {
             groupId: $('#sbGroupSelect').val() || '',
             proxyIds: getSelectedProxyIds(),
@@ -126,18 +123,7 @@ $(document).ready(function() {
                     $(this).prop('selected', strIds.includes($(this).val()));
                 });
             }
-            if (Array.isArray(state.items) && state.items.length > 0) {
-                // Show table before initializing to allow correct width calc
-                $('#sbEmptyState').hide();
-                $('#sbTableWrap').show();
-                initTable();
-                const rows = rowsFromItems(state.items);
-                if (sb.dt && sb.dt.clear) {
-                    sb.dt.clear().rows.add(rows).draw(false);
-                    try { if (sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {}
-                }
-                setStatus('저장된 내역');
-            }
+            // Do not restore cached items; rely on server-side data to persist last load
         } catch (e) { /* ignore */ }
     }
 
@@ -241,7 +227,7 @@ $(document).ready(function() {
             $('#sbTableWrap').show();
             if (res && res.failed && res.failed > 0) { showErr('일부 프록시 수집에 실패했습니다.'); }
             setStatus('완료');
-            // persist only selection state; do not store large items
+            // Clear any cached items to avoid mixing old data on next restore; persist only selection
             saveState([]);
         }).catch(() => { setStatus('오류', true); showErr('수집 요청 중 오류가 발생했습니다.'); });
     }
