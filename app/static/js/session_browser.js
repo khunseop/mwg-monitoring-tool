@@ -178,29 +178,9 @@ $(document).ready(function() {
                 initComplete: function(){
                     try{
                         var api = this.api ? this.api() : (sb.dt && sb.dt.columns ? sb.dt : null);
-                        if(!api) return;
-                        var $thead = $('#sbTable thead');
-                        // Remove existing filter row if present
-                        $thead.find('tr.sb-filters').remove();
-                        var $filterTr = $('<tr class="sb-filters"></tr>');
-                        var totalCols = api.columns().count();
-                        for(var i=0;i<totalCols;i++){
-                            if(i === totalCols - 1){ $filterTr.append('<th></th>'); continue; }
-                            var ph = '필터';
-                            var inputHtml = '<input type="text" class="input is-small" placeholder="'+ph+'">';
-                            $filterTr.append('<th>'+inputHtml+'</th>');
-                        }
-                        $thead.append($filterTr);
-                        // Bind events per column
-                        api.columns().every(function(colIdx){
-                            if(colIdx === totalCols - 1) return; // skip hidden id
-                            var th = $filterTr.find('th').eq(colIdx);
-                            var input = th.find('input');
-                            input.on('keyup change', function(){
-                                var val = this.value || '';
-                                api.column(colIdx).search(val).draw();
-                            });
-                        });
+                        if(!api || !window.ColumnControl) return;
+                        // Skip hidden id(last col)
+                        window.ColumnControl.attach(api, { skipColumns: [api.columns().count() - 1] });
                     }catch(e){ /* ignore */ }
                 }
             });
