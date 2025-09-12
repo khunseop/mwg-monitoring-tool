@@ -2,6 +2,8 @@
 	const API_BASE = '/api';
 	let PROXIES = [];
 	const STORAGE_KEY = 'tl_state_v1';
+	let LAST_RENDERED_HASH = null;
+	let IS_RESTORING = false;
 	const COLS = [
 		"datetime","username","client_ip","url_destination_ip","timeintransaction",
 		"response_statuscode","cache_status","comm_name","url_protocol","url_host",
@@ -96,6 +98,7 @@
 
 	function restoreState(){
 		try{
+			IS_RESTORING = true;
 			const raw = localStorage.getItem(STORAGE_KEY);
 			if(!raw) return;
 			const state = JSON.parse(raw);
@@ -104,12 +107,21 @@
 			if(state.limit !== undefined){ $('#tlLimit').val(state.limit); }
 			if(state.direction !== undefined){ $('#tlDirection').val(state.direction); }
 			if(Array.isArray(state.records) && state.records.length > 0){
-				renderParsed(state.records);
+				var hashNow;
+				try { hashNow = JSON.stringify(state.records || []); } catch(e) { hashNow = null; }
+				if (hashNow !== LAST_RENDERED_HASH) {
+					renderParsed(state.records);
+				} else {
+					$('#tlResultParsed').show();
+					$('#tlResultRaw').hide();
+					$('#tlEmptyState').toggle(state.records.length === 0);
+				}
 				setStatus('저장된 내역', 'is-light');
 			}else{
 				$('#tlEmptyState').show();
 			}
 		}catch(e){ /* ignore */ }
+		finally { IS_RESTORING = false; }
 	}
 
 	async function fetchProxies(){
@@ -169,8 +181,8 @@
 		$('#tlResultParsed').show();
 		$('#tlResultRaw').hide();
 		$('#tlEmptyState').toggle(records.length === 0);
-		// Persist last results
-		saveState(records);
+		// Update last rendered signature to suppress redundant re-renders
+		try { LAST_RENDERED_HASH = JSON.stringify(records || []); } catch(e) { LAST_RENDERED_HASH = null; }
 	}
 
 	function renderRaw(lines){
@@ -217,6 +229,8 @@
 			}
 			const data = await res.json();
 			renderParsed(data.records || []);
+			// Persist last results only after successful fetch to avoid storage-event loops
+			saveState(Array.isArray(data.records) ? data.records : []);
 			const suffix = data.truncated ? ' (truncated)' : '';
 			setStatus(`완료 - ${data.count} 라인${suffix}`, 'is-success');
 		}catch(e){
@@ -243,11 +257,30 @@
 		// Save selection changes
 		$('#tlProxySelect, #tlQuery, #tlLimit, #tlDirection').on('change keyup', function(){ saveState(undefined); });
 		$('#tlLoadBtn').on('click', loadLogs);
-		// Cross-tab sync
+		// Cross-tab sync: only re-render when records changed
 		try{
 			window.addEventListener('storage', function(e){
 				if(!e) return;
-				if(e.key === STORAGE_KEY){ restoreState(); }
+				if(e.key === STORAGE_KEY){
+					try{
+						const state = JSON.parse(e.newValue || 'null');
+						if(state && Array.isArray(state.records)){
+							var hashNow = null;
+							try { hashNow = JSON.stringify(state.records || []); } catch(err2) { hashNow = null; }
+							if (hashNow !== LAST_RENDERED_HASH) {
+								restoreState();
+							} else {
+								// Only sync controls
+								if(state.proxyId !== undefined){ $('#tlProxySelect').val(String(state.proxyId)); }
+								if(state.query !== undefined){ $('#tlQuery').val(state.query); }
+								if(state.limit !== undefined){ $('#tlLimit').val(state.limit); }
+								if(state.direction !== undefined){ $('#tlDirection').val(state.direction); }
+							}
+						} else {
+							restoreState();
+						}
+					}catch(err3){ /* ignore */ }
+				}
 			});
 		}catch(err){ /* ignore */ }
 	});
