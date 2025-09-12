@@ -178,9 +178,9 @@ $(document).ready(function() {
                 initComplete: function(){
                     try{
                         var api = this.api ? this.api() : (sb.dt && sb.dt.columns ? sb.dt : null);
-                        if(!api || !window.ColumnControl) return;
+                        if(!api || !(api.columnControl && api['columnControl.bind'])) return;
                         // Skip hidden id(last col)
-                        window.ColumnControl.bind(api, { skipColumns: [api.columns().count() - 1] });
+                        api['columnControl.bind']({ skipColumns: [api.columns().count() - 1] });
                     }catch(e){ /* ignore */ }
                 }
             });

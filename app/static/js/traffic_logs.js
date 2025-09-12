@@ -174,7 +174,7 @@
 		setTimeout(function(){ TableConfig.adjustColumns(dt); }, 0);
 		// Header filters via ColumnControl
 		try{
-			if (window.ColumnControl){ window.ColumnControl.bind(dt, {}); }
+			if (dt && dt['columnControl.bind']){ dt['columnControl.bind']({}); }
 		}catch(e){ /* ignore */ }
 		// Row click opens detail modal
 		$('#tlTable tbody').off('click', 'tr').on('click', 'tr', function(){
