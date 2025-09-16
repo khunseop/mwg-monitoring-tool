@@ -20,6 +20,7 @@ pip install -r requirements.txt
 - `CORS_ALLOW_ORIGINS`: 기본 `*` (쉼표로 다중 허용)
 - `CORS_ALLOW_CREDENTIALS`: 기본 `false` (와일드카드일 때 자동 비활성)
 - `ENABLE_DOCS`: 기본 `true` (API 문서 노출)
+- `PROXY_PASSWORD_KEY`: 프록시 비밀번호 암호화용 Fernet 키. 미설정 시 `./.secret/proxy_key.key` 자동 생성/사용. 컨테이너/배포 간 동일 키 유지 필요
 
 3) 애플리케이션 실행
 ```bash
