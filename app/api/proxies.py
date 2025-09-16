@@ -8,6 +8,7 @@ from app.models.proxy import Proxy
 from sqlalchemy.orm import joinedload
 from app.schemas.proxy import ProxyCreate, ProxyUpdate, ProxyOut
 from sqlalchemy import func
+from app.utils.crypto import encrypt_string
 
 router = APIRouter()
 
@@ -47,7 +48,9 @@ def create_proxy(proxy: ProxyCreate, db: Session = Depends(get_db)):
     )
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Proxy host already exists")
-    db_proxy = Proxy(**proxy.model_dump())
+    data = proxy.model_dump()
+    data["password"] = encrypt_string(data.get("password"))
+    db_proxy = Proxy(**data)
     db.add(db_proxy)
     db.commit()
     db.refresh(db_proxy)
@@ -61,9 +64,12 @@ def update_proxy(proxy_id: int, proxy: ProxyUpdate, db: Session = Depends(get_db
     
     update_data = proxy.model_dump(exclude_unset=True)
     
-    # 비밀번호가 제공되지 않은 경우 업데이트에서 제외
+    # 비밀번호가 제공되지 않은 경우 업데이트에서 제외하고,
+    # 제공된 경우에는 암호화하여 저장
     if not update_data.get('password'):
         update_data.pop('password', None)
+    else:
+        update_data['password'] = encrypt_string(update_data.get('password'))
 
     # If host is being updated, enforce uniqueness (case-insensitive)
     if 'host' in update_data and update_data['host']:

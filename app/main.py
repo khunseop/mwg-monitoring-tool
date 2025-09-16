@@ -25,6 +25,9 @@ try:
     warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
 except Exception:
     pass
+from app.database.database import SessionLocal
+from app.models.proxy import Proxy as ProxyModel
+from app.utils.crypto import encrypt_string
 
 # Load environment variables from .env
 load_dotenv(override=False)
@@ -111,3 +114,25 @@ async def add_security_headers(request: Request, call_next):
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
     return response
+
+
+# One-time startup task: migrate legacy plaintext proxy passwords to encrypted format
+@app.on_event("startup")
+def migrate_legacy_proxy_passwords():
+    try:
+        db = SessionLocal()
+        try:
+            rows = db.query(ProxyModel).all()
+            changed = 0
+            for row in rows:
+                pw = getattr(row, "password", None)
+                if pw and not str(pw).strip().startswith("enc$"):
+                    row.password = encrypt_string(pw)
+                    changed += 1
+            if changed:
+                db.commit()
+        finally:
+            db.close()
+    except Exception:
+        # avoid breaking startup due to migration failure
+        pass
