@@ -124,6 +124,9 @@ def get_proxy_traffic_logs(
 	# For analysis and detail view, we persist snapshot rows.
 	if to_insert:
 		try:
+			# Replacement semantics for parsed snapshot: keep only latest records for this proxy
+			# Clear existing rows to avoid accumulation
+			db.query(TrafficLogModel).filter(TrafficLogModel.proxy_id == proxy_id).delete(synchronize_session=False)
 			# Use bulk insert for performance
 			db.bulk_insert_mappings(TrafficLogModel, to_insert)
 			db.commit()
