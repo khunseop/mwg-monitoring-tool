@@ -11,14 +11,19 @@ function activateSettingsTab(targetId) {
 }
 
 // Clicks on navbar submenu are normal links to '/#<id>' so when we land here, sync by hash
-function initSettingsTabsFromHash() {
-    const hash = (window.location.hash || '#proxy-list').replace('#', '');
-    activateSettingsTab(hash);
+function initSettingsTabsFromQuery() {
+    const params = new URLSearchParams(window.location.search);
+    let tab = params.get('tab');
+    if (!tab || tab.length === 0) {
+        // Fallback: support legacy hash anchors if present
+        const legacy = (window.location.hash || '#proxy-list').replace('#', '');
+        tab = legacy || 'proxy-list';
+    }
+    activateSettingsTab(tab);
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    initSettingsTabsFromHash();
-    window.addEventListener('hashchange', initSettingsTabsFromHash);
+    initSettingsTabsFromQuery();
 });
 
 // 모달 관리
