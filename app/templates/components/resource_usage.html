@@ -60,6 +60,34 @@
                         </p>
                     </div>
                 </div>
+                <div class="level-item">
+                    <div class="field has-addons">
+                        <p class="control">
+                            <span class="button is-static">기간</span>
+                        </p>
+                        <p class="control">
+                            <div class="select">
+                                <select id="ruQuickRange">
+                                    <option value="1h">최근 1시간</option>
+                                    <option value="6h">최근 6시간</option>
+                                    <option value="24h" selected>최근 24시간</option>
+                                    <option value="7d">최근 7일</option>
+                                    <option value="30d">최근 30일</option>
+                                    <option value="custom">사용자 지정</option>
+                                </select>
+                            </div>
+                        </p>
+                        <p class="control">
+                            <input class="input" id="ruStartAt" type="datetime-local" style="max-width: 210px;" disabled>
+                        </p>
+                        <p class="control">
+                            <input class="input" id="ruEndAt" type="datetime-local" style="max-width: 210px;" disabled>
+                        </p>
+                        <p class="control">
+                            <button class="button" id="ruRangeApply">조회</button>
+                        </p>
+                    </div>
+                </div>
             </div>
             <div class="level-right">
                 <div class="level-item">
@@ -82,7 +110,7 @@
             현재 표시할 데이터가 없습니다. 상단에서 대상을 선택하고 "시작"을 클릭하세요.
         </div>
         <div class="box">
-            <h4 class="title is-5">실시간 그래프</h4>
+            <h4 class="title is-5">그래프</h4>
             <div id="ruChartsWrap" class="columns is-multiline" data-initialized="false">
                 <!-- Charts will be injected per metric by resource_usage.js -->
             </div>

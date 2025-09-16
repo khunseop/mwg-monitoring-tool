@@ -310,37 +310,22 @@ $(document).ready(function() {
     }
 
     function collectOnce() {
+        // Deprecated active collection from client; replaced by server-side monitor start.
+        // Kept for backward compatibility: perform a lightweight refresh from DB.
+        return refreshLatest();
+    }
+
+    function refreshLatest() {
         clearRuError();
         const proxyIds = getSelectedProxyIds();
-        if (proxyIds.length === 0) { showRuError('프록시를 하나 이상 선택하세요.'); return; }
-        const community = (cachedConfig && cachedConfig.community) ? cachedConfig.community.toString() : 'public';
-        const oids = (cachedConfig && cachedConfig.oids) ? cachedConfig.oids : {};
-        if (Object.keys(oids).length === 0) { showRuError('설정된 OID가 없습니다. 설정 페이지를 확인하세요.'); return; }
-        return $.ajax({
-            url: '/api/resource-usage/collect',
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ proxy_ids: proxyIds, community: community, oids: oids })
-        }).then(res => {
-            const items = (res && Array.isArray(res.items)) ? res.items : [];
-            updateTable(items);
-            if (Array.isArray(items)) { saveState(items); } else { saveState(undefined); }
-            if (res && res.failed && res.failed > 0) { showRuError('일부 프록시 수집에 실패했습니다.'); }
-            // Fetch latest rows from DB to ensure consistency and append to buffer
-            fetchLatestForProxies(proxyIds).then(latestRows => {
-                // filter invalid latest rows
-                const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
-                bufferAppendBatch(valid);
-                saveBufferState();
-                renderAllCharts();
-            }).catch(() => {
-                // fallback: use returned items
-                const valid = (items || []).filter(r => r && r.proxy_id && r.collected_at);
-                bufferAppendBatch(valid);
-                saveBufferState();
-                renderAllCharts();
-            });
-        }).catch(() => { showRuError('수집 요청 중 오류가 발생했습니다.'); });
+        if (proxyIds.length === 0) { showRuError('프록시를 하나 이상 선택하세요.'); return Promise.resolve(); }
+        return fetchLatestForProxies(proxyIds).then(latestRows => {
+            const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
+            updateTable(valid);
+            bufferAppendBatch(valid);
+            saveBufferState();
+            renderAllCharts();
+        }).catch(() => { showRuError('최신 데이터 조회 중 오류가 발생했습니다.'); });
     }
 
     function fetchLatestForProxies(proxyIds) {
@@ -350,15 +335,32 @@ $(document).ready(function() {
 
     function startPolling() {
         if (ru.intervalId) return;
+        const proxyIds = getSelectedProxyIds();
+        if (proxyIds.length === 0) { showRuError('프록시를 하나 이상 선택하세요.'); return; }
+        const community = (cachedConfig && cachedConfig.community) ? cachedConfig.community.toString() : 'public';
+        const oids = (cachedConfig && cachedConfig.oids) ? cachedConfig.oids : {};
+        if (Object.keys(oids).length === 0) { showRuError('설정된 OID가 없습니다. 설정 페이지를 확인하세요.'); return; }
         const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 30;
-        const periodMs = Math.max(5, intervalSec) * 1000;
-        setRunning(true);
-        collectOnce();
-        ru.intervalId = setInterval(() => { collectOnce(); }, periodMs);
+        // Start server-side monitor
+        $.ajax({
+            url: `/api/resource-usage/monitor/start?interval_sec=${Math.max(5, intervalSec)}`,
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ proxy_ids: proxyIds, community: community, oids: oids })
+        }).then(() => {
+            setRunning(true);
+            const periodMs = Math.max(5, intervalSec) * 1000;
+            // Initial refresh and then periodic refresh of latest rows only
+            refreshLatest();
+            ru.intervalId = setInterval(() => { refreshLatest(); }, periodMs);
+        }).catch(() => { showRuError('모니터 시작 중 오류가 발생했습니다. 설정을 확인하세요.'); });
     }
     function stopPolling() {
         if (ru.intervalId) { clearInterval(ru.intervalId); ru.intervalId = null; }
-        setRunning(false);
+        // Stop server-side monitor
+        $.post('/api/resource-usage/monitor/stop').always(() => {
+            setRunning(false);
+        });
     }
 
     $('#ruStartBtn').on('click', function() { startPolling(); });
@@ -384,15 +386,22 @@ $(document).ready(function() {
     ]).then(function(){ 
         return restoreState();
     }).then(function(){
-        // After restore, start or render based on persisted running flag
-        try {
-            const running = localStorage.getItem(RUN_STORAGE_KEY) === '1';
-            if (running) {
-                // ensure we actually have proxies before first collect
-                if (getSelectedProxyIds().length === 0) { renderAllCharts(); setRunning(false); }
-                else { startPolling(); }
-            } else { renderAllCharts(); }
-        } catch (e) { renderAllCharts(); }
+        // Sync server monitor status and UI
+        $.getJSON('/api/resource-usage/monitor/status').then(st => {
+            if (st && st.running) {
+                setRunning(true);
+                if (st.interval_sec) $('#ruIntervalSec').val(parseInt(st.interval_sec, 10));
+                // Begin lightweight refresh loop (does not start server monitor again)
+                const periodMs = Math.max(5, parseInt($('#ruIntervalSec').val(), 10) || 30) * 1000;
+                if (!ru.intervalId) {
+                    refreshLatest();
+                    ru.intervalId = setInterval(() => { refreshLatest(); }, periodMs);
+                }
+            } else {
+                setRunning(false);
+                renderAllCharts();
+            }
+        }).catch(() => { renderAllCharts(); });
     });
 
     // =====================
@@ -575,6 +584,94 @@ $(document).ready(function() {
             ru.charts[metricKey].updateSeries(series, true);
         }
     }
+
+    // ===============
+    // Range selection
+    // ===============
+    function setCustomRangeEnabled(enabled) {
+        $('#ruStartAt').prop('disabled', !enabled);
+        $('#ruEndAt').prop('disabled', !enabled);
+    }
+    $('#ruQuickRange').on('change', function(){
+        const v = $(this).val();
+        setCustomRangeEnabled(v === 'custom');
+    });
+    function computeRange(value) {
+        const now = new Date();
+        let start = new Date(now.getTime() - 24*60*60*1000);
+        let end = now;
+        switch (value) {
+            case '1h': start = new Date(now.getTime() - 1*60*60*1000); break;
+            case '6h': start = new Date(now.getTime() - 6*60*60*1000); break;
+            case '24h': start = new Date(now.getTime() - 24*60*60*1000); break;
+            case '7d': start = new Date(now.getTime() - 7*24*60*60*1000); break;
+            case '30d': start = new Date(now.getTime() - 30*24*60*60*1000); break;
+            case 'custom': {
+                const s = $('#ruStartAt').val();
+                const e = $('#ruEndAt').val();
+                if (s) start = new Date(s);
+                if (e) end = new Date(e);
+                break;
+            }
+        }
+        return { start, end };
+    }
+    function toIso(dt) { try { return new Date(dt).toISOString(); } catch (e) { return new Date().toISOString(); } }
+
+    function fetchSeriesForRange() {
+        clearRuError();
+        const proxyIds = getSelectedProxyIds();
+        if (proxyIds.length === 0) { showRuError('프록시를 하나 이상 선택하세요.'); return Promise.resolve(); }
+        const quick = $('#ruQuickRange').val();
+        const { start, end } = computeRange(quick);
+        // Build query string with repeated proxy_ids
+        const params = proxyIds.map(id => 'proxy_ids=' + encodeURIComponent(id)).join('&')
+            + `&start=${encodeURIComponent(toIso(start))}`
+            + `&end=${encodeURIComponent(toIso(end))}`;
+        return $.getJSON(`/api/resource-usage/series?${params}`).then(res => {
+            const items = (res && Array.isArray(res.items)) ? res.items : [];
+            // Reset buffer and fill with fetched series
+            ru.tsBuffer = {};
+            const rowsForHeatmap = [];
+            items.forEach(it => {
+                const pid = it.proxy_id;
+                ru.tsBuffer[pid] = ru.tsBuffer[pid] || { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [] };
+                (it.points || []).forEach(p => {
+                    const ts = new Date(p.ts).getTime();
+                    ['cpu','mem','cc','cs','http','https','ftp'].forEach(k => {
+                        const v = p[k];
+                        if (typeof v === 'number') {
+                            ru.tsBuffer[pid][k].push({ x: ts, y: v });
+                        }
+                    });
+                });
+                // use last point per proxy for heatmap snapshot
+                const last = (it.points || [])[ (it.points || []).length - 1 ];
+                if (last) {
+                    rowsForHeatmap.push({
+                        proxy_id: pid,
+                        cpu: last.cpu, mem: last.mem, cc: last.cc, cs: last.cs,
+                        http: last.http, https: last.https, ftp: last.ftp,
+                        collected_at: last.ts
+                    });
+                }
+            });
+            // sort and limit buffer per config
+            Object.values(ru.tsBuffer).forEach(byMetric => {
+                Object.keys(byMetric).forEach(k => {
+                    byMetric[k].sort((a,b) => a.x - b.x);
+                    if (byMetric[k].length > ru.bufferMaxPoints) {
+                        byMetric[k] = byMetric[k].slice(-ru.bufferMaxPoints);
+                    }
+                });
+            });
+            updateTable(rowsForHeatmap);
+            saveBufferState();
+            renderAllCharts();
+        }).catch(() => { showRuError('기간 데이터 조회 중 오류가 발생했습니다.'); });
+    }
+
+    $('#ruRangeApply').on('click', function(){ fetchSeriesForRange(); });
 
     // initialize DOM, legend and buffer state
     ru.legendState = loadLegendState();
