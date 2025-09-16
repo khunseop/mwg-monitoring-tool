@@ -75,12 +75,17 @@ app.include_router(traffic_logs_api.router, prefix="/api", tags=["traffic-logs"]
 
 # 페이지 라우터
 @app.get("/")
-async def read_settings(request: Request):
-    return templates.TemplateResponse("components/settings.html", {"request": request})
+async def read_root(request: Request):
+    # 기본 라우트를 자원사용률 페이지로 제공
+    return templates.TemplateResponse("components/resource_usage.html", {"request": request})
 
 @app.get("/resource")
 async def read_resource(request: Request):
     return templates.TemplateResponse("components/resource_usage.html", {"request": request})
+
+@app.get("/settings")
+async def read_settings(request: Request):
+    return templates.TemplateResponse("components/settings.html", {"request": request})
 
 @app.get("/session")
 async def read_session(request: Request):

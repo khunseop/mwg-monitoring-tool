@@ -30,7 +30,7 @@
 
                 <div id="mainNavbar" class="navbar-menu">
                     <div class="navbar-start">
-                        <a class="navbar-item {% if request.url.path.startswith('/resource') %}is-active{% endif %}" href="/resource">
+                        <a class="navbar-item {% if request.url.path == '/' or request.url.path.startswith('/resource') %}is-active{% endif %}" href="/resource">
                             자원사용률
                         </a>
                         <a class="navbar-item {% if request.url.path.startswith('/traffic-logs') %}is-active{% endif %}" href="/traffic-logs">
@@ -40,22 +40,22 @@
                             세션브라우저
                         </a>
                         <div class="navbar-item has-dropdown is-hoverable is-hidden-touch">
-                            <a id="navSettings" class="navbar-link {% if request.url.path == '/' %}is-active{% endif %}" href="/">설정</a>
+                            <a id="navSettings" class="navbar-link {% if request.url.path.startswith('/settings') %}is-active{% endif %}" href="/settings">설정</a>
                             <div class="navbar-dropdown is-boxed">
-                                <a class="navbar-item" href="/#proxy-list">프록시 목록</a>
-                                <a class="navbar-item" href="/#proxy-groups">프록시 그룹</a>
-                                <a class="navbar-item" href="/#resource-config">리소스 설정</a>
-                                <a class="navbar-item" href="/#session-config">세션브라우저 설정</a>
+                                <a class="navbar-item" href="/settings?tab=proxy-list">프록시 목록</a>
+                                <a class="navbar-item" href="/settings?tab=proxy-groups">프록시 그룹</a>
+                                <a class="navbar-item" href="/settings?tab=resource-config">리소스 설정</a>
+                                <a class="navbar-item" href="/settings?tab=session-config">세션브라우저 설정</a>
                             </div>
                         </div>
                         <!-- Touch (mobile/tablet) shows dropdown via click -->
                         <div class="navbar-item has-dropdown is-hidden-desktop" id="settingsDropdownMobile">
                             <a class="navbar-link">설정</a>
                             <div class="navbar-dropdown is-boxed">
-                                <a class="navbar-item" href="/#proxy-list">프록시 목록</a>
-                                <a class="navbar-item" href="/#proxy-groups">프록시 그룹</a>
-                                <a class="navbar-item" href="/#resource-config">리소스 설정</a>
-                                <a class="navbar-item" href="/#session-config">세션브라우저 설정</a>
+                                <a class="navbar-item" href="/settings?tab=proxy-list">프록시 목록</a>
+                                <a class="navbar-item" href="/settings?tab=proxy-groups">프록시 그룹</a>
+                                <a class="navbar-item" href="/settings?tab=resource-config">리소스 설정</a>
+                                <a class="navbar-item" href="/settings?tab=session-config">세션브라우저 설정</a>
                             </div>
                         </div>
                     </div>
