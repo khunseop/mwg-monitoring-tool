@@ -60,15 +60,29 @@ $(document).ready(function() {
             if (!raw) return;
             const state = JSON.parse(raw);
             if (state.groupId !== undefined) {
-                $('#ruGroupSelect').val(state.groupId);
-                // Trigger change so DeviceSelector repopulates proxies for selected group
-                $('#ruGroupSelect').trigger('change');
+                const groupEl = document.getElementById('ruGroupSelect');
+                const gtom = groupEl && groupEl._tom ? groupEl._tom : null;
+                if (gtom) { gtom.setValue(state.groupId || '', true); }
+                else {
+                    $('#ruGroupSelect').val(state.groupId);
+                    $('#ruGroupSelect').trigger('change');
+                }
             }
             if (Array.isArray(state.proxyIds)) {
                 const strIds = state.proxyIds.map(id => String(id));
-                $('#ruProxySelect option').each(function() {
-                    $(this).prop('selected', strIds.includes($(this).val()));
-                });
+                const applyProxySelection = function() {
+                    const proxyEl = document.getElementById('ruProxySelect');
+                    const ptom = proxyEl && proxyEl._tom ? proxyEl._tom : null;
+                    if (ptom) { ptom.setValue(strIds, true); }
+                    else {
+                        $('#ruProxySelect option').each(function() {
+                            $(this).prop('selected', strIds.includes($(this).val()));
+                        });
+                        $('#ruProxySelect').trigger('change');
+                    }
+                };
+                // Defer to allow DeviceSelector's group change to populate proxies first
+                setTimeout(applyProxySelection, 0);
             }
             if (Array.isArray(state.items) && state.items.length > 0) {
                 // Reset cumulative cache so deltas don't mislead on restore
@@ -360,7 +374,14 @@ $(document).ready(function() {
             onData: function(data){ ru.groups = data.groups || []; ru.proxies = data.proxies || []; }
         }), 
         loadConfig()
-    ]).then(function(){ restoreState(); });
+    ]).then(function(){ 
+        restoreState();
+        // After restore, start or render based on persisted running flag
+        try {
+            const running = localStorage.getItem(RUN_STORAGE_KEY) === '1';
+            if (running) { startPolling(); } else { renderAllCharts(); }
+        } catch (e) { renderAllCharts(); }
+    });
 
     // =====================
     // Timeseries Graph UI
@@ -548,10 +569,5 @@ $(document).ready(function() {
     ru.tsBuffer = loadBufferState();
     // initialize charts DOM for ApexCharts
     ensureApexChartsDom();
-    // auto-restore running state and render charts from buffer
-    try {
-        const running = localStorage.getItem(RUN_STORAGE_KEY) === '1';
-        if (running) { startPolling(); } else { renderAllCharts(); }
-    } catch (e) { renderAllCharts(); }
 });
 
