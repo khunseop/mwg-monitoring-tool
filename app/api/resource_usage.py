@@ -466,19 +466,24 @@ async def latest_resource_usage(proxy_id: int, db: Session = Depends(get_db)):
 async def series_resource_usage(
     db: Session = Depends(get_db),
     proxy_ids: List[int] = Query(..., alias="proxy_ids"),
-    start: datetime = Query(...),
+    start: datetime | None = Query(None),
     end: datetime | None = Query(None),
 ):
     if not proxy_ids:
         raise HTTPException(status_code=400, detail="proxy_ids is required")
-    # enforce retention window
+    # default to last retention window
     now_dt = now_kst()
     cutoff = now_dt - timedelta(days=_retention_days())
-    start_dt = start if start.tzinfo else start.replace(tzinfo=now_dt.tzinfo)
-    end_dt = (end if end else now_dt)
-    end_dt = end_dt if end_dt.tzinfo else end_dt.replace(tzinfo=now_dt.tzinfo)
-    if start_dt < cutoff:
+    if start is None:
         start_dt = cutoff
+    else:
+        start_dt = start if start.tzinfo else start.replace(tzinfo=now_dt.tzinfo)
+        if start_dt < cutoff:
+            start_dt = cutoff
+    if end is None:
+        end_dt = now_dt
+    else:
+        end_dt = end if end.tzinfo else end.replace(tzinfo=now_dt.tzinfo)
     if end_dt < start_dt:
         raise HTTPException(status_code=400, detail="end must be >= start")
 

@@ -12,7 +12,8 @@ $(document).ready(function() {
         bufferWindowMs: 60 * 60 * 1000, // last 1 hour
         bufferMaxPoints: 600,
         timeBucketMs: 1000, // quantize to seconds to align x-axis across proxies
-        legendState: {} // { [metricKey]: { [proxyId]: hiddenBoolean } }
+        legendState: {}, // { [metricKey]: { [proxyId]: hiddenBoolean } }
+        fullSeriesLoaded: false
     };
     const STORAGE_KEY = 'ru_state_v1';
     const LEGEND_STORAGE_KEY = 'ru_legend_v1';
@@ -369,8 +370,15 @@ $(document).ready(function() {
         ru.lastCumulativeByProxy = {};
         $('#ruTableBody').empty();
         saveState(undefined);
+        // Reload full series if selection exists
+        if (getSelectedProxyIds().length > 0) { loadAllSeries(); }
     });
-    $('#ruProxySelect').on('change', function() { saveState(undefined); });
+    $('#ruProxySelect').on('change', function() {
+        saveState(undefined);
+        ru.lastCumulativeByProxy = {};
+        // Load full retained series for new selection
+        if (getSelectedProxyIds().length > 0) { loadAllSeries(); }
+    });
 
     // Show empty state initially
     $('#ruHeatmapWrap').hide();
@@ -394,12 +402,19 @@ $(document).ready(function() {
                 // Begin lightweight refresh loop (does not start server monitor again)
                 const periodMs = Math.max(5, parseInt($('#ruIntervalSec').val(), 10) || 30) * 1000;
                 if (!ru.intervalId) {
-                    refreshLatest();
+                    // load all retained series once, then keep appending latest
+                    if (getSelectedProxyIds().length > 0) {
+                        loadAllSeries().then(() => { refreshLatest(); });
+                    } else {
+                        refreshLatest();
+                    }
                     ru.intervalId = setInterval(() => { refreshLatest(); }, periodMs);
                 }
             } else {
                 setRunning(false);
-                renderAllCharts();
+                // load all retained series once for static view
+                if (getSelectedProxyIds().length > 0) { loadAllSeries(); }
+                else { renderAllCharts(); }
             }
         }).catch(() => { renderAllCharts(); });
     });
@@ -585,57 +600,18 @@ $(document).ready(function() {
         }
     }
 
-    // ===============
-    // Range selection
-    // ===============
-    function setCustomRangeEnabled(enabled) {
-        $('#ruStartAt').prop('disabled', !enabled);
-        $('#ruEndAt').prop('disabled', !enabled);
-    }
-    $('#ruQuickRange').on('change', function(){
-        const v = $(this).val();
-        setCustomRangeEnabled(v === 'custom');
-    });
-    function computeRange(value) {
-        const now = new Date();
-        let start = new Date(now.getTime() - 24*60*60*1000);
-        let end = now;
-        switch (value) {
-            case '1h': start = new Date(now.getTime() - 1*60*60*1000); break;
-            case '6h': start = new Date(now.getTime() - 6*60*60*1000); break;
-            case '24h': start = new Date(now.getTime() - 24*60*60*1000); break;
-            case '7d': start = new Date(now.getTime() - 7*24*60*60*1000); break;
-            case '30d': start = new Date(now.getTime() - 30*24*60*60*1000); break;
-            case 'custom': {
-                const s = $('#ruStartAt').val();
-                const e = $('#ruEndAt').val();
-                if (s) start = new Date(s);
-                if (e) end = new Date(e);
-                break;
-            }
-        }
-        return { start, end };
-    }
-    function toIso(dt) { try { return new Date(dt).toISOString(); } catch (e) { return new Date().toISOString(); } }
-
-    function fetchSeriesForRange() {
+    function loadAllSeries() {
         clearRuError();
         const proxyIds = getSelectedProxyIds();
-        if (proxyIds.length === 0) { showRuError('프록시를 하나 이상 선택하세요.'); return Promise.resolve(); }
-        const quick = $('#ruQuickRange').val();
-        const { start, end } = computeRange(quick);
-        // Build query string with repeated proxy_ids
-        const params = proxyIds.map(id => 'proxy_ids=' + encodeURIComponent(id)).join('&')
-            + `&start=${encodeURIComponent(toIso(start))}`
-            + `&end=${encodeURIComponent(toIso(end))}`;
+        if (proxyIds.length === 0) { return Promise.resolve(); }
+        const params = proxyIds.map(id => 'proxy_ids=' + encodeURIComponent(id)).join('&');
         return $.getJSON(`/api/resource-usage/series?${params}`).then(res => {
             const items = (res && Array.isArray(res.items)) ? res.items : [];
-            // Reset buffer and fill with fetched series
             ru.tsBuffer = {};
             const rowsForHeatmap = [];
             items.forEach(it => {
                 const pid = it.proxy_id;
-                ru.tsBuffer[pid] = ru.tsBuffer[pid] || { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [] };
+                ru.tsBuffer[pid] = { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [] };
                 (it.points || []).forEach(p => {
                     const ts = new Date(p.ts).getTime();
                     ['cpu','mem','cc','cs','http','https','ftp'].forEach(k => {
@@ -645,7 +621,7 @@ $(document).ready(function() {
                         }
                     });
                 });
-                // use last point per proxy for heatmap snapshot
+                // latest point for heatmap
                 const last = (it.points || [])[ (it.points || []).length - 1 ];
                 if (last) {
                     rowsForHeatmap.push({
@@ -655,23 +631,17 @@ $(document).ready(function() {
                         collected_at: last.ts
                     });
                 }
-            });
-            // sort and limit buffer per config
-            Object.values(ru.tsBuffer).forEach(byMetric => {
-                Object.keys(byMetric).forEach(k => {
-                    byMetric[k].sort((a,b) => a.x - b.x);
-                    if (byMetric[k].length > ru.bufferMaxPoints) {
-                        byMetric[k] = byMetric[k].slice(-ru.bufferMaxPoints);
-                    }
+                // ensure sorted
+                Object.keys(ru.tsBuffer[pid]).forEach(k => {
+                    ru.tsBuffer[pid][k].sort((a,b) => a.x - b.x);
                 });
             });
+            ru.fullSeriesLoaded = true;
             updateTable(rowsForHeatmap);
             saveBufferState();
             renderAllCharts();
-        }).catch(() => { showRuError('기간 데이터 조회 중 오류가 발생했습니다.'); });
+        }).catch(() => { showRuError('데이터 조회 중 오류가 발생했습니다.'); });
     }
-
-    $('#ruRangeApply').on('click', function(){ fetchSeriesForRange(); });
 
     // initialize DOM, legend and buffer state
     ru.legendState = loadLegendState();
