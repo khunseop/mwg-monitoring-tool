@@ -39,29 +39,29 @@
                         <a class="navbar-item {% if request.url.path.startswith('/session') %}is-active{% endif %}" href="/session">
                             세션브라우저
                         </a>
-                        <a id="navSettings" class="navbar-item {% if request.url.path == '/' %}is-active{% endif %}" href="/">
-                            설정
-                        </a>
-                        <!-- Mobile-only direct links to settings subpages -->
-                        <a class="navbar-item is-hidden-desktop" href="/#proxy-list">설정: 프록시 목록</a>
-                        <a class="navbar-item is-hidden-desktop" href="/#proxy-groups">설정: 프록시 그룹</a>
-                        <a class="navbar-item is-hidden-desktop" href="/#resource-config">설정: 리소스 설정</a>
-                        <a class="navbar-item is-hidden-desktop" href="/#session-config">설정: 세션브라우저 설정</a>
+                        <div class="navbar-item has-dropdown is-hoverable is-hidden-touch">
+                            <a id="navSettings" class="navbar-link {% if request.url.path == '/' %}is-active{% endif %}" href="/">설정</a>
+                            <div class="navbar-dropdown is-boxed">
+                                <a class="navbar-item" href="/#proxy-list">프록시 목록</a>
+                                <a class="navbar-item" href="/#proxy-groups">프록시 그룹</a>
+                                <a class="navbar-item" href="/#resource-config">리소스 설정</a>
+                                <a class="navbar-item" href="/#session-config">세션브라우저 설정</a>
+                            </div>
+                        </div>
+                        <!-- Touch (mobile/tablet) shows dropdown via click -->
+                        <div class="navbar-item has-dropdown is-hidden-desktop" id="settingsDropdownMobile">
+                            <a class="navbar-link">설정</a>
+                            <div class="navbar-dropdown is-boxed">
+                                <a class="navbar-item" href="/">설정 홈</a>
+                                <hr class="navbar-divider">
+                                <a class="navbar-item" href="/#proxy-list">프록시 목록</a>
+                                <a class="navbar-item" href="/#proxy-groups">프록시 그룹</a>
+                                <a class="navbar-item" href="/#resource-config">리소스 설정</a>
+                                <a class="navbar-item" href="/#session-config">세션브라우저 설정</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
-
-                {% if request.url.path == '/' %}
-                <div class="navbar-submenu">
-                    <div class="tabs is-small">
-                        <ul>
-                            <li class="is-active" data-target="proxy-list"><a href="/#proxy-list">프록시 목록</a></li>
-                            <li data-target="proxy-groups"><a href="/#proxy-groups">프록시 그룹</a></li>
-                            <li data-target="resource-config"><a href="/#resource-config">리소스 설정</a></li>
-                            <li data-target="session-config"><a href="/#session-config">세션브라우저 설정</a></li>
-                        </ul>
-                    </div>
-                </div>
-                {% endif %}
             </nav>
 
             {% block content %}{% endblock %}

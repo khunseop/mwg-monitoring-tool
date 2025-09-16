@@ -76,7 +76,7 @@ body {
     margin-bottom: 1.5rem;
     padding: 0.5rem 1rem;
     overflow: hidden;
-    transition: height 220ms ease-in-out, box-shadow 220ms ease-in-out, padding 220ms ease-in-out;
+    transition: box-shadow 220ms ease-in-out, padding 220ms ease-in-out;
     flex-wrap: wrap;
 }
 
@@ -100,23 +100,7 @@ body {
     height: 3.25rem;
 }
 
-/* Expandable navbar: base height matches brand/menu row; submenu reveals on expand */
-.navbar:not(.is-expanded) .navbar-submenu { pointer-events: none; transform: translateY(-4px); height: 0; }
-.navbar .navbar-submenu { 
-    border-top: 0;
-    margin-top: 0.25rem;
-    padding-top: 0;
-    transition: transform 220ms ease-in-out;
-    width: 100%;
-    flex: 0 0 100%;
-    overflow: hidden; /* ensure no content bleeds when collapsed */
-}
-
-/* Use a fixed collapsed height and auto-expand via JS class */
-@media screen and (min-width: 1024px) {
-    .navbar { height: 4.25rem; }
-    .navbar.is-expanded { height: 6.5rem; }
-}
+/* Removed expandable submenu styles */
 
 .navbar-brand {
     align-items: center;
@@ -221,16 +205,7 @@ body {
         background: color-mix(in srgb, var(--color-primary) 10%, transparent) !important;
     }
 
-    /* Hide and fully collapse settings submenu on mobile */
-    .navbar-submenu {
-        display: none !important;
-        max-height: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        border: 0 !important;
-        overflow: hidden !important;
-        transform: none !important;
-    }
+    /* No custom submenu on mobile */
 }
 
 /* Buttons: unified variants */
@@ -256,9 +231,7 @@ body {
 .tabs a { color: var(--color-text-muted); font-size: 0.98rem; }
 .tabs li.is-active a { color: var(--color-primary); border-bottom-color: currentColor; }
 
-.navbar-submenu .tabs { margin-top: 0.25rem; }
-.navbar-submenu .tabs a { padding: 0.25rem 0.5rem; }
-.navbar-submenu .tabs li a:hover { color: var(--color-text); text-decoration: none; }
+/* Submenu tabs removed */
 
 /* Tables */
 .table thead th { color: var(--color-text); font-weight: 600; background: #f9fafb; }

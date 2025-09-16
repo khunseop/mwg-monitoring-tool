@@ -6,54 +6,19 @@ $(document).ready(function() {
         const willBeActive = !$this.hasClass('is-active');
         $this.toggleClass('is-active', willBeActive).attr('aria-expanded', willBeActive);
         $('#' + targetId).toggleClass('is-active', willBeActive);
-        // Always collapse settings submenu when using burger
-        setNavbarExpanded(false);
     });
 
-    // Navbar expandable (hover-only for settings)
-    const $navbar = $('.navbar');
-    const desktopQuery = window.matchMedia('(min-width: 1024px)');
-    let collapseTimer = null;
-
-    function setNavbarExpanded(expanded) {
-        $navbar.toggleClass('is-expanded', !!expanded);
-    }
-
-    // start collapsed
-    setNavbarExpanded(false);
-
-    function updateNavbarMode() {
-        if (!desktopQuery.matches) {
-            setNavbarExpanded(false);
-        }
-    }
-
-    if (typeof desktopQuery.addEventListener === 'function') {
-        desktopQuery.addEventListener('change', updateNavbarMode);
-    } else if (typeof desktopQuery.addListener === 'function') {
-        desktopQuery.addListener(updateNavbarMode);
-    }
-    updateNavbarMode();
-
-    // open on hover over settings item or submenu
-    $(document).on('mouseenter', '#navSettings, .navbar-submenu', function() {
-        if (!desktopQuery.matches) return;
-        if (collapseTimer) { clearTimeout(collapseTimer); collapseTimer = null; }
-        setNavbarExpanded(true);
-    });
-
-    // close with a small delay when leaving entire navbar area
-    $(document).on('mouseleave', '.navbar', function(e) {
-        if (!desktopQuery.matches) return;
-        const self = this;
-        const related = e.relatedTarget;
-        if (related && $.contains(self, related)) return;
-        if (collapseTimer) clearTimeout(collapseTimer);
-        collapseTimer = setTimeout(() => setNavbarExpanded(false), 500);
+    // Bulma dropdown: enable click toggle for mobile-only settings dropdown
+    $(document).on('click', '#settingsDropdownMobile > .navbar-link', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const $parent = $(this).closest('.navbar-item.has-dropdown');
+        $parent.toggleClass('is-active');
     });
 
     // Auto-collapse burger menu after clicking any navbar-item (mobile)
     $(document).on('click', '.navbar-item', function() {
+        const desktopQuery = window.matchMedia('(min-width: 1024px)');
         if (desktopQuery.matches) return;
         const $burger = $('.navbar-burger');
         const targetId = $burger.attr('data-target');
