@@ -61,7 +61,8 @@ $(document).ready(function() {
             const state = JSON.parse(raw);
             if (state.groupId !== undefined) {
                 $('#ruGroupSelect').val(state.groupId);
-                renderProxySelect();
+                // Trigger change so DeviceSelector repopulates proxies for selected group
+                $('#ruGroupSelect').trigger('change');
             }
             if (Array.isArray(state.proxyIds)) {
                 const strIds = state.proxyIds.map(id => String(id));
