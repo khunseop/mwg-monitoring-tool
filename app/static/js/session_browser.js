@@ -174,15 +174,7 @@ $(document).ready(function() {
                     { targets: 1, className: 'dt-nowrap' },
                     { targets: 8, className: 'dt-nowrap dt-ellipsis', width: '480px' }
                 ],
-                createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); },
-                initComplete: function(){
-                    try{
-                        var api = this.api ? this.api() : (sb.dt && sb.dt.columns ? sb.dt : null);
-                        if(!api || !(api.columnControl && api['columnControl.bind'])) return;
-                        // Skip hidden id(last col)
-                        api['columnControl.bind']({ skipColumns: [api.columns().count() - 1] });
-                    }catch(e){ /* ignore */ }
-                }
+                createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
             });
             setTimeout(function(){ TableConfig.adjustColumns(sb.dt); }, 0);
         } catch (e) {
