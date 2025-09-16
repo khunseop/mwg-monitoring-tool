@@ -1,5 +1,15 @@
 # 릴리즈 노트
 
+## v1.3.2
+- 문서/구성
+  - API 문서 노출을 `ENABLE_DOCS` 환경변수로 제어(기본 true)
+  - 정적 문서 자원 마운트 `/docs-static` 추가
+  - 루트 README 엔드포인트 목록 보강: `/traffic-logs`, `/healthz`
+- CORS
+  - 와일드카드 원본(`*`)만 허용되는 경우 자격증명 자동 비활성화로 Starlette 제약 준수
+- 보안
+  - 최소 보안 헤더 추가: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`
+
 ## v1.3.1
 - 테이블 공통화 및 UI 정렬
   - 공통 JS 모듈 `TableConfig` 추가: DataTables 기본 옵션/한국어/초기화 통합
