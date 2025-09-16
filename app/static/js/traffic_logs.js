@@ -1,6 +1,9 @@
 (function(){
 	const API_BASE = '/api';
 	let PROXIES = [];
+	const STORAGE_KEY = 'tl_state_v1';
+	let LAST_RENDERED_HASH = null;
+	let IS_RESTORING = false;
 	const COLS = [
 		"datetime","username","client_ip","url_destination_ip","timeintransaction",
 		"response_statuscode","cache_status","comm_name","url_protocol","url_host",
@@ -32,6 +35,93 @@
 			$body.append(`<tr><th style="width: 220px;">${c}</th><td>${String(v)}</td></tr>`);
 		});
 		$('#tlDetailModal').addClass('is-active');
+	}
+
+	// localStorage helpers for persistence
+	function tryWriteState(state){
+		try{
+			localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+			return true;
+		}catch(e){
+			return false;
+		}
+	}
+
+	function sanitizeRecordsForStorage(records){
+		const MAX = 500;
+		const arr = Array.isArray(records) ? records.slice(0, MAX) : [];
+		return arr.map(function(r){
+			if(!r || typeof r !== 'object') return {};
+			const out = {};
+			COLS.forEach(function(c){
+				let v = r[c];
+				if(typeof v === 'string' && v.length > 2000){ v = v.slice(0, 2000) + '…'; }
+				out[c] = v;
+			});
+			return out;
+		});
+	}
+
+	function persistState(state){
+		if(tryWriteState(state)) return true;
+		if(!state || !Array.isArray(state.records) || state.records.length === 0) return false;
+		let reduced = sanitizeRecordsForStorage(state.records);
+		let temp = Object.assign({}, state, { records: reduced });
+		if(tryWriteState(temp)) return true;
+		let count = Math.min(reduced.length, 250);
+		while(count > 0){
+			let slice = reduced.slice(0, count);
+			temp = Object.assign({}, state, { records: slice });
+			if(tryWriteState(temp)) return true;
+			count = Math.floor(count / 2);
+		}
+		return false;
+	}
+
+	function saveState(recordsForSave){
+		let prev;
+		try{
+			const raw = localStorage.getItem(STORAGE_KEY);
+			if(raw){ prev = JSON.parse(raw); }
+		}catch(e){ /* ignore */ }
+		const state = {
+			proxyId: $('#tlProxySelect').val() || '',
+			query: ($('#tlQuery').val() || '').trim(),
+			limit: $('#tlLimit').val() || '200',
+			direction: $('#tlDirection').val() || 'tail',
+			parsed: true,
+			records: (recordsForSave !== undefined) ? (Array.isArray(recordsForSave) ? recordsForSave : undefined) : (prev ? prev.records : undefined),
+			savedAt: Date.now()
+		};
+		persistState(state);
+	}
+
+	function restoreState(){
+		try{
+			IS_RESTORING = true;
+			const raw = localStorage.getItem(STORAGE_KEY);
+			if(!raw) return;
+			const state = JSON.parse(raw);
+			if(state.proxyId !== undefined){ $('#tlProxySelect').val(String(state.proxyId)); }
+			if(state.query !== undefined){ $('#tlQuery').val(state.query); }
+			if(state.limit !== undefined){ $('#tlLimit').val(state.limit); }
+			if(state.direction !== undefined){ $('#tlDirection').val(state.direction); }
+			if(Array.isArray(state.records) && state.records.length > 0){
+				var hashNow;
+				try { hashNow = JSON.stringify(state.records || []); } catch(e) { hashNow = null; }
+				if (hashNow !== LAST_RENDERED_HASH) {
+					renderParsed(state.records);
+				} else {
+					$('#tlResultParsed').show();
+					$('#tlResultRaw').hide();
+					$('#tlEmptyState').toggle(state.records.length === 0);
+				}
+				setStatus('저장된 내역', 'is-light');
+			}else{
+				$('#tlEmptyState').show();
+			}
+		}catch(e){ /* ignore */ }
+		finally { IS_RESTORING = false; }
 	}
 
 	async function fetchProxies(){
@@ -82,6 +172,10 @@
 		// Initialize DataTables via shared config
 		const dt = TableConfig.init('#tlTable', { order: [] });
 		setTimeout(function(){ TableConfig.adjustColumns(dt); }, 0);
+		// Header filters via ColumnControl
+		try{
+			if (dt && dt['columnControl.bind']){ dt['columnControl.bind']({}); }
+		}catch(e){ /* ignore */ }
 		// Row click opens detail modal
 		$('#tlTable tbody').off('click', 'tr').on('click', 'tr', function(){
 			const rowIdx = $(this).data('row');
@@ -91,6 +185,8 @@
 		$('#tlResultParsed').show();
 		$('#tlResultRaw').hide();
 		$('#tlEmptyState').toggle(records.length === 0);
+		// Update last rendered signature to suppress redundant re-renders
+		try { LAST_RENDERED_HASH = JSON.stringify(records || []); } catch(e) { LAST_RENDERED_HASH = null; }
 	}
 
 	function renderRaw(lines){
@@ -116,6 +212,12 @@
 		const parsed = true;
 
 		setStatus('조회 중...', 'is-info');
+		// Clear current UI and cached results to ensure replacement semantics
+		destroyTableIfExists();
+		$('#tlResultParsed').hide();
+		$('#tlResultRaw').hide();
+		$('#tlEmptyState').hide();
+		saveState([]);
 		$('#tlLoadBtn').addClass('is-loading').prop('disabled', true);
 		try{
 			const params = new URLSearchParams();
@@ -131,6 +233,8 @@
 			}
 			const data = await res.json();
 			renderParsed(data.records || []);
+			// Persist last results only after successful fetch to avoid storage-event loops
+			saveState(Array.isArray(data.records) ? data.records : []);
 			const suffix = data.truncated ? ' (truncated)' : '';
 			setStatus(`완료 - ${data.count} 라인${suffix}`, 'is-success');
 		}catch(e){
@@ -152,7 +256,37 @@
 			showError('프록시 목록 로딩 실패');
 			setStatus('실패', 'is-danger');
 		}
+		// Restore previous state and results after proxies are loaded
+		restoreState();
+		// Save selection changes
+		$('#tlProxySelect, #tlQuery, #tlLimit, #tlDirection').on('change keyup', function(){ saveState(undefined); });
 		$('#tlLoadBtn').on('click', loadLogs);
+		// Cross-tab sync: only re-render when records changed
+		try{
+			window.addEventListener('storage', function(e){
+				if(!e) return;
+				if(e.key === STORAGE_KEY){
+					try{
+						const state = JSON.parse(e.newValue || 'null');
+						if(state && Array.isArray(state.records)){
+							var hashNow = null;
+							try { hashNow = JSON.stringify(state.records || []); } catch(err2) { hashNow = null; }
+							if (hashNow !== LAST_RENDERED_HASH) {
+								restoreState();
+							} else {
+								// Only sync controls
+								if(state.proxyId !== undefined){ $('#tlProxySelect').val(String(state.proxyId)); }
+								if(state.query !== undefined){ $('#tlQuery').val(state.query); }
+								if(state.limit !== undefined){ $('#tlLimit').val(state.limit); }
+								if(state.direction !== undefined){ $('#tlDirection').val(state.direction); }
+							}
+						} else {
+							restoreState();
+						}
+					}catch(err3){ /* ignore */ }
+				}
+			});
+		}catch(err){ /* ignore */ }
 	});
 })();
 

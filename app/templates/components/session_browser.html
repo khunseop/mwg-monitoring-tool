@@ -96,8 +96,10 @@
 </div>
 
 <!-- DataTables (local) -->
-<link rel="stylesheet" href="/static/vendor/datatables/datatables.min.css">
-<script src="/static/vendor/datatables/datatables.min.js"></script>
+<link rel="stylesheet" href="/static/vendor/datatables/datatables.min.css?v={{ request.app.version }}">
+<link rel="stylesheet" href="/static/vendor/datatables/columnControl/columnControl.dataTables.min.css?v={{ request.app.version }}">
+<script src="/static/vendor/datatables/datatables.min.js?v={{ request.app.version }}"></script>
+<script src="/static/vendor/datatables/columnControl/dataTables.columnControl.min.js?v={{ request.app.version }}"></script>
 
  
 
@@ -122,6 +124,6 @@
     </div>
  </div>
 
-<script src="/static/js/session_browser.js"></script>
+<script src="/static/js/session_browser.js?v={{ request.app.version }}"></script>
 {% endblock %}
 

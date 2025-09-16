@@ -34,9 +34,11 @@
 		scrollX: true,
 		scrollY: 480,
 		scrollCollapse: true,
+		orderCellsTop: true,
 		pageLength: 25,
-		lengthMenu: [[25, 50, 100], [25, 50, 100]],
-		dom: 'lfrtip',
+		lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+		// Place length + filter in top row, info + pagination in bottom row (Bulma 'level' containers)
+		dom: "<'dt-top level is-mobile is-align-items-center is-justify-content-space-between'lf>t<'dt-bottom level is-mobile is-align-items-center is-justify-content-space-between'ip>",
 		language: LANGUAGE_KO
 	};
 
@@ -56,16 +58,52 @@
 			var opts = TableConfig.mergeDefaults(options);
 			try{
 				if (typeof window.DataTable === 'function'){
-					return new window.DataTable(selectorOrElement, opts);
+					var dt = new window.DataTable(selectorOrElement, opts);
+					setTimeout(function(){ TableConfig.applyBulmaStyles(dt); }, 0);
+					dt.on('draw', function(){ TableConfig.applyBulmaStyles(dt); });
+					return dt;
 				}
 				if (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable){
-					return window.jQuery(selectorOrElement).DataTable(opts);
+					var $el = window.jQuery(selectorOrElement);
+					var dtj = $el.DataTable(opts);
+					setTimeout(function(){ TableConfig.applyBulmaStyles(dtj); }, 0);
+					$el.on('draw.dt', function(){ TableConfig.applyBulmaStyles(dtj); });
+					return dtj;
 				}
 			}catch(e){ /* ignore */ }
 			return null;
 		},
 		adjustColumns: function(dt){
 			try { if (dt && dt.columns && dt.columns.adjust) { dt.columns.adjust(); } } catch (e) { /* ignore */ }
+		},
+		applyBulmaStyles: function(dt){
+			try{
+				var container = dt && dt.table ? dt.table().container() : null;
+				if(!container) return;
+				var $c = (window.jQuery) ? window.jQuery(container) : null;
+				if(!$c) return;
+				// Search input -> Bulma input
+				$c.find('div.dataTables_filter input').each(function(){
+					var $inp = window.jQuery(this);
+					$inp.addClass('input is-small');
+				});
+				// Length select -> wrap with Bulma select
+				$c.find('div.dataTables_length').each(function(){
+					var $wrap = window.jQuery(this);
+					var $sel = $wrap.find('select');
+					if ($sel.length && !$sel.data('bulma-wrapped')){
+						var $bulma = window.jQuery('<div class="select is-small"></div>');
+						$sel.after($bulma);
+						$bulma.append($sel);
+						$sel.data('bulma-wrapped', true);
+					}
+				});
+				// Pagination buttons -> Bulma buttons style
+				$c.find('div.dataTables_paginate a.paginate_button').each(function(){
+					var $a = window.jQuery(this);
+					$a.addClass('button is-small');
+				});
+			}catch(e){ /* ignore */ }
 		}
 	};
 
