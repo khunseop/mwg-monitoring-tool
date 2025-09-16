@@ -72,10 +72,15 @@ body {
     box-shadow: var(--shadow-sm);
 }
 
+/* Ensure dropdown menu renders above content */
+.navbar .navbar-dropdown {
+    z-index: 40;
+}
+
 .navbar {
     margin-bottom: 1.5rem;
     padding: 0.5rem 1rem;
-    overflow: hidden;
+    overflow: visible; /* allow dropdowns to overflow */
     transition: box-shadow 220ms ease-in-out, padding 220ms ease-in-out;
     flex-wrap: wrap;
 }
@@ -118,6 +123,25 @@ body {
     transition: all 0.2s ease;
     position: relative;
     padding: 0.5rem 0.75rem;
+}
+
+/* Ensure navbar-link (dropdown trigger) looks identical to navbar-item */
+.navbar-link {
+    color: var(--color-text-muted);
+    background: transparent !important;
+}
+.navbar-link:hover,
+.navbar-link:focus,
+.navbar-link:focus-within {
+    color: var(--color-text);
+    background: transparent !important;
+}
+.navbar-item.has-dropdown.is-active > .navbar-link,
+.navbar-item.is-active > .navbar-link,
+.navbar-link.is-active,
+.navbar-link.is-selected {
+    color: var(--color-primary) !important;
+    background: transparent !important;
 }
 
 .navbar-item:hover {
