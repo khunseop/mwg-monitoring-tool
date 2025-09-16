@@ -30,6 +30,7 @@ from app.schemas.session_browser_config import (
     SessionBrowserConfig as SessionBrowserConfigSchema,
     SessionBrowserConfigUpdateSafe,
 )
+from app.utils.crypto import decrypt_string_if_encrypted
 
 
 router = APIRouter()
@@ -295,7 +296,7 @@ def _collect_for_proxy(proxy: Proxy, cfg: SessionBrowserConfigModel) -> Tuple[in
                 hostname=proxy.host,
                 port=cfg.ssh_port or 22,
                 username=proxy.username,
-                password=proxy.password,
+                password=decrypt_string_if_encrypted(proxy.password),
                 timeout=cfg.timeout_sec or 10,
                 auth_timeout=cfg.timeout_sec or 10,
                 banner_timeout=cfg.timeout_sec or 10,
@@ -489,6 +490,7 @@ def get_session_browser_config(db: Session = Depends(get_db)):
 @router.put("/session-browser/config", response_model=SessionBrowserConfigSchema)
 def update_session_browser_config(payload: SessionBrowserConfigUpdateSafe, db: Session = Depends(get_db)):
     cfg = _get_cfg(db)
+    # Only allow safe fields to update; prevent command_path/command_args modifications
     cfg.ssh_port = payload.ssh_port
     cfg.timeout_sec = payload.timeout_sec
     cfg.host_key_policy = payload.host_key_policy

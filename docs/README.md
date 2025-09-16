@@ -19,6 +19,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - `CORS_ALLOW_ORIGINS` (기본: `*`)
 - `CORS_ALLOW_CREDENTIALS` (기본: `false`) — 허용 원본이 와일드카드(`*`) 단일일 때는 Starlette 제약으로 자동 비활성화됨
 - `ENABLE_DOCS` (기본: `true`)
+- `PROXY_PASSWORD_KEY` (권장): 프록시 비밀번호 암호화용 Fernet 키. 미지정 시 `./.secret/proxy_key.key` 자동 생성/사용. 운영환경에서 키를 고정/백업해야 복호화 일관성 유지
 
 자세한 정보는 프로젝트 루트의 `README.md`를 참고하세요.
 

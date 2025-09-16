@@ -27,6 +27,7 @@ from app.schemas.resource_usage import (
 
 # aiosnmp import for SNMP operations
 from aiosnmp import Snmp
+from app.utils.crypto import decrypt_string_if_encrypted
 
 
 router = APIRouter()
@@ -129,7 +130,7 @@ async def _ssh_get_mem_percent(proxy: Proxy, spec: str, timeout_sec: int = _SSH_
                 proxy.host,
                 getattr(proxy, "port", 22) or 22,
                 proxy.username,
-                getattr(proxy, "password", None),
+                decrypt_string_if_encrypted(getattr(proxy, "password", None)),
                 cmd,
                 timeout_sec,
             ),

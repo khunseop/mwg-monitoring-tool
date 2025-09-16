@@ -10,6 +10,7 @@ from app.models.proxy import Proxy
 from app.schemas.traffic_log import TrafficLogResponse, TrafficLogRecord, TrafficLogDB
 from app.models.traffic_log import TrafficLog as TrafficLogModel
 from app.utils.traffic_log_parser import parse_log_line
+from app.utils.crypto import decrypt_string_if_encrypted
 
 
 router = APIRouter()
@@ -97,7 +98,7 @@ def get_proxy_traffic_logs(
 	q_valid = _validate_query(q)
 
 	command = _build_remote_command(db_proxy.traffic_log_path, q_valid, limit, direction)
-	raw = _ssh_exec(db_proxy.host, db_proxy.port or 22, db_proxy.username, db_proxy.password, command)
+	raw = _ssh_exec(db_proxy.host, db_proxy.port or 22, db_proxy.username, decrypt_string_if_encrypted(db_proxy.password), command)
 	lines = [ln for ln in raw.split("\n") if ln]
 	truncated = len(lines) >= min(limit, len(lines)) and len(lines) == limit
 
