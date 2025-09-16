@@ -115,7 +115,8 @@ $(document).ready(function() {
             const state = JSON.parse(raw);
             if (state.groupId !== undefined) {
                 $('#sbGroupSelect').val(state.groupId);
-                renderProxySelect();
+                // Trigger change so DeviceSelector repopulates proxies for selected group
+                $('#sbGroupSelect').trigger('change');
             }
             if (Array.isArray(state.proxyIds)) {
                 const strIds = state.proxyIds.map(id => String(id));
@@ -182,33 +183,7 @@ $(document).ready(function() {
         }
     }
 
-    let currentItemsById = {};
-    function rowsFromItems(items) {
-        currentItemsById = {};
-        return (items || []).map(row => {
-            if (row && typeof row.id !== 'undefined') { currentItemsById[String(row.id)] = row; }
-            const proxy = (sb.proxies || []).find(p => p.id === row.proxy_id);
-            const name = proxy ? `${proxy.host}` : `#${row.proxy_id}`;
-            const ctStr = row.creation_time ? new Date(row.creation_time).toLocaleString() : '';
-            const clRecv = (typeof row.cl_bytes_received === 'number') ? String(row.cl_bytes_received) : '';
-            const clSent = (typeof row.cl_bytes_sent === 'number') ? String(row.cl_bytes_sent) : '';
-            const urlFull = (row.url || '').toString();
-            const urlShort = urlFull.length > 100 ? (urlFull.slice(0, 100) + '…') : urlFull;
-            const ageStr = (typeof row.age_seconds === 'number' && row.age_seconds >= 0) ? String(row.age_seconds) : '';
-            return [
-                name,
-                ctStr,
-                row.user_name || '',
-                row.client_ip || '',
-                row.server_ip || '',
-                clRecv,
-                clSent,
-                ageStr,
-                urlShort,
-                row.id || ''
-            ];
-        });
-    }
+    // Removed unused rowsFromItems/currentItemsById
 
     function loadLatest() {
         clearErr();
