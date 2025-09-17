@@ -138,37 +138,4 @@ def migrate_legacy_proxy_passwords():
         pass
 
 
-# One-time startup cleanup for legacy accumulated rows (enable via env)
-@app.on_event("startup")
-def cleanup_old_data_once():
-    try:
-        flag = os.getenv("CLEANUP_OLD_DATA_ONCE", "false").lower() in {"1", "true", "yes"}
-        if not flag:
-            return
-        marker_dir = os.path.join(".", ".state")
-        marker_path = os.path.join(marker_dir, "cleanup_old_data_done")
-        try:
-            os.makedirs(marker_dir, exist_ok=True)
-        except Exception:
-            pass
-        if os.path.exists(marker_path):
-            return
-        db = SessionLocal()
-        try:
-            # Remove previously accumulated rows so new behavior starts clean
-            db.execute(text("DELETE FROM traffic_logs"))
-            db.execute(text("DELETE FROM session_records"))
-            db.commit()
-            try:
-                with open(marker_path, "w") as f:
-                    f.write("ok")
-            except Exception:
-                pass
-        finally:
-            try:
-                db.close()
-            except Exception:
-                pass
-    except Exception:
-        # Do not block startup if cleanup fails
-        pass
+# (removed) one-time startup cleanup for legacy accumulated rows
