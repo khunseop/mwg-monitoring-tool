@@ -64,6 +64,31 @@
 			var h = m / 60;
 			return (h < 10 ? h.toFixed(1) : Math.round(h)) + ' h';
 		},
+		// Parse traffic-log style datetime like: [17/Sep/2025:17:22:29 +0900]
+		parseTrafficLogDateMs(str){
+			if(!str || typeof str !== 'string') return null;
+			var s = str.trim();
+			if(s[0] === '[' && s[s.length-1] === ']') s = s.slice(1, -1);
+			// DD/Mon/YYYY:HH:MM:SS +/-ZZZZ
+			var m = s.match(/^(\d{1,2})\/([A-Za-z]{3})\/(\d{4}):(\d{2}):(\d{2}):(\d{2})\s+([+\-]\d{4})$/);
+			if(!m) return null;
+			var day = parseInt(m[1], 10);
+			var monStr = m[2].toLowerCase();
+			var year = parseInt(m[3], 10);
+			var hh = parseInt(m[4], 10);
+			var mm = parseInt(m[5], 10);
+			var ss = parseInt(m[6], 10);
+			var tz = m[7];
+			var monMap = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+			var month = monMap[monStr];
+			if(month == null) return null;
+			var sign = tz[0] === '-' ? -1 : 1;
+			var tzh = parseInt(tz.slice(1,3), 10) || 0;
+			var tzm = parseInt(tz.slice(3,5), 10) || 0;
+			var offsetMs = sign * ((tzh * 60) + tzm) * 60 * 1000;
+			var utcMs = Date.UTC(year, month, day, hh, mm, ss) - offsetMs;
+			return utcMs;
+		},
 		// Format timestamp string/number to YYYY-MM-DD HH:mm:ss (local)
 		formatDateTime(value){
 			if(value === null || value === undefined || value === '') return '';
@@ -78,8 +103,13 @@
 					if(trimmed.length === 10) n = n * 1000;
 					d = new Date(n);
 				} else {
+					// Try traffic-log style date first
+					var ms = AppUtils.parseTrafficLogDateMs(trimmed);
+					if(ms != null){ d = new Date(ms); }
+					else {
 					var parsed = Date.parse(trimmed);
 					if(Number.isFinite(parsed)) d = new Date(parsed);
+					}
 				}
 			}
 			if(!d || isNaN(d.getTime())) return String(value);
