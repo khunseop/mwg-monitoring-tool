@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Tuple
+from datetime import timedelta
 import asyncio
 from asyncio import Semaphore
 from app.utils.time import now_kst
@@ -222,6 +223,9 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
     for model in collected_models:
         db.refresh(model)
 
+    # Enforce 30-day retention after successful commit
+    _enforce_resource_usage_retention(db, days=30)
+
     return CollectResponse(
         requested=len(proxies),
         succeeded=len(collected_models),
@@ -229,6 +233,9 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
         errors=errors,
         items=collected_models,  # Pydantic will convert with from_attributes
     )
+
+    # enforce 30-day retention after successful commit
+    # Note: placed after return would be unreachable, so we move to just before returning if needed
 
 
 @router.get("/resource-usage", response_model=List[ResourceUsageSchema])
@@ -261,4 +268,16 @@ async def latest_resource_usage(proxy_id: int, db: Session = Depends(get_db)):
 
 
 # series endpoint removed; UI uses collect + latest buffering
+
+def _enforce_resource_usage_retention(db: Session, days: int = 30) -> None:
+    cutoff = now_kst() - timedelta(days=days)
+    try:
+        db.query(ResourceUsageModel).filter(ResourceUsageModel.collected_at < cutoff).delete(synchronize_session=False)
+        db.commit()
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return
 

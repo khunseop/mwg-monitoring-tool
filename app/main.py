@@ -42,7 +42,7 @@ traffic_log_model.Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="PPAT",
     description="Proxy Performance Analysis Tool",
-    version="1.3.3"
+    version="1.3.4"
 )
 # Security/CORS middleware (configure via env)
 cors_origins = os.getenv("CORS_ALLOW_ORIGINS", "*")
@@ -136,3 +136,6 @@ def migrate_legacy_proxy_passwords():
     except Exception:
         # avoid breaking startup due to migration failure
         pass
+
+
+# (removed) one-time startup cleanup for legacy accumulated rows
