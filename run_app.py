@@ -53,8 +53,15 @@ def main() -> None:
         )
         sys.exit(1)
 
+    # Import the app object directly to avoid module resolution issues in frozen builds
+    try:
+        from app.main import app as asgi_app
+    except Exception as exc:
+        print(f"[PPAT] ASGI 앱(app.main:app) 가져오기 실패: {exc}", file=sys.stderr)
+        sys.exit(1)
+
     uvicorn.run(
-        "app.main:app",
+        asgi_app,
         host=host,
         port=port,
         reload=False,
