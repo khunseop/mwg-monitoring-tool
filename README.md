@@ -74,10 +74,11 @@ pyinstaller --name PPAT \
   --add-data "app/templates;app/templates" \
   --add-data "app/static;app/static" \
   --add-data "docs;docs" \
-  --hidden-import "uvicorn" \
+  --collect-all uvicorn \
   --hidden-import "dotenv" \
   --hidden-import "Jinja2" \
   --hidden-import "cryptography.hazmat.bindings._rust" \
+  --additional-hooks-dir hooks \
   run_app.py
 ```
 

@@ -5,6 +5,12 @@ import time
 import webbrowser
 from typing import Optional
 
+# Ensure PyInstaller can see this import during analysis
+try:
+    import uvicorn  # type: ignore
+except Exception:
+    uvicorn = None  # type: ignore
+
 
 def ensure_default_env() -> None:
     os.environ.setdefault("HOST", "127.0.0.1")
@@ -31,9 +37,7 @@ def main() -> None:
 
     open_browser_later(url, delay_sec=1.2)
 
-    try:
-        import uvicorn
-    except Exception:
+    if uvicorn is None:
         print(
             (
                 "[PPAT] Uvicorn을 불러올 수 없습니다.\n"
@@ -43,6 +47,7 @@ def main() -> None:
                 "Windows PowerShell:\n"
                 "  py -3.10 -m venv .venv; .\\.venv\\Scripts\\activate; pip install -r requirements.txt\n\n"
                 "대안: pip install uvicorn==0.35.0\n"
+                "또는 EXE 빌드시 '--collect-all uvicorn' 혹은 PyInstaller hook을 추가하세요.\n"
             ),
             file=sys.stderr,
         )
