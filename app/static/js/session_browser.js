@@ -172,7 +172,12 @@ $(document).ready(function() {
                 columnDefs: [
                     { targets: -1, visible: false, searchable: false },
                     { targets: 0, className: 'dt-nowrap' },
-                    { targets: 1, className: 'dt-nowrap' },
+                    { targets: 1, className: 'dt-nowrap', render: function(data){ return (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(data) : data; } },
+                    { targets: 3, className: 'dt-nowrap mono' },
+                    { targets: 4, className: 'dt-nowrap mono' },
+                    { targets: 5, className: 'dt-nowrap num', render: function(data){ return (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(data) : data; } },
+                    { targets: 6, className: 'dt-nowrap num', render: function(data){ return (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(data) : data; } },
+                    { targets: 7, className: 'dt-nowrap', render: function(data){ return (window.AppUtils && AppUtils.formatSeconds) ? AppUtils.formatSeconds(data) : data; } },
                     { targets: 8, className: 'dt-nowrap dt-ellipsis', width: '480px' }
                 ],
                 createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
@@ -268,27 +273,27 @@ $(document).ready(function() {
 function openSbModal(){ $('#sbDetailModal').addClass('is-active'); }
 function fillDetailModal(item){
     const rows = [];
-    const kv = (k,v) => `<tr><th style="white-space:nowrap;">${k}</th><td>${(v===null||v===undefined)?'':String(v)}</td></tr>`;
+    const kv = (k,v,cls) => `<tr><th style="white-space:nowrap;">${k}</th><td class="${cls||''}">${(v===null||v===undefined)?'':String(v)}</td></tr>`;
     rows.push(kv('프록시 ID', item.proxy_id));
-    rows.push(kv('트랜잭션', item.transaction));
-    rows.push(kv('생성시각', item.creation_time ? new Date(item.creation_time).toLocaleString() : ''));
+    rows.push(kv('트랜잭션', item.transaction, 'mono'));
+    rows.push(kv('생성시각', (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(item.creation_time) : (item.creation_time ? new Date(item.creation_time).toLocaleString() : '')));
     rows.push(kv('프로토콜', item.protocol));
     rows.push(kv('사용자', item.user_name));
     rows.push(kv('Cust ID', item.cust_id));
-    rows.push(kv('클라이언트 IP', item.client_ip));
-    rows.push(kv('Client-side MWG IP', item.client_side_mwg_ip));
-    rows.push(kv('Server-side MWG IP', item.server_side_mwg_ip));
-    rows.push(kv('서버 IP', item.server_ip));
-    rows.push(kv('클라이언트 수신(Bytes)', item.cl_bytes_received));
-    rows.push(kv('클라이언트 송신(Bytes)', item.cl_bytes_sent));
-    rows.push(kv('서버 수신(Bytes)', item.srv_bytes_received));
-    rows.push(kv('서버 송신(Bytes)', item.srv_bytes_sent));
+    rows.push(kv('클라이언트 IP', item.client_ip, 'mono'));
+    rows.push(kv('Client-side MWG IP', item.client_side_mwg_ip, 'mono'));
+    rows.push(kv('Server-side MWG IP', item.server_side_mwg_ip, 'mono'));
+    rows.push(kv('서버 IP', item.server_ip, 'mono'));
+    rows.push(kv('클라이언트 수신(Bytes)', (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(item.cl_bytes_received) : item.cl_bytes_received, 'num'));
+    rows.push(kv('클라이언트 송신(Bytes)', (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(item.cl_bytes_sent) : item.cl_bytes_sent, 'num'));
+    rows.push(kv('서버 수신(Bytes)', (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(item.srv_bytes_received) : item.srv_bytes_received, 'num'));
+    rows.push(kv('서버 송신(Bytes)', (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(item.srv_bytes_sent) : item.srv_bytes_sent, 'num'));
     rows.push(kv('Trxn Index', item.trxn_index));
-    rows.push(kv('Age(s)', item.age_seconds));
+    rows.push(kv('Age(s)', (window.AppUtils && AppUtils.formatSeconds) ? AppUtils.formatSeconds(item.age_seconds) : item.age_seconds));
     rows.push(kv('상태', item.status));
-    rows.push(kv('In Use', item.in_use));
+    rows.push(kv('In Use', (window.AppUtils && AppUtils.renderBoolTag) ? AppUtils.renderBoolTag(item.in_use) : (item.in_use ? 'Y' : 'N')));
     rows.push(kv('URL', item.url));
-    rows.push(kv('수집시각', item.collected_at ? new Date(item.collected_at).toLocaleString() : ''));
+    rows.push(kv('수집시각', (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(item.collected_at) : (item.collected_at ? new Date(item.collected_at).toLocaleString() : '')));
     rows.push(kv('원본', item.raw_line));
     $('#sbDetailBody').html(rows.join(''));
 }

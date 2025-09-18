@@ -32,7 +32,23 @@
 		COLS.forEach(c => {
 			let v = record[c];
 			if(v === null || v === undefined) v = '';
-			$body.append(`<tr><th style="width: 220px;">${c}</th><td>${String(v)}</td></tr>`);
+			let formatted = v;
+			if(c === 'datetime' || c === 'collected_at'){
+				formatted = (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(v) : v;
+			}else if(c === 'response_statuscode'){
+				formatted = (window.AppUtils && AppUtils.renderStatusTag) ? AppUtils.renderStatusTag(v) : String(v);
+			}else if(c === 'recv_byte' || c === 'sent_byte' || c === 'content_lenght'){
+				formatted = (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(v) : v;
+			}else if(c === 'timeintransaction'){
+				// assume seconds if small; or ms when large
+				var num = Number(v);
+				if(Number.isFinite(num)){
+					formatted = (window.AppUtils && AppUtils.formatDurationMs) ? AppUtils.formatDurationMs(num < 1000 ? num * 1000 : num) : v;
+				}
+			}
+			const isUrlish = (c === 'url_path' || c === 'url_parametersstring' || c === 'referer' || c === 'url_host' || c === 'user_agent');
+			const cls = isUrlish ? '' : (c === 'recv_byte' || c === 'sent_byte' || c === 'content_lenght' || c === 'response_statuscode' ? 'num' : '');
+			$body.append(`<tr><th style="width: 220px;">${c}</th><td class="${cls}">${typeof formatted === 'string' ? formatted : String(formatted)}</td></tr>`);
 		});
 		$('#tlDetailModal').addClass('is-active');
 	}
@@ -162,10 +178,37 @@
 			const tds = COLS.map(c => {
 				let v = r[c];
 				if (v === null || v === undefined) v = '';
+				let formatted = v;
+				let orderVal = '';
+				if(c === 'datetime' || c === 'collected_at'){
+					var msOrder = null;
+					if (window.AppUtils && AppUtils.parseTrafficLogDateMs) { msOrder = AppUtils.parseTrafficLogDateMs(String(v)); }
+					if (msOrder == null) { var parsed = Date.parse(String(v)); msOrder = Number.isFinite(parsed) ? parsed : null; }
+					if (msOrder != null) orderVal = String(msOrder);
+					formatted = (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(v) : v;
+				}else if(c === 'response_statuscode'){
+					formatted = (window.AppUtils && AppUtils.renderStatusTag) ? AppUtils.renderStatusTag(v) : String(v);
+					var code = Number(v); if (Number.isFinite(code)) orderVal = String(code);
+				}else if(c === 'recv_byte' || c === 'sent_byte' || c === 'content_lenght'){
+					var b = Number(v);
+					if (Number.isFinite(b)) orderVal = String(b);
+					formatted = (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(v) : v;
+				}else if(c === 'timeintransaction'){
+					var num = Number(v);
+					if(Number.isFinite(num)){
+						var msVal = num < 1000 ? num * 1000 : num;
+						orderVal = String(msVal);
+						formatted = (window.AppUtils && AppUtils.formatDurationMs) ? AppUtils.formatDurationMs(msVal) : v;
+					}
+				}
 				const isUrlish = (c === 'url_path' || c === 'url_parametersstring' || c === 'referer' || c === 'url_host' || c === 'user_agent');
-				const cls = 'dt-nowrap';
-				const content = isUrlish ? `<div class="dt-ellipsis">${String(v)}</div>` : String(v);
-				return `<td class="${cls}" data-col="${c}">${content}</td>`;
+				const clsParts = ['dt-nowrap'];
+				if(c === 'recv_byte' || c === 'sent_byte' || c === 'content_lenght') clsParts.push('num');
+				if(c === 'response_statuscode') clsParts.push('mono');
+				const cls = clsParts.join(' ');
+				const content = isUrlish ? `<div class="dt-ellipsis">${String(formatted)}</div>` : (typeof formatted === 'string' ? formatted : String(formatted));
+				const orderAttr = orderVal !== '' ? ` data-order="${orderVal}"` : '';
+				return `<td class="${cls}" data-col="${c}"${orderAttr}>${content}</td>`;
 			}).join('');
 			$body.append(`<tr data-row="${idx}">${tds}</tr>`);
 		});
