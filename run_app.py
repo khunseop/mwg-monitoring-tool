@@ -31,7 +31,22 @@ def main() -> None:
 
     open_browser_later(url, delay_sec=1.2)
 
-    import uvicorn
+    try:
+        import uvicorn
+    except Exception:
+        print(
+            (
+                "[PPAT] Uvicorn을 불러올 수 없습니다.\n"
+                "가상환경을 활성화한 뒤 의존성을 설치하세요.\n\n"
+                "Linux/macOS:\n"
+                "  python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt\n\n"
+                "Windows PowerShell:\n"
+                "  py -3.10 -m venv .venv; .\\.venv\\Scripts\\activate; pip install -r requirements.txt\n\n"
+                "대안: pip install uvicorn==0.35.0\n"
+            ),
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     uvicorn.run(
         "app.main:app",
