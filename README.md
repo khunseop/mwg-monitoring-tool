@@ -79,6 +79,7 @@ pyinstaller --name PPAT \
   --collect-all aiosnmp \
   --collect-all asyncio_dgram \
   --collect-all pyasn1 \
+  --collect-all paramiko \
   --hidden-import "dotenv" \
   --hidden-import "Jinja2" \
   --hidden-import "cryptography.hazmat.bindings._rust" \

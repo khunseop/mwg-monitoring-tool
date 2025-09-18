@@ -45,7 +45,9 @@ async def _snmp_get(host: str, port: int, community: str, oid: str, timeout_sec:
             if values and len(values) > 0:
                 return float(values[0].value)
             return None
-    except Exception:
+    except Exception as exc:
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.exception(f"[resource_usage] SNMP get failed host={host} oid={oid}: {exc}")
         return None
 
 
@@ -95,7 +97,9 @@ def _ssh_exec_and_parse_mem(host: str, port: int, username: str, password: str |
             return val
         except Exception:
             return None
-    except Exception:
+    except Exception as exc:
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.exception(f"[resource_usage] SSH exec failed host={host} cmd={command}: {exc}")
         return None
     finally:
         try:

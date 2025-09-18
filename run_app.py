@@ -64,6 +64,14 @@ def main() -> None:
         print(f"[PPAT] ASGI 앱(app.main:app) 가져오기 실패: {exc}", file=sys.stderr)
         sys.exit(1)
 
+    # Force asyncio loop policy on Windows (Proactor may break some libs)
+    try:
+        if sys.platform.startswith("win"):
+            import asyncio
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
     uvicorn.run(
         asgi_app,
         host=host,
