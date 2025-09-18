@@ -75,6 +75,7 @@ pyinstaller --name PPAT \
   --add-data "app/static;app/static" \
   --add-data "docs;docs" \
   --collect-all uvicorn \
+  --collect-all fastapi_standalone_docs \
   --hidden-import "dotenv" \
   --hidden-import "Jinja2" \
   --hidden-import "cryptography.hazmat.bindings._rust" \

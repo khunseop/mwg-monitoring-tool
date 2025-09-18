@@ -15,7 +15,11 @@ except Exception:
 def ensure_default_env() -> None:
     os.environ.setdefault("HOST", "127.0.0.1")
     os.environ.setdefault("PORT", "8000")
-    os.environ.setdefault("ENABLE_DOCS", "true")
+    # In frozen (PyInstaller) builds, disable docs by default to avoid missing asset errors
+    if getattr(sys, "frozen", False):
+        os.environ.setdefault("ENABLE_DOCS", "false")
+    else:
+        os.environ.setdefault("ENABLE_DOCS", "true")
 
 
 def open_browser_later(url: str, delay_sec: float = 1.0) -> None:
