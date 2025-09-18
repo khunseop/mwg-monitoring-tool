@@ -34,3 +34,41 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 const dt = TableConfig.init('#tlTable', { order: [] });
 ```
 
+
+## 윈도우 독립 실행 파일(로컬 프로그램) 빌드
+
+아래 방법으로 Windows용 단일 실행 파일을 만들 수 있습니다. (개발 PC에 Python 3.10+, pip, 빌드 도구 필요)
+
+1) 가상환경/의존성 설치
+```powershell
+py -3.10 -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
+pip install pyinstaller==6.11.0
+```
+
+2) 빌드 실행 (PowerShell)
+```powershell
+pyinstaller --name PPAT \
+  --onefile \
+  --noconsole \
+  --add-data "app/templates;app/templates" \
+  --add-data "app/static;app/static" \
+  --add-data "docs;docs" \
+  --hidden-import "dotenv" \
+  --hidden-import "Jinja2" \
+  --hidden-import "cryptography.hazmat.bindings._rust" \
+  run_app.py
+```
+
+- 출력물은 `dist/PPAT.exe` 입니다.
+- 방화벽 경고가 뜰 수 있습니다. 로컬 접속만 필요하므로 허용 후 사용하세요.
+
+3) 실행
+```powershell
+./dist/PPAT.exe
+```
+기본으로 브라우저가 자동으로 열리며 주소는 `http://127.0.0.1:8000/` 입니다.
+
+참고: 리소스 경로는 PyInstaller 번들 환경에서도 동작하도록 `app/utils/path_resolver.py` 로 처리합니다.
+

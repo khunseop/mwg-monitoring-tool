@@ -53,3 +53,33 @@ awk '/MemTotal/ {total=$2} /MemAvailable/ {available=$2} END {printf "%.0f", 100
 - 검증(디버깅): 로그 레벨을 DEBUG로 올리면 다음 로그가 출력됩니다.
   - `Using SSH mem for host=... oidSpec=ssh...`
   - `SSH mem start host=...` / `SSH mem end host=... ms=... value=...`
+
+### 윈도우 독립 실행 파일로 빌드 (PyInstaller)
+
+Windows에서 로컬 프로그램처럼 실행할 수 있는 `PPAT.exe`를 생성합니다.
+
+1) 의존성 설치
+```powershell
+py -3.10 -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
+pip install pyinstaller==6.11.0
+```
+
+2) 빌드 명령
+```powershell
+pyinstaller --name PPAT \
+  --onefile \
+  --noconsole \
+  --add-data "app/templates;app/templates" \
+  --add-data "app/static;app/static" \
+  --add-data "docs;docs" \
+  --hidden-import "dotenv" \
+  --hidden-import "Jinja2" \
+  --hidden-import "cryptography.hazmat.bindings._rust" \
+  run_app.py
+```
+
+- 결과: `dist/PPAT.exe`
+- 실행 시 기본 브라우저가 자동으로 열리고 주소는 `http://127.0.0.1:8000/` 입니다.
+- 리소스 경로는 `app/utils/path_resolver.py` 에서 PyInstaller 번들을 고려해 처리합니다.

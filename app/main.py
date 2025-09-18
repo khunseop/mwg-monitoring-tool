@@ -28,6 +28,7 @@ except Exception:
 from app.database.database import SessionLocal
 from app.models.proxy import Proxy as ProxyModel
 from app.utils.crypto import encrypt_string
+from app.utils.path_resolver import get_templates_dir, get_static_dir, get_docs_dir
 
 # Load environment variables from .env
 load_dotenv(override=False)
@@ -63,10 +64,10 @@ if os.getenv("ENABLE_DOCS", "true").lower() in {"1", "true", "yes"}:
     # expose version in app state for templates
 app.github_url = os.getenv("GITHUB_URL")
 
-# 템플릿과 정적 파일 설정
-templates = Jinja2Templates(directory="app/templates")
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
-app.mount("/docs-static", StaticFiles(directory="docs"), name="docs-static")
+# 템플릿과 정적 파일 설정 (dev/pyinstaller 모두 지원)
+templates = Jinja2Templates(directory=get_templates_dir())
+app.mount("/static", StaticFiles(directory=get_static_dir()), name="static")
+app.mount("/docs-static", StaticFiles(directory=get_docs_dir()), name="docs-static")
 
 # API 라우터
 app.include_router(proxies.router, prefix="/api", tags=["proxies"])
