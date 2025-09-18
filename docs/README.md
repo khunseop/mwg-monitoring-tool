@@ -57,6 +57,9 @@ pyinstaller --name PPAT \
   --add-data "docs;docs" \
   --collect-all uvicorn \
   --collect-all fastapi_standalone_docs \
+  --collect-all aiosnmp \
+  --collect-all asyncio_dgram \
+  --collect-all pyasn1 \
   --hidden-import "dotenv" \
   --hidden-import "Jinja2" \
   --hidden-import "cryptography.hazmat.bindings._rust" \
