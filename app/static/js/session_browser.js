@@ -1,68 +1,7 @@
 $(document).ready(function() {
     const sb = { proxies: [], groups: [], dt: null, mode: undefined, tmpToken: null };
-    const STORAGE_KEY = 'sb_state_v1';
 
-    // Helpers for robust localStorage persistence
-    function sanitizeItemsForStorage(items) {
-        // Drop heavy fields and bound array length to avoid quota errors
-        const MAX_ITEMS = 250; // keep most recent up to 250
-        const trimmed = Array.isArray(items) ? items.slice(0, MAX_ITEMS) : [];
-        return trimmed.map(function(it) {
-            if (!it || typeof it !== 'object') return {};
-            const out = {
-                id: it.id,
-                proxy_id: it.proxy_id,
-                creation_time: it.creation_time,
-                user_name: it.user_name,
-                client_ip: it.client_ip,
-                server_ip: it.server_ip,
-                cl_bytes_received: it.cl_bytes_received,
-                cl_bytes_sent: it.cl_bytes_sent,
-                age_seconds: it.age_seconds,
-                url: (typeof it.url === 'string') ? (it.url.length > 1000 ? it.url.slice(0, 1000) + '…' : it.url) : it.url,
-                collected_at: it.collected_at,
-                transaction: it.transaction,
-                protocol: it.protocol,
-                cust_id: it.cust_id,
-                client_side_mwg_ip: it.client_side_mwg_ip,
-                server_side_mwg_ip: it.server_side_mwg_ip,
-                srv_bytes_received: it.srv_bytes_received,
-                srv_bytes_sent: it.srv_bytes_sent,
-                trxn_index: it.trxn_index,
-                status: it.status,
-                in_use: it.in_use
-            };
-            return out;
-        });
-    }
-
-    function tryWriteState(state) {
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-            return true;
-        } catch (e) {
-            return false;
-        }
-    }
-
-    function persistState(state) {
-        // Attempt to persist; if it fails due to quota, progressively reduce items size
-        if (tryWriteState(state)) return true;
-        if (!state || !Array.isArray(state.items) || state.items.length === 0) return false;
-        // First, sanitize items by dropping heavy fields
-        var reduced = sanitizeItemsForStorage(state.items);
-        var temp = Object.assign({}, state, { items: reduced });
-        if (tryWriteState(temp)) return true;
-        // If still failing, aggressively reduce count
-        var count = Math.min(reduced.length, 120);
-        while (count > 0) {
-            var slice = reduced.slice(0, count);
-            temp = Object.assign({}, state, { items: slice });
-            if (tryWriteState(temp)) return true;
-            count = Math.floor(count / 2);
-        }
-        return false;
-    }
+    // No local storage persistence (as requested)
 
     function showErr(msg) { $('#sbError').text(msg).show(); }
     function clearErr() { $('#sbError').hide().text(''); }
@@ -87,107 +26,11 @@ $(document).ready(function() {
         } catch (e) { /* ignore */ }
     }
 
-    function saveState(itemsForSave) {
-        var prevItems;
-        try {
-            var prevRaw = localStorage.getItem(STORAGE_KEY);
-            if (prevRaw) {
-                var prev = JSON.parse(prevRaw);
-                prevItems = Array.isArray(prev.items) ? prev.items : undefined;
-            }
-        } catch (e) { /* ignore */ }
-        // If itemsForSave is provided, use it as-is (including empty array to CLEAR)
-        var items = (itemsForSave !== undefined) ? (Array.isArray(itemsForSave) ? itemsForSave : undefined) : prevItems;
-        var state = {
-            groupId: $('#sbGroupSelect').val() || '',
-            proxyIds: getSelectedProxyIds(),
-            items: items,
-            savedAt: Date.now()
-        };
-        var ok = persistState(state);
-        if (!ok) { try { setStatus('로컬 저장 실패', true); } catch (e) { /* ignore */ } }
-    }
+    function saveState() { /* no-op */ }
 
-    function restoreState() {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (!raw) return;
-            const state = JSON.parse(raw);
-            if (state.groupId !== undefined) {
-                $('#sbGroupSelect').val(state.groupId);
-                // Trigger change so DeviceSelector repopulates proxies for selected group
-                $('#sbGroupSelect').trigger('change');
-            }
-            if (Array.isArray(state.proxyIds)) {
-                const strIds = state.proxyIds.map(id => String(id));
-                $('#sbProxySelect option').each(function() {
-                    $(this).prop('selected', strIds.includes($(this).val()));
-                });
-            }
-            // Do not restore cached items; rely on server-side data to persist last load
-        } catch (e) { /* ignore */ }
-    }
+    function restoreState() { /* no-op */ }
 
-    function initTable() {
-        if (sb.dt) return;
-        try {
-            var ajaxFn = function(data, callback) {
-                // DataTables -> backend query params
-                var params = {
-                    draw: data.draw,
-                    start: data.start,
-                    length: data.length,
-                };
-                if (data.search && data.search.value) {
-                    params['search[value]'] = data.search.value;
-                }
-                if (data.order && data.order.length > 0) {
-                    params['order[0][column]'] = data.order[0].column;
-                    params['order[0][dir]'] = data.order[0].dir;
-                }
-                var g = $('#sbGroupSelect').val();
-                if (g) params.group_id = g;
-                var pids = ($('#sbProxySelect').val() || []).join(',');
-                if (pids) params.proxy_ids = pids;
-                $.ajax({ url: '/api/session-browser/datatables', method: 'GET', data: params })
-                    .done(function(res){ callback(res); })
-                    .fail(function(){ callback({ draw: data.draw, recordsTotal: 0, recordsFiltered: 0, data: [] }); });
-            };
-            sb.dt = TableConfig.init('#sbTable', {
-                serverSide: true,
-                ajax: function(data, callback){ ajaxFn(data, callback); },
-                drawCallback: function(){ updateTableVisibility(); },
-                columns: [
-                    { title: '프록시' },
-                    { title: '생성시각' },
-                    { title: '사용자' },
-                    { title: '클라이언트 IP' },
-                    { title: '서버 IP' },
-                    { title: 'CL 수신' },
-                    { title: 'CL 송신' },
-                    { title: 'Age(s)' },
-                    { title: 'URL' },
-                    { title: 'id', visible: false }
-                ],
-                columnDefs: [
-                    { targets: -1, visible: false, searchable: false },
-                    { targets: 0, className: 'dt-nowrap' },
-                    { targets: 1, className: 'dt-nowrap', render: function(data){ return (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(data) : data; } },
-                    { targets: 3, className: 'dt-nowrap mono' },
-                    { targets: 4, className: 'dt-nowrap mono' },
-                    { targets: 5, className: 'dt-nowrap num', render: function(data){ return (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(data) : data; } },
-                    { targets: 6, className: 'dt-nowrap num', render: function(data){ return (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(data) : data; } },
-                    { targets: 7, className: 'dt-nowrap', render: function(data){ return (window.AppUtils && AppUtils.formatSeconds) ? AppUtils.formatSeconds(data) : data; } },
-                    { targets: 8, className: 'dt-nowrap dt-ellipsis', width: '480px' }
-                ],
-                createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
-            });
-            sb.mode = 'server';
-            setTimeout(function(){ TableConfig.adjustColumns(sb.dt); }, 0);
-        } catch (e) {
-            // Ignore DataTables init failures; selection UI will still work
-        }
-    }
+    function initTable() { ensureClientMode([]); }
 
     function destroyTable() {
         try { if (sb.dt && sb.dt.destroy) { sb.dt.destroy(); } } catch (e) { /* ignore */ }
@@ -195,15 +38,7 @@ $(document).ready(function() {
         sb.dt = null;
     }
 
-    function ensureServerMode() {
-        if (sb.mode === 'server' && sb.dt) return;
-        destroyTable();
-        sb.mode = undefined;
-        // Rebuild header tbody to clean any previous data
-        try { $('#sbTable tbody').empty(); } catch (e) { /* ignore */ }
-        initTable();
-        sb.mode = 'server';
-    }
+    function ensureServerMode() { /* removed: server-side table not used */ }
 
     function ensureClientMode(rows) {
         destroyTable();
@@ -249,7 +84,7 @@ $(document).ready(function() {
         clearErr();
         const proxyIds = getSelectedProxyIds();
         if (proxyIds.length === 0) { showErr('프록시를 하나 이상 선택하세요.'); return; }
-        const deferSave = !!$('#sbDeferSave').is(':checked');
+        const deferSave = true;
         setStatus('수집 중...');
         return $.ajax({
             url: '/api/session-browser/collect',
@@ -257,7 +92,7 @@ $(document).ready(function() {
             contentType: 'application/json',
             data: JSON.stringify({ proxy_ids: proxyIds, defer_save: deferSave })
         }).then(res => {
-            if (deferSave && res && Array.isArray(res.rows)) {
+            if (res && Array.isArray(res.rows)) {
                 sb.tmpToken = res.tmp_token || null;
                 ensureClientMode(res.rows);
                 $('#sbEmptyState').hide();
@@ -265,14 +100,12 @@ $(document).ready(function() {
                 setStatus('완료(' + res.rows.length + '건 표시)');
             } else {
                 sb.tmpToken = null;
-                ensureServerMode();
-                if (sb.dt && sb.dt.ajax) { sb.dt.ajax.reload(null, false); }
                 $('#sbEmptyState').hide();
                 $('#sbTableWrap').show();
             }
             if (res && res.failed && res.failed > 0) { showErr('일부 프록시 수집에 실패했습니다.'); }
             // Clear any cached items to avoid mixing old data on next restore; persist only selection
-            saveState([]);
+            saveState();
         }).catch(() => { setStatus('오류', true); showErr('수집 요청 중 오류가 발생했습니다.'); });
     }
 
@@ -302,8 +135,8 @@ $(document).ready(function() {
         // open in new tab to trigger download without blocking UI
         window.open(url, '_blank');
     });
-    $('#sbGroupSelect').on('change', function() { saveState(undefined); if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true); });
-    $('#sbProxySelect').on('change', function() { saveState(undefined); if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true); });
+    $('#sbGroupSelect').on('change', function() { /* no-op */ });
+    $('#sbProxySelect').on('change', function() { /* no-op */ });
 
     // Row click -> open detail modal
     $('#sbTable tbody').on('click', 'tr', function() {
@@ -336,18 +169,9 @@ $(document).ready(function() {
         autoSelectOnGroupChange: true,
         enableSelectAll: true,
         onData: function(data){ sb.groups = data.groups || []; sb.proxies = data.proxies || []; }
-    }).then(function(){ restoreState(); if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true); });
+    }).then(function(){ restoreState(); });
 
-    // Cross-tab sync: update UI when other tabs modify stored state
-    try {
-        window.addEventListener('storage', function(e) {
-            if (!e) return;
-            if (e.key === STORAGE_KEY) {
-                restoreState();
-                if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, false);
-            }
-        });
-    } catch (e) { /* ignore */ }
+    // No cross-tab storage sync
 });
 
 function openSbModal(){ $('#sbDetailModal').addClass('is-active'); }

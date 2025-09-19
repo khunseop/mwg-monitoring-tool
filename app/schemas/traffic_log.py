@@ -44,6 +44,8 @@ class TrafficLogResponse(BaseModel):
 	records: List[TrafficLogRecord] | None = None
 	truncated: bool = False
 	count: int
+	tmp_token: Optional[str] = None
+	total_count: Optional[int] = None
 
 
 class TrafficLogDB(BaseModel):
