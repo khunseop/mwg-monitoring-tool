@@ -6,10 +6,11 @@ from fastapi import Query
 from app.database.database import get_db
 from app.models.proxy import Proxy
 from sqlalchemy.orm import joinedload
-from app.schemas.proxy import ProxyCreate, ProxyUpdate, ProxyOut, ProxyBulkCreateResult
+from app.schemas.proxy import ProxyCreate, ProxyUpdate, ProxyOut, ProxyBulkCreateResult, ProxyBulkCreateIn
 from sqlalchemy import func
 from app.utils.crypto import encrypt_string
 from pydantic import ValidationError
+from app.models.proxy_group import ProxyGroup
 
 router = APIRouter()
 
@@ -60,19 +61,33 @@ def create_proxy(proxy: ProxyCreate, db: Session = Depends(get_db)):
 
 @router.post("/proxies/bulk", response_model=List[ProxyBulkCreateResult], status_code=status.HTTP_201_CREATED)
 def bulk_create_proxies(
-    items: List[dict] = Body(..., description="List of proxies to create"),
+    items: List[dict] = Body(..., description="List of proxies to create (supports group_name)"),
     db: Session = Depends(get_db),
 ):
     results: List[ProxyBulkCreateResult] = []
     for idx, raw in enumerate(items):
         # Validate each item individually to avoid failing the whole request
         try:
-            item = ProxyCreate(**raw)
+            # Accept group_name for lookup; validate base fields first using dedicated schema
+            item = ProxyBulkCreateIn(**raw)
         except ValidationError as ve:
             # Collect validation error per item
             host_val = (raw.get("host") if isinstance(raw, dict) else None) or "(invalid)"
             results.append(ProxyBulkCreateResult(index=idx, host=str(host_val), status="error", detail=ve.errors()[0].get("msg", "validation error")))
             continue
+
+        # Resolve group by name if provided
+        resolved_group_id = None
+        if getattr(item, "group_name", None):
+            group = (
+                db.query(ProxyGroup)
+                .filter(func.lower(ProxyGroup.name) == func.lower(item.group_name))
+                .first()
+            )
+            if not group:
+                results.append(ProxyBulkCreateResult(index=idx, host=item.host, status="error", detail=f"Proxy group not found: {item.group_name}"))
+                continue
+            resolved_group_id = group.id
 
         # Duplicate host guard (case-insensitive)
         existing = (
@@ -85,7 +100,18 @@ def bulk_create_proxies(
             continue
 
         try:
-            data = item.model_dump()
+            # Build through ProxyCreate to reuse validation
+            create_input = {
+                "host": item.host,
+                "username": item.username,
+                "password": item.password,
+                "traffic_log_path": item.traffic_log_path,
+                "is_active": item.is_active,
+                "group_id": resolved_group_id,
+                "description": item.description,
+            }
+            valid = ProxyCreate(**create_input)
+            data = valid.model_dump()
             data["password"] = encrypt_string(data.get("password"))
             db_proxy = Proxy(**data)
             db.add(db_proxy)

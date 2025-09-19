@@ -372,7 +372,7 @@ function parseCsvLinesToProxies(text) {
             // Skip malformed line
             continue;
         }
-        const groupIdRaw = parts[3] || '';
+        const groupNameRaw = parts[3] || '';
         const trafficLogPathRaw = parts[4] || '';
         const isActiveRaw = parts[5] || '';
         const descriptionRaw = parts.slice(6).join(','); // allow commas in description by joining remainder
@@ -382,8 +382,8 @@ function parseCsvLinesToProxies(text) {
             username,
             password,
         };
-        if (groupIdRaw && /^\d+$/.test(groupIdRaw)) {
-            payload.group_id = parseInt(groupIdRaw, 10);
+        if (groupNameRaw && groupNameRaw.trim().length > 0) {
+            payload.group_name = groupNameRaw.trim();
         }
         if (trafficLogPathRaw && trafficLogPathRaw.trim().length > 0) {
             payload.traffic_log_path = trafficLogPathRaw.trim();

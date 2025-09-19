@@ -49,3 +49,13 @@ class ProxyBulkCreateResult(BaseModel):
     status: Literal["created", "duplicate", "error"]
     id: Optional[int] = None
     detail: Optional[str] = None
+
+
+class ProxyBulkCreateIn(BaseModel):
+    host: HostnameOrIPv4
+    username: constr(min_length=1)
+    password: constr(min_length=1)
+    group_name: Optional[constr(min_length=1)] = None
+    traffic_log_path: Optional[str] = None
+    is_active: bool = True
+    description: Optional[str] = None
