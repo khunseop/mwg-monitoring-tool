@@ -266,8 +266,12 @@ $(document).ready(function() {
             return { name: rowLabel, data: dataPoints };
         });
 
+        // ApexCharts heatmap renders series from bottom to top; reverse to anchor top-left
+        ru._heatRaw.reverse();
+        seriesData.reverse();
+
         const options = {
-            chart: { type: 'heatmap', height: 460, animations: { enabled: false }, toolbar: { show: false } },
+            chart: { type: 'heatmap', height: 520, animations: { enabled: false }, toolbar: { show: false } },
             dataLabels: { enabled: true, style: { colors: ['#111827'] }, formatter: function(val, opts) {
                 const y = opts.seriesIndex; const x = opts.dataPointIndex;
                 const raw = (ru._heatRaw && ru._heatRaw[y]) ? ru._heatRaw[y][x] : null;
@@ -448,7 +452,7 @@ $(document).ready(function() {
                         <div class="level" style="margin-bottom:6px;">
                             <div class="level-left"><h5 class="title is-6" style="margin:0;">${titles[m]}</h5></div>
                         </div>
-                        <div id="ruApex-${m}" style="width:100%; height:200px;"></div>
+                        <div id="ruApex-${m}" style="width:100%; height:240px;"></div>
                     </div>
                 </div>`;
             $wrap.append(panel);
@@ -536,7 +540,7 @@ $(document).ready(function() {
 
         const options = {
             chart: {
-                type: 'line', height: 200, animations: { enabled: false }, toolbar: { show: false },
+                type: 'line', height: 240, animations: { enabled: false }, toolbar: { show: false },
                 events: {
                     legendClick: function(chartContext, seriesIndex, config) {
                         const proxyId = ru.seriesMap[metricKey] && ru.seriesMap[metricKey][seriesIndex];
