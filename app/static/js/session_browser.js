@@ -1,5 +1,5 @@
 $(document).ready(function() {
-    const sb = { proxies: [], groups: [], dt: null };
+    const sb = { proxies: [], groups: [], dt: null, mode: undefined, tmpToken: null };
     const STORAGE_KEY = 'sb_state_v1';
 
     // Helpers for robust localStorage persistence
@@ -258,11 +258,13 @@ $(document).ready(function() {
             data: JSON.stringify({ proxy_ids: proxyIds, defer_save: deferSave })
         }).then(res => {
             if (deferSave && res && Array.isArray(res.rows)) {
+                sb.tmpToken = res.tmp_token || null;
                 ensureClientMode(res.rows);
                 $('#sbEmptyState').hide();
                 $('#sbTableWrap').show();
                 setStatus('완료(' + res.rows.length + '건 표시)');
             } else {
+                sb.tmpToken = null;
                 ensureServerMode();
                 if (sb.dt && sb.dt.ajax) { sb.dt.ajax.reload(null, false); }
                 $('#sbEmptyState').hide();
@@ -277,22 +279,26 @@ $(document).ready(function() {
     $('#sbLoadBtn').on('click', function() { loadLatest(); });
     $('#sbExportBtn').on('click', function() {
         const params = {};
-        const g = $('#sbGroupSelect').val();
-        if (g) params.group_id = g;
-        const pids = ($('#sbProxySelect').val() || []).join(',');
-        if (pids) params.proxy_ids = pids;
-        const searchVal = (sb.dt && sb.dt.search) ? (typeof sb.dt.search === 'function' ? sb.dt.search() : '') : '';
-        if (searchVal) params['search[value]'] = searchVal;
-        // carry over ordering
-        try {
-            const order = sb.dt && sb.dt.order ? (typeof sb.dt.order === 'function' ? sb.dt.order() : []) : [];
-            if (order && order.length > 0) {
-                params['order[0][column]'] = order[0][0];
-                params['order[0][dir]'] = order[0][1];
-            }
-        } catch (e) {}
-        const qs = $.param(params);
-        const url = '/api/session-browser/export' + (qs ? ('?' + qs) : '');
+        let url;
+        if (sb.tmpToken) {
+            url = '/api/session-browser/tmp/export?token=' + encodeURIComponent(sb.tmpToken);
+        } else {
+            const g = $('#sbGroupSelect').val();
+            if (g) params.group_id = g;
+            const pids = ($('#sbProxySelect').val() || []).join(',');
+            if (pids) params.proxy_ids = pids;
+            const searchVal = (sb.dt && sb.dt.search) ? (typeof sb.dt.search === 'function' ? sb.dt.search() : '') : '';
+            if (searchVal) params['search[value]'] = searchVal;
+            try {
+                const order = sb.dt && sb.dt.order ? (typeof sb.dt.order === 'function' ? sb.dt.order() : []) : [];
+                if (order && order.length > 0) {
+                    params['order[0][column]'] = order[0][0];
+                    params['order[0][dir]'] = order[0][1];
+                }
+            } catch (e) {}
+            const qs = $.param(params);
+            url = '/api/session-browser/export' + (qs ? ('?' + qs) : '');
+        }
         // open in new tab to trigger download without blocking UI
         window.open(url, '_blank');
     });
@@ -303,10 +309,19 @@ $(document).ready(function() {
     $('#sbTable tbody').on('click', 'tr', function() {
         const itemId = $(this).attr('data-item-id');
         if (!itemId) return;
-        // Fetch full row from backend to avoid relying on client cache
-        $.getJSON(`/api/session-browser/item/${itemId}`)
-            .done(function(item){ fillDetailModal(item || {}); openSbModal(); })
-            .fail(function(){ showErr('상세를 불러오지 못했습니다.'); });
+        if (itemId.startsWith('tmp:')) {
+            const parts = itemId.split(':');
+            const token = parts[1];
+            const idx = parts[2];
+            $.getJSON(`/api/session-browser/tmp/item/${encodeURIComponent(token)}/${encodeURIComponent(idx)}`)
+                .done(function(item){ fillDetailModal(item || {}); openSbModal(); })
+                .fail(function(){ showErr('상세를 불러오지 못했습니다.'); });
+        } else {
+            // Fetch full row from backend to avoid relying on client cache
+            $.getJSON(`/api/session-browser/item/${itemId}`)
+                .done(function(item){ fillDetailModal(item || {}); openSbModal(); })
+                .fail(function(){ showErr('상세를 불러오지 못했습니다.'); });
+        }
     });
 
     initTable();

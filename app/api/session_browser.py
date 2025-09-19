@@ -2,6 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Tuple, Iterable
+import os
+import uuid
+import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from app.utils.time import now_kst, KST_TZ
@@ -408,9 +411,32 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
         try:
             # Build DataTables rows mirroring sessions_datatables output
             host_map: Dict[int, str] = {p.id: p.host for p in proxies}
-            max_preview = 5000
+            # Write full results to a temp JSONL file for preview/export without DB writes
+            tmp_dir = os.path.join(os.path.dirname(__file__), '..', 'runtime', 'sb_tmp')
+            tmp_dir = os.path.abspath(tmp_dir)
+            os.makedirs(tmp_dir, exist_ok=True)
+            token = uuid.uuid4().hex
+            tmp_path = os.path.join(tmp_dir, f"{token}.jsonl")
+            total = 0
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                for rec in insert_mappings:
+                    payload_row = dict(rec)
+                    try:
+                        # datetime is not JSON serializable by default
+                        ct = payload_row.get('creation_time')
+                        if ct is not None:
+                            payload_row['creation_time'] = ct.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S")
+                        ca = payload_row.get('collected_at')
+                        if ca is not None:
+                            payload_row['collected_at'] = ca.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S")
+                    except Exception:
+                        pass
+                    f.write(json.dumps(payload_row, ensure_ascii=False) + "\n")
+                    total += 1
+
+            max_preview = 2000
             count = 0
-            for rec in insert_mappings:
+            for idx, rec in enumerate(insert_mappings):
                 host = host_map.get(rec.get("proxy_id"), f"#{rec.get('proxy_id')}")
                 ct = rec.get("creation_time")
                 ct_str = ct.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S") if ct else ""
@@ -429,7 +455,7 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
                     "" if cl_sent is None else str(cl_sent),
                     "" if (age_val is None or age_val < 0) else str(age_val),
                     url_short,
-                    ""
+                    f"tmp:{token}:{idx}"
                 ])
                 count += 1
                 if count >= max_preview:
@@ -472,6 +498,8 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
         # Keep payload light; UI reloads from server-side table anyway
         items=[],
         rows=rows_for_dt,
+        tmp_token=(token if (payload.defer_save and rows_for_dt is not None) else None),
+        total_count=(total if (payload.defer_save and rows_for_dt is not None) else None),
     )
 
 
@@ -639,6 +667,29 @@ async def get_session_record(record_id: int, db: Session = Depends(get_db)):
     return row
 
 
+@router.get("/session-browser/tmp/item/{token}/{index}")
+async def get_session_record_tmp(token: str, index: int):
+    # Read nth line (0-based) from temp preview file and return as JSON
+    tmp_dir = os.path.join(os.path.dirname(__file__), '..', 'runtime', 'sb_tmp')
+    tmp_dir = os.path.abspath(tmp_dir)
+    path = os.path.join(tmp_dir, f"{token}.jsonl")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Temp preview not found")
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            for i, line in enumerate(f):
+                if i == index:
+                    try:
+                        obj = json.loads(line)
+                    except Exception:
+                        obj = {}
+                    # For modal, align keys similar to SessionRecordSchema
+                    return obj
+    except Exception:
+        pass
+    raise HTTPException(status_code=404, detail="Record not found")
+
+
 @router.get("/session-browser/export")
 async def sessions_export(
     db: Session = Depends(get_db),
@@ -725,6 +776,62 @@ async def sessions_export(
 
     filename = f"sessions_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}\.csv"
     return StreamingResponse(row_iter(), media_type="text/csv", headers={
+        "Content-Disposition": f"attachment; filename={filename}"
+    })
+
+
+@router.get("/session-browser/tmp/export")
+async def sessions_export_tmp(token: str):
+    tmp_dir = os.path.join(os.path.dirname(__file__), '..', 'runtime', 'sb_tmp')
+    tmp_dir = os.path.abspath(tmp_dir)
+    path = os.path.join(tmp_dir, f"{token}.jsonl")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Temp preview not found")
+
+    def row_iter_file() -> Iterable[str]:
+        yield "\ufeff"
+        headers = [
+            "proxy_id","transaction","creation_time","protocol","cust_id","user_name","client_ip",
+            "client_side_mwg_ip","server_side_mwg_ip","server_ip","cl_bytes_received","cl_bytes_sent",
+            "srv_bytes_received","srv_bytes_sent","trxn_index","age_seconds","status","in_use","url"
+        ]
+        yield ",".join(headers) + "\n"
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    obj = json.loads(line)
+                except Exception:
+                    obj = {}
+                def esc(v: Any) -> str:
+                    s = "" if v is None else str(v)
+                    if '"' in s or "," in s or "\n" in s or "\r" in s:
+                        s = '"' + s.replace('"', '""') + '"'
+                    return s
+                row = [
+                    esc(obj.get('proxy_id')),
+                    esc(obj.get('transaction')),
+                    esc(obj.get('creation_time')),
+                    esc(obj.get('protocol')),
+                    esc(obj.get('cust_id')),
+                    esc(obj.get('user_name')),
+                    esc(obj.get('client_ip')),
+                    esc(obj.get('client_side_mwg_ip')),
+                    esc(obj.get('server_side_mwg_ip')),
+                    esc(obj.get('server_ip')),
+                    esc(obj.get('cl_bytes_received')),
+                    esc(obj.get('cl_bytes_sent')),
+                    esc(obj.get('srv_bytes_received')),
+                    esc(obj.get('srv_bytes_sent')),
+                    esc(obj.get('trxn_index')),
+                    esc(obj.get('age_seconds')),
+                    esc(obj.get('status')),
+                    esc(obj.get('in_use')),
+                    esc(obj.get('url')),
+                ]
+                yield ",".join(row) + "\n"
+
+    filename = f"sessions_preview_{datetime.now().strftime('%Y%m%d_%H%M%S')}\.csv"
+    return StreamingResponse(row_iter_file(), media_type="text/csv", headers={
         "Content-Disposition": f"attachment; filename={filename}"
     })
 

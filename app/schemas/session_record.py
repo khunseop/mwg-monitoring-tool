@@ -47,4 +47,6 @@ class CollectResponse(BaseModel):
     errors: Dict[int, str] = Field(default_factory=dict)
     items: List[SessionRecord]
     rows: List[List[str]] = Field(default_factory=list)
+    tmp_token: Optional[str] = None
+    total_count: Optional[int] = None
 
