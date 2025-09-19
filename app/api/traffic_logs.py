@@ -105,8 +105,7 @@ def get_proxy_traffic_logs(
 	lines = [ln for ln in raw.split("\n") if ln]
 	truncated = len(lines) >= min(limit, len(lines)) and len(lines) == limit
 
-    if not parsed:
-        return TrafficLogResponse(proxy_id=proxy_id, lines=lines, records=None, truncated=truncated, count=len(lines))
+	# Always parse for simplified, fast troubleshooting flow
 
     records: List[TrafficLogRecord] = []
     collected_ts = datetime.utcnow()
