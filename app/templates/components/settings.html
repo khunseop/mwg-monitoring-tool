@@ -13,9 +13,10 @@
             </div>
             <div class="level-right">
                 <div class="level-item">
-                    <button class="button is-primary" onclick="openModal('proxy')">
-                        프록시 추가
-                    </button>
+                    <div class="buttons">
+                        <button class="button is-primary" onclick="openModal('proxy')">프록시 추가</button>
+                        <button class="button is-link is-light" onclick="openBulkProxyModal()">일괄 등록</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -177,6 +178,39 @@
             </div>
         </div>
     </div>
+</div>
+
+<!-- 프록시 일괄 등록 모달 -->
+<div class="modal" id="bulkProxyModal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">프록시 일괄 등록</p>
+            <button class="delete" aria-label="close" onclick="closeBulkProxyModal()"></button>
+        </header>
+        <section class="modal-card-body">
+            <div class="content">
+                <p>아래 형식으로 한 줄에 하나씩 입력하세요:</p>
+                <pre><code>host,username,password[,group_name][,traffic_log_path][,is_active(true|false)][,description]</code></pre>
+                <p class="is-size-7" style="color: var(--color-text-muted);">그룹명이 존재하지 않으면 해당 행은 오류로 처리됩니다.</p>
+            </div>
+            <div class="field">
+                <label class="label">CSV 입력</label>
+                <div class="control">
+                    <textarea class="textarea" id="bulkProxyInput" placeholder="ex)
+proxy-01.local,admin,pass123,서울센터,/var/log/proxy/traffic.log,true,서울센터 1호기
+10.0.0.5,root,Secret!,,,,false,임시 서버" rows="10"></textarea>
+                </div>
+                <p class="help">빈 값은 생략하거나 비워둘 수 있습니다. 공백만 있는 값은 무시됩니다.</p>
+            </div>
+        </section>
+        <footer class="modal-card-foot">
+            <button class="button is-primary" onclick="submitBulkProxies()">등록</button>
+            <button class="button" onclick="closeBulkProxyModal()">취소</button>
+        </footer>
+    </div>
+    
+    
 </div>
 <!-- 세션브라우저 설정 탭 -->
 <div id="session-config" class="tab-panel">

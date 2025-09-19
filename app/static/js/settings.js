@@ -347,3 +347,122 @@ $(document).ready(() => {
 // Expose functions for inline onclick handlers
 window.saveResourceConfig = saveResourceConfig;
 
+// 일괄 등록 UI helpers
+function openBulkProxyModal() {
+    try { $('#bulkProxyInput').val(''); } catch (e) {}
+    $('#bulkProxyModal').addClass('is-active');
+}
+
+function closeBulkProxyModal() {
+    $('#bulkProxyModal').removeClass('is-active');
+}
+
+function parseCsvLinesToProxies(text) {
+    const lines = (text || '').split(/\r?\n/);
+    const proxies = [];
+    for (let i = 0; i < lines.length; i++) {
+        const raw = lines[i].trim();
+        if (raw.length === 0) continue;
+        // Split by comma, keeping empty entries
+        const parts = raw.split(',').map(s => (s == null ? '' : s.trim()));
+        const host = parts[0] || '';
+        const username = parts[1] || '';
+        const password = parts[2] || '';
+        if (!host || !username || !password) {
+            // Skip malformed line
+            continue;
+        }
+        const groupNameRaw = parts[3] || '';
+        const trafficLogPathRaw = parts[4] || '';
+        const isActiveRaw = parts[5] || '';
+        const descriptionRaw = parts.slice(6).join(','); // allow commas in description by joining remainder
+
+        const payload = {
+            host,
+            username,
+            password,
+        };
+        if (groupNameRaw && groupNameRaw.trim().length > 0) {
+            payload.group_name = groupNameRaw.trim();
+        }
+        if (trafficLogPathRaw && trafficLogPathRaw.trim().length > 0) {
+            payload.traffic_log_path = trafficLogPathRaw.trim();
+        }
+        if (isActiveRaw) {
+            const lowered = isActiveRaw.toLowerCase();
+            if (['true','1','yes','y','on'].includes(lowered)) payload.is_active = true;
+            else if (['false','0','no','n','off'].includes(lowered)) payload.is_active = false;
+        }
+        if (descriptionRaw && descriptionRaw.trim().length > 0) {
+            payload.description = descriptionRaw.trim();
+        }
+        proxies.push(payload);
+    }
+    return proxies;
+}
+
+function submitBulkProxies() {
+    const raw = $('#bulkProxyInput').val() || '';
+    const items = parseCsvLinesToProxies(raw);
+    if (!items.length) {
+        if (window.AppUtils) AppUtils.showError('유효한 입력이 없습니다. host,username,password는 필수입니다.');
+        return;
+    }
+    $.ajax({
+        url: '/api/proxies/bulk',
+        method: 'POST',
+        contentType: 'application/json',
+        dataType: 'json',
+        data: JSON.stringify(items),
+        success: (results) => {
+            try {
+                // Normalize results to an array
+                let arr = Array.isArray(results) ? results : [];
+                if (!arr.length && results && typeof results === 'string') {
+                    try { const parsed = JSON.parse(results); if (Array.isArray(parsed)) arr = parsed; } catch (e) {}
+                }
+                const created = (arr || []).filter(r => r && r.status === 'created').length;
+                const dup = (arr || []).filter(r => r && r.status === 'duplicate').length;
+                const errors = (arr || []).filter(r => r && r.status === 'error');
+                const groupMissing = (arr || []).filter(r => r && r.status === 'error' && typeof r.detail === 'string' && r.detail.toLowerCase().includes('group not found'));
+
+                // Specific alert for missing group rows
+                if (groupMissing.length > 0 && window.AppUtils) {
+                    const sample = groupMissing.slice(0, 5).map(e => `${((e && typeof e.index === 'number') ? (e.index + 1) : '?')}:${(e && e.host) || '?'} - ${e && e.detail ? e.detail : '그룹 없음'}`).join('\n');
+                    const more = groupMissing.length > 5 ? '\n...' : '';
+                    AppUtils.showError(`그룹이 존재하지 않아 실패: ${groupMissing.length}건\n\n예시:\n${sample}${more}`);
+                }
+
+                // Success alert for created rows
+                if (created > 0 && window.AppUtils) {
+                    AppUtils.showInfo(`프록시 ${created}건 등록 완료`);
+                }
+
+                // Summary info
+                if (window.AppUtils) {
+                    let msg = `완료: 생성 ${created}건, 중복 ${dup}건, 오류 ${errors.length}건`;
+                    if (errors.length > 0) {
+                        const sampleAll = errors.slice(0, 5).map(e => `${((e && typeof e.index === 'number') ? (e.index + 1) : '?')}:${(e && e.host) || '?'} - ${e && e.detail ? e.detail : '오류'}`).join('\n');
+                        msg += `\n\n오류 예시:\n${sampleAll}${errors.length > 5 ? '\n...' : ''}`;
+                    }
+                    AppUtils.showInfo(msg);
+                }
+            } catch (err) {
+                // Swallow UI summarization errors; proceed to close and refresh
+                if (window.console && console.warn) console.warn('Bulk summary render failed:', err);
+            }
+            // Always close & refresh even if summary failed
+            closeBulkProxyModal();
+            loadProxies();
+        },
+        error: (xhr) => {
+            if (window.AppUtils) AppUtils.showError(xhr.responseText || '일괄 등록 실패');
+        }
+    });
+}
+
+// expose for inline handlers
+window.openBulkProxyModal = openBulkProxyModal;
+window.closeBulkProxyModal = closeBulkProxyModal;
+window.submitBulkProxies = submitBulkProxies;
+
