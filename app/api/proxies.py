@@ -11,6 +11,9 @@ from sqlalchemy import func
 from app.utils.crypto import encrypt_string
 from pydantic import ValidationError
 from app.models.proxy_group import ProxyGroup
+from app.models.session_record import SessionRecord
+from app.models.resource_usage import ResourceUsage
+from app.models.traffic_log import TrafficLog
 
 router = APIRouter()
 
@@ -162,8 +165,18 @@ def delete_proxy(proxy_id: int, db: Session = Depends(get_db)):
     db_proxy = db.query(Proxy).filter(Proxy.id == proxy_id).first()
     if not db_proxy:
         raise HTTPException(status_code=404, detail="Proxy not found")
-    
-    db.delete(db_proxy)
-    db.commit()
+
+    try:
+        # Manually delete dependents to support legacy schemas without ON DELETE CASCADE
+        db.query(SessionRecord).filter(SessionRecord.proxy_id == proxy_id).delete(synchronize_session=False)
+        db.query(ResourceUsage).filter(ResourceUsage.proxy_id == proxy_id).delete(synchronize_session=False)
+        # TrafficLog has no FK constraint but we delete for data hygiene
+        db.query(TrafficLog).filter(TrafficLog.proxy_id == proxy_id).delete(synchronize_session=False)
+
+        db.delete(db_proxy)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Failed to delete proxy: {str(e)}")
     return None
 
