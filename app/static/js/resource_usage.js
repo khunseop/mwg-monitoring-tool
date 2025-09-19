@@ -271,7 +271,7 @@ $(document).ready(function() {
         seriesData.reverse();
 
         const options = {
-            chart: { type: 'heatmap', height: 520, animations: { enabled: false }, toolbar: { show: false } },
+            chart: { type: 'heatmap', height: 700, animations: { enabled: false }, toolbar: { show: false } },
             dataLabels: { enabled: true, style: { colors: ['#111827'] }, formatter: function(val, opts) {
                 const y = opts.seriesIndex; const x = opts.dataPointIndex;
                 const raw = (ru._heatRaw && ru._heatRaw[y]) ? ru._heatRaw[y][x] : null;
