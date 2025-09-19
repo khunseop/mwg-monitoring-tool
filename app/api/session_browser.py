@@ -347,16 +347,17 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
 
     errors: Dict[int, str] = {}
 
-    # Replacement semantics: clear existing session records for TARGETED proxies only
+    # Replacement semantics: clear existing session records for TARGETED proxies only (skip when deferring save)
     t_overall_start = time.perf_counter()
     proxy_ids_selected = [p.id for p in proxies]
     t_delete_start = time.perf_counter()
-    try:
-        if proxy_ids_selected:
-            db.query(SessionRecordModel).filter(SessionRecordModel.proxy_id.in_(proxy_ids_selected)).delete(synchronize_session=False)
-    except Exception as e:
-        logger.exception("Failed to clear previous session records for selected proxies before collect: %s", e)
-        # proceed anyway to attempt fresh insert
+    if not (payload.defer_save or False):
+        try:
+            if proxy_ids_selected:
+                db.query(SessionRecordModel).filter(SessionRecordModel.proxy_id.in_(proxy_ids_selected)).delete(synchronize_session=False)
+        except Exception as e:
+            logger.exception("Failed to clear previous session records for selected proxies before collect: %s", e)
+            # proceed anyway to attempt fresh insert
     t_delete_end = time.perf_counter()
 
     collected_at_ts = now_kst()
@@ -401,17 +402,50 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
 
     t_fetch_parse_end = time.perf_counter()
 
-    # Bulk insert for speed
-    t_db_insert_start = time.perf_counter()
-    if insert_mappings:
+    # If defer_save requested, skip DB writes and return rows for immediate display
+    rows_for_dt: List[List[Any]] = []
+    if payload.defer_save:
         try:
-            db.bulk_insert_mappings(SessionRecordModel, insert_mappings)
-        except Exception as e:
-            logger.exception("Bulk insert failed; falling back to row-by-row: %s", e)
-            for row in insert_mappings:
-                db.add(SessionRecordModel(**row))
-    db.commit()
-    t_db_insert_end = time.perf_counter()
+            # Build DataTables rows mirroring sessions_datatables output
+            host_map: Dict[int, str] = {p.id: p.host for p in proxies}
+            for rec in insert_mappings:
+                host = host_map.get(rec.get("proxy_id"), f"#{rec.get('proxy_id')}")
+                ct = rec.get("creation_time")
+                ct_str = ct.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S") if ct else ""
+                cl_recv = rec.get("cl_bytes_received")
+                cl_sent = rec.get("cl_bytes_sent")
+                age_val = rec.get("age_seconds")
+                url_full = rec.get("url") or ""
+                url_short = url_full[:100] + ("…" if len(url_full) > 100 else "")
+                rows_for_dt.append([
+                    host,
+                    ct_str,
+                    rec.get("user_name") or "",
+                    rec.get("client_ip") or "",
+                    rec.get("server_ip") or "",
+                    "" if cl_recv is None else str(cl_recv),
+                    "" if cl_sent is None else str(cl_sent),
+                    "" if (age_val is None or age_val < 0) else str(age_val),
+                    url_short,
+                    ""
+                ])
+        except Exception:
+            rows_for_dt = []
+        # Skip DB insert/commit
+        t_db_insert_start = time.perf_counter()
+        t_db_insert_end = t_db_insert_start
+    else:
+        # Bulk insert for speed
+        t_db_insert_start = time.perf_counter()
+        if insert_mappings:
+            try:
+                db.bulk_insert_mappings(SessionRecordModel, insert_mappings)
+            except Exception as e:
+                logger.exception("Bulk insert failed; falling back to row-by-row: %s", e)
+                for row in insert_mappings:
+                    db.add(SessionRecordModel(**row))
+        db.commit()
+        t_db_insert_end = time.perf_counter()
 
     logger.info(
         "session-collect: proxies=%d ok=%d fail=%d records=%d delete_ms=%.1f fetch_parse_ms=%.1f db_insert_ms=%.1f total_ms=%.1f",
@@ -432,6 +466,7 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
         errors=errors,
         # Keep payload light; UI reloads from server-side table anyway
         items=[],
+        rows=rows_for_dt,
     )
 
 

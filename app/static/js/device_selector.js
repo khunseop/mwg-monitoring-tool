@@ -16,13 +16,27 @@
 			var labelForProxy = (typeof options.labelForProxy === 'function') ? options.labelForProxy : defaultLabelForProxy;
 			var apiGroups = options.apiGroups || '/api/proxy-groups';
 			var apiProxies = options.apiProxies || '/api/proxies';
+			var allowAllGroup = (options.allowAllGroup === undefined) ? true : !!options.allowAllGroup;
+			var autoSelectOnGroupChange = (options.autoSelectOnGroupChange === undefined) ? true : !!options.autoSelectOnGroupChange;
+			var enableSelectAll = (options.enableSelectAll === undefined) ? true : !!options.enableSelectAll;
 			var state = { groups: [], proxies: [], ts: null };
 
 			function populateGroups() {
 				if ($group && $group.length) {
 					$group.empty();
-					$group.append('<option value="">전체</option>');
+					if (allowAllGroup) {
+						$group.append('<option value="">전체</option>');
+					}
 					(state.groups || []).forEach(function(g) { $group.append('<option value="' + g.id + '">' + g.name + '</option>'); });
+					// If disallowing all-group and nothing is selected, default to first group
+					try {
+						if (!allowAllGroup) {
+							var current = $group.val();
+							if (!current && state.groups && state.groups.length > 0) {
+								$group.val(String(state.groups[0].id));
+							}
+						}
+					} catch (e) { /* ignore */ }
 				}
 			}
 
@@ -100,15 +114,22 @@
 				if ($group && $group.length) {
 					$group.off('.devicesel').on('change.devicesel', function() {
 						populateProxies();
-						// Auto-select all proxies in the currently filtered group
-						var allVals = $proxy.find('option').map(function() { return $(this).val(); }).get();
-						try {
-							if (state.ts) { state.ts.setValue(allVals, true); }
-							else { $proxy.find('option').prop('selected', true); $proxy.trigger('change'); }
-						} catch (e) { /* ignore */ }
+						// Optionally auto-select all proxies when group changes
+						if (autoSelectOnGroupChange) {
+							var allVals = $proxy.find('option').map(function() { return $(this).val(); }).get();
+							try {
+								if (state.ts) { state.ts.setValue(allVals, true); }
+								else { $proxy.find('option').prop('selected', true); $proxy.trigger('change'); }
+							} catch (e) { /* ignore */ }
+						}
 					});
 				}
 				if ($selectAll && $selectAll.length) {
+					if (!enableSelectAll) {
+						try { $selectAll.closest('label').hide(); } catch (e) { /* ignore */ }
+						// Do not bind events when disabled
+						return;
+					}
 					$selectAll.off('.devicesel').on('change.devicesel', function() {
 						var checked = $(this).is(':checked');
 						var vals = $proxy.find('option').map(function() { return $(this).val(); }).get();

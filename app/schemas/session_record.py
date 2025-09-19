@@ -37,6 +37,7 @@ class SessionRecord(SessionRecordBase, TimestampModel):
 
 class CollectRequest(BaseModel):
     proxy_ids: List[int] = Field(min_length=1)
+    defer_save: bool | None = False
 
 
 class CollectResponse(BaseModel):
@@ -45,4 +46,5 @@ class CollectResponse(BaseModel):
     failed: int
     errors: Dict[int, str] = Field(default_factory=dict)
     items: List[SessionRecord]
+    rows: List[List[str]] = Field(default_factory=list)
 

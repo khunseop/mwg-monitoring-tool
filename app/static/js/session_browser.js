@@ -194,17 +194,26 @@ $(document).ready(function() {
         clearErr();
         const proxyIds = getSelectedProxyIds();
         if (proxyIds.length === 0) { showErr('프록시를 하나 이상 선택하세요.'); return; }
+        const deferSave = !!$('#sbDeferSave').is(':checked');
         setStatus('수집 중...');
         return $.ajax({
             url: '/api/session-browser/collect',
             method: 'POST',
             contentType: 'application/json',
-            data: JSON.stringify({ proxy_ids: proxyIds })
+            data: JSON.stringify({ proxy_ids: proxyIds, defer_save: deferSave })
         }).then(res => {
-            // On collect, simply reload table from DB via server-side ajax
-            if (sb.dt && sb.dt.ajax) { sb.dt.ajax.reload(null, false); }
-            $('#sbEmptyState').hide();
-            $('#sbTableWrap').show();
+            if (deferSave && res && Array.isArray(res.rows) && res.rows.length >= 0) {
+                try {
+                    if (sb.dt) { sb.dt.clear(); sb.dt.rows.add(res.rows).draw(false); }
+                } catch (e) { /* ignore */ }
+                $('#sbEmptyState').hide();
+                $('#sbTableWrap').show();
+            } else {
+                // Default behavior: reload from server
+                if (sb.dt && sb.dt.ajax) { sb.dt.ajax.reload(null, false); }
+                $('#sbEmptyState').hide();
+                $('#sbTableWrap').show();
+            }
             if (res && res.failed && res.failed > 0) { showErr('일부 프록시 수집에 실패했습니다.'); }
             setStatus('완료');
             // Clear any cached items to avoid mixing old data on next restore; persist only selection
@@ -255,6 +264,9 @@ $(document).ready(function() {
         groupSelect: '#sbGroupSelect', 
         proxySelect: '#sbProxySelect', 
         selectAll: '#sbSelectAll',
+        allowAllGroup: false,
+        autoSelectOnGroupChange: false,
+        enableSelectAll: false,
         onData: function(data){ sb.groups = data.groups || []; sb.proxies = data.proxies || []; }
     }).then(function(){ restoreState(); if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true); });
 
