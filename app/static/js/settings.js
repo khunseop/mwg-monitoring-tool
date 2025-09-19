@@ -424,12 +424,29 @@ function submitBulkProxies() {
                 const created = (arr || []).filter(r => r && r.status === 'created').length;
                 const dup = (arr || []).filter(r => r && r.status === 'duplicate').length;
                 const errors = (arr || []).filter(r => r && r.status === 'error');
-                let msg = `완료: 생성 ${created}건, 중복 ${dup}건, 오류 ${errors.length}건`;
-                if (errors.length > 0) {
-                    const sample = errors.slice(0, 5).map(e => `${((e && typeof e.index === 'number') ? (e.index + 1) : '?')}:${(e && e.host) || '?'} - ${e && e.detail ? e.detail : '오류'}`).join('\n');
-                    msg += `\n\n오류 예시:\n${sample}${errors.length > 5 ? '\n...' : ''}`;
+                const groupMissing = (arr || []).filter(r => r && r.status === 'error' && typeof r.detail === 'string' && r.detail.toLowerCase().includes('group not found'));
+
+                // Specific alert for missing group rows
+                if (groupMissing.length > 0 && window.AppUtils) {
+                    const sample = groupMissing.slice(0, 5).map(e => `${((e && typeof e.index === 'number') ? (e.index + 1) : '?')}:${(e && e.host) || '?'} - ${e && e.detail ? e.detail : '그룹 없음'}`).join('\n');
+                    const more = groupMissing.length > 5 ? '\n...' : '';
+                    AppUtils.showError(`그룹이 존재하지 않아 실패: ${groupMissing.length}건\n\n예시:\n${sample}${more}`);
                 }
-                if (window.AppUtils) AppUtils.showInfo(msg);
+
+                // Success alert for created rows
+                if (created > 0 && window.AppUtils) {
+                    AppUtils.showInfo(`프록시 ${created}건 등록 완료`);
+                }
+
+                // Summary info
+                if (window.AppUtils) {
+                    let msg = `완료: 생성 ${created}건, 중복 ${dup}건, 오류 ${errors.length}건`;
+                    if (errors.length > 0) {
+                        const sampleAll = errors.slice(0, 5).map(e => `${((e && typeof e.index === 'number') ? (e.index + 1) : '?')}:${(e && e.host) || '?'} - ${e && e.detail ? e.detail : '오류'}`).join('\n');
+                        msg += `\n\n오류 예시:\n${sampleAll}${errors.length > 5 ? '\n...' : ''}`;
+                    }
+                    AppUtils.showInfo(msg);
+                }
             } catch (err) {
                 // Swallow UI summarization errors; proceed to close and refresh
                 if (window.console && console.warn) console.warn('Bulk summary render failed:', err);
