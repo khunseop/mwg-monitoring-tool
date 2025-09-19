@@ -27,7 +27,26 @@ from app.schemas.resource_usage import (
 )
 
 # aiosnmp import for SNMP operations
-from aiosnmp import Snmp
+try:
+    # Preferred async SNMP client
+    from aiosnmp import Snmp  # type: ignore
+    _USE_AIOSNMP = True
+except Exception:
+    Snmp = None  # type: ignore
+    _USE_AIOSNMP = False
+    # Fallback to pysnmp (sync); we'll run it in a thread to keep API async
+    try:
+        from pysnmp.hlapi import (
+            SnmpEngine,
+            CommunityData,
+            UdpTransportTarget,
+            ContextData,
+            ObjectType,
+            ObjectIdentity,
+            getCmd,
+        )
+    except Exception:
+        SnmpEngine = None  # type: ignore
 from app.utils.crypto import decrypt_string_if_encrypted
 
 
@@ -39,15 +58,52 @@ SUPPORTED_KEYS = {"cpu", "mem", "cc", "cs", "http", "https", "ftp"}
 
 
 async def _snmp_get(host: str, port: int, community: str, oid: str, timeout_sec: int = 2) -> float | None:
-    try:
-        async with Snmp(host=host, port=port, community=community, timeout=timeout_sec) as snmp:
-            values = await snmp.get(oid)
-            if values and len(values) > 0:
-                return float(values[0].value)
+    if _USE_AIOSNMP and Snmp is not None:
+        try:
+            async with Snmp(host=host, port=port, community=community, timeout=timeout_sec) as snmp:
+                values = await snmp.get(oid)
+                if values and len(values) > 0:
+                    try:
+                        return float(values[0].value)
+                    except Exception:
+                        return None
+                return None
+        except Exception as exc:
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.exception(f"[resource_usage] SNMP get failed host={host} oid={oid}: {exc}")
             return None
+    # Fallback via pysnmp in thread
+    try:
+        async def run_in_thread() -> float | None:
+            def do_get() -> float | None:
+                try:
+                    iterator = getCmd(
+                        SnmpEngine(),
+                        CommunityData(community, mpModel=1),  # v2c
+                        UdpTransportTarget((host, port), timeout=timeout_sec, retries=0),
+                        ContextData(),
+                        ObjectType(ObjectIdentity(oid)),
+                    )
+                    errorIndication, errorStatus, errorIndex, varBinds = next(iterator)
+                    if errorIndication or errorStatus:
+                        return None
+                    if not varBinds:
+                        return None
+                    try:
+                        return float(varBinds[0][1])
+                    except Exception:
+                        # best-effort numeric conversion
+                        try:
+                            return float(str(varBinds[0][1]))
+                        except Exception:
+                            return None
+                except Exception:
+                    return None
+            return await asyncio.to_thread(do_get)
+        return await run_in_thread()
     except Exception as exc:
         if logger.isEnabledFor(logging.DEBUG):
-            logger.exception(f"[resource_usage] SNMP get failed host={host} oid={oid}: {exc}")
+            logger.exception(f"[resource_usage] SNMP get (fallback) failed host={host} oid={oid}: {exc}")
         return None
 
 
