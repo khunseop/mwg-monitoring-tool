@@ -421,6 +421,13 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
             with open(tmp_path, 'w', encoding='utf-8') as f:
                 for rec in insert_mappings:
                     payload_row = dict(rec)
+                    # Add proxy_host for DB-less display/export
+                    try:
+                        pid = payload_row.get('proxy_id')
+                        if pid is not None:
+                            payload_row['proxy_host'] = host_map.get(pid)
+                    except Exception:
+                        pass
                     try:
                         # datetime is not JSON serializable by default
                         ct = payload_row.get('creation_time')
@@ -433,6 +440,13 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
                         pass
                     f.write(json.dumps(payload_row, ensure_ascii=False) + "\n")
                     total += 1
+            # Write meta
+            try:
+                meta = { 'total_count': total }
+                with open(os.path.join(tmp_dir, f"{token}.meta.json"), 'w', encoding='utf-8') as mf:
+                    json.dump(meta, mf)
+            except Exception:
+                pass
 
             max_preview = 2000
             count = 0
@@ -791,7 +805,7 @@ async def sessions_export_tmp(token: str):
     def row_iter_file() -> Iterable[str]:
         yield "\ufeff"
         headers = [
-            "proxy_id","transaction","creation_time","protocol","cust_id","user_name","client_ip",
+            "proxy_host","transaction","creation_time","protocol","cust_id","user_name","client_ip",
             "client_side_mwg_ip","server_side_mwg_ip","server_ip","cl_bytes_received","cl_bytes_sent",
             "srv_bytes_received","srv_bytes_sent","trxn_index","age_seconds","status","in_use","url"
         ]
@@ -808,7 +822,7 @@ async def sessions_export_tmp(token: str):
                         s = '"' + s.replace('"', '""') + '"'
                     return s
                 row = [
-                    esc(obj.get('proxy_id')),
+                    esc(obj.get('proxy_host') or obj.get('proxy_id')),
                     esc(obj.get('transaction')),
                     esc(obj.get('creation_time')),
                     esc(obj.get('protocol')),
