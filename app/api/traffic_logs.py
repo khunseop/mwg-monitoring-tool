@@ -107,37 +107,37 @@ def get_proxy_traffic_logs(
 
 	# Always parse for simplified, fast troubleshooting flow
 
-    records: List[TrafficLogRecord] = []
-    collected_ts = datetime.utcnow()
-    # Temp file writer (DB-less)
-    tmp_dir = os.path.join(os.path.dirname(__file__), '..', 'runtime', 'tl_tmp')
-    tmp_dir = os.path.abspath(tmp_dir)
-    os.makedirs(tmp_dir, exist_ok=True)
-    token = uuid.uuid4().hex
-    tmp_path = os.path.join(tmp_dir, f"{token}.jsonl")
-    total = 0
-    f = open(tmp_path, 'w', encoding='utf-8')
+	records: List[TrafficLogRecord] = []
+	collected_ts = datetime.utcnow()
+	# Temp file writer (DB-less)
+	tmp_dir = os.path.join(os.path.dirname(__file__), '..', 'runtime', 'tl_tmp')
+	tmp_dir = os.path.abspath(tmp_dir)
+	os.makedirs(tmp_dir, exist_ok=True)
+	token = uuid.uuid4().hex
+	tmp_path = os.path.join(tmp_dir, f"{token}.jsonl")
+	total = 0
+	f = open(tmp_path, 'w', encoding='utf-8')
 	for ln in lines:
 		try:
 			rec_dict = parse_log_line(ln)
 			records.append(TrafficLogRecord(**rec_dict))
-            payload_row = { "proxy_id": proxy_id, "collected_at": collected_ts.isoformat() }
-            payload_row.update(rec_dict)
-            f.write(json.dumps(payload_row, ensure_ascii=False) + "\n")
-            total += 1
+			payload_row = { "proxy_id": proxy_id, "collected_at": collected_ts.isoformat() }
+			payload_row.update(rec_dict)
+			f.write(json.dumps(payload_row, ensure_ascii=False) + "\n")
+			total += 1
 		except Exception:
 			records.append(TrafficLogRecord(url_path=ln))
-    try:
-        f.close()
-    except Exception:
-        pass
-    # Write meta
-    try:
-        with open(os.path.join(tmp_dir, f"{token}.meta.json"), 'w', encoding='utf-8') as mf:
-            json.dump({ 'total_count': total }, mf)
-    except Exception:
-        pass
-    return TrafficLogResponse(proxy_id=proxy_id, lines=None, records=records, truncated=truncated, count=len(records), tmp_token=token, total_count=total)
+	try:
+		f.close()
+	except Exception:
+		pass
+	# Write meta
+	try:
+		with open(os.path.join(tmp_dir, f"{token}.meta.json"), 'w', encoding='utf-8') as mf:
+			json.dump({ 'total_count': total }, mf)
+	except Exception:
+		pass
+	return TrafficLogResponse(proxy_id=proxy_id, lines=None, records=records, truncated=truncated, count=len(records), tmp_token=token, total_count=total)
 
 
 @router.get("/traffic-logs/item/{record_id}", response_model=TrafficLogDB)
