@@ -182,10 +182,65 @@ $(document).ready(function() {
                 ],
                 createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
             });
+            sb.mode = 'server';
             setTimeout(function(){ TableConfig.adjustColumns(sb.dt); }, 0);
         } catch (e) {
             // Ignore DataTables init failures; selection UI will still work
         }
+    }
+
+    function destroyTable() {
+        try { if (sb.dt && sb.dt.destroy) { sb.dt.destroy(); } } catch (e) { /* ignore */ }
+        try { $('#sbTable').DataTable && $('#sbTable').DataTable().clear(); } catch (e) { /* ignore */ }
+        sb.dt = null;
+    }
+
+    function ensureServerMode() {
+        if (sb.mode === 'server' && sb.dt) return;
+        destroyTable();
+        sb.mode = undefined;
+        // Rebuild header tbody to clean any previous data
+        try { $('#sbTable tbody').empty(); } catch (e) { /* ignore */ }
+        initTable();
+        sb.mode = 'server';
+    }
+
+    function ensureClientMode(rows) {
+        destroyTable();
+        sb.mode = undefined;
+        try {
+            sb.dt = TableConfig.init('#sbTable', {
+                serverSide: false,
+                data: Array.isArray(rows) ? rows : [],
+                columns: [
+                    { title: '프록시' },
+                    { title: '생성시각' },
+                    { title: '사용자' },
+                    { title: '클라이언트 IP' },
+                    { title: '서버 IP' },
+                    { title: 'CL 수신' },
+                    { title: 'CL 송신' },
+                    { title: 'Age(s)' },
+                    { title: 'URL' },
+                    { title: 'id', visible: false }
+                ],
+                columnDefs: [
+                    { targets: -1, visible: false, searchable: false },
+                    { targets: 0, className: 'dt-nowrap' },
+                    { targets: 1, className: 'dt-nowrap' },
+                    { targets: 3, className: 'dt-nowrap mono' },
+                    { targets: 4, className: 'dt-nowrap mono' },
+                    { targets: 5, className: 'dt-nowrap num' },
+                    { targets: 6, className: 'dt-nowrap num' },
+                    { targets: 7, className: 'dt-nowrap' },
+                    { targets: 8, className: 'dt-nowrap dt-ellipsis', width: '480px' }
+                ],
+                createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); },
+                drawCallback: function(){ updateTableVisibility(); }
+            });
+            sb.mode = 'client';
+            setTimeout(function(){ TableConfig.adjustColumns(sb.dt); }, 0);
+        } catch (e) { /* ignore */ }
     }
 
     // Removed unused rowsFromItems/currentItemsById
@@ -202,20 +257,18 @@ $(document).ready(function() {
             contentType: 'application/json',
             data: JSON.stringify({ proxy_ids: proxyIds, defer_save: deferSave })
         }).then(res => {
-            if (deferSave && res && Array.isArray(res.rows) && res.rows.length >= 0) {
-                try {
-                    if (sb.dt) { sb.dt.clear(); sb.dt.rows.add(res.rows).draw(false); }
-                } catch (e) { /* ignore */ }
+            if (deferSave && res && Array.isArray(res.rows)) {
+                ensureClientMode(res.rows);
                 $('#sbEmptyState').hide();
                 $('#sbTableWrap').show();
+                setStatus('완료(' + res.rows.length + '건 표시)');
             } else {
-                // Default behavior: reload from server
+                ensureServerMode();
                 if (sb.dt && sb.dt.ajax) { sb.dt.ajax.reload(null, false); }
                 $('#sbEmptyState').hide();
                 $('#sbTableWrap').show();
             }
             if (res && res.failed && res.failed > 0) { showErr('일부 프록시 수집에 실패했습니다.'); }
-            setStatus('완료');
             // Clear any cached items to avoid mixing old data on next restore; persist only selection
             saveState([]);
         }).catch(() => { setStatus('오류', true); showErr('수집 요청 중 오류가 발생했습니다.'); });
@@ -265,8 +318,8 @@ $(document).ready(function() {
         proxySelect: '#sbProxySelect', 
         selectAll: '#sbSelectAll',
         allowAllGroup: false,
-        autoSelectOnGroupChange: false,
-        enableSelectAll: false,
+        autoSelectOnGroupChange: true,
+        enableSelectAll: true,
         onData: function(data){ sb.groups = data.groups || []; sb.proxies = data.proxies || []; }
     }).then(function(){ restoreState(); if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true); });
 

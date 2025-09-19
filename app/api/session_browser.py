@@ -408,6 +408,8 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
         try:
             # Build DataTables rows mirroring sessions_datatables output
             host_map: Dict[int, str] = {p.id: p.host for p in proxies}
+            max_preview = 5000
+            count = 0
             for rec in insert_mappings:
                 host = host_map.get(rec.get("proxy_id"), f"#{rec.get('proxy_id')}")
                 ct = rec.get("creation_time")
@@ -429,6 +431,9 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
                     url_short,
                     ""
                 ])
+                count += 1
+                if count >= max_preview:
+                    break
         except Exception:
             rows_for_dt = []
         # Skip DB insert/commit
