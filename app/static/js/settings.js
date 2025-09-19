@@ -412,18 +412,29 @@ function submitBulkProxies() {
         url: '/api/proxies/bulk',
         method: 'POST',
         contentType: 'application/json',
+        dataType: 'json',
         data: JSON.stringify(items),
         success: (results) => {
-            // Summarize results
-            const created = results.filter(r => r.status === 'created').length;
-            const dup = results.filter(r => r.status === 'duplicate').length;
-            const errors = results.filter(r => r.status === 'error');
-            let msg = `완료: 생성 ${created}건, 중복 ${dup}건, 오류 ${errors.length}건`;
-            if (errors.length > 0) {
-                const sample = errors.slice(0, 5).map(e => `${e.index + 1}:${e.host} - ${e.detail || '오류'}`).join('\n');
-                msg += `\n\n오류 예시:\n${sample}${errors.length > 5 ? '\n...' : ''}`;
+            try {
+                // Normalize results to an array
+                let arr = Array.isArray(results) ? results : [];
+                if (!arr.length && results && typeof results === 'string') {
+                    try { const parsed = JSON.parse(results); if (Array.isArray(parsed)) arr = parsed; } catch (e) {}
+                }
+                const created = (arr || []).filter(r => r && r.status === 'created').length;
+                const dup = (arr || []).filter(r => r && r.status === 'duplicate').length;
+                const errors = (arr || []).filter(r => r && r.status === 'error');
+                let msg = `완료: 생성 ${created}건, 중복 ${dup}건, 오류 ${errors.length}건`;
+                if (errors.length > 0) {
+                    const sample = errors.slice(0, 5).map(e => `${((e && typeof e.index === 'number') ? (e.index + 1) : '?')}:${(e && e.host) || '?'} - ${e && e.detail ? e.detail : '오류'}`).join('\n');
+                    msg += `\n\n오류 예시:\n${sample}${errors.length > 5 ? '\n...' : ''}`;
+                }
+                if (window.AppUtils) AppUtils.showInfo(msg);
+            } catch (err) {
+                // Swallow UI summarization errors; proceed to close and refresh
+                if (window.console && console.warn) console.warn('Bulk summary render failed:', err);
             }
-            if (window.AppUtils) AppUtils.showInfo(msg);
+            // Always close & refresh even if summary failed
             closeBulkProxyModal();
             loadProxies();
         },
