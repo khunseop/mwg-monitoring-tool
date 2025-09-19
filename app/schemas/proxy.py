@@ -1,6 +1,6 @@
 from pydantic import BaseModel, conint, constr
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Literal
 from .base import TimestampModel
 
 
@@ -41,3 +41,11 @@ class ProxyOut(TimestampModel):
 
     class Config:
         from_attributes = True
+
+
+class ProxyBulkCreateResult(BaseModel):
+    index: int
+    host: str
+    status: Literal["created", "duplicate", "error"]
+    id: Optional[int] = None
+    detail: Optional[str] = None

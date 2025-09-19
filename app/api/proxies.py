@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
 from typing import List
 from fastapi import Query
@@ -6,9 +6,10 @@ from fastapi import Query
 from app.database.database import get_db
 from app.models.proxy import Proxy
 from sqlalchemy.orm import joinedload
-from app.schemas.proxy import ProxyCreate, ProxyUpdate, ProxyOut
+from app.schemas.proxy import ProxyCreate, ProxyUpdate, ProxyOut, ProxyBulkCreateResult
 from sqlalchemy import func
 from app.utils.crypto import encrypt_string
+from pydantic import ValidationError
 
 router = APIRouter()
 
@@ -55,6 +56,47 @@ def create_proxy(proxy: ProxyCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_proxy)
     return db_proxy
+
+
+@router.post("/proxies/bulk", response_model=List[ProxyBulkCreateResult], status_code=status.HTTP_201_CREATED)
+def bulk_create_proxies(
+    items: List[dict] = Body(..., description="List of proxies to create"),
+    db: Session = Depends(get_db),
+):
+    results: List[ProxyBulkCreateResult] = []
+    for idx, raw in enumerate(items):
+        # Validate each item individually to avoid failing the whole request
+        try:
+            item = ProxyCreate(**raw)
+        except ValidationError as ve:
+            # Collect validation error per item
+            host_val = (raw.get("host") if isinstance(raw, dict) else None) or "(invalid)"
+            results.append(ProxyBulkCreateResult(index=idx, host=str(host_val), status="error", detail=ve.errors()[0].get("msg", "validation error")))
+            continue
+
+        # Duplicate host guard (case-insensitive)
+        existing = (
+            db.query(Proxy)
+            .filter(func.lower(Proxy.host) == func.lower(item.host))
+            .first()
+        )
+        if existing:
+            results.append(ProxyBulkCreateResult(index=idx, host=item.host, status="duplicate", id=existing.id, detail="Proxy host already exists"))
+            continue
+
+        try:
+            data = item.model_dump()
+            data["password"] = encrypt_string(data.get("password"))
+            db_proxy = Proxy(**data)
+            db.add(db_proxy)
+            db.commit()
+            db.refresh(db_proxy)
+            results.append(ProxyBulkCreateResult(index=idx, host=item.host, status="created", id=db_proxy.id))
+        except Exception as e:
+            db.rollback()
+            results.append(ProxyBulkCreateResult(index=idx, host=item.host, status="error", detail=str(e)))
+
+    return results
 
 @router.put("/proxies/{proxy_id}", response_model=ProxyOut)
 def update_proxy(proxy_id: int, proxy: ProxyUpdate, db: Session = Depends(get_db)):
