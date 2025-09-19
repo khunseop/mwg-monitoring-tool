@@ -6,7 +6,8 @@ python-dotenv==1.1.1
 requests==2.32.5
 paramiko==3.3.1
 fastapi-standalone-docs==0.2.0
-aiosnmp==0.7.2
+# aiosnmp requires Rust to build from source; omit for runtime if SNMP is unused
+# aiosnmp==0.7.2
 Jinja2==3.1.6
 cryptography==42.0.7
 pynacl==1.5.0
