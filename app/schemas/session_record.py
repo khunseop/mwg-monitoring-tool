@@ -29,7 +29,7 @@ class SessionRecordBase(BaseModel):
 class SessionRecord(SessionRecordBase, TimestampModel):
     id: int
     proxy_id: int
-    collected_at: datetime
+    collected_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
