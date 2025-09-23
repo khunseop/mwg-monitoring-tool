@@ -11,7 +11,6 @@ from sqlalchemy import func
 from app.utils.crypto import encrypt_string
 from pydantic import ValidationError
 from app.models.proxy_group import ProxyGroup
-from app.models.session_record import SessionRecord
 from app.models.resource_usage import ResourceUsage
 from app.models.traffic_log import TrafficLog
 
@@ -168,7 +167,6 @@ def delete_proxy(proxy_id: int, db: Session = Depends(get_db)):
 
     try:
         # Manually delete dependents to support legacy schemas without ON DELETE CASCADE
-        db.query(SessionRecord).filter(SessionRecord.proxy_id == proxy_id).delete(synchronize_session=False)
         db.query(ResourceUsage).filter(ResourceUsage.proxy_id == proxy_id).delete(synchronize_session=False)
         # TrafficLog has no FK constraint but we delete for data hygiene
         db.query(TrafficLog).filter(TrafficLog.proxy_id == proxy_id).delete(synchronize_session=False)

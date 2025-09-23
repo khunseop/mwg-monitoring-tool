@@ -16,6 +16,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ## 환경변수(옵션)
 - `DATABASE_URL` (기본: `sqlite:///./ppat.db`)
+- `SESSION_TMP_DIR` (선택): 세션 브라우저 임시파일 저장 경로. 미설정 시 OS tmp 하위 `session_browser/` 사용
 - `CORS_ALLOW_ORIGINS` (기본: `*`)
 - `CORS_ALLOW_CREDENTIALS` (기본: `false`) — 허용 원본이 와일드카드(`*`) 단일일 때는 Starlette 제약으로 자동 비활성화됨
 - `ENABLE_DOCS` (기본: `true`)

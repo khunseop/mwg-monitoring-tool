@@ -5,7 +5,6 @@ from typing import List, Dict, Any, Tuple, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from app.utils.time import now_kst, KST_TZ
-from sqlalchemy import func, or_, asc, desc, String as SAString
 import re
 import warnings
 import time
@@ -19,7 +18,6 @@ import paramiko
 
 from app.database.database import get_db
 from app.models.proxy import Proxy
-from app.models.session_record import SessionRecord as SessionRecordModel
 from app.models.session_browser_config import SessionBrowserConfig as SessionBrowserConfigModel
 from app.schemas.session_record import (
     SessionRecord as SessionRecordSchema,
@@ -31,10 +29,27 @@ from app.schemas.session_browser_config import (
     SessionBrowserConfigUpdateSafe,
 )
 from app.utils.crypto import decrypt_string_if_encrypted
+from app.storage import temp_store
 
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+def _ensure_timestamps(item: Dict[str, Any]) -> Dict[str, Any]:
+    out = dict(item)
+    collected = out.get("collected_at")
+    # Use collected_at if available; otherwise now
+    try:
+        default_dt = now_kst()
+        if collected:
+            # Pydantic can parse ISO strings, no need to convert
+            out.setdefault("created_at", collected)
+            out.setdefault("updated_at", collected)
+        else:
+            out.setdefault("created_at", default_dt)
+            out.setdefault("updated_at", default_dt)
+    except Exception:
+        pass
+    return out
 
 
 def _get_cfg(db: Session) -> SessionBrowserConfigModel:
@@ -45,100 +60,7 @@ def _get_cfg(db: Session) -> SessionBrowserConfigModel:
         db.commit()
         db.refresh(cfg)
     return cfg
-def _sessions_col_map() -> Dict[int, Any]:
-    # DataTables column index -> model column for sorting
-    return {
-        0: Proxy.host,
-        1: SessionRecordModel.creation_time,
-        2: SessionRecordModel.user_name,
-        3: SessionRecordModel.client_ip,
-        4: SessionRecordModel.server_ip,
-        5: SessionRecordModel.cl_bytes_received,
-        6: SessionRecordModel.cl_bytes_sent,
-        7: SessionRecordModel.age_seconds,
-        8: SessionRecordModel.url,
-        9: SessionRecordModel.id,
-    }
-
-
-def _base_sessions_query(db: Session):
-    return db.query(SessionRecordModel, Proxy).join(Proxy, SessionRecordModel.proxy_id == Proxy.id)
-
-
-def _apply_sessions_filters(base_q, group_id: int | None, proxy_ids_csv: str | None, search: str | None):
-    q = base_q
-    if group_id is not None:
-        q = q.filter(Proxy.group_id == group_id)
-    if proxy_ids_csv:
-        try:
-            id_list = [int(x) for x in proxy_ids_csv.split(",") if x.strip()]
-            if id_list:
-                q = q.filter(SessionRecordModel.proxy_id.in_(id_list))
-        except Exception:
-            pass
-    if search:
-        s = f"%{search}%"
-        q = q.filter(
-            or_(
-                SessionRecordModel.transaction.ilike(s),
-                SessionRecordModel.user_name.ilike(s),
-                SessionRecordModel.client_ip.ilike(s),
-                SessionRecordModel.server_ip.ilike(s),
-                SessionRecordModel.protocol.ilike(s),
-                SessionRecordModel.status.ilike(s),
-                SessionRecordModel.url.ilike(s),
-                Proxy.host.ilike(s),
-            )
-        )
-    return q
-
-
-def _apply_sessions_order(q, order_col: int | None, order_dir: str | None):
-    col_map = _sessions_col_map()
-    if order_col is not None and order_col in col_map:
-        col = col_map[order_col]
-        if (order_dir or "").lower() == "desc":
-            return q.order_by(desc(col))
-        elif (order_dir or "").lower() == "asc":
-            return q.order_by(asc(col))
-        else:
-            return q.order_by(desc(col))
-    # default order: newest first
-    return q.order_by(SessionRecordModel.collected_at.desc(), SessionRecordModel.id.desc())
-
-
-def _apply_column_searches(q, col_searches: Dict[int, str]):
-    if not col_searches:
-        return q
-    conds = []
-    for idx, term in col_searches.items():
-        if not term:
-            continue
-        s = f"%{term}%"
-        try:
-            if idx == 0:
-                conds.append(Proxy.host.ilike(s))
-            elif idx == 1:
-                conds.append(func.cast(SessionRecordModel.creation_time, SAString).ilike(s))
-            elif idx == 2:
-                conds.append(SessionRecordModel.user_name.ilike(s))
-            elif idx == 3:
-                conds.append(SessionRecordModel.client_ip.ilike(s))
-            elif idx == 4:
-                conds.append(SessionRecordModel.server_ip.ilike(s))
-            elif idx == 5:
-                conds.append(func.cast(SessionRecordModel.cl_bytes_received, SAString).ilike(s))
-            elif idx == 6:
-                conds.append(func.cast(SessionRecordModel.cl_bytes_sent, SAString).ilike(s))
-            elif idx == 7:
-                conds.append(func.cast(SessionRecordModel.age_seconds, SAString).ilike(s))
-            elif idx == 8:
-                conds.append(SessionRecordModel.url.ilike(s))
-        except Exception:
-            pass
-    if conds:
-        q = q.filter(*conds)
-    return q
+# Removed DB session query helpers; temp-store mode doesn't use them
 
 
 
@@ -347,20 +269,10 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
 
     errors: Dict[int, str] = {}
 
-    # Replacement semantics: clear existing session records for TARGETED proxies only
+    # Replacement semantics now happen at temp-store level by creating a new batch per proxy
     t_overall_start = time.perf_counter()
-    proxy_ids_selected = [p.id for p in proxies]
-    t_delete_start = time.perf_counter()
-    try:
-        if proxy_ids_selected:
-            db.query(SessionRecordModel).filter(SessionRecordModel.proxy_id.in_(proxy_ids_selected)).delete(synchronize_session=False)
-    except Exception as e:
-        logger.exception("Failed to clear previous session records for selected proxies before collect: %s", e)
-        # proceed anyway to attempt fresh insert
-    t_delete_end = time.perf_counter()
-
     collected_at_ts = now_kst()
-    insert_mappings: List[Dict[str, Any]] = []
+    per_proxy_records: Dict[int, List[Dict[str, Any]]] = {}
 
     t_fetch_parse_start = time.perf_counter()
     with ThreadPoolExecutor(max_workers=cfg.max_workers or 4) as executor:
@@ -372,8 +284,9 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
                 if err:
                     errors[proxy_id] = err
                     continue
+                enriched: List[Dict[str, Any]] = []
                 for rec in records or []:
-                    insert_mappings.append({
+                    row = {
                         "proxy_id": proxy_id,
                         "transaction": rec.get("transaction"),
                         "creation_time": rec.get("creation_time"),
@@ -394,34 +307,42 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
                         "in_use": rec.get("in_use"),
                         "url": rec.get("url"),
                         "raw_line": rec.get("raw_line"),
-                        "collected_at": collected_at_ts,
-                    })
+                        # enrich for UI convenience
+                        "host": proxy.host,
+                    }
+                    enriched.append(row)
+                per_proxy_records[proxy_id] = enriched
             except Exception as e:
                 errors[proxy.id] = str(e)
 
     t_fetch_parse_end = time.perf_counter()
 
-    # Bulk insert for speed
-    t_db_insert_start = time.perf_counter()
-    if insert_mappings:
+    # Write temp batches per proxy for real-time use
+    t_tmp_write_start = time.perf_counter()
+    total_written = 0
+    for pid, rows in per_proxy_records.items():
         try:
-            db.bulk_insert_mappings(SessionRecordModel, insert_mappings)
+            temp_store.write_batch(pid, collected_at_ts, rows)
+            total_written += len(rows or [])
         except Exception as e:
-            logger.exception("Bulk insert failed; falling back to row-by-row: %s", e)
-            for row in insert_mappings:
-                db.add(SessionRecordModel(**row))
-    db.commit()
-    t_db_insert_end = time.perf_counter()
+            errors[pid] = str(e)
+    t_tmp_write_end = time.perf_counter()
+
+    # Keep only the latest batch per proxy to avoid accumulation
+    try:
+        temp_store.cleanup_old_batches(retain_per_proxy=1)
+    except Exception:
+        pass
 
     logger.info(
         "session-collect: proxies=%d ok=%d fail=%d records=%d delete_ms=%.1f fetch_parse_ms=%.1f db_insert_ms=%.1f total_ms=%.1f",
         len(proxies),
         len(proxies) - len(errors),
         len(errors),
-        len(insert_mappings),
-        (t_delete_end - t_delete_start) * 1000.0,
+        total_written,
+        0.0,
         (t_fetch_parse_end - t_fetch_parse_start) * 1000.0,
-        (t_db_insert_end - t_db_insert_start) * 1000.0,
+        (t_tmp_write_end - t_tmp_write_start) * 1000.0,
         (time.perf_counter() - t_overall_start) * 1000.0,
     )
 
@@ -441,34 +362,42 @@ async def list_sessions(
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
 ):
-    rows = (
-        db.query(SessionRecordModel)
-        .order_by(SessionRecordModel.collected_at.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
-    return rows
+    # Aggregate latest batches across all proxies
+    rows: List[Dict[str, Any]] = []
+    proxies = db.query(Proxy).filter(Proxy.is_active == True).all()
+    for p in proxies:
+        latest = temp_store.read_latest(p.id)
+        for idx, rec in enumerate(latest):
+            item = dict(rec)
+            item.setdefault("proxy_id", p.id)
+            # build stable numeric id: proxy + collected_at + line index
+            rid = temp_store.build_record_id(p.id, str(item.get("collected_at") or ""), idx)
+            item["id"] = rid
+            rows.append(_ensure_timestamps(item))
+    # Sort by collected_at desc then id asc
+    def _to_sort_ts(v: Any) -> float:
+        try:
+            if not v:
+                return 0.0
+            return datetime.fromisoformat(str(v)).timestamp()
+        except Exception:
+            return 0.0
+    rows.sort(key=lambda r: (_to_sort_ts(r.get("collected_at")), r.get("id") or 0), reverse=True)
+    sliced = rows[offset:offset + limit]
+    return [SessionRecordSchema(**r) for r in sliced]
 
 
 @router.get("/session-browser/latest/{proxy_id}", response_model=List[SessionRecordSchema])
 async def latest_sessions(proxy_id: int, db: Session = Depends(get_db)):
-    # Return latest batch for a proxy: we approximate by taking latest collected_at and returning those rows
-    subq = (
-        db.query(SessionRecordModel.collected_at)
-        .filter(SessionRecordModel.proxy_id == proxy_id)
-        .order_by(SessionRecordModel.collected_at.desc())
-        .limit(1)
-        .subquery()
-    )
-    rows = (
-        db.query(SessionRecordModel)
-        .filter(SessionRecordModel.proxy_id == proxy_id)
-        .filter(SessionRecordModel.collected_at == subq.c.collected_at)
-        .order_by(SessionRecordModel.id.asc())
-        .all()
-    )
-    return rows
+    latest = temp_store.read_latest(proxy_id)
+    out: List[SessionRecordSchema] = []
+    for idx, rec in enumerate(latest):
+        r = dict(rec)
+        r.setdefault("proxy_id", proxy_id)
+        rid = temp_store.build_record_id(proxy_id, str(r.get("collected_at") or ""), idx)
+        r["id"] = rid
+        out.append(SessionRecordSchema(**_ensure_timestamps(r)))
+    return out
 
 
 @router.get("/session-browser/config", response_model=SessionBrowserConfigSchema)
@@ -523,61 +452,105 @@ async def sessions_datatables(
     group_id: int | None = Query(None),
     proxy_ids: str | None = Query(None),  # comma-separated
 ):
-    # Mapping DataTables column index -> (model column, default sort direction)
-    # Base query with join to proxy for filtering/sorting by host/group
-    base_q = _base_sessions_query(db)
+    # Require explicit selection: if no proxy_ids provided, return empty dataset
+    target_ids: List[int] = []
+    if proxy_ids:
+        try:
+            target_ids = [int(x) for x in proxy_ids.split(",") if x.strip()]
+        except Exception:
+            target_ids = []
+    if not target_ids:
+        try:
+            draw = int(request.query_params.get("draw", "0"))
+        except Exception:
+            draw = 0
+        return {"draw": draw, "recordsTotal": 0, "recordsFiltered": 0, "data": []}
 
-    # Total records (before filters)
-    records_total = db.query(func.count(SessionRecordModel.id)).scalar() or 0
+    # Build proxy_id -> host mapping for display
+    host_map: Dict[int, str] = {}
+    if target_ids:
+        for p in db.query(Proxy).filter(Proxy.id.in_(target_ids)).all():
+            host_map[p.id] = p.host
 
-    # Apply filters
-    base_q = _apply_sessions_filters(base_q, group_id, proxy_ids, search)
-    # Per-column filters from DataTables
-    col_searches: Dict[int, str] = {}
-    try:
-        # Expect up to 10 columns (including hidden id)
-        for i in range(0, 10):
-            key = f"columns[{i}][search][value]"
-            val = request.query_params.get(key)
-            if val:
-                col_searches[i] = val
-    except Exception:
-        pass
-    base_q = _apply_column_searches(base_q, col_searches)
+    # Load latest rows from temp store
+    rows: List[Dict[str, Any]] = []
+    for pid in target_ids:
+        batch = temp_store.read_latest(pid)
+        for idx, rec in enumerate(batch):
+            r = dict(rec)
+            r.setdefault("proxy_id", pid)
+            r.setdefault("host", host_map.get(pid, f"#{pid}"))
+            r["__line_index"] = idx
+            rows.append(r)
 
-    # records after filtering
-    records_filtered = base_q.with_entities(func.count(SessionRecordModel.id)).scalar() or 0
+    records_total = len(rows)
+
+    # Apply simple search filter
+    def include(row: Dict[str, Any]) -> bool:
+        if not search:
+            return True
+        s = str(search).lower()
+        for key in ("transaction", "user_name", "client_ip", "server_ip", "protocol", "status", "url", "host"):
+            val = row.get(key)
+            if val is not None and s in str(val).lower():
+                return True
+        return False
+
+    filtered = [r for r in rows if include(r)]
+    records_filtered = len(filtered)
 
     # Ordering
-    base_q = _apply_sessions_order(base_q, order_col, order_dir)
+    def sort_key(row: Dict[str, Any]):
+        mapping = {
+            0: (row.get("host") or ""),
+            1: row.get("creation_time") or "",
+            2: row.get("user_name") or "",
+            3: row.get("client_ip") or "",
+            4: row.get("server_ip") or "",
+            5: row.get("cl_bytes_received") or -1,
+            6: row.get("cl_bytes_sent") or -1,
+            7: row.get("age_seconds") or -1,
+            8: row.get("url") or "",
+            9: 0,
+        }
+        return mapping.get(order_col or 1)
 
-    # Pagination
-    rows = base_q.offset(start).limit(length).all()
+    reverse = (order_dir or "desc").lower() == "desc"
+    try:
+        filtered.sort(key=sort_key, reverse=reverse)
+    except Exception:
+        pass
 
-    # Build DataTables row arrays matching UI columns
+    # Pagination and build DataTables rows
+    # Rebuild page and assign stable ids using original order index when loading batch
+    page = filtered[start:start + length]
     data: List[List[Any]] = []
-    for rec, proxy in rows:
-        host = proxy.host if proxy else f"#{rec.proxy_id}"
-        ct_str = rec.creation_time.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S") if rec.creation_time else ""
-        cl_recv = rec.cl_bytes_received if rec.cl_bytes_received is not None else ""
-        cl_sent = rec.cl_bytes_sent if rec.cl_bytes_sent is not None else ""
-        age_str = rec.age_seconds if rec.age_seconds is not None and rec.age_seconds >= 0 else ""
-        url_full = rec.url or ""
+    for rec in page:
+        host = rec.get("host") or f"#{rec.get('proxy_id')}"
+        ct_str = rec.get("creation_time") or ""
+        cl_recv = rec.get("cl_bytes_received")
+        cl_sent = rec.get("cl_bytes_sent")
+        age_val = rec.get("age_seconds")
+        url_full = rec.get("url") or ""
         url_short = url_full[:100] + ("…" if len(url_full) > 100 else "")
+        # Use stored '__line_index' if present; else 0
+        pid = int(rec.get("proxy_id") or 0)
+        collected_iso = str(rec.get("collected_at") or "")
+        line_index = int(rec.get("__line_index") or 0)
+        rid_val = temp_store.build_record_id(pid, collected_iso, line_index)
         data.append([
             host,
             ct_str,
-            rec.user_name or "",
-            rec.client_ip or "",
-            rec.server_ip or "",
-            str(cl_recv) if cl_recv != "" else "",
-            str(cl_sent) if cl_sent != "" else "",
-            str(age_str) if age_str != "" else "",
+            rec.get("user_name") or "",
+            rec.get("client_ip") or "",
+            rec.get("server_ip") or "",
+            str(cl_recv) if cl_recv is not None else "",
+            str(cl_sent) if cl_sent is not None else "",
+            str(age_val) if isinstance(age_val, int) and age_val >= 0 else "",
             url_short,
-            rec.id,
+            rid_val,
         ])
 
-    # DataTables draw counter (echo)
     try:
         draw = int(request.query_params.get("draw", "0"))
     except Exception:
@@ -591,12 +564,14 @@ async def sessions_datatables(
     }
 
 
-@router.get("/session-browser/item/{record_id}", response_model=SessionRecordSchema)
+@router.get("/session-browser/item/{record_id}")
 async def get_session_record(record_id: int, db: Session = Depends(get_db)):
-    row = db.query(SessionRecordModel).filter(SessionRecordModel.id == record_id).first()
-    if not row:
+    item = temp_store.read_item_by_id(record_id)
+    if not item:
         raise HTTPException(status_code=404, detail="Record not found")
-    return row
+    item = dict(item)
+    item["id"] = record_id
+    return _ensure_timestamps(item)
 
 
 @router.get("/session-browser/export")
@@ -608,14 +583,80 @@ async def sessions_export(
     group_id: int | None = Query(None),
     proxy_ids: str | None = Query(None),  # comma-separated
 ):
-    base_q = _base_sessions_query(db)
-    base_q = _apply_sessions_filters(base_q, group_id, proxy_ids, search)
-    base_q = _apply_sessions_order(base_q, order_col, order_dir)
+    # Require explicit selection
+    target_ids: List[int] = []
+    if proxy_ids:
+        try:
+            target_ids = [int(x) for x in proxy_ids.split(",") if x.strip()]
+        except Exception:
+            target_ids = []
+    if not target_ids:
+        # Empty CSV with header
+        def row_iter_empty() -> Iterable[str]:
+            yield "\ufeff"
+            headers = [
+                "id","프록시","수집시각","트랜잭션","생성시각","프로토콜","Cust ID","사용자",
+                "클라이언트 IP","Client-side MWG IP","Server-side MWG IP","서버 IP",
+                "CL 수신(Bytes)","CL 송신(Bytes)","서버 수신(Bytes)","서버 송신(Bytes)",
+                "Trxn Index","Age(s)","상태","In Use","URL",
+            ]
+            yield ",".join(headers) + "\n"
+        filename = f"sessions_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}\.csv"
+        return StreamingResponse(row_iter_empty(), media_type="text/csv", headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        })
+
+    host_map: Dict[int, str] = {}
+    if target_ids:
+        for p in db.query(Proxy).filter(Proxy.id.in_(target_ids)).all():
+            host_map[p.id] = p.host
+
+    # Load rows
+    rows: List[Dict[str, Any]] = []
+    for pid in target_ids:
+        batch = temp_store.read_latest(pid)
+        for idx, rec in enumerate(batch):
+            r = dict(rec)
+            r.setdefault("proxy_id", pid)
+            r.setdefault("host", host_map.get(pid, f"#{pid}"))
+            r["id"] = temp_store.build_record_id(pid, str(r.get("collected_at") or ""), idx)
+            rows.append(r)
+
+    # Filter
+    def include(row: Dict[str, Any]) -> bool:
+        if not search:
+            return True
+        s = str(search).lower()
+        for key in ("transaction", "user_name", "client_ip", "server_ip", "protocol", "status", "url", "host"):
+            val = row.get(key)
+            if val is not None and s in str(val).lower():
+                return True
+        return False
+    filtered = [r for r in rows if include(r)]
+
+    # Order similarly to datatables
+    def sort_key(row: Dict[str, Any]):
+        mapping = {
+            0: (row.get("host") or ""),
+            1: row.get("creation_time") or "",
+            2: row.get("user_name") or "",
+            3: row.get("client_ip") or "",
+            4: row.get("server_ip") or "",
+            5: row.get("cl_bytes_received") or -1,
+            6: row.get("cl_bytes_sent") or -1,
+            7: row.get("age_seconds") or -1,
+            8: row.get("url") or "",
+        }
+        return mapping.get(order_col or 1)
+    reverse = (order_dir or "desc").lower() == "desc"
+    try:
+        filtered.sort(key=sort_key, reverse=reverse)
+    except Exception:
+        pass
 
     def row_iter() -> Iterable[str]:
         # Write UTF-8 BOM for Excel compatibility
         yield "\ufeff"
-        # Header (Korean labels to match UI)
         headers = [
             "id",
             "프록시",
@@ -641,47 +682,47 @@ async def sessions_export(
         ]
         yield ",".join(headers) + "\n"
 
-        chunk = 2000
-        offset = 0
-        while True:
-            batch = base_q.offset(offset).limit(chunk).all()
-            if not batch:
-                break
-            for rec, proxy in batch:
-                host = proxy.host if proxy else f"#{rec.proxy_id}"
-                collected_str = rec.collected_at.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S") if rec.collected_at else ""
-                creation_str = rec.creation_time.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S") if rec.creation_time else ""
-                # simple CSV escaping
-                def esc(v: Any) -> str:
-                    s = "" if v is None else str(v)
-                    if '"' in s or "," in s or "\n" in s or "\r" in s:
-                        s = '"' + s.replace('"', '""') + '"'
-                    return s
-                row = [
-                    esc(rec.id),
-                    esc(host),
-                    esc(collected_str),
-                    esc(rec.transaction or ""),
-                    esc(creation_str),
-                    esc(rec.protocol or ""),
-                    esc(rec.cust_id or ""),
-                    esc(rec.user_name or ""),
-                    esc(rec.client_ip or ""),
-                    esc(rec.client_side_mwg_ip or ""),
-                    esc(rec.server_side_mwg_ip or ""),
-                    esc(rec.server_ip or ""),
-                    esc(rec.cl_bytes_received),
-                    esc(rec.cl_bytes_sent),
-                    esc(rec.srv_bytes_received),
-                    esc(rec.srv_bytes_sent),
-                    esc(rec.trxn_index),
-                    esc(rec.age_seconds),
-                    esc(rec.status or ""),
-                    esc(rec.in_use),
-                    esc(rec.url or ""),
-                ]
-                yield ",".join(row) + "\n"
-            offset += chunk
+        for idx, rec in enumerate(filtered, start=1):
+            host = rec.get("host") or f"#{rec.get('proxy_id')}"
+            def to_kst_str(val: Any) -> str:
+                try:
+                    if not val:
+                        return ""
+                    dt = datetime.fromisoformat(str(val))
+                    return dt.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    return ""
+            collected_str = to_kst_str(rec.get("collected_at"))
+            creation_str = to_kst_str(rec.get("creation_time"))
+            def esc(v: Any) -> str:
+                s = "" if v is None else str(v)
+                if '"' in s or "," in s or "\n" in s or "\r" in s:
+                    s = '"' + s.replace('"', '""') + '"'
+                return s
+            row = [
+                esc(idx),
+                esc(host),
+                esc(collected_str),
+                esc(rec.get("transaction") or ""),
+                esc(creation_str),
+                esc(rec.get("protocol") or ""),
+                esc(rec.get("cust_id") or ""),
+                esc(rec.get("user_name") or ""),
+                esc(rec.get("client_ip") or ""),
+                esc(rec.get("client_side_mwg_ip") or ""),
+                esc(rec.get("server_side_mwg_ip") or ""),
+                esc(rec.get("server_ip") or ""),
+                esc(rec.get("cl_bytes_received")),
+                esc(rec.get("cl_bytes_sent")),
+                esc(rec.get("srv_bytes_received")),
+                esc(rec.get("srv_bytes_sent")),
+                esc(rec.get("trxn_index")),
+                esc(rec.get("age_seconds")),
+                esc(rec.get("status") or ""),
+                esc(rec.get("in_use")),
+                esc(rec.get("url") or ""),
+            ]
+            yield ",".join(row) + "\n"
 
     filename = f"sessions_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}\.csv"
     return StreamingResponse(row_iter(), media_type="text/csv", headers={

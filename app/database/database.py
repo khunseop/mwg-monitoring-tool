@@ -31,6 +31,17 @@ engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     **engine_kwargs,
 )
+
+# For SQLite, disable WAL/Journal if desired to reduce ppat.db-wal/.db-shm creation.
+if is_sqlite:
+    try:
+        with engine.connect() as conn:
+            # JOURNAL_MODE=DELETE turns off WAL
+            conn.execute("PRAGMA journal_mode=DELETE")
+            conn.execute("PRAGMA synchronous=NORMAL")
+    except Exception:
+        # Non-fatal: proceed with defaults
+        pass
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
