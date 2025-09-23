@@ -34,6 +34,22 @@ from app.storage import temp_store
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+def _ensure_timestamps(item: Dict[str, Any]) -> Dict[str, Any]:
+    out = dict(item)
+    collected = out.get("collected_at")
+    # Use collected_at if available; otherwise now
+    try:
+        default_dt = now_kst()
+        if collected:
+            # Pydantic can parse ISO strings, no need to convert
+            out.setdefault("created_at", collected)
+            out.setdefault("updated_at", collected)
+        else:
+            out.setdefault("created_at", default_dt)
+            out.setdefault("updated_at", default_dt)
+    except Exception:
+        pass
+    return out
 
 
 def _get_cfg(db: Session) -> SessionBrowserConfigModel:
@@ -312,6 +328,12 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
             errors[pid] = str(e)
     t_tmp_write_end = time.perf_counter()
 
+    # Keep only the latest batch per proxy to avoid accumulation
+    try:
+        temp_store.cleanup_old_batches(retain_per_proxy=1)
+    except Exception:
+        pass
+
     logger.info(
         "session-collect: proxies=%d ok=%d fail=%d records=%d delete_ms=%.1f fetch_parse_ms=%.1f db_insert_ms=%.1f total_ms=%.1f",
         len(proxies),
@@ -351,7 +373,7 @@ async def list_sessions(
             # build stable numeric id: proxy + collected_at + line index
             rid = temp_store.build_record_id(p.id, str(item.get("collected_at") or ""), idx)
             item["id"] = rid
-            rows.append(item)
+            rows.append(_ensure_timestamps(item))
     # Sort by collected_at desc then id asc
     def _to_sort_ts(v: Any) -> float:
         try:
@@ -374,7 +396,7 @@ async def latest_sessions(proxy_id: int, db: Session = Depends(get_db)):
         r.setdefault("proxy_id", proxy_id)
         rid = temp_store.build_record_id(proxy_id, str(r.get("collected_at") or ""), idx)
         r["id"] = rid
-        out.append(SessionRecordSchema(**r))
+        out.append(SessionRecordSchema(**_ensure_timestamps(r)))
     return out
 
 
@@ -546,7 +568,7 @@ async def get_session_record(record_id: int, db: Session = Depends(get_db)):
     item = temp_store.read_item_by_id(record_id)
     if not item:
         raise HTTPException(status_code=404, detail="Record not found")
-    return SessionRecordSchema(**item)
+    return SessionRecordSchema(**_ensure_timestamps(item))
 
 
 @router.get("/session-browser/export")
