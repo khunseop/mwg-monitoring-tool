@@ -13,6 +13,7 @@
 			var $group = $(options.groupSelect);
 			var $proxy = $(options.proxySelect);
 			var $selectAll = options.selectAll ? $(options.selectAll) : $();
+			var allowAllGroups = (options.allowAllGroups === undefined) ? true : !!options.allowAllGroups;
 			var labelForProxy = (typeof options.labelForProxy === 'function') ? options.labelForProxy : defaultLabelForProxy;
 			var apiGroups = options.apiGroups || '/api/proxy-groups';
 			var apiProxies = options.apiProxies || '/api/proxies';
@@ -21,13 +22,16 @@
 			function populateGroups() {
 				if ($group && $group.length) {
 					$group.empty();
-					$group.append('<option value="">전체</option>');
+					if (allowAllGroups) { $group.append('<option value="">전체</option>'); }
 					(state.groups || []).forEach(function(g) { $group.append('<option value="' + g.id + '">' + g.name + '</option>'); });
 				}
 			}
 
 			function filteredProxies() {
 				var gid = $group && $group.length ? $group.val() : '';
+				if (!allowAllGroups && !gid) {
+					gid = (state.groups && state.groups.length) ? String(state.groups[0].id) : '';
+				}
 				return (state.proxies || []).filter(function(p) {
 					if (!p || !p.is_active) return false;
 					if (!gid) return true;
@@ -82,7 +86,7 @@
 							create: false,
 							persist: true,
 							maxItems: 1,
-							allowEmptyOption: true,
+							allowEmptyOption: allowAllGroups,
 							dropdownParent: 'body',
 							render: {
 								option: function(data, escape) { return '<div style="white-space:nowrap;">' + (data.text || '') + '</div>'; },
@@ -127,6 +131,15 @@
 				enhanceGroupSelect();
 				enhanceMultiSelect(); 
 				bindEvents(); 
+				if (!allowAllGroups) {
+					var currentVal = $group && $group.length ? $group.val() : '';
+					if (!currentVal) {
+						var first = (state.groups && state.groups.length) ? String(state.groups[0].id) : '';
+						if (first) {
+							try { if (state.gts) { state.gts.setValue(first, true); } else { $group.val(first).trigger('change'); } } catch (e) { /* ignore */ }
+						}
+					}
+				}
 				try { if (typeof options.onData === 'function') { options.onData({ groups: state.groups, proxies: state.proxies }); } } catch (e) { /* ignore */ }
 			});
 		}
