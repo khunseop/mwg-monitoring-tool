@@ -255,6 +255,7 @@ $(document).ready(function() {
         groupSelect: '#sbGroupSelect', 
         proxySelect: '#sbProxySelect', 
         selectAll: '#sbSelectAll',
+        allowAllGroups: false,
         onData: function(data){ sb.groups = data.groups || []; sb.proxies = data.proxies || []; }
     }).then(function(){ restoreState(); if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true); });
 
