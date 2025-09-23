@@ -5,7 +5,6 @@ from typing import List, Dict, Any, Tuple, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from app.utils.time import now_kst, KST_TZ
-from sqlalchemy import func, or_, asc, desc, String as SAString
 import re
 import warnings
 import time
@@ -19,7 +18,6 @@ import paramiko
 
 from app.database.database import get_db
 from app.models.proxy import Proxy
-from app.models.session_record import SessionRecord as SessionRecordModel
 from app.models.session_browser_config import SessionBrowserConfig as SessionBrowserConfigModel
 from app.schemas.session_record import (
     SessionRecord as SessionRecordSchema,
@@ -46,100 +44,7 @@ def _get_cfg(db: Session) -> SessionBrowserConfigModel:
         db.commit()
         db.refresh(cfg)
     return cfg
-def _sessions_col_map() -> Dict[int, Any]:
-    # DataTables column index -> model column for sorting
-    return {
-        0: Proxy.host,
-        1: SessionRecordModel.creation_time,
-        2: SessionRecordModel.user_name,
-        3: SessionRecordModel.client_ip,
-        4: SessionRecordModel.server_ip,
-        5: SessionRecordModel.cl_bytes_received,
-        6: SessionRecordModel.cl_bytes_sent,
-        7: SessionRecordModel.age_seconds,
-        8: SessionRecordModel.url,
-        9: SessionRecordModel.id,
-    }
-
-
-def _base_sessions_query(db: Session):
-    return db.query(SessionRecordModel, Proxy).join(Proxy, SessionRecordModel.proxy_id == Proxy.id)
-
-
-def _apply_sessions_filters(base_q, group_id: int | None, proxy_ids_csv: str | None, search: str | None):
-    q = base_q
-    if group_id is not None:
-        q = q.filter(Proxy.group_id == group_id)
-    if proxy_ids_csv:
-        try:
-            id_list = [int(x) for x in proxy_ids_csv.split(",") if x.strip()]
-            if id_list:
-                q = q.filter(SessionRecordModel.proxy_id.in_(id_list))
-        except Exception:
-            pass
-    if search:
-        s = f"%{search}%"
-        q = q.filter(
-            or_(
-                SessionRecordModel.transaction.ilike(s),
-                SessionRecordModel.user_name.ilike(s),
-                SessionRecordModel.client_ip.ilike(s),
-                SessionRecordModel.server_ip.ilike(s),
-                SessionRecordModel.protocol.ilike(s),
-                SessionRecordModel.status.ilike(s),
-                SessionRecordModel.url.ilike(s),
-                Proxy.host.ilike(s),
-            )
-        )
-    return q
-
-
-def _apply_sessions_order(q, order_col: int | None, order_dir: str | None):
-    col_map = _sessions_col_map()
-    if order_col is not None and order_col in col_map:
-        col = col_map[order_col]
-        if (order_dir or "").lower() == "desc":
-            return q.order_by(desc(col))
-        elif (order_dir or "").lower() == "asc":
-            return q.order_by(asc(col))
-        else:
-            return q.order_by(desc(col))
-    # default order: newest first
-    return q.order_by(SessionRecordModel.collected_at.desc(), SessionRecordModel.id.desc())
-
-
-def _apply_column_searches(q, col_searches: Dict[int, str]):
-    if not col_searches:
-        return q
-    conds = []
-    for idx, term in col_searches.items():
-        if not term:
-            continue
-        s = f"%{term}%"
-        try:
-            if idx == 0:
-                conds.append(Proxy.host.ilike(s))
-            elif idx == 1:
-                conds.append(func.cast(SessionRecordModel.creation_time, SAString).ilike(s))
-            elif idx == 2:
-                conds.append(SessionRecordModel.user_name.ilike(s))
-            elif idx == 3:
-                conds.append(SessionRecordModel.client_ip.ilike(s))
-            elif idx == 4:
-                conds.append(SessionRecordModel.server_ip.ilike(s))
-            elif idx == 5:
-                conds.append(func.cast(SessionRecordModel.cl_bytes_received, SAString).ilike(s))
-            elif idx == 6:
-                conds.append(func.cast(SessionRecordModel.cl_bytes_sent, SAString).ilike(s))
-            elif idx == 7:
-                conds.append(func.cast(SessionRecordModel.age_seconds, SAString).ilike(s))
-            elif idx == 8:
-                conds.append(SessionRecordModel.url.ilike(s))
-        except Exception:
-            pass
-    if conds:
-        q = q.filter(*conds)
-    return q
+# Removed DB session query helpers; temp-store mode doesn't use them
 
 
 
