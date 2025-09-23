@@ -563,12 +563,14 @@ async def sessions_datatables(
     }
 
 
-@router.get("/session-browser/item/{record_id}", response_model=SessionRecordSchema)
+@router.get("/session-browser/item/{record_id}")
 async def get_session_record(record_id: int, db: Session = Depends(get_db)):
     item = temp_store.read_item_by_id(record_id)
     if not item:
         raise HTTPException(status_code=404, detail="Record not found")
-    return SessionRecordSchema(**_ensure_timestamps(item))
+    item = dict(item)
+    item["id"] = record_id
+    return _ensure_timestamps(item)
 
 
 @router.get("/session-browser/export")
