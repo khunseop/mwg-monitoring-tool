@@ -17,6 +17,7 @@ pip install -r requirements.txt
 
 2) 환경변수(.env 권장) 설정
 - `DATABASE_URL`: 기본 `sqlite:///./ppat.db`
+- `SESSION_TMP_DIR`: 세션 브라우저 임시파일 저장 경로(미설정 시 시스템 tmp 하위 `session_browser/`)
 - `CORS_ALLOW_ORIGINS`: 기본 `*` (쉼표로 다중 허용)
 - `CORS_ALLOW_CREDENTIALS`: 기본 `false` (와일드카드일 때 자동 비활성)
 - `ENABLE_DOCS`: 기본 `true` (API 문서 노출)
@@ -38,7 +39,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ### 주요 기능
 - 프록시/그룹 CRUD
-- 세션 브라우저 수집(SSH) 및 파싱 저장
+- 세션 브라우저 수집(SSH) 및 임시파일(JSONL) 저장/조회(프록시별 최신 1개 배치 유지)
 - 자원 사용률 수집(SNMP 기본, 메모리는 선택적으로 SSH) 및 저장/조회
 
 ### 자원 사용률(SSH 메모리)
