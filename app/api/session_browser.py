@@ -348,8 +348,9 @@ async def list_sessions(
         for idx, rec in enumerate(latest):
             item = dict(rec)
             item.setdefault("proxy_id", p.id)
-            # synthesize id for the session within this response
-            item.setdefault("id", idx + 1)
+            # build stable numeric id: proxy + collected_at + line index
+            rid = temp_store.build_record_id(p.id, str(item.get("collected_at") or ""), idx)
+            item["id"] = rid
             rows.append(item)
     # Sort by collected_at desc then id asc
     def _to_sort_ts(v: Any) -> float:
@@ -371,7 +372,8 @@ async def latest_sessions(proxy_id: int, db: Session = Depends(get_db)):
     for idx, rec in enumerate(latest):
         r = dict(rec)
         r.setdefault("proxy_id", proxy_id)
-        r.setdefault("id", idx + 1)
+        rid = temp_store.build_record_id(proxy_id, str(r.get("collected_at") or ""), idx)
+        r["id"] = rid
         out.append(SessionRecordSchema(**r))
     return out
 
@@ -454,6 +456,9 @@ async def sessions_datatables(
             r = dict(rec)
             r.setdefault("proxy_id", pid)
             r.setdefault("host", host_map.get(pid, f"#{pid}"))
+            # include stable id
+            collected = str(r.get("collected_at") or "")
+            # we don't have the line index here cheaply; rebuild after sort/pagination below
             rows.append(r)
 
     records_total = len(rows)
@@ -495,6 +500,7 @@ async def sessions_datatables(
         pass
 
     # Pagination and build DataTables rows
+    # Rebuild page and assign stable ids using original order within each proxy batch
     page = filtered[start:start + length]
     data: List[List[Any]] = []
     for rec in page:
@@ -505,6 +511,20 @@ async def sessions_datatables(
         age_val = rec.get("age_seconds")
         url_full = rec.get("url") or ""
         url_short = url_full[:100] + ("…" if len(url_full) > 100 else "")
+        # Determine line index by scanning the proxy's latest batch until match; fallback 0
+        rid_val = 0
+        try:
+            pid = int(rec.get("proxy_id") or 0)
+            batch = temp_store.read_latest(pid)
+            collected_iso = str(rec.get("collected_at") or "")
+            line_index = 0
+            for i, obj in enumerate(batch):
+                if obj is rec:
+                    line_index = i
+                    break
+            rid_val = temp_store.build_record_id(pid, collected_iso, line_index)
+        except Exception:
+            rid_val = 0
         data.append([
             host,
             ct_str,
@@ -515,7 +535,7 @@ async def sessions_datatables(
             str(cl_sent) if cl_sent is not None else "",
             str(age_val) if isinstance(age_val, int) and age_val >= 0 else "",
             url_short,
-            0,
+            rid_val,
         ])
 
     try:
@@ -533,8 +553,10 @@ async def sessions_datatables(
 
 @router.get("/session-browser/item/{record_id}", response_model=SessionRecordSchema)
 async def get_session_record(record_id: int, db: Session = Depends(get_db)):
-    # Not supported in temp-file mode; details are not indexed by id
-    raise HTTPException(status_code=404, detail="Record not found in temp mode")
+    item = temp_store.read_item_by_id(record_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Record not found")
+    return SessionRecordSchema(**item)
 
 
 @router.get("/session-browser/export")
@@ -567,10 +589,12 @@ async def sessions_export(
     # Load rows
     rows: List[Dict[str, Any]] = []
     for pid in target_ids:
-        for rec in temp_store.read_latest(pid):
+        batch = temp_store.read_latest(pid)
+        for idx, rec in enumerate(batch):
             r = dict(rec)
             r.setdefault("proxy_id", pid)
             r.setdefault("host", host_map.get(pid, f"#{pid}"))
+            r["id"] = temp_store.build_record_id(pid, str(r.get("collected_at") or ""), idx)
             rows.append(r)
 
     # Filter

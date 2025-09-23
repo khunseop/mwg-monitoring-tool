@@ -9,6 +9,14 @@ from app.utils.time import KST_TZ
 
 _io_lock = threading.Lock()
 
+# Bit layout for synthetic numeric record IDs
+# [ proxy_id (20 bits) | collected_at_unix_sec (32 bits) | line_index (12 bits) ]
+_PROXY_BITS = 20
+_TS_BITS = 32
+_INDEX_BITS = 12
+_INDEX_MASK = (1 << _INDEX_BITS) - 1
+_TS_MASK = (1 << _TS_BITS) - 1
+
 
 def _get_base_tmp_dir() -> str:
     base = os.getenv("SESSION_TMP_DIR") or os.path.join(tempfile.gettempdir(), "session_browser")
@@ -127,12 +135,52 @@ def read_latest(proxy_id: int) -> List[Dict[str, Any]]:
     return list(_iter_jsonl(path))
 
 
+def _iso_to_unix_seconds(iso_str: str) -> int:
+    try:
+        dt = datetime.fromisoformat(iso_str)
+        # Ensure timezone-aware in KST for consistency, then convert to UTC timestamp
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=KST_TZ)
+        return int(dt.timestamp())
+    except Exception:
+        return 0
+
+
+def build_record_id(proxy_id: int, collected_at_iso: str, line_index: int) -> int:
+    ts_sec = _iso_to_unix_seconds(collected_at_iso) & _TS_MASK
+    pid = proxy_id & ((1 << _PROXY_BITS) - 1)
+    idx = line_index & _INDEX_MASK
+    return (pid << (_TS_BITS + _INDEX_BITS)) | (ts_sec << _INDEX_BITS) | idx
+
+
+def _decode_record_id(record_id: int) -> Tuple[int, int, int]:
+    idx = record_id & _INDEX_MASK
+    ts_sec = (record_id >> _INDEX_BITS) & _TS_MASK
+    pid = record_id >> (_TS_BITS + _INDEX_BITS)
+    return int(pid), int(ts_sec), int(idx)
+
+
+def _ts_to_batch_name(ts_sec: int) -> str:
+    dt = datetime.fromtimestamp(ts_sec, tz=KST_TZ)
+    return _batch_filename(dt)
+
+
 def read_item_by_id(record_id: int) -> Optional[Dict[str, Any]]:
-    """
-    Since temp records have no DB id, we synthesize an id per line: hash of content.
-    But the UI expects numeric ids. For compatibility, we cannot reliably serve historical ids.
-    This function returns None to indicate not supported unless the record includes an 'id'.
-    """
+    pid, ts_sec, idx = _decode_record_id(record_id)
+    directory = _proxy_dir(pid)
+    batch_name = _ts_to_batch_name(ts_sec)
+    path = os.path.join(directory, batch_name)
+    if not os.path.exists(path):
+        return None
+    try:
+        for line_no, obj in enumerate(_iter_jsonl(path)):
+            if line_no == idx:
+                # Attach essential identifiers
+                item = dict(obj)
+                item.setdefault("proxy_id", pid)
+                return item
+    except Exception:
+        return None
     return None
 
 
