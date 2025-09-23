@@ -452,18 +452,19 @@ async def sessions_datatables(
     group_id: int | None = Query(None),
     proxy_ids: str | None = Query(None),  # comma-separated
 ):
-    # Determine target proxies
+    # Require explicit selection: if no proxy_ids provided, return empty dataset
     target_ids: List[int] = []
     if proxy_ids:
         try:
             target_ids = [int(x) for x in proxy_ids.split(",") if x.strip()]
         except Exception:
             target_ids = []
-    else:
-        q = db.query(Proxy).filter(Proxy.is_active == True)
-        if group_id is not None:
-            q = q.filter(Proxy.group_id == group_id)
-        target_ids = [p.id for p in q.all()]
+    if not target_ids:
+        try:
+            draw = int(request.query_params.get("draw", "0"))
+        except Exception:
+            draw = 0
+        return {"draw": draw, "recordsTotal": 0, "recordsFiltered": 0, "data": []}
 
     # Build proxy_id -> host mapping for display
     host_map: Dict[int, str] = {}
@@ -582,18 +583,28 @@ async def sessions_export(
     group_id: int | None = Query(None),
     proxy_ids: str | None = Query(None),  # comma-separated
 ):
-    # Determine proxies
+    # Require explicit selection
     target_ids: List[int] = []
     if proxy_ids:
         try:
             target_ids = [int(x) for x in proxy_ids.split(",") if x.strip()]
         except Exception:
             target_ids = []
-    else:
-        q = db.query(Proxy).filter(Proxy.is_active == True)
-        if group_id is not None:
-            q = q.filter(Proxy.group_id == group_id)
-        target_ids = [p.id for p in q.all()]
+    if not target_ids:
+        # Empty CSV with header
+        def row_iter_empty() -> Iterable[str]:
+            yield "\ufeff"
+            headers = [
+                "id","프록시","수집시각","트랜잭션","생성시각","프로토콜","Cust ID","사용자",
+                "클라이언트 IP","Client-side MWG IP","Server-side MWG IP","서버 IP",
+                "CL 수신(Bytes)","CL 송신(Bytes)","서버 수신(Bytes)","서버 송신(Bytes)",
+                "Trxn Index","Age(s)","상태","In Use","URL",
+            ]
+            yield ",".join(headers) + "\n"
+        filename = f"sessions_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}\.csv"
+        return StreamingResponse(row_iter_empty(), media_type="text/csv", headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        })
 
     host_map: Dict[int, str] = {}
     if target_ids:
