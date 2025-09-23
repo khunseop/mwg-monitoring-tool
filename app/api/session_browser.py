@@ -452,13 +452,12 @@ async def sessions_datatables(
     # Load latest rows from temp store
     rows: List[Dict[str, Any]] = []
     for pid in target_ids:
-        for rec in temp_store.read_latest(pid):
+        batch = temp_store.read_latest(pid)
+        for idx, rec in enumerate(batch):
             r = dict(rec)
             r.setdefault("proxy_id", pid)
             r.setdefault("host", host_map.get(pid, f"#{pid}"))
-            # include stable id
-            collected = str(r.get("collected_at") or "")
-            # we don't have the line index here cheaply; rebuild after sort/pagination below
+            r["__line_index"] = idx
             rows.append(r)
 
     records_total = len(rows)
@@ -500,7 +499,7 @@ async def sessions_datatables(
         pass
 
     # Pagination and build DataTables rows
-    # Rebuild page and assign stable ids using original order within each proxy batch
+    # Rebuild page and assign stable ids using original order index when loading batch
     page = filtered[start:start + length]
     data: List[List[Any]] = []
     for rec in page:
@@ -511,20 +510,11 @@ async def sessions_datatables(
         age_val = rec.get("age_seconds")
         url_full = rec.get("url") or ""
         url_short = url_full[:100] + ("…" if len(url_full) > 100 else "")
-        # Determine line index by scanning the proxy's latest batch until match; fallback 0
-        rid_val = 0
-        try:
-            pid = int(rec.get("proxy_id") or 0)
-            batch = temp_store.read_latest(pid)
-            collected_iso = str(rec.get("collected_at") or "")
-            line_index = 0
-            for i, obj in enumerate(batch):
-                if obj is rec:
-                    line_index = i
-                    break
-            rid_val = temp_store.build_record_id(pid, collected_iso, line_index)
-        except Exception:
-            rid_val = 0
+        # Use stored '__line_index' if present; else 0
+        pid = int(rec.get("proxy_id") or 0)
+        collected_iso = str(rec.get("collected_at") or "")
+        line_index = int(rec.get("__line_index") or 0)
+        rid_val = temp_store.build_record_id(pid, collected_iso, line_index)
         data.append([
             host,
             ct_str,

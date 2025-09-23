@@ -31,6 +31,44 @@ def _proxy_dir(proxy_id: int) -> str:
     return path
 
 
+def cleanup_old_batches(retain_per_proxy: int = 3, max_age_seconds: Optional[int] = None) -> None:
+    """
+    Keep only the latest N batches per proxy and optionally remove batches older than max_age_seconds.
+    """
+    try:
+        for pid, _ in list_batches():
+            # Gather and sort batches for this proxy
+            batches = [p for p_pid, p in list_batches(pid) if p_pid == pid]
+            batches.sort(key=lambda p: os.path.basename(p), reverse=True)
+            # Drop beyond retain_per_proxy
+            to_delete = batches[retain_per_proxy:]
+            # Age filter
+            if max_age_seconds is not None:
+                now_ts = int(datetime.now(tz=KST_TZ).timestamp())
+                to_delete_age_filtered: List[str] = []
+                for path in batches:
+                    # infer timestamp from filename
+                    try:
+                        base = os.path.basename(path)
+                        ts_str = base.replace("batch_", "").replace(".jsonl", "")
+                        dt = datetime.strptime(ts_str, "%Y%m%dT%H%M%S").replace(tzinfo=KST_TZ)
+                        if (now_ts - int(dt.timestamp())) > max_age_seconds:
+                            to_delete_age_filtered.append(path)
+                    except Exception:
+                        pass
+                # merge
+                path_set = set(to_delete)
+                path_set.update(to_delete_age_filtered)
+                to_delete = list(path_set)
+            for path in to_delete:
+                try:
+                    os.remove(path)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
 def _batch_filename(collected_at: datetime) -> str:
     # Use KST timestamp for consistency with app
     ts = collected_at.astimezone(KST_TZ).strftime("%Y%m%dT%H%M%S")
