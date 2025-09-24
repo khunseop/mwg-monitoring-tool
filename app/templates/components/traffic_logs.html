@@ -27,7 +27,7 @@
 				</div>
 			</div>
 		</div>
-		<div class="column is-4">
+		<div class="column is-3">
 			<div class="field">
 				<label class="label">검색어 (고정문자열)</label>
 				<input class="input" id="tlQuery" maxlength="256" placeholder="예: login">
@@ -50,13 +50,13 @@
 				</div>
 			</div>
 		</div>
-		<div class="column is-2">
+		<div class="column is-3">
 			<div class="field">
-				<button class="button is-primary is-fullwidth mt-4" id="tlLoadBtn">조회</button>
-				<div class="mt-4">
+				<div class="buttons is-right mt-4">
+					<button class="button is-primary" id="tlLoadBtn">조회</button>
 					<span id="tlStatus" class="tag is-light">대기</span>
-					<p id="tlError" class="help is-danger" style="display:none;"></p>
 				</div>
+				<p id="tlError" class="help is-danger" style="display:none;"></p>
 			</div>
 		</div>
 	</div>
@@ -85,8 +85,9 @@
 <!-- 업로드 분석 섹션 -->
 <div id="tlaSection" style="display:none;">
 	<div class="columns is-vcentered">
-		<div class="column is-6">
+		<div class="column is-7">
 			<div class="field">
+				<label class="label">로그 파일</label>
 				<div class="file has-name is-fullwidth" id="tlaFileWrap">
 					<label class="file-label">
 						<input class="file-input" type="file" id="tlaFile" accept=".log,text/plain">
@@ -105,12 +106,14 @@
 				<input class="input" type="number" id="tlaTopN" min="1" max="100" value="20">
 			</div>
 		</div>
-		<div class="column is-2">
-			<button class="button is-info is-fullwidth mt-4" id="tlaAnalyzeBtn">업로드 분석</button>
-		</div>
-		<div class="column is-2">
-			<span id="tlaStatus" class="tag is-light">대기</span>
-			<p id="tlaError" class="help is-danger" style="display:none;"></p>
+		<div class="column is-3">
+			<div class="field">
+				<div class="buttons is-right mt-4">
+					<button class="button is-primary" id="tlaAnalyzeBtn">업로드 분석</button>
+					<span id="tlaStatus" class="tag is-light">대기</span>
+				</div>
+				<p id="tlaError" class="help is-danger" style="display:none;"></p>
+			</div>
 		</div>
 	</div>
 
