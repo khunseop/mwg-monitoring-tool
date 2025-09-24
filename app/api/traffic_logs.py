@@ -149,7 +149,6 @@ async def analyze_traffic_log_upload(
 		raise HTTPException(status_code=400, detail="file is required")
 
 	from collections import Counter, defaultdict
-	import io
 
 	status_counter: Counter[int] = Counter()
 	host_counter: Counter[str] = Counter()
@@ -165,15 +164,12 @@ async def analyze_traffic_log_upload(
 	unique_clients: set[str] = set()
 	unique_hosts: set[str] = set()
 
-	# Wrap the binary file with a tolerant text decoder
-	buffered = io.BufferedReader(logfile.file)
-	text_stream = io.TextIOWrapper(buffered, encoding="utf-8", errors="ignore", newline="\n")
-
+	# Stream decode lines from the uploaded file without additional wrappers
 	try:
-		for line in text_stream:
-			if not line:
+		for bline in logfile.file:
+			if not bline:
 				continue
-			line = line.rstrip("\n")
+			line = bline.decode("utf-8", "ignore").rstrip("\n")
 			if not line:
 				continue
 			try:
@@ -221,11 +217,6 @@ async def analyze_traffic_log_upload(
 
 	except Exception as e:
 		raise HTTPException(status_code=400, detail=f"failed to read file: {str(e)}")
-	finally:
-		try:
-			text_stream.detach()
-		except Exception:
-			pass
 
 	def top_n(counter_like, n: int):
 		try:
