@@ -14,7 +14,7 @@ try:
     warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
 except Exception:
     pass
-import paramiko
+from app.utils.ssh import ssh_exec
 
 from app.database.database import get_db
 from app.models.proxy import Proxy
@@ -26,8 +26,8 @@ from app.schemas.session_record import (
 )
 from app.schemas.session_browser_config import (
     SessionBrowserConfig as SessionBrowserConfigSchema,
-    SessionBrowserConfigUpdateSafe,
 )
+from app.services.session_browser_config import get_or_create_config as _get_cfg_service
 from app.utils.crypto import decrypt_string_if_encrypted
 from app.storage import temp_store
 
@@ -53,43 +53,11 @@ def _ensure_timestamps(item: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _get_cfg(db: Session) -> SessionBrowserConfigModel:
-    cfg = db.query(SessionBrowserConfigModel).order_by(SessionBrowserConfigModel.id.asc()).first()
-    if not cfg:
-        cfg = SessionBrowserConfigModel()
-        db.add(cfg)
-        db.commit()
-        db.refresh(cfg)
-    return cfg
+    return _get_cfg_service(db)
 # Removed DB session query helpers; temp-store mode doesn't use them
 
 
 
-def _exec_ssh_command(host: str, username: str, password: str | None, port: int, command: str, timeout_sec: int) -> str:
-    client = paramiko.SSHClient()
-    # Host key policy will be set by caller
-    try:
-        client.connect(
-            hostname=host,
-            port=port,
-            username=username,
-            password=password,
-            timeout=timeout_sec,
-            auth_timeout=timeout_sec,
-            banner_timeout=timeout_sec,
-            disabled_algorithms={"cipher": ["3des-cbc", "des-cbc"]},
-        )
-        stdin, stdout, stderr = client.exec_command(command, timeout=timeout_sec)
-        stdout_str = stdout.read().decode(errors="ignore")
-        stderr_str = stderr.read().decode(errors="ignore")
-        if stderr_str and not stdout_str:
-            # Some commands may print warnings to stderr but still succeed. Prefer stdout when available.
-            raise RuntimeError(stderr_str.strip())
-        return stdout_str
-    finally:
-        try:
-            client.close()
-        except Exception:
-            pass
 
 
 def _parse_sessions(output: str) -> List[Dict[str, Any]]:
@@ -208,34 +176,19 @@ def _collect_for_proxy(proxy: Proxy, cfg: SessionBrowserConfigModel) -> Tuple[in
     command = f"{cfg.command_path} {cfg.command_args}".strip()
     try:
         t0 = time.perf_counter()
-        client = paramiko.SSHClient()
-        if (cfg.host_key_policy or "auto_add").lower() == "reject":
-            client.set_missing_host_key_policy(paramiko.RejectPolicy())
-        else:
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        try:
-            client.connect(
-                hostname=proxy.host,
-                port=cfg.ssh_port or 22,
-                username=proxy.username,
-                password=decrypt_string_if_encrypted(proxy.password),
-                timeout=cfg.timeout_sec or 10,
-                auth_timeout=cfg.timeout_sec or 10,
-                banner_timeout=cfg.timeout_sec or 10,
-                look_for_keys=False,
-                allow_agent=False,
-                disabled_algorithms={"cipher": ["3des-cbc", "des-cbc"]},
-            )
-            stdin, stdout, stderr = client.exec_command(command, timeout=cfg.timeout_sec or 10)
-            stdout_str = stdout.read().decode(errors="ignore")
-            stderr_str = stderr.read().decode(errors="ignore")
-            if stderr_str and not stdout_str:
-                raise RuntimeError(stderr_str.strip())
-        finally:
-            try:
-                client.close()
-            except Exception:
-                pass
+        stdout_str = ssh_exec(
+            host=proxy.host,
+            port=cfg.ssh_port or 22,
+            username=proxy.username,
+            password=decrypt_string_if_encrypted(proxy.password),
+            command=command,
+            timeout_sec=cfg.timeout_sec or 10,
+            auth_timeout_sec=cfg.timeout_sec or 10,
+            banner_timeout_sec=cfg.timeout_sec or 10,
+            host_key_policy=cfg.host_key_policy or "auto_add",
+            look_for_keys=False,
+            allow_agent=False,
+        )
         t1 = time.perf_counter()
         records = _parse_sessions(stdout_str)
         t2 = time.perf_counter()
@@ -400,46 +353,58 @@ async def latest_sessions(proxy_id: int, db: Session = Depends(get_db)):
     return out
 
 
-@router.get("/session-browser/config", response_model=SessionBrowserConfigSchema)
-def get_session_browser_config(db: Session = Depends(get_db)):
-    cfg = _get_cfg(db)
-    return SessionBrowserConfigSchema(
-        id=cfg.id,
-        ssh_port=cfg.ssh_port,
-        command_path=cfg.command_path,
-        command_args=cfg.command_args,
-        timeout_sec=cfg.timeout_sec,
-        host_key_policy=cfg.host_key_policy,
-        max_workers=cfg.max_workers,
-        created_at=cfg.created_at,
-        updated_at=cfg.updated_at,
-    )
-
-
-@router.put("/session-browser/config", response_model=SessionBrowserConfigSchema)
-def update_session_browser_config(payload: SessionBrowserConfigUpdateSafe, db: Session = Depends(get_db)):
-    cfg = _get_cfg(db)
-    # Only allow safe fields to update; prevent command_path/command_args modifications
-    cfg.ssh_port = payload.ssh_port
-    cfg.timeout_sec = payload.timeout_sec
-    cfg.host_key_policy = payload.host_key_policy
-    cfg.max_workers = payload.max_workers
-    db.commit()
-    db.refresh(cfg)
-    return SessionBrowserConfigSchema(
-        id=cfg.id,
-        ssh_port=cfg.ssh_port,
-        command_path=cfg.command_path,
-        command_args=cfg.command_args,
-        timeout_sec=cfg.timeout_sec,
-        host_key_policy=cfg.host_key_policy,
-        max_workers=cfg.max_workers,
-        created_at=cfg.created_at,
-        updated_at=cfg.updated_at,
-    )
+ 
 
 
 # DataTables server-side endpoint for large datasets
+def _load_latest_rows_for_proxies(db: Session, target_ids: List[int]) -> List[Dict[str, Any]]:
+    host_map: Dict[int, str] = {}
+    if target_ids:
+        for p in db.query(Proxy).filter(Proxy.id.in_(target_ids)).all():
+            host_map[p.id] = p.host
+    rows: List[Dict[str, Any]] = []
+    for pid in target_ids:
+        batch = temp_store.read_latest(pid)
+        for idx, rec in enumerate(batch):
+            r = dict(rec)
+            r.setdefault("proxy_id", pid)
+            r.setdefault("host", host_map.get(pid, f"#{pid}"))
+            r["__line_index"] = idx
+            rows.append(r)
+    return rows
+
+
+def _filter_rows(rows: List[Dict[str, Any]], search: str | None) -> List[Dict[str, Any]]:
+    if not search:
+        return rows
+    s = str(search).lower()
+    def include(row: Dict[str, Any]) -> bool:
+        for key in ("transaction", "user_name", "client_ip", "server_ip", "protocol", "status", "url", "host"):
+            val = row.get(key)
+            if val is not None and s in str(val).lower():
+                return True
+        return False
+    return [r for r in rows if include(r)]
+
+
+def _sort_key_func(order_col: int | None):
+    def sort_key(row: Dict[str, Any]):
+        mapping = {
+            0: (row.get("host") or ""),
+            1: row.get("creation_time") or "",
+            2: row.get("user_name") or "",
+            3: row.get("client_ip") or "",
+            4: row.get("server_ip") or "",
+            5: row.get("cl_bytes_received") or -1,
+            6: row.get("cl_bytes_sent") or -1,
+            7: row.get("age_seconds") or -1,
+            8: row.get("url") or "",
+            9: 0,
+        }
+        return mapping.get(order_col or 1)
+    return sort_key
+
+
 @router.get("/session-browser/datatables")
 async def sessions_datatables(
     request: Request,
@@ -466,58 +431,18 @@ async def sessions_datatables(
             draw = 0
         return {"draw": draw, "recordsTotal": 0, "recordsFiltered": 0, "data": []}
 
-    # Build proxy_id -> host mapping for display
-    host_map: Dict[int, str] = {}
-    if target_ids:
-        for p in db.query(Proxy).filter(Proxy.id.in_(target_ids)).all():
-            host_map[p.id] = p.host
-
-    # Load latest rows from temp store
-    rows: List[Dict[str, Any]] = []
-    for pid in target_ids:
-        batch = temp_store.read_latest(pid)
-        for idx, rec in enumerate(batch):
-            r = dict(rec)
-            r.setdefault("proxy_id", pid)
-            r.setdefault("host", host_map.get(pid, f"#{pid}"))
-            r["__line_index"] = idx
-            rows.append(r)
+    # Load latest rows
+    rows = _load_latest_rows_for_proxies(db, target_ids)
 
     records_total = len(rows)
 
-    # Apply simple search filter
-    def include(row: Dict[str, Any]) -> bool:
-        if not search:
-            return True
-        s = str(search).lower()
-        for key in ("transaction", "user_name", "client_ip", "server_ip", "protocol", "status", "url", "host"):
-            val = row.get(key)
-            if val is not None and s in str(val).lower():
-                return True
-        return False
-
-    filtered = [r for r in rows if include(r)]
+    filtered = _filter_rows(rows, search)
     records_filtered = len(filtered)
 
     # Ordering
-    def sort_key(row: Dict[str, Any]):
-        mapping = {
-            0: (row.get("host") or ""),
-            1: row.get("creation_time") or "",
-            2: row.get("user_name") or "",
-            3: row.get("client_ip") or "",
-            4: row.get("server_ip") or "",
-            5: row.get("cl_bytes_received") or -1,
-            6: row.get("cl_bytes_sent") or -1,
-            7: row.get("age_seconds") or -1,
-            8: row.get("url") or "",
-            9: 0,
-        }
-        return mapping.get(order_col or 1)
-
     reverse = (order_dir or "desc").lower() == "desc"
     try:
-        filtered.sort(key=sort_key, reverse=reverse)
+        filtered.sort(key=_sort_key_func(order_col), reverse=reverse)
     except Exception:
         pass
 
@@ -606,51 +531,20 @@ async def sessions_export(
             "Content-Disposition": f"attachment; filename={filename}"
         })
 
-    host_map: Dict[int, str] = {}
-    if target_ids:
-        for p in db.query(Proxy).filter(Proxy.id.in_(target_ids)).all():
-            host_map[p.id] = p.host
-
     # Load rows
-    rows: List[Dict[str, Any]] = []
-    for pid in target_ids:
-        batch = temp_store.read_latest(pid)
-        for idx, rec in enumerate(batch):
-            r = dict(rec)
-            r.setdefault("proxy_id", pid)
-            r.setdefault("host", host_map.get(pid, f"#{pid}"))
-            r["id"] = temp_store.build_record_id(pid, str(r.get("collected_at") or ""), idx)
-            rows.append(r)
+    rows = _load_latest_rows_for_proxies(db, target_ids)
+    for r in rows:
+        pid = int(r.get("proxy_id") or 0)
+        idx = int(r.get("__line_index") or 0)
+        r["id"] = temp_store.build_record_id(pid, str(r.get("collected_at") or ""), idx)
 
     # Filter
-    def include(row: Dict[str, Any]) -> bool:
-        if not search:
-            return True
-        s = str(search).lower()
-        for key in ("transaction", "user_name", "client_ip", "server_ip", "protocol", "status", "url", "host"):
-            val = row.get(key)
-            if val is not None and s in str(val).lower():
-                return True
-        return False
-    filtered = [r for r in rows if include(r)]
+    filtered = _filter_rows(rows, search)
 
     # Order similarly to datatables
-    def sort_key(row: Dict[str, Any]):
-        mapping = {
-            0: (row.get("host") or ""),
-            1: row.get("creation_time") or "",
-            2: row.get("user_name") or "",
-            3: row.get("client_ip") or "",
-            4: row.get("server_ip") or "",
-            5: row.get("cl_bytes_received") or -1,
-            6: row.get("cl_bytes_sent") or -1,
-            7: row.get("age_seconds") or -1,
-            8: row.get("url") or "",
-        }
-        return mapping.get(order_col or 1)
     reverse = (order_dir or "desc").lower() == "desc"
     try:
-        filtered.sort(key=sort_key, reverse=reverse)
+        filtered.sort(key=_sort_key_func(order_col), reverse=reverse)
     except Exception:
         pass
 

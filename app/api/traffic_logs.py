@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import shlex
-import paramiko
+from app.utils.ssh import ssh_exec
 
 from app.database.database import get_db
 from app.models.proxy import Proxy
@@ -46,34 +46,20 @@ def _build_remote_command(log_path: str, q: Optional[str], limit: int, direction
 
 
 def _ssh_exec(host: str, port: int, username: str, password: Optional[str], command: str) -> str:
-	client = paramiko.SSHClient()
-	client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-	try:
-		client.connect(
-			hostname=host,
-			port=port,
-			username=username,
-			password=password,
-			timeout=5.0,
-			auth_timeout=5.0,
-			banner_timeout=5.0,
-		)
-		stdin, stdout, stderr = client.exec_command(command, timeout=7.0)
-		output = stdout.read().decode("utf-8", errors="replace")
-		err = stderr.read().decode("utf-8", errors="replace")
-		exit_status = stdout.channel.recv_exit_status()
-		if exit_status != 0:
-			raise HTTPException(status_code=502, detail=f"remote command failed: {err.strip() or exit_status}")
-		return output
-	except HTTPException:
-		raise
-	except Exception as e:
-		raise HTTPException(status_code=502, detail=f"ssh error: {str(e)}")
-	finally:
-		try:
-			client.close()
-		except Exception:
-			pass
+    try:
+        return ssh_exec(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            command=command,
+            timeout_sec=7,
+            auth_timeout_sec=5,
+            banner_timeout_sec=5,
+            host_key_policy="auto_add",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"ssh error: {str(e)}")
 
 
 @router.get("/traffic-logs/{proxy_id}", response_model=TrafficLogResponse)
