@@ -22,6 +22,14 @@
 		$('#tlaBlocked').text(summary.blocked_requests || 0);
 		$('#tlaRecv').text(humanBytes(summary.total_recv_bytes || 0));
 		$('#tlaSent').text(humanBytes(summary.total_sent_bytes || 0));
+		var start = summary.time_range_start || null;
+		var end = summary.time_range_end || null;
+		var fmt = function(x){
+			if(!x) return '-';
+			try{ return (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(x) : String(x); }catch(e){ return String(x); }
+		};
+		$('#tlaTimeStart').text(fmt(start));
+		$('#tlaTimeEnd').text(fmt(end));
 		$('#tlaSummary').show();
 	}
 
@@ -45,15 +53,6 @@
 
 	function renderCharts(payload){
 		if(!payload) return;
-		const statusCounts = payload.summary && payload.summary.status_counts ? payload.summary.status_counts : {};
-		const statusKeys = Object.keys(statusCounts).sort((a,b)=>Number(a)-Number(b));
-		ensureChart('tlaChartStatus', 'bar', {
-			series: [{ name: 'count', data: statusKeys.map(k => statusCounts[k] || 0) }],
-			xaxis: { categories: statusKeys },
-			yaxis: { labels: { formatter: v => String(Math.round(v)) } },
-			title: { text: '' }
-		});
-
 		const top = payload.top || {};
 		const sClientReq = toBarSeriesFromPairs(top.clients_by_requests || []);
 		ensureChart('tlaChartClientReq', 'bar', { series: [{ name: 'req', data: sClientReq.data }], xaxis: { categories: sClientReq.categories, labels: { rotate: -45 } } });
@@ -69,6 +68,12 @@
 
 		const sUrls = toBarSeriesFromPairs(top.urls_by_requests || []);
 		ensureChart('tlaChartUrls', 'bar', { series: [{ name: 'req', data: sUrls.data }], xaxis: { categories: sUrls.categories, labels: { rotate: -45, trim: true } }, dataLabels: { enabled: false } });
+
+		const sHostDown = toBarSeriesFromPairs(top.hosts_by_download_bytes || []);
+		ensureChart('tlaChartHostDown', 'bar', { series: [{ name: 'bytes', data: sHostDown.data }], xaxis: { categories: sHostDown.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
+
+		const sHostUp = toBarSeriesFromPairs(top.hosts_by_upload_bytes || []);
+		ensureChart('tlaChartHostUp', 'bar', { series: [{ name: 'bytes', data: sHostUp.data }], xaxis: { categories: sHostUp.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
 
 		$('#tlaCharts').show();
 	}

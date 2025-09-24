@@ -150,12 +150,13 @@ async def analyze_traffic_log_upload(
 
 	from collections import Counter, defaultdict
 
-	status_counter: Counter[int] = Counter()
 	host_counter: Counter[str] = Counter()
 	url_counter: Counter[str] = Counter()
 	client_req_counter: Counter[str] = Counter()
 	client_download_bytes: defaultdict[str, int] = defaultdict(int)
 	client_upload_bytes: defaultdict[str, int] = defaultdict(int)
+	host_download_bytes: defaultdict[str, int] = defaultdict(int)
+	host_upload_bytes: defaultdict[str, int] = defaultdict(int)
 	blocked_count = 0
 	total_recv = 0
 	total_sent = 0
@@ -163,6 +164,8 @@ async def analyze_traffic_log_upload(
 	unparsed_lines = 0
 	unique_clients: set[str] = set()
 	unique_hosts: set[str] = set()
+	earliest_dt = None
+	latest_dt = None
 
 	# Stream decode lines from the uploaded file without additional wrappers
 	try:
@@ -187,10 +190,9 @@ async def analyze_traffic_log_upload(
 			sent_b = rec.get("sent_byte") or 0
 			action_names = str(rec.get("action_names") or "")
 			block_id = str(rec.get("block_id") or "")
+			dt_str = rec.get("datetime")
 
 			# Counters
-			if isinstance(status, int):
-				status_counter[status] += 1
 			if client_ip:
 				client_req_counter[client_ip] += 1
 				unique_clients.add(client_ip)
@@ -209,11 +211,30 @@ async def analyze_traffic_log_upload(
 			if client_ip and isinstance(sent_b, int):
 				client_upload_bytes[client_ip] += max(0, sent_b)
 				total_sent += max(0, sent_b)
+			if url_host and isinstance(recv_b, int):
+				host_download_bytes[url_host] += max(0, recv_b)
+			if url_host and isinstance(sent_b, int):
+				host_upload_bytes[url_host] += max(0, sent_b)
 
 			# Blocked detection: action includes 'block' or block_id present
-			act_lower = action_names.lower()
-			if ("block" in act_lower) or (block_id != ""):
+			act_eq_block = action_names.strip().lower() == "block"
+			if act_eq_block:
 				blocked_count += 1
+
+			# Track time range if datetime present
+			if dt_str:
+				try:
+					s = str(dt_str).strip()
+					if s.startswith("[") and s.endswith("]"):
+						s = s[1:-1]
+					from datetime import datetime as _dt
+					dt_val = _dt.strptime(s, "%d/%b/%Y:%H:%M:%S %z")
+					if earliest_dt is None or dt_val < earliest_dt:
+						earliest_dt = dt_val
+					if latest_dt is None or dt_val > latest_dt:
+						latest_dt = dt_val
+				except Exception:
+					pass
 
 	except Exception as e:
 		raise HTTPException(status_code=400, detail=f"failed to read file: {str(e)}")
@@ -237,7 +258,8 @@ async def analyze_traffic_log_upload(
 			"total_recv_bytes": total_recv,
 			"total_sent_bytes": total_sent,
 			"blocked_requests": blocked_count,
-			"status_counts": {str(k): v for k, v in sorted(status_counter.items(), key=lambda kv: kv[0])},
+			"time_range_start": (earliest_dt.isoformat() if earliest_dt else None),
+			"time_range_end": (latest_dt.isoformat() if latest_dt else None),
 		},
 		"top": {
 			"hosts_by_requests": top_n(host_counter, topN),
@@ -245,6 +267,8 @@ async def analyze_traffic_log_upload(
 			"clients_by_requests": top_n(client_req_counter, topN),
 			"clients_by_download_bytes": top_n(client_download_bytes, topN),
 			"clients_by_upload_bytes": top_n(client_upload_bytes, topN),
+			"hosts_by_download_bytes": top_n(host_download_bytes, topN),
+			"hosts_by_upload_bytes": top_n(host_upload_bytes, topN),
 		},
 	}
 
