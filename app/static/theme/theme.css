@@ -264,7 +264,7 @@ body {
 
 /* Keep table width when empty */
 #sbTable { min-width: 1200px; }
-#sbTable thead th { white-space: nowrap; }
+#sbTable thead th { white-space: nowrap; min-width: 110px; }
 
 /* Tags */
 .tag.is-light { background: color-mix(in srgb, var(--color-primary) 10%, white); color: var(--color-primary); border: 1px solid color-mix(in srgb, var(--color-primary) 20%, white); }
