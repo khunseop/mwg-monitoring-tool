@@ -1,6 +1,7 @@
 (function(){
 	const API_BASE = '/api';
 	let charts = {};
+	const STORAGE_KEY = 'tla_result_v1';
 
 	function setStatus(text, cls){
 		const $tag = $('#tlaStatus');
@@ -38,7 +39,7 @@
 		if(charts[id]){ try { charts[id].destroy(); } catch(e){} charts[id] = null; }
 		const el = document.querySelector('#' + id);
 		if(!el) return null;
-		const base = { chart: { type, height: 280, animations: { dynamicAnimation: { speed: 250 } } }, legend: { show: false }, noData: { text: 'No data' } };
+		const base = { chart: { type, height: 280, animations: { dynamicAnimation: { speed: 250 } } }, legend: { show: false }, noData: { text: 'No data' }, dataLabels: { enabled: false } };
 		const opts = Object.assign({}, base, options || {});
 		charts[id] = new ApexCharts(el, opts);
 		charts[id].render();
@@ -54,28 +55,45 @@
 	function renderCharts(payload){
 		if(!payload) return;
 		const top = payload.top || {};
+		// 1) 요청 상위 클라이언트
 		const sClientReq = toBarSeriesFromPairs(top.clients_by_requests || []);
 		ensureChart('tlaChartClientReq', 'bar', { series: [{ name: 'req', data: sClientReq.data }], xaxis: { categories: sClientReq.categories, labels: { rotate: -45 } } });
-
-		const sClientDown = toBarSeriesFromPairs(top.clients_by_download_bytes || []);
-		ensureChart('tlaChartClientDown', 'bar', { series: [{ name: 'bytes', data: sClientDown.data }], xaxis: { categories: sClientDown.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
-
-		const sClientUp = toBarSeriesFromPairs(top.clients_by_upload_bytes || []);
-		ensureChart('tlaChartClientUp', 'bar', { series: [{ name: 'bytes', data: sClientUp.data }], xaxis: { categories: sClientUp.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
-
+		// 2) 요청 상위 호스트
 		const sHosts = toBarSeriesFromPairs(top.hosts_by_requests || []);
 		ensureChart('tlaChartHosts', 'bar', { series: [{ name: 'req', data: sHosts.data }], xaxis: { categories: sHosts.categories, labels: { rotate: -45 } } });
-
-		const sUrls = toBarSeriesFromPairs(top.urls_by_requests || []);
-		ensureChart('tlaChartUrls', 'bar', { series: [{ name: 'req', data: sUrls.data }], xaxis: { categories: sUrls.categories, labels: { rotate: -45, trim: true } }, dataLabels: { enabled: false } });
-
+		// 3) 다운로드 상위 클라이언트
+		const sClientDown = toBarSeriesFromPairs(top.clients_by_download_bytes || []);
+		ensureChart('tlaChartClientDown', 'bar', { series: [{ name: 'bytes', data: sClientDown.data }], xaxis: { categories: sClientDown.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
+		// 4) 업로드 상위 클라이언트
+		const sClientUp = toBarSeriesFromPairs(top.clients_by_upload_bytes || []);
+		ensureChart('tlaChartClientUp', 'bar', { series: [{ name: 'bytes', data: sClientUp.data }], xaxis: { categories: sClientUp.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
+		// 5) 다운로드 상위 호스트
 		const sHostDown = toBarSeriesFromPairs(top.hosts_by_download_bytes || []);
 		ensureChart('tlaChartHostDown', 'bar', { series: [{ name: 'bytes', data: sHostDown.data }], xaxis: { categories: sHostDown.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
-
+		// 6) 업로드 상위 호스트
 		const sHostUp = toBarSeriesFromPairs(top.hosts_by_upload_bytes || []);
 		ensureChart('tlaChartHostUp', 'bar', { series: [{ name: 'bytes', data: sHostUp.data }], xaxis: { categories: sHostUp.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
+		// 7) 요청 상위 URL
+		const sUrls = toBarSeriesFromPairs(top.urls_by_requests || []);
+		ensureChart('tlaChartUrls', 'bar', { series: [{ name: 'req', data: sUrls.data }], xaxis: { categories: sUrls.categories, labels: { rotate: -45, trim: true } } });
 
 		$('#tlaCharts').show();
+	}
+
+	function saveResult(payload){
+		try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); }catch(e){}
+	}
+
+	function restoreResult(){
+		try{
+			const raw = localStorage.getItem(STORAGE_KEY);
+			if(!raw) return;
+			const data = JSON.parse(raw);
+			if(!data || typeof data !== 'object') return;
+			renderSummary(data.summary || {});
+			renderCharts(data);
+			setStatus('저장된 분석 결과', 'is-light');
+		}catch(e){}
 	}
 
 	async function analyze(){
@@ -99,6 +117,7 @@
 			const data = await res.json();
 			renderSummary(data.summary || {});
 			renderCharts(data);
+			saveResult(data);
 			setStatus('완료', 'is-success');
 		}catch(e){
 			showError(e.message || String(e));
@@ -114,6 +133,7 @@
 			$('#tlaFileName').text(f ? (f.name + ' (' + (f.size||0) + ' bytes)') : '선택된 파일 없음');
 		});
 		$('#tlaAnalyzeBtn').on('click', analyze);
+		restoreResult();
 	});
 })();
 
