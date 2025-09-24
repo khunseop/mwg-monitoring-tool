@@ -4,6 +4,10 @@
 <div class="box">
 	<h3 class="title is-4">트래픽 로그</h3>
 
+	<div class="notification is-link is-light mb-4">
+		파일 업로드 분석을 통해 과부하 원인(대용량 다운로드/업로드, 과다 요청, 차단, 특정 URL/Host 집중)을 빠르게 파악할 수 있습니다.
+	</div>
+
 	<div class="columns is-vcentered">
 		<div class="column is-3">
 			<div class="field">
@@ -70,6 +74,65 @@
 			<tbody id="tlTableBody"></tbody>
 		</table>
 	</div>
+
+	<hr>
+
+	<h4 class="title is-5">업로드하여 로그 파일 분석</h4>
+	<div class="columns is-vcentered">
+		<div class="column is-6">
+			<div class="field">
+				<div class="file has-name is-fullwidth" id="tlaFileWrap">
+					<label class="file-label">
+						<input class="file-input" type="file" id="tlaFile" accept=".log,text/plain">
+						<span class="file-cta">
+							<span class="file-icon"><i class="fas fa-upload"></i></span>
+							<span class="file-label">로그 파일 선택…</span>
+						</span>
+						<span class="file-name" id="tlaFileName">선택된 파일 없음</span>
+					</label>
+				</div>
+			</div>
+		</div>
+		<div class="column is-2">
+			<div class="field">
+				<label class="label">Top N</label>
+				<input class="input" type="number" id="tlaTopN" min="1" max="100" value="20">
+			</div>
+		</div>
+		<div class="column is-2">
+			<button class="button is-info is-fullwidth mt-4" id="tlaAnalyzeBtn">업로드 분석</button>
+		</div>
+		<div class="column is-2">
+			<span id="tlaStatus" class="tag is-light">대기</span>
+			<p id="tlaError" class="help is-danger" style="display:none;"></p>
+		</div>
+	</div>
+
+	<div id="tlaSummary" class="columns is-multiline" style="display:none;">
+		<div class="column is-2"><div class="box has-text-centered"><p class="heading">총 라인</p><p class="title is-5" id="tlaTotalLines">0</p></div></div>
+		<div class="column is-2"><div class="box has-text-centered"><p class="heading">파싱 성공</p><p class="title is-5" id="tlaParsed">0</p></div></div>
+		<div class="column is-2"><div class="box has-text-centered"><p class="heading">파싱 실패</p><p class="title is-5" id="tlaUnparsed">0</p></div></div>
+		<div class="column is-2"><div class="box has-text-centered"><p class="heading">클라이언트 수</p><p class="title is-5" id="tlaClients">0</p></div></div>
+		<div class="column is-2"><div class="box has-text-centered"><p class="heading">호스트 수</p><p class="title is-5" id="tlaHosts">0</p></div></div>
+		<div class="column is-2"><div class="box has-text-centered"><p class="heading">차단 수</p><p class="title is-5" id="tlaBlocked">0</p></div></div>
+		<div class="column is-3"><div class="box has-text-centered"><p class="heading">다운로드 바이트</p><p class="title is-6" id="tlaRecv">0</p></div></div>
+		<div class="column is-3"><div class="box has-text-centered"><p class="heading">업로드 바이트</p><p class="title is-6" id="tlaSent">0</p></div></div>
+	</div>
+
+	<div id="tlaCharts" style="display:none;">
+		<div class="columns">
+			<div class="column is-6"><div class="box"><h5 class="title is-6">상태코드 분포</h5><div id="tlaChartStatus"></div></div></div>
+			<div class="column is-6"><div class="box"><h5 class="title is-6">요청 상위 클라이언트</h5><div id="tlaChartClientReq"></div></div></div>
+		</div>
+		<div class="columns">
+			<div class="column is-6"><div class="box"><h5 class="title is-6">다운로드 상위 클라이언트</h5><div id="tlaChartClientDown"></div></div></div>
+			<div class="column is-6"><div class="box"><h5 class="title is-6">업로드 상위 클라이언트</h5><div id="tlaChartClientUp"></div></div></div>
+		</div>
+		<div class="columns">
+			<div class="column is-6"><div class="box"><h5 class="title is-6">요청 상위 호스트</h5><div id="tlaChartHosts"></div></div></div>
+			<div class="column is-6"><div class="box"><h5 class="title is-6">요청 상위 URL</h5><div id="tlaChartUrls"></div></div></div>
+		</div>
+	</div>
 </div>
 
 <!-- DataTables (local) -->
@@ -77,8 +140,11 @@
 <link rel="stylesheet" href="/static/vendor/datatables/columnControl/columnControl.dataTables.min.css?v={{ request.app.version }}">
 <script src="/static/vendor/datatables/datatables.min.js?v={{ request.app.version }}"></script>
 <script src="/static/vendor/datatables/columnControl/dataTables.columnControl.min.js?v={{ request.app.version }}"></script>
+<!-- ApexCharts (local) -->
+<script src="/static/vendor/apexcharts/apexcharts.min.js?v={{ request.app.version }}"></script>
 
 <script src="/static/js/traffic_logs.js?v={{ request.app.version }}"></script>
+<script src="/static/js/traffic_logs_analyze.js?v={{ request.app.version }}"></script>
 
 <!-- 상세 모달 -->
 <div class="modal" id="tlDetailModal">

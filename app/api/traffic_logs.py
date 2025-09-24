@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -130,4 +130,132 @@ def get_traffic_log_detail(record_id: int, db: Session = Depends(get_db)):
     if not row:
         raise HTTPException(status_code=404, detail="Record not found")
     return row
+
+
+@router.post("/traffic-logs/analyze-upload")
+async def analyze_traffic_log_upload(
+	logfile: UploadFile = File(..., description="Traffic log file to analyze"),
+	topN: int = Query(default=20, ge=1, le=100),
+):
+	"""Analyze an uploaded traffic-log file in a streaming manner and return summary data.
+
+	This endpoint does not persist any data. It parses the uploaded file line-by-line and
+	computes aggregates helpful for detecting proxy overload causes (heavy downloads/uploads,
+	request spikes, blocks, hot URLs/hosts/clients, status distribution).
+	"""
+ 
+ 	# Defensive: restrict unbounded filenames/content-types
+ 	if not logfile:
+ 		raise HTTPException(status_code=400, detail="file is required")
+ 
+ 	from collections import Counter, defaultdict
+ 	import io
+ 
+ 	status_counter: Counter[int] = Counter()
+ 	host_counter: Counter[str] = Counter()
+ 	url_counter: Counter[str] = Counter()
+ 	client_req_counter: Counter[str] = Counter()
+ 	client_download_bytes: defaultdict[str, int] = defaultdict(int)
+ 	client_upload_bytes: defaultdict[str, int] = defaultdict(int)
+ 	blocked_count = 0
+ 	total_recv = 0
+ 	total_sent = 0
+ 	parsed_lines = 0
+ 	unparsed_lines = 0
+ 	unique_clients: set[str] = set()
+ 	unique_hosts: set[str] = set()
+ 
+ 	# Wrap the binary file with a tolerant text decoder
+ 	buffered = io.BufferedReader(logfile.file)
+ 	text_stream = io.TextIOWrapper(buffered, encoding="utf-8", errors="ignore", newline="\n")
+ 
+ 	try:
+ 		for line in text_stream:
+ 			if not line:
+ 				continue
+ 			line = line.rstrip("\n")
+ 			if not line:
+ 				continue
+ 			try:
+ 				rec = parse_log_line(line)
+ 				parsed_lines += 1
+ 			except Exception:
+ 				unparsed_lines += 1
+ 				continue
+ 
+ 			client_ip = str(rec.get("client_ip") or "")
+ 			url_host = str(rec.get("url_host") or "")
+ 			url_path = str(rec.get("url_path") or "")
+ 			status = rec.get("response_statuscode")
+ 			recv_b = rec.get("recv_byte") or 0
+ 			sent_b = rec.get("sent_byte") or 0
+ 			action_names = str(rec.get("action_names") or "")
+ 			block_id = str(rec.get("block_id") or "")
+ 
+ 			# Counters
+ 			if isinstance(status, int):
+ 				status_counter[status] += 1
+ 			if client_ip:
+ 				client_req_counter[client_ip] += 1
+ 				unique_clients.add(client_ip)
+ 			if url_host:
+ 				host_counter[url_host] += 1
+ 				unique_hosts.add(url_host)
+ 			# Join host and path for URL hotness (truncate key length reasonably)
+ 			if url_host or url_path:
+ 				url_key = (url_host + url_path)[:2048]
+ 				url_counter[url_key] += 1
+ 
+ 			# Byte aggregations per client
+ 			if client_ip and isinstance(recv_b, int):
+ 				client_download_bytes[client_ip] += max(0, recv_b)
+ 				total_recv += max(0, recv_b)
+ 			if client_ip and isinstance(sent_b, int):
+ 				client_upload_bytes[client_ip] += max(0, sent_b)
+ 				total_sent += max(0, sent_b)
+ 
+ 			# Blocked detection: action includes 'block' or block_id present
+ 			act_lower = action_names.lower()
+ 			if ("block" in act_lower) or (block_id != ""):
+ 				blocked_count += 1
+ 
+ 	except Exception as e:
+ 		raise HTTPException(status_code=400, detail=f"failed to read file: {str(e)}")
+ 	finally:
+ 		try:
+ 			text_stream.detach()
+ 		except Exception:
+ 			pass
+ 
+ 	def top_n(counter_like, n: int):
+ 		try:
+ 			return counter_like.most_common(n)
+ 		except AttributeError:
+ 			# for dict-like totals
+ 			items = list(counter_like.items())
+ 			items.sort(key=lambda kv: kv[1], reverse=True)
+ 			return items[:n]
+ 
+ 	result = {
+ 		"summary": {
+ 			"total_lines": parsed_lines + unparsed_lines,
+ 			"parsed_lines": parsed_lines,
+ 			"unparsed_lines": unparsed_lines,
+ 			"unique_clients": len(unique_clients),
+ 			"unique_hosts": len(unique_hosts),
+ 			"total_recv_bytes": total_recv,
+ 			"total_sent_bytes": total_sent,
+ 			"blocked_requests": blocked_count,
+ 			"status_counts": {str(k): v for k, v in sorted(status_counter.items(), key=lambda kv: kv[0])},
+ 		},
+ 		"top": {
+ 			"hosts_by_requests": top_n(host_counter, topN),
+ 			"urls_by_requests": top_n(url_counter, topN),
+ 			"clients_by_requests": top_n(client_req_counter, topN),
+ 			"clients_by_download_bytes": top_n(client_download_bytes, topN),
+ 			"clients_by_upload_bytes": top_n(client_upload_bytes, topN),
+ 		},
+ 	}
+ 
+ 	return result
 
