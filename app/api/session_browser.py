@@ -30,6 +30,7 @@ from app.schemas.session_browser_config import (
 from app.services.session_browser_config import get_or_create_config as _get_cfg_service
 from app.utils.crypto import decrypt_string_if_encrypted
 from app.storage import temp_store
+from urllib.parse import urlparse
 
 
 router = APIRouter()
@@ -623,3 +624,126 @@ async def sessions_export(
         "Content-Disposition": f"attachment; filename={filename}"
     })
 
+
+@router.get("/session-browser/analyze")
+async def sessions_analyze(
+    db: Session = Depends(get_db),
+    proxy_ids: str | None = Query(None, description="comma-separated proxy ids"),
+    topN: int = Query(20, ge=1, le=100),
+):
+    # Parse target proxy ids
+    target_ids: List[int] = []
+    if proxy_ids:
+        try:
+            target_ids = [int(x) for x in proxy_ids.split(",") if x.strip()]
+        except Exception:
+            target_ids = []
+    if not target_ids:
+        raise HTTPException(status_code=400, detail="proxy_ids required")
+
+    # Load latest batches
+    rows: List[Dict[str, Any]] = _load_latest_rows_for_proxies(db, target_ids)
+
+    # Aggregations
+    from collections import Counter, defaultdict
+
+    host_counter: Counter[str] = Counter()
+    url_counter: Counter[str] = Counter()
+    client_req_counter: Counter[str] = Counter()
+    client_download_bytes: defaultdict[str, int] = defaultdict(int)
+    client_upload_bytes: defaultdict[str, int] = defaultdict(int)
+    host_download_bytes: defaultdict[str, int] = defaultdict(int)
+    host_upload_bytes: defaultdict[str, int] = defaultdict(int)
+
+    total_recv = 0
+    total_sent = 0
+    unique_clients: set[str] = set()
+    unique_hosts: set[str] = set()
+    earliest_dt = None
+    latest_dt = None
+
+    def _parse_host(url_val: Any) -> str:
+        try:
+            s = str(url_val or "").strip()
+            if not s:
+                return ""
+            pu = urlparse(s)
+            return pu.hostname or ""
+        except Exception:
+            return ""
+
+    for rec in rows:
+        client_ip = str(rec.get("client_ip") or "")
+        url_full = rec.get("url")
+        url_host = _parse_host(url_full)
+        recv_b = rec.get("cl_bytes_received") or 0
+        sent_b = rec.get("cl_bytes_sent") or 0
+        ct = rec.get("creation_time") or rec.get("collected_at")
+
+        if client_ip:
+            client_req_counter[client_ip] += 1
+            unique_clients.add(client_ip)
+        if url_host:
+            host_counter[url_host] += 1
+            unique_hosts.add(url_host)
+        if url_full:
+            try:
+                key = str(url_full)[:2048]
+                url_counter[key] += 1
+            except Exception:
+                pass
+
+        if client_ip and isinstance(recv_b, int):
+            v = max(0, recv_b)
+            client_download_bytes[client_ip] += v
+            total_recv += v
+        if client_ip and isinstance(sent_b, int):
+            v = max(0, sent_b)
+            client_upload_bytes[client_ip] += v
+            total_sent += v
+        if url_host and isinstance(recv_b, int):
+            host_download_bytes[url_host] += max(0, recv_b)
+        if url_host and isinstance(sent_b, int):
+            host_upload_bytes[url_host] += max(0, sent_b)
+
+        # time range by creation_time if available, else collected_at
+        if ct:
+            try:
+                dt = datetime.fromisoformat(str(ct))
+                if earliest_dt is None or dt < earliest_dt:
+                    earliest_dt = dt
+                if latest_dt is None or dt > latest_dt:
+                    latest_dt = dt
+            except Exception:
+                pass
+
+    def top_n(counter_like, n: int):
+        try:
+            return counter_like.most_common(n)
+        except AttributeError:
+            items = list(counter_like.items())
+            items.sort(key=lambda kv: kv[1], reverse=True)
+            return items[:n]
+
+    result = {
+        "summary": {
+            "total_sessions": len(rows),
+            "unique_clients": len(unique_clients),
+            "unique_hosts": len(unique_hosts),
+            "total_recv_bytes": total_recv,
+            "total_sent_bytes": total_sent,
+            "time_range_start": (earliest_dt.isoformat() if earliest_dt else None),
+            "time_range_end": (latest_dt.isoformat() if latest_dt else None),
+        },
+        "top": {
+            "hosts_by_requests": top_n(host_counter, topN),
+            "urls_by_requests": top_n(url_counter, topN),
+            "clients_by_requests": top_n(client_req_counter, topN),
+            "clients_by_download_bytes": top_n(client_download_bytes, topN),
+            "clients_by_upload_bytes": top_n(client_upload_bytes, topN),
+            "hosts_by_download_bytes": top_n(host_download_bytes, topN),
+            "hosts_by_upload_bytes": top_n(host_upload_bytes, topN),
+        },
+    }
+
+    return result

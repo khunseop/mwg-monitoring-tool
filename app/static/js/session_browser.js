@@ -209,10 +209,12 @@ $(document).ready(function() {
             setStatus('완료');
             // Clear any cached items to avoid mixing old data on next restore; persist only selection
             saveState([]);
+            try { if (window.SbAnalyze && typeof window.SbAnalyze.run === 'function') { window.SbAnalyze.showSection(); window.SbAnalyze.run({ proxyIds: proxyIds }); } } catch (e) { /* ignore */ }
         }).catch(() => { setStatus('오류', true); showErr('수집 요청 중 오류가 발생했습니다.'); });
     }
 
     $('#sbLoadBtn').on('click', function() { loadLatest(); });
+    $('#sbAnalyzeBtn').on('click', function(){ try { if (window.SbAnalyze && typeof window.SbAnalyze.run === 'function') { window.SbAnalyze.showSection(); window.SbAnalyze.run({ proxyIds: getSelectedProxyIds() }); } } catch (e) {} });
     $('#sbExportBtn').on('click', function() {
         const params = {};
         const g = $('#sbGroupSelect').val();

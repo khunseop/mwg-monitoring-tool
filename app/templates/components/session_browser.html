@@ -85,6 +85,69 @@
                 <tbody></tbody>
             </table>
         </div>
+        
+        <!-- 분석 섹션 -->
+        <div id="sbAnalyzeSection" class="mt-5" style="display:none;">
+            <div class="level">
+                <div class="level-left">
+                    <div class="level-item">
+                        <h4 class="title is-5">세션 분석</h4>
+                    </div>
+                </div>
+                <div class="level-right">
+                    <div class="level-item">
+                        <div class="field has-addons">
+                            <p class="control">
+                                <span class="select">
+                                    <select id="sbTopN">
+                                        <option value="10">Top 10</option>
+                                        <option value="20" selected>Top 20</option>
+                                        <option value="50">Top 50</option>
+                                    </select>
+                                </span>
+                            </p>
+                            <p class="control">
+                                <button class="button is-link" id="sbAnalyzeBtn">분석 실행</button>
+                            </p>
+                            <p class="control">
+                                <span id="sbAnalyzeStatus" class="tag is-light">대기</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <p id="sbAnalyzeError" class="help is-danger" style="display:none;"></p>
+
+            <div id="sbSummary" class="columns is-multiline" style="display:none;">
+                <div class="column is-2"><div class="box has-text-centered"><p class="heading">총 세션</p><p class="title is-5" id="sbTotSessions">0</p></div></div>
+                <div class="column is-2"><div class="box has-text-centered"><p class="heading">클라이언트 수</p><p class="title is-5" id="sbClients">0</p></div></div>
+                <div class="column is-2"><div class="box has-text-centered"><p class="heading">호스트 수</p><p class="title is-5" id="sbHosts">0</p></div></div>
+                <div class="column is-3"><div class="box has-text-centered"><p class="heading">다운로드 바이트</p><p class="title is-6" id="sbRecv">0</p></div></div>
+                <div class="column is-3"><div class="box has-text-centered"><p class="heading">업로드 바이트</p><p class="title is-6" id="sbSent">0</p></div></div>
+                <div class="column is-3"><div class="box has-text-centered"><p class="heading">시작 시간</p><p class="title is-6" id="sbTimeStart">-</p></div></div>
+                <div class="column is-3"><div class="box has-text-centered"><p class="heading">종료 시간</p><p class="title is-6" id="sbTimeEnd">-</p></div></div>
+            </div>
+
+            <div id="sbCharts" style="display:none;">
+                <p class="mb-2 has-text-grey is-size-7">차트 막대를 클릭하면 항목 라벨(호스트/클라이언트/URL)을 복사합니다.</p>
+                <div class="columns">
+                    <div class="column is-6"><div class="box"><h5 class="title is-6">요청 상위 클라이언트</h5><div id="sbChartClientReq"></div></div></div>
+                    <div class="column is-6"><div class="box"><h5 class="title is-6">요청 상위 호스트</h5><div id="sbChartHosts"></div></div></div>
+                </div>
+                <div class="columns">
+                    <div class="column is-6"><div class="box"><h5 class="title is-6">다운로드 상위 클라이언트</h5><div id="sbChartClientDown"></div></div></div>
+                    <div class="column is-6"><div class="box"><h5 class="title is-6">업로드 상위 클라이언트</h5><div id="sbChartClientUp"></div></div></div>
+                </div>
+                <div class="columns">
+                    <div class="column is-6"><div class="box"><h5 class="title is-6">다운로드 상위 호스트</h5><div id="sbChartHostDown"></div></div></div>
+                    <div class="column is-6"><div class="box"><h5 class="title is-6">업로드 상위 호스트</h5><div id="sbChartHostUp"></div></div></div>
+                </div>
+                <div class="columns">
+                    <div class="column is-12"><div class="box"><h5 class="title is-6">요청 상위 URL</h5><div id="sbChartUrls"></div></div></div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -92,7 +155,8 @@
 <link rel="stylesheet" href="/static/vendor/datatables/datatables.min.css?v={{ request.app.version }}">
 <script src="/static/vendor/datatables/datatables.min.js?v={{ request.app.version }}"></script>
 
- 
+<!-- ApexCharts (local) -->
+<script src="/static/vendor/apexcharts/apexcharts.min.js?v={{ request.app.version }}"></script>
 
 <!-- 상세 모달 -->
 <div class="modal" id="sbDetailModal">
@@ -116,5 +180,6 @@
  </div>
 
 <script src="/static/js/session_browser.js?v={{ request.app.version }}"></script>
+<script src="/static/js/session_browser_analyze.js?v={{ request.app.version }}"></script>
 {% endblock %}
 
