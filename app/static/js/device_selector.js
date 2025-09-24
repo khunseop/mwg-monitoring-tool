@@ -106,20 +106,20 @@
 						populateProxies();
 						// Auto-select all proxies in the currently filtered group
 						var allVals = $proxy.find('option').map(function() { return $(this).val(); }).get();
-						try {
-							if (state.ts) { state.ts.setValue(allVals, true); }
-							else { $proxy.find('option').prop('selected', true); $proxy.trigger('change'); }
-						} catch (e) { /* ignore */ }
+					try {
+						if (state.ts) { state.ts.setValue(allVals, false); }
+						else { $proxy.find('option').prop('selected', true); $proxy.trigger('change'); }
+					} catch (e) { /* ignore */ }
 					});
 				}
 				if ($selectAll && $selectAll.length) {
 					$selectAll.off('.devicesel').on('change.devicesel', function() {
 						var checked = $(this).is(':checked');
 						var vals = $proxy.find('option').map(function() { return $(this).val(); }).get();
-						try {
-							if (state.ts) { state.ts.setValue(checked ? vals : [], true); }
-							else { $proxy.find('option').prop('selected', checked); $proxy.trigger('change'); }
-						} catch (e) { /* ignore */ }
+					try {
+						if (state.ts) { state.ts.setValue(checked ? vals : [], false); }
+						else { $proxy.find('option').prop('selected', checked); $proxy.trigger('change'); }
+					} catch (e) { /* ignore */ }
 					});
 				}
 			}
@@ -133,10 +133,10 @@
 				bindEvents(); 
 				if (!allowAllGroups) {
 					var currentVal = $group && $group.length ? $group.val() : '';
-					if (!currentVal) {
+						if (!currentVal) {
 						var first = (state.groups && state.groups.length) ? String(state.groups[0].id) : '';
 						if (first) {
-							try { if (state.gts) { state.gts.setValue(first, true); } else { $group.val(first).trigger('change'); } } catch (e) { /* ignore */ }
+								try { if (state.gts) { state.gts.setValue(first, false); } else { $group.val(first).trigger('change'); } } catch (e) { /* ignore */ }
 						}
 					}
 				}
