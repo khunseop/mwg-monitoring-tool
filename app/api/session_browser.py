@@ -126,14 +126,31 @@ def _parse_sessions(output: str) -> List[Dict[str, Any]]:
         cust_id = get_after(3)
         user_name = get_after(4)
         client_ip = get_after(5)
+        # Normalize client_ip: drop trailing :port for IPv4 forms (e.g., 1.2.3.4:56789)
+        def _strip_port(ip: Any) -> Any:
+            try:
+                s = str(ip or '').strip()
+                # Only strip patterns like a.b.c.d:port
+                if re.match(r"^\d+\.\d+\.\d+\.\d+:\d+$", s):
+                    return s.rsplit(":", 1)[0]
+                return s
+            except Exception:
+                return ip
+        client_ip = _strip_port(client_ip)
         client_side_mwg_ip = get_after(6)
         server_side_mwg_ip = get_after(7)
         server_ip = get_after(8)
 
-        cl_bytes_received = _to_int(get_after(9))
-        cl_bytes_sent = _to_int(get_after(10))
-        srv_bytes_received = _to_int(get_after(11))
-        srv_bytes_sent = _to_int(get_after(12))
+        # The device reports directions inversely to our UI expectation.
+        # Swap received/sent pairs for both client and server sides.
+        _cl_recv_raw = _to_int(get_after(9))
+        _cl_sent_raw = _to_int(get_after(10))
+        _srv_recv_raw = _to_int(get_after(11))
+        _srv_sent_raw = _to_int(get_after(12))
+        cl_bytes_received = _cl_sent_raw
+        cl_bytes_sent = _cl_recv_raw
+        srv_bytes_received = _srv_sent_raw
+        srv_bytes_sent = _srv_recv_raw
         trxn_index = _to_int(get_after(13))
         age_seconds = _to_int(get_after(14))
         status = get_after(15)
@@ -371,6 +388,13 @@ def _load_latest_rows_for_proxies(db: Session, target_ids: List[int]) -> List[Di
             r.setdefault("proxy_id", pid)
             r.setdefault("host", host_map.get(pid, f"#{pid}"))
             r["__line_index"] = idx
+            # Normalize client_ip by dropping ephemeral port if present
+            try:
+                cip = r.get("client_ip")
+                if isinstance(cip, str) and re.match(r"^\d+\.\d+\.\d+\.\d+:\d+$", cip.strip()):
+                    r["client_ip"] = cip.strip().rsplit(":", 1)[0]
+            except Exception:
+                pass
             rows.append(r)
     return rows
 
@@ -464,11 +488,18 @@ async def sessions_datatables(
         collected_iso = str(rec.get("collected_at") or "")
         line_index = int(rec.get("__line_index") or 0)
         rid_val = temp_store.build_record_id(pid, collected_iso, line_index)
+        # Ensure client_ip without port for display
+        try:
+            cip = rec.get("client_ip") or ""
+            if isinstance(cip, str) and re.match(r"^\d+\.\d+\.\d+\.\d+:\d+$", cip.strip()):
+                cip = cip.strip().rsplit(":", 1)[0]
+        except Exception:
+            cip = rec.get("client_ip") or ""
         data.append([
             host,
             ct_str,
             rec.get("user_name") or "",
-            rec.get("client_ip") or "",
+            cip,
             rec.get("server_ip") or "",
             str(cl_recv) if cl_recv is not None else "",
             str(cl_sent) if cl_sent is not None else "",
@@ -594,6 +625,13 @@ async def sessions_export(
                 if '"' in s or "," in s or "\n" in s or "\r" in s:
                     s = '"' + s.replace('"', '""') + '"'
                 return s
+            # normalize client ip for export
+            try:
+                cip = rec.get("client_ip") or ""
+                if isinstance(cip, str) and re.match(r"^\d+\.\d+\.\d+\.\d+:\d+$", cip.strip()):
+                    cip = cip.strip().rsplit(":", 1)[0]
+            except Exception:
+                cip = rec.get("client_ip") or ""
             row = [
                 esc(idx),
                 esc(host),
@@ -603,7 +641,7 @@ async def sessions_export(
                 esc(rec.get("protocol") or ""),
                 esc(rec.get("cust_id") or ""),
                 esc(rec.get("user_name") or ""),
-                esc(rec.get("client_ip") or ""),
+                esc(cip),
                 esc(rec.get("client_side_mwg_ip") or ""),
                 esc(rec.get("server_side_mwg_ip") or ""),
                 esc(rec.get("server_ip") or ""),
@@ -672,8 +710,17 @@ async def sessions_analyze(
         except Exception:
             return ""
 
+    def _strip_port_val(val: Any) -> str:
+        try:
+            s = str(val or "").strip()
+            if re.match(r"^\d+\.\d+\.\d+\.\d+:\d+$", s):
+                return s.rsplit(":", 1)[0]
+            return s
+        except Exception:
+            return str(val or "")
+
     for rec in rows:
-        client_ip = str(rec.get("client_ip") or "")
+        client_ip = _strip_port_val(rec.get("client_ip"))
         url_full = rec.get("url")
         url_host = _parse_host(url_full)
         recv_b = rec.get("cl_bytes_received") or 0

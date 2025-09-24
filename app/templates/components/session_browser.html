@@ -4,6 +4,14 @@
 <div class="box">
     <h3 class="title is-4">세션브라우저</h3>
 
+    <!-- 탭: 목록 / 분석 -->
+    <div class="tabs is-boxed mb-3" id="sbTabs">
+        <ul>
+            <li class="is-active"><a href="#" data-view="list">세션 목록</a></li>
+            <li><a href="#" data-view="analyze">분석</a></li>
+        </ul>
+    </div>
+
     <div class="accordion" id="sbSelectAccordion">
         <div class="accordion-header">
             <h4>대상 선택</h4>
@@ -63,7 +71,8 @@
         </div>
     </div>
 
-    <div class="mt-4">
+    <!-- 목록 섹션 -->
+    <div id="sbListSection" class="mt-4">
         <div id="sbEmptyState" class="box empty-state" style="display:none;">
             현재 표시할 데이터가 없습니다. 상단에서 대상을 선택하고 "세션 불러오기"를 클릭하세요.
         </div>
@@ -107,7 +116,7 @@
                                 </span>
                             </p>
                             <p class="control">
-                                <button class="button is-link" id="sbAnalyzeBtn">분석 실행</button>
+                                <button class="button is-primary" id="sbAnalyzeBtn">분석 실행</button>
                             </p>
                             <p class="control">
                                 <span id="sbAnalyzeStatus" class="tag is-light">대기</span>
