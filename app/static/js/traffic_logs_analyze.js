@@ -14,6 +14,27 @@
 
 	function humanBytes(v){ return (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(v) : String(v); }
 
+	function copyTextToClipboard(text){
+		if(!text) return;
+		try{
+			if(navigator.clipboard && navigator.clipboard.writeText){
+				navigator.clipboard.writeText(String(text)).then(function(){ setStatus('복사됨: ' + String(text), 'is-success'); }).catch(function(){ /* noop */ });
+				return;
+			}
+			var ta = document.createElement('textarea');
+			ta.value = String(text);
+			ta.style.position = 'fixed';
+			ta.style.left = '-1000px';
+			ta.style.top = '-1000px';
+			document.body.appendChild(ta);
+			ta.focus();
+			ta.select();
+			document.execCommand('copy');
+			document.body.removeChild(ta);
+			setStatus('복사됨: ' + String(text), 'is-success');
+		}catch(e){ /* ignore */ }
+	}
+
 	function renderSummary(summary){
 		$('#tlaTotalLines').text(summary.total_lines || 0);
 		$('#tlaParsed').text(summary.parsed_lines || 0);
@@ -39,7 +60,7 @@
 		if(charts[id]){ try { charts[id].destroy(); } catch(e){} charts[id] = null; }
 		const el = document.querySelector('#' + id);
 		if(!el) return null;
-		const base = { chart: { type, height: 280, animations: { dynamicAnimation: { speed: 250 } } }, legend: { show: false }, noData: { text: 'No data' }, dataLabels: { enabled: false } };
+		const base = { chart: { type, height: 280, animations: { dynamicAnimation: { speed: 250 } }, events: { dataPointSelection: function(event, chartCtx, config){ try { var w = (config && config.w) || (chartCtx && chartCtx.w) || null; var idx = (config && typeof config.dataPointIndex === 'number') ? config.dataPointIndex : -1; var labels = (w && w.globals && (w.globals.labels && w.globals.labels.length ? w.globals.labels : w.globals.categoryLabels)) || []; var label = (idx >= 0 && labels && labels[idx] != null) ? labels[idx] : ''; if(!label && w && w.config && w.config.xaxis && w.config.xaxis.categories){ label = w.config.xaxis.categories[idx] || ''; } if(label){ copyTextToClipboard(String(label)); } } catch(e){} } } }, legend: { show: false }, noData: { text: 'No data' }, dataLabels: { enabled: false } };
 		const opts = Object.assign({}, base, options || {});
 		charts[id] = new ApexCharts(el, opts);
 		charts[id].render();
