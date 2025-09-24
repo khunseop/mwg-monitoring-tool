@@ -153,7 +153,6 @@ function deleteProxy(id) {
 function loadGroups() {
     $.get('/api/proxy-groups')
         .done(groups => {
-            console.log('Loaded groups:', groups);  // 디버깅용
             const tbody = $('#groupTableBody');
             tbody.empty();
             
@@ -174,7 +173,6 @@ function loadGroups() {
             });
         })
         .fail((xhr) => {
-            console.error('Failed to load groups:', xhr);  // 디버깅용
             if (window.AppUtils) AppUtils.showError('그룹 목록을 불러오는데 실패했습니다.');
         });
 }
