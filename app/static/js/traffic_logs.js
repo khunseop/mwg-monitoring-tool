@@ -4,6 +4,7 @@
 	const STORAGE_KEY = 'tl_state_v1';
 	let LAST_RENDERED_HASH = null;
 	let IS_RESTORING = false;
+	let CURRENT_VIEW = 'remote';
 	const COLS = [
 		"datetime","username","client_ip","url_destination_ip","timeintransaction",
 		"response_statuscode","cache_status","comm_name","url_protocol","url_host",
@@ -101,6 +102,7 @@
 			if(raw){ prev = JSON.parse(raw); }
 		}catch(e){ /* ignore */ }
 		const state = {
+			view: CURRENT_VIEW,
 			proxyId: $('#tlProxySelect').val() || '',
 			query: ($('#tlQuery').val() || '').trim(),
 			limit: $('#tlLimit').val() || '200',
@@ -118,6 +120,7 @@
 			const raw = localStorage.getItem(STORAGE_KEY);
 			if(!raw) return;
 			const state = JSON.parse(raw);
+			if(state.view){ CURRENT_VIEW = state.view; }
 			if(state.proxyId !== undefined){ $('#tlProxySelect').val(String(state.proxyId)); }
 			if(state.query !== undefined){ $('#tlQuery').val(state.query); }
 			if(state.limit !== undefined){ $('#tlLimit').val(state.limit); }
@@ -301,6 +304,29 @@
 		}
 		// Restore previous state and results after proxies are loaded
 		restoreState();
+		// Tabs behavior
+		function setView(view, write){
+			CURRENT_VIEW = view;
+			if(view === 'upload'){
+				$('#tlRemoteSection').hide();
+				$('#tlaSection').show();
+				$('#tlTabs li').removeClass('is-active');
+				$('#tlTabs [data-view="upload"]').parent().addClass('is-active');
+			}else{
+				$('#tlaSection').hide();
+				$('#tlRemoteSection').show();
+				$('#tlTabs li').removeClass('is-active');
+				$('#tlTabs [data-view="remote"]').parent().addClass('is-active');
+			}
+			if(write){ saveState(undefined); }
+		}
+		function applyViewFromQuery(){
+			const params = new URLSearchParams(window.location.search);
+			const view = (params.get('view') || CURRENT_VIEW || 'remote').toLowerCase();
+			setView(view === 'upload' ? 'upload' : 'remote', false);
+		}
+		applyViewFromQuery();
+		$('#tlTabs').on('click', 'a[data-view]', function(e){ e.preventDefault(); var v = $(this).data('view'); setView(String(v || 'remote'), true); });
 		// Save selection changes
 		$('#tlProxySelect, #tlQuery, #tlLimit, #tlDirection').on('change keyup', function(){ saveState(undefined); });
 		$('#tlLoadBtn').on('click', loadLogs);
@@ -322,6 +348,7 @@
 								if(state.query !== undefined){ $('#tlQuery').val(state.query); }
 								if(state.limit !== undefined){ $('#tlLimit').val(state.limit); }
 								if(state.direction !== undefined){ $('#tlDirection').val(state.direction); }
+								if(state.view){ setView(state.view, false); }
 							}
 						} else {
 							restoreState();

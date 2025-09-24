@@ -4,10 +4,20 @@
 <div class="box">
 	<h3 class="title is-4">트래픽 로그</h3>
 
+	<!-- 탭: 원격 조회 / 파일 업로드 분석 (딥링크: ?view=remote|upload) -->
+	<div class="tabs is-boxed mb-3" id="tlTabs">
+		<ul>
+			<li class="is-active"><a href="#" data-view="remote">원격 조회(SSH)</a></li>
+			<li><a href="#" data-view="upload">파일 업로드 분석</a></li>
+		</ul>
+	</div>
+
 	<div class="notification is-link is-light mb-4">
 		파일 업로드 분석을 통해 과부하 원인(대용량 다운로드/업로드, 과다 요청, 차단, 특정 URL/Host 집중)을 빠르게 파악할 수 있습니다.
 	</div>
 
+	<!-- 원격 조회 섹션 -->
+	<div id="tlRemoteSection">
 	<div class="columns is-vcentered">
 		<div class="column is-3">
 			<div class="field">
@@ -74,9 +84,12 @@
 			<tbody id="tlTableBody"></tbody>
 		</table>
 	</div>
+	</div> <!-- /#tlRemoteSection -->
 
 	<hr>
 
+<!-- 업로드 분석 섹션 -->
+<div id="tlaSection" style="display:none;">
 	<h4 class="title is-5">업로드하여 로그 파일 분석</h4>
 	<div class="columns is-vcentered">
 		<div class="column is-6">
@@ -137,7 +150,7 @@
 		<div class="columns">
 			<div class="column is-12"><div class="box"><h5 class="title is-6">요청 상위 URL</h5><div id="tlaChartUrls"></div></div></div>
 		</div>
-	</div>
+	</div> <!-- /#tlaSection -->
 </div>
 
 <!-- DataTables (local) -->
