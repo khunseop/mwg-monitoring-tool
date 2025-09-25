@@ -133,15 +133,26 @@ $(document).ready(function() {
             if (!raw) return;
             const state = JSON.parse(raw);
             if (state.groupId !== undefined) {
-                $('#sbGroupSelect').val(state.groupId);
-                // Trigger change so DeviceSelector repopulates proxies for selected group
-                $('#sbGroupSelect').trigger('change');
+                var $g = $('#sbGroupSelect');
+                var gtom = ($g && $g[0]) ? $g[0]._tom : null;
+                if (gtom && typeof gtom.setValue === 'function') {
+                    try { gtom.setValue(String(state.groupId || ''), false); } catch (e) { /* ignore */ }
+                } else {
+                    $g.val(state.groupId);
+                    // Trigger change so DeviceSelector repopulates proxies for selected group
+                    $g.trigger('change');
+                }
             }
             if (Array.isArray(state.proxyIds) && state.proxyIds.length > 0) {
-                const strIds = state.proxyIds.map(id => String(id));
-                $('#sbProxySelect option').each(function() {
-                    $(this).prop('selected', strIds.includes($(this).val()));
-                });
+                const strIds = state.proxyIds.map(function(id){ return String(id); });
+                var $p = $('#sbProxySelect');
+                var ptom = ($p && $p[0]) ? $p[0]._tom : null;
+                if (ptom && typeof ptom.setValue === 'function') {
+                    try { ptom.setValue(strIds, false); } catch (e) { /* ignore */ }
+                } else {
+                    $p.find('option').each(function() { $(this).prop('selected', strIds.indexOf($(this).val()) !== -1); });
+                    try { $p.trigger('change'); } catch (e) { /* ignore */ }
+                }
             }
             // Do not restore cached items; rely on server-side data to persist last load
         } catch (e) { /* ignore */ }
