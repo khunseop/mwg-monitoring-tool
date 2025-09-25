@@ -141,16 +141,11 @@ def _parse_sessions(output: str) -> List[Dict[str, Any]]:
         server_side_mwg_ip = get_after(7)
         server_ip = get_after(8)
 
-        # The device reports directions inversely to our UI expectation.
-        # Swap received/sent pairs for both client and server sides.
-        _cl_recv_raw = _to_int(get_after(9))
-        _cl_sent_raw = _to_int(get_after(10))
-        _srv_recv_raw = _to_int(get_after(11))
-        _srv_sent_raw = _to_int(get_after(12))
-        cl_bytes_received = _cl_sent_raw
-        cl_bytes_sent = _cl_recv_raw
-        srv_bytes_received = _srv_sent_raw
-        srv_bytes_sent = _srv_recv_raw
+        # Use raw values as reported
+        cl_bytes_received = _to_int(get_after(9))
+        cl_bytes_sent = _to_int(get_after(10))
+        srv_bytes_received = _to_int(get_after(11))
+        srv_bytes_sent = _to_int(get_after(12))
         trxn_index = _to_int(get_after(13))
         age_seconds = _to_int(get_after(14))
         status = get_after(15)
@@ -688,10 +683,10 @@ async def sessions_analyze(
     host_counter: Counter[str] = Counter()
     url_counter: Counter[str] = Counter()
     client_req_counter: Counter[str] = Counter()
-    client_download_bytes: defaultdict[str, int] = defaultdict(int)
-    client_upload_bytes: defaultdict[str, int] = defaultdict(int)
-    host_download_bytes: defaultdict[str, int] = defaultdict(int)
-    host_upload_bytes: defaultdict[str, int] = defaultdict(int)
+    client_cl_recv_bytes: defaultdict[str, int] = defaultdict(int)
+    client_cl_sent_bytes: defaultdict[str, int] = defaultdict(int)
+    host_srv_recv_bytes: defaultdict[str, int] = defaultdict(int)
+    host_srv_sent_bytes: defaultdict[str, int] = defaultdict(int)
 
     total_recv = 0
     total_sent = 0
@@ -725,6 +720,8 @@ async def sessions_analyze(
         url_host = _parse_host(url_full)
         recv_b = rec.get("cl_bytes_received") or 0
         sent_b = rec.get("cl_bytes_sent") or 0
+        srv_recv_b = rec.get("srv_bytes_received") or 0
+        srv_sent_b = rec.get("srv_bytes_sent") or 0
         ct = rec.get("creation_time") or rec.get("collected_at")
 
         if client_ip:
@@ -742,16 +739,16 @@ async def sessions_analyze(
 
         if client_ip and isinstance(recv_b, int):
             v = max(0, recv_b)
-            client_download_bytes[client_ip] += v
+            client_cl_recv_bytes[client_ip] += v
             total_recv += v
         if client_ip and isinstance(sent_b, int):
             v = max(0, sent_b)
-            client_upload_bytes[client_ip] += v
+            client_cl_sent_bytes[client_ip] += v
             total_sent += v
-        if url_host and isinstance(recv_b, int):
-            host_download_bytes[url_host] += max(0, recv_b)
-        if url_host and isinstance(sent_b, int):
-            host_upload_bytes[url_host] += max(0, sent_b)
+        if url_host and isinstance(srv_recv_b, int):
+            host_srv_recv_bytes[url_host] += max(0, srv_recv_b)
+        if url_host and isinstance(srv_sent_b, int):
+            host_srv_sent_bytes[url_host] += max(0, srv_sent_b)
 
         # time range by creation_time if available, else collected_at
         if ct:
@@ -772,6 +769,7 @@ async def sessions_analyze(
             items.sort(key=lambda kv: kv[1], reverse=True)
             return items[:n]
 
+    # Build top sections with data-centric keys; keep old keys for backward compatibility
     result = {
         "summary": {
             "total_sessions": len(rows),
@@ -786,10 +784,16 @@ async def sessions_analyze(
             "hosts_by_requests": top_n(host_counter, topN),
             "urls_by_requests": top_n(url_counter, topN),
             "clients_by_requests": top_n(client_req_counter, topN),
-            "clients_by_download_bytes": top_n(client_download_bytes, topN),
-            "clients_by_upload_bytes": top_n(client_upload_bytes, topN),
-            "hosts_by_download_bytes": top_n(host_download_bytes, topN),
-            "hosts_by_upload_bytes": top_n(host_upload_bytes, topN),
+            # New keys
+            "clients_by_cl_recv_bytes": top_n(client_cl_recv_bytes, topN),
+            "clients_by_cl_sent_bytes": top_n(client_cl_sent_bytes, topN),
+            "hosts_by_srv_recv_bytes": top_n(host_srv_recv_bytes, topN),
+            "hosts_by_srv_sent_bytes": top_n(host_srv_sent_bytes, topN),
+            # Backward-compat keys
+            "clients_by_download_bytes": top_n(client_cl_recv_bytes, topN),
+            "clients_by_upload_bytes": top_n(client_cl_sent_bytes, topN),
+            "hosts_by_download_bytes": top_n(host_srv_recv_bytes, topN),
+            "hosts_by_upload_bytes": top_n(host_srv_sent_bytes, topN),
         },
     }
 

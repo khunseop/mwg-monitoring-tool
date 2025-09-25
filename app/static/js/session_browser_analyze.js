@@ -64,13 +64,13 @@
 		ensureChart('sbChartClientReq', 'bar', { series: [{ name: 'req', data: sClientReq.data }], xaxis: { categories: sClientReq.categories, labels: { rotate: -45 } } });
 		const sHosts = toBarSeriesFromPairs(top.hosts_by_requests || []);
 		ensureChart('sbChartHosts', 'bar', { series: [{ name: 'req', data: sHosts.data }], xaxis: { categories: sHosts.categories, labels: { rotate: -45 } } });
-		const sClientDown = toBarSeriesFromPairs(top.clients_by_download_bytes || []);
+		const sClientDown = toBarSeriesFromPairs(top.clients_by_cl_recv_bytes || top.clients_by_download_bytes || []);
 		ensureChart('sbChartClientDown', 'bar', { series: [{ name: 'bytes', data: sClientDown.data }], xaxis: { categories: sClientDown.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
-		const sClientUp = toBarSeriesFromPairs(top.clients_by_upload_bytes || []);
+		const sClientUp = toBarSeriesFromPairs(top.clients_by_cl_sent_bytes || top.clients_by_upload_bytes || []);
 		ensureChart('sbChartClientUp', 'bar', { series: [{ name: 'bytes', data: sClientUp.data }], xaxis: { categories: sClientUp.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
-		const sHostDown = toBarSeriesFromPairs(top.hosts_by_download_bytes || []);
+		const sHostDown = toBarSeriesFromPairs(top.hosts_by_srv_recv_bytes || top.hosts_by_download_bytes || []);
 		ensureChart('sbChartHostDown', 'bar', { series: [{ name: 'bytes', data: sHostDown.data }], xaxis: { categories: sHostDown.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
-		const sHostUp = toBarSeriesFromPairs(top.hosts_by_upload_bytes || []);
+		const sHostUp = toBarSeriesFromPairs(top.hosts_by_srv_sent_bytes || top.hosts_by_upload_bytes || []);
 		ensureChart('sbChartHostUp', 'bar', { series: [{ name: 'bytes', data: sHostUp.data }], xaxis: { categories: sHostUp.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
 		const sUrls = toBarSeriesFromPairs(top.urls_by_requests || []);
 		ensureChart('sbChartUrls', 'bar', { series: [{ name: 'req', data: sUrls.data }], xaxis: { categories: sUrls.categories, labels: { rotate: -45, trim: true } } });
