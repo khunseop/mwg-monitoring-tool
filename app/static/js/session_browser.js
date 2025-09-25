@@ -78,32 +78,7 @@ $(document).ready(function() {
     function getSelectedProxyIds() { return ($('#sbProxySelect').val() || []).map(v => parseInt(v, 10)); }
 
     function updateTableVisibility() {
-        try {
-            var displayed = 0;
-            try {
-                if (sb.dt && typeof sb.dt.rows === 'function') {
-                    var apiRows = sb.dt.rows({ filter: 'applied' });
-                    if (apiRows && typeof apiRows.count === 'function') {
-                        displayed = apiRows.count();
-                    } else if (apiRows && apiRows.data && typeof apiRows.data === 'function') {
-                        displayed = apiRows.data().length;
-                    }
-                }
-            } catch (e) { /* fall back to DOM check below */ }
-            if (displayed === 0) {
-                var $tbody = $('#sbTable tbody');
-                var $trs = $tbody.find('tr');
-                if ($trs.length === 0) {
-                    displayed = 0;
-                } else {
-                    var firstIsEmpty = $tbody.find('td').first().hasClass('dataTables_empty');
-                    displayed = firstIsEmpty ? 0 : $trs.length;
-                }
-            }
-            var isEmpty = (displayed === 0);
-            if (isEmpty) { $('#sbTableWrap').hide(); $('#sbEmptyState').show(); }
-            else { $('#sbEmptyState').hide(); $('#sbTableWrap').show(); try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {} }
-        } catch (e) { /* ignore */ }
+        try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) { /* ignore */ }
     }
 
     function saveState(itemsForSave) {
@@ -276,14 +251,10 @@ $(document).ready(function() {
     $('#sbGroupSelect').on('change', function() {
         saveState(undefined);
         if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true);
-        // If no proxies are selected for the new group, keep empty state visible until data arrives
-        try { if (getSelectedProxyIds().length === 0) { $('#sbTableWrap').hide(); $('#sbEmptyState').show(); } } catch (e) { /* ignore */ }
     });
     $('#sbProxySelect').on('change', function() {
         saveState(undefined);
         if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true);
-        // If user cleared selection, show empty state immediately
-        try { if (getSelectedProxyIds().length === 0) { $('#sbTableWrap').hide(); $('#sbEmptyState').show(); } } catch (e) { /* ignore */ }
     });
 
     // Row click -> open detail modal
@@ -297,9 +268,8 @@ $(document).ready(function() {
     });
 
     initTable();
-    // Show empty state initially
-    $('#sbTableWrap').hide();
-    $('#sbEmptyState').show();
+    // Always show table
+    $('#sbTableWrap').show();
     DeviceSelector.init({ 
         groupSelect: '#sbGroupSelect', 
         proxySelect: '#sbProxySelect', 
