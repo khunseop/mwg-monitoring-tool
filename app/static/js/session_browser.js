@@ -209,30 +209,12 @@ $(document).ready(function() {
             setStatus('완료');
             // Clear any cached items to avoid mixing old data on next restore; persist only selection
             saveState([]);
+            try { if (window.SbAnalyze && typeof window.SbAnalyze.run === 'function') { window.SbAnalyze.run({ proxyIds: proxyIds }); $('#sbAnalyzeSection').show(); } } catch (e) { /* ignore */ }
         }).catch(() => { setStatus('오류', true); showErr('수집 요청 중 오류가 발생했습니다.'); });
     }
 
     $('#sbLoadBtn').on('click', function() { loadLatest(); });
-    $('#sbAnalyzeBtn').on('click', function(){ try { if (window.SbAnalyze && typeof window.SbAnalyze.run === 'function') { window.SbAnalyze.run({ proxyIds: getSelectedProxyIds() }); } } catch (e) {} });
-
-    // Tabs: list vs analyze
-    function switchSbTab(view){
-        try {
-            $('#sbTabs li').removeClass('is-active');
-            if(view === 'analyze') { $('#sbTabs a[data-view="analyze"]').parent().addClass('is-active'); }
-            else { $('#sbTabs a[data-view="list"]').parent().addClass('is-active'); }
-        } catch(e) {}
-        if(view === 'analyze'){
-            $('#sbTableWrap').hide();
-            $('#sbEmptyState').hide();
-            $('#sbAnalyzeSection').show();
-        } else {
-            $('#sbAnalyzeSection').hide();
-            updateTableVisibility();
-        }
-        try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch(e) {}
-    }
-    $('#sbTabs').on('click', 'a', function(e){ e.preventDefault(); var v = $(this).data('view'); switchSbTab(v); });
+    // Removed analyze button and tabs; analysis auto-runs after collect
     $('#sbExportBtn').on('click', function() {
         const params = {};
         const g = $('#sbGroupSelect').val();

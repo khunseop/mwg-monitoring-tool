@@ -4,13 +4,7 @@
 <div class="box">
     <h3 class="title is-4">세션브라우저</h3>
 
-    <!-- 탭: 목록 / 분석 -->
-    <div class="tabs is-boxed mb-3" id="sbTabs">
-        <ul>
-            <li class="is-active"><a href="#" data-view="list">세션 목록</a></li>
-            <li><a href="#" data-view="analyze">분석</a></li>
-        </ul>
-    </div>
+    
 
     <div class="accordion" id="sbSelectAccordion">
         <div class="accordion-header">
@@ -95,36 +89,10 @@
             </table>
         </div>
         
-        <!-- 분석 섹션 -->
+        <!-- 분석 섹션 (하단 자동 표시) -->
         <div id="sbAnalyzeSection" class="mt-5" style="display:none;">
-            <div class="level">
-                <div class="level-left">
-                    <div class="level-item">
-                        <h4 class="title is-5">세션 분석</h4>
-                    </div>
-                </div>
-                <div class="level-right">
-                    <div class="level-item">
-                        <div class="field has-addons">
-                            <p class="control">
-                                <span class="select">
-                                    <select id="sbTopN">
-                                        <option value="10">Top 10</option>
-                                        <option value="20" selected>Top 20</option>
-                                        <option value="50">Top 50</option>
-                                    </select>
-                                </span>
-                            </p>
-                            <p class="control">
-                                <button class="button is-primary" id="sbAnalyzeBtn">분석 실행</button>
-                            </p>
-                            <p class="control">
-                                <span id="sbAnalyzeStatus" class="tag is-light">대기</span>
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <h4 class="title is-5">세션 분석</h4>
+            <span id="sbAnalyzeStatus" class="tag is-light">대기</span>
 
             <p id="sbAnalyzeError" class="help is-danger" style="display:none;"></p>
 
