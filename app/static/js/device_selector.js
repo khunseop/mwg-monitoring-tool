@@ -156,11 +156,13 @@
 				enhanceMultiSelect(); 
 				bindEvents(); 
 				if (!allowAllGroups) {
-					var currentVal = $group && $group.length ? $group.val() : '';
-						if (!currentVal) {
+					// If no value has been set externally, default to first group once
+					var currentVal = '';
+					try { currentVal = ($group && $group.length) ? ($group[0]._tom ? $group[0]._tom.getValue() : $group.val()) : ''; } catch (e) { currentVal = $group.val(); }
+					if (!currentVal) {
 						var first = (state.groups && state.groups.length) ? String(state.groups[0].id) : '';
 						if (first) {
-								try { if (state.gts) { state.gts.setValue(first, false); } else { $group.val(first).trigger('change'); } } catch (e) { /* ignore */ }
+							try { if (state.gts) { state.gts.setValue(first, false); } else { $group.val(first).trigger('change'); } } catch (e) { /* ignore */ }
 						}
 					}
 				}

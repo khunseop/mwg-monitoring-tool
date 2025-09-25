@@ -117,8 +117,14 @@ $(document).ready(function() {
         } catch (e) { /* ignore */ }
         // If itemsForSave is provided, use it as-is (including empty array to CLEAR)
         var items = (itemsForSave !== undefined) ? (Array.isArray(itemsForSave) ? itemsForSave : undefined) : prevItems;
+        var groupVal;
+        try {
+            var gEl = $('#sbGroupSelect')[0];
+            if (gEl && gEl._tom && typeof gEl._tom.getValue === 'function') { groupVal = gEl._tom.getValue(); }
+            else { groupVal = $('#sbGroupSelect').val() || ''; }
+        } catch (e) { groupVal = $('#sbGroupSelect').val() || ''; }
         var state = {
-            groupId: $('#sbGroupSelect').val() || '',
+            groupId: groupVal || '',
             proxyIds: getSelectedProxyIds(),
             items: items,
             savedAt: Date.now()
@@ -137,6 +143,7 @@ $(document).ready(function() {
                 var gtom = ($g && $g[0]) ? $g[0]._tom : null;
                 if (gtom && typeof gtom.setValue === 'function') {
                     try { gtom.setValue(String(state.groupId || ''), false); } catch (e) { /* ignore */ }
+                    try { $g.trigger('change'); } catch (e) { /* ignore */ }
                 } else {
                     $g.val(state.groupId);
                     // Trigger change so DeviceSelector repopulates proxies for selected group
