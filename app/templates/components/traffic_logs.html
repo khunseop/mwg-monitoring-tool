@@ -123,30 +123,28 @@
 		<div class="column is-2"><div class="box has-text-centered"><p class="heading">파싱 실패</p><p class="title is-5" id="tlaUnparsed">0</p></div></div>
 		<div class="column is-2"><div class="box has-text-centered"><p class="heading">클라이언트 수</p><p class="title is-5" id="tlaClients">0</p></div></div>
 		<div class="column is-2"><div class="box has-text-centered"><p class="heading">호스트 수</p><p class="title is-5" id="tlaHosts">0</p></div></div>
-		<div class="column is-2"><div class="box has-text-centered"><p class="heading">차단 수</p><p class="title is-5" id="tlaBlocked">0</p></div></div>
-		<div class="column is-3"><div class="box has-text-centered"><p class="heading">다운로드 바이트</p><p class="title is-6" id="tlaRecv">0</p></div></div>
-		<div class="column is-3"><div class="box has-text-centered"><p class="heading">업로드 바이트</p><p class="title is-6" id="tlaSent">0</p></div></div>
-		<div class="column is-3"><div class="box has-text-centered"><p class="heading">시작 시간</p><p class="title is-6" id="tlaTimeStart">-</p></div></div>
-		<div class="column is-3"><div class="box has-text-centered"><p class="heading">종료 시간</p><p class="title is-6" id="tlaTimeEnd">-</p></div></div>
+		<div class="column is-2"><div class="box has-text-centered"><p class="heading">차단 로그 수</p><p class="title is-5" id="tlaBlocked">0</p></div></div>
+		<div class="column is-3"><div class="box has-text-centered"><p class="heading">받은 데이터</p><p class="title is-6" id="tlaRecv">0</p></div></div>
+		<div class="column is-3"><div class="box has-text-centered"><p class="heading">보낸 데이터</p><p class="title is-6" id="tlaSent">0</p></div></div>
+		<div class="column is-3"><div class="box has-text-centered"><p class="heading">로그 시작 시간</p><p class="title is-6" id="tlaTimeStart">-</p></div></div>
+		<div class="column is-3"><div class="box has-text-centered"><p class="heading">로그 종료 시간</p><p class="title is-6" id="tlaTimeEnd">-</p></div></div>
 	</div>
 
 	<div id="tlaCharts" style="display:none;">
-		<p class="mb-2 has-text-grey is-size-7">차트 막대를 클릭하면 해당 항목 라벨(예: 호스트명/클라이언트 IP/URL)을 복사합니다.</p>
+		<p class="mb-2 has-text-grey is-size-7">차트 막대를 클릭하면 항목 라벨(호스트/클라이언트)을 복사합니다.</p>
 		<div class="columns">
 			<div class="column is-6"><div class="box"><h5 class="title is-6">요청 상위 클라이언트</h5><div id="tlaChartClientReq"></div></div></div>
 			<div class="column is-6"><div class="box"><h5 class="title is-6">요청 상위 호스트</h5><div id="tlaChartHosts"></div></div></div>
 		</div>
 		<div class="columns">
-			<div class="column is-6"><div class="box"><h5 class="title is-6">다운로드 상위 클라이언트</h5><div id="tlaChartClientDown"></div></div></div>
-			<div class="column is-6"><div class="box"><h5 class="title is-6">업로드 상위 클라이언트</h5><div id="tlaChartClientUp"></div></div></div>
+			<div class="column is-6"><div class="box"><h5 class="title is-6">받은 데이터 상위 클라이언트</h5><div id="tlaChartClientDown"></div></div></div>
+			<div class="column is-6"><div class="box"><h5 class="title is-6">보낸 데이터 상위 클라이언트</h5><div id="tlaChartClientUp"></div></div></div>
 		</div>
 		<div class="columns">
-			<div class="column is-6"><div class="box"><h5 class="title is-6">다운로드 상위 호스트</h5><div id="tlaChartHostDown"></div></div></div>
-			<div class="column is-6"><div class="box"><h5 class="title is-6">업로드 상위 호스트</h5><div id="tlaChartHostUp"></div></div></div>
+			<div class="column is-6"><div class="box"><h5 class="title is-6">받은 데이터 상위 호스트</h5><div id="tlaChartHostDown"></div></div></div>
+			<div class="column is-6"><div class="box"><h5 class="title is-6">보낸 데이터 상위 호스트</h5><div id="tlaChartHostUp"></div></div></div>
 		</div>
-		<div class="columns">
-			<div class="column is-12"><div class="box"><h5 class="title is-6">요청 상위 URL</h5><div id="tlaChartUrls"></div></div></div>
-		</div>
+		
 	</div> <!-- /#tlaSection -->
 </div>
 

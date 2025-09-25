@@ -82,22 +82,19 @@
 		// 2) 요청 상위 호스트
 		const sHosts = toBarSeriesFromPairs(top.hosts_by_requests || []);
 		ensureChart('tlaChartHosts', 'bar', { series: [{ name: 'req', data: sHosts.data }], xaxis: { categories: sHosts.categories, labels: { rotate: -45 } } });
-		// 3) 다운로드 상위 클라이언트
-		const sClientDown = toBarSeriesFromPairs(top.clients_by_download_bytes || []);
+		// 3) CL 수신 상위 클라이언트
+		const sClientDown = toBarSeriesFromPairs(top.clients_by_recv_bytes || top.clients_by_download_bytes || []);
 		ensureChart('tlaChartClientDown', 'bar', { series: [{ name: 'bytes', data: sClientDown.data }], xaxis: { categories: sClientDown.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
-		// 4) 업로드 상위 클라이언트
-		const sClientUp = toBarSeriesFromPairs(top.clients_by_upload_bytes || []);
+		// 4) CL 송신 상위 클라이언트
+		const sClientUp = toBarSeriesFromPairs(top.clients_by_sent_bytes || top.clients_by_upload_bytes || []);
 		ensureChart('tlaChartClientUp', 'bar', { series: [{ name: 'bytes', data: sClientUp.data }], xaxis: { categories: sClientUp.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
-		// 5) 다운로드 상위 호스트
-		const sHostDown = toBarSeriesFromPairs(top.hosts_by_download_bytes || []);
+		// 5) 서버 수신 상위 호스트
+		const sHostDown = toBarSeriesFromPairs(top.hosts_by_recv_bytes || top.hosts_by_download_bytes || []);
 		ensureChart('tlaChartHostDown', 'bar', { series: [{ name: 'bytes', data: sHostDown.data }], xaxis: { categories: sHostDown.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
-		// 6) 업로드 상위 호스트
-		const sHostUp = toBarSeriesFromPairs(top.hosts_by_upload_bytes || []);
+		// 6) 서버 송신 상위 호스트
+		const sHostUp = toBarSeriesFromPairs(top.hosts_by_sent_bytes || top.hosts_by_upload_bytes || []);
 		ensureChart('tlaChartHostUp', 'bar', { series: [{ name: 'bytes', data: sHostUp.data }], xaxis: { categories: sHostUp.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
 		// 7) 요청 상위 URL
-		const sUrls = toBarSeriesFromPairs(top.urls_by_requests || []);
-		ensureChart('tlaChartUrls', 'bar', { series: [{ name: 'req', data: sUrls.data }], xaxis: { categories: sUrls.categories, labels: { rotate: -45, trim: true } } });
-
 		$('#tlaCharts').show();
 	}
 

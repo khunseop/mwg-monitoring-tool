@@ -30,6 +30,7 @@ from app.schemas.session_browser_config import (
 from app.services.session_browser_config import get_or_create_config as _get_cfg_service
 from app.utils.crypto import decrypt_string_if_encrypted
 from app.storage import temp_store
+from urllib.parse import urlparse
 
 
 router = APIRouter()
@@ -125,10 +126,22 @@ def _parse_sessions(output: str) -> List[Dict[str, Any]]:
         cust_id = get_after(3)
         user_name = get_after(4)
         client_ip = get_after(5)
+        # Normalize client_ip: drop trailing :port for IPv4 forms (e.g., 1.2.3.4:56789)
+        def _strip_port(ip: Any) -> Any:
+            try:
+                s = str(ip or '').strip()
+                # Only strip patterns like a.b.c.d:port
+                if re.match(r"^\d+\.\d+\.\d+\.\d+:\d+$", s):
+                    return s.rsplit(":", 1)[0]
+                return s
+            except Exception:
+                return ip
+        client_ip = _strip_port(client_ip)
         client_side_mwg_ip = get_after(6)
         server_side_mwg_ip = get_after(7)
         server_ip = get_after(8)
 
+        # Use raw values as reported
         cl_bytes_received = _to_int(get_after(9))
         cl_bytes_sent = _to_int(get_after(10))
         srv_bytes_received = _to_int(get_after(11))
@@ -370,6 +383,13 @@ def _load_latest_rows_for_proxies(db: Session, target_ids: List[int]) -> List[Di
             r.setdefault("proxy_id", pid)
             r.setdefault("host", host_map.get(pid, f"#{pid}"))
             r["__line_index"] = idx
+            # Normalize client_ip by dropping ephemeral port if present
+            try:
+                cip = r.get("client_ip")
+                if isinstance(cip, str) and re.match(r"^\d+\.\d+\.\d+\.\d+:\d+$", cip.strip()):
+                    r["client_ip"] = cip.strip().rsplit(":", 1)[0]
+            except Exception:
+                pass
             rows.append(r)
     return rows
 
@@ -463,11 +483,18 @@ async def sessions_datatables(
         collected_iso = str(rec.get("collected_at") or "")
         line_index = int(rec.get("__line_index") or 0)
         rid_val = temp_store.build_record_id(pid, collected_iso, line_index)
+        # Ensure client_ip without port for display
+        try:
+            cip = rec.get("client_ip") or ""
+            if isinstance(cip, str) and re.match(r"^\d+\.\d+\.\d+\.\d+:\d+$", cip.strip()):
+                cip = cip.strip().rsplit(":", 1)[0]
+        except Exception:
+            cip = rec.get("client_ip") or ""
         data.append([
             host,
             ct_str,
             rec.get("user_name") or "",
-            rec.get("client_ip") or "",
+            cip,
             rec.get("server_ip") or "",
             str(cl_recv) if cl_recv is not None else "",
             str(cl_sent) if cl_sent is not None else "",
@@ -593,6 +620,13 @@ async def sessions_export(
                 if '"' in s or "," in s or "\n" in s or "\r" in s:
                     s = '"' + s.replace('"', '""') + '"'
                 return s
+            # normalize client ip for export
+            try:
+                cip = rec.get("client_ip") or ""
+                if isinstance(cip, str) and re.match(r"^\d+\.\d+\.\d+\.\d+:\d+$", cip.strip()):
+                    cip = cip.strip().rsplit(":", 1)[0]
+            except Exception:
+                cip = rec.get("client_ip") or ""
             row = [
                 esc(idx),
                 esc(host),
@@ -602,7 +636,7 @@ async def sessions_export(
                 esc(rec.get("protocol") or ""),
                 esc(rec.get("cust_id") or ""),
                 esc(rec.get("user_name") or ""),
-                esc(rec.get("client_ip") or ""),
+                esc(cip),
                 esc(rec.get("client_side_mwg_ip") or ""),
                 esc(rec.get("server_side_mwg_ip") or ""),
                 esc(rec.get("server_ip") or ""),
@@ -623,3 +657,144 @@ async def sessions_export(
         "Content-Disposition": f"attachment; filename={filename}"
     })
 
+
+@router.get("/session-browser/analyze")
+async def sessions_analyze(
+    db: Session = Depends(get_db),
+    proxy_ids: str | None = Query(None, description="comma-separated proxy ids"),
+    topN: int = Query(20, ge=1, le=100),
+):
+    # Parse target proxy ids
+    target_ids: List[int] = []
+    if proxy_ids:
+        try:
+            target_ids = [int(x) for x in proxy_ids.split(",") if x.strip()]
+        except Exception:
+            target_ids = []
+    if not target_ids:
+        raise HTTPException(status_code=400, detail="proxy_ids required")
+
+    # Load latest batches
+    rows: List[Dict[str, Any]] = _load_latest_rows_for_proxies(db, target_ids)
+
+    # Aggregations
+    from collections import Counter, defaultdict
+
+    host_counter: Counter[str] = Counter()
+    url_counter: Counter[str] = Counter()
+    client_req_counter: Counter[str] = Counter()
+    client_cl_recv_bytes: defaultdict[str, int] = defaultdict(int)
+    client_cl_sent_bytes: defaultdict[str, int] = defaultdict(int)
+    host_srv_recv_bytes: defaultdict[str, int] = defaultdict(int)
+    host_srv_sent_bytes: defaultdict[str, int] = defaultdict(int)
+
+    total_recv = 0
+    total_sent = 0
+    unique_clients: set[str] = set()
+    unique_hosts: set[str] = set()
+    earliest_dt = None
+    latest_dt = None
+
+    def _parse_host(url_val: Any) -> str:
+        try:
+            s = str(url_val or "").strip()
+            if not s:
+                return ""
+            pu = urlparse(s)
+            return pu.hostname or ""
+        except Exception:
+            return ""
+
+    def _strip_port_val(val: Any) -> str:
+        try:
+            s = str(val or "").strip()
+            if re.match(r"^\d+\.\d+\.\d+\.\d+:\d+$", s):
+                return s.rsplit(":", 1)[0]
+            return s
+        except Exception:
+            return str(val or "")
+
+    for rec in rows:
+        client_ip = _strip_port_val(rec.get("client_ip"))
+        url_full = rec.get("url")
+        url_host = _parse_host(url_full)
+        recv_b = rec.get("cl_bytes_received") or 0
+        sent_b = rec.get("cl_bytes_sent") or 0
+        srv_recv_b = rec.get("srv_bytes_received") or 0
+        srv_sent_b = rec.get("srv_bytes_sent") or 0
+        ct = rec.get("creation_time") or rec.get("collected_at")
+
+        if client_ip:
+            client_req_counter[client_ip] += 1
+            unique_clients.add(client_ip)
+        if url_host:
+            host_counter[url_host] += 1
+            unique_hosts.add(url_host)
+        if url_full:
+            try:
+                key = str(url_full)[:2048]
+                url_counter[key] += 1
+            except Exception:
+                pass
+
+        if client_ip and isinstance(recv_b, int):
+            v = max(0, recv_b)
+            client_cl_recv_bytes[client_ip] += v
+            total_recv += v
+        if client_ip and isinstance(sent_b, int):
+            v = max(0, sent_b)
+            client_cl_sent_bytes[client_ip] += v
+            total_sent += v
+        if url_host and isinstance(srv_recv_b, int):
+            host_srv_recv_bytes[url_host] += max(0, srv_recv_b)
+        if url_host and isinstance(srv_sent_b, int):
+            host_srv_sent_bytes[url_host] += max(0, srv_sent_b)
+
+        # time range by creation_time if available, else collected_at
+        if ct:
+            try:
+                dt = datetime.fromisoformat(str(ct))
+                if earliest_dt is None or dt < earliest_dt:
+                    earliest_dt = dt
+                if latest_dt is None or dt > latest_dt:
+                    latest_dt = dt
+            except Exception:
+                pass
+
+    def top_n(counter_like, n: int):
+        try:
+            return counter_like.most_common(n)
+        except AttributeError:
+            items = list(counter_like.items())
+            items.sort(key=lambda kv: kv[1], reverse=True)
+            return items[:n]
+
+    # Build top sections with data-centric keys; keep old keys for backward compatibility
+    result = {
+        "summary": {
+            "total_sessions": len(rows),
+            "unique_clients": len(unique_clients),
+            "unique_hosts": len(unique_hosts),
+            "total_recv_bytes": total_recv,
+            "total_sent_bytes": total_sent,
+            "time_range_start": (earliest_dt.isoformat() if earliest_dt else None),
+            "time_range_end": (latest_dt.isoformat() if latest_dt else None),
+        },
+        "top": {
+            "hosts_by_requests": top_n(host_counter, topN),
+            "urls_by_requests": top_n(url_counter, topN),
+            "clients_by_requests": top_n(client_req_counter, topN),
+            # New keys
+            "clients_by_cl_recv_bytes": top_n(client_cl_recv_bytes, topN),
+            "clients_by_cl_sent_bytes": top_n(client_cl_sent_bytes, topN),
+            "hosts_by_srv_recv_bytes": top_n(host_srv_recv_bytes, topN),
+            "hosts_by_srv_sent_bytes": top_n(host_srv_sent_bytes, topN),
+            # Backward-compat keys
+            "clients_by_download_bytes": top_n(client_cl_recv_bytes, topN),
+            "clients_by_upload_bytes": top_n(client_cl_sent_bytes, topN),
+            "hosts_by_download_bytes": top_n(host_srv_recv_bytes, topN),
+            "hosts_by_upload_bytes": top_n(host_srv_sent_bytes, topN),
+        },
+    }
+
+    return result

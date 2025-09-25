@@ -153,10 +153,11 @@ async def analyze_traffic_log_upload(
 	host_counter: Counter[str] = Counter()
 	url_counter: Counter[str] = Counter()
 	client_req_counter: Counter[str] = Counter()
-	client_download_bytes: defaultdict[str, int] = defaultdict(int)
-	client_upload_bytes: defaultdict[str, int] = defaultdict(int)
-	host_download_bytes: defaultdict[str, int] = defaultdict(int)
-	host_upload_bytes: defaultdict[str, int] = defaultdict(int)
+	# Data-centric counters: proxy perspective (recv/sent)
+	client_recv_bytes: defaultdict[str, int] = defaultdict(int)
+	client_sent_bytes: defaultdict[str, int] = defaultdict(int)
+	host_recv_bytes: defaultdict[str, int] = defaultdict(int)
+	host_sent_bytes: defaultdict[str, int] = defaultdict(int)
 	blocked_count = 0
 	total_recv = 0
 	total_sent = 0
@@ -206,15 +207,17 @@ async def analyze_traffic_log_upload(
 
 			# Byte aggregations per client
 			if client_ip and isinstance(recv_b, int):
-				client_download_bytes[client_ip] += max(0, recv_b)
-				total_recv += max(0, recv_b)
+				v = max(0, recv_b)
+				client_recv_bytes[client_ip] += v
+				total_recv += v
 			if client_ip and isinstance(sent_b, int):
-				client_upload_bytes[client_ip] += max(0, sent_b)
-				total_sent += max(0, sent_b)
+				v = max(0, sent_b)
+				client_sent_bytes[client_ip] += v
+				total_sent += v
 			if url_host and isinstance(recv_b, int):
-				host_download_bytes[url_host] += max(0, recv_b)
+				host_recv_bytes[url_host] += max(0, recv_b)
 			if url_host and isinstance(sent_b, int):
-				host_upload_bytes[url_host] += max(0, sent_b)
+				host_sent_bytes[url_host] += max(0, sent_b)
 
 			# Blocked detection: action includes 'block' or block_id present
 			act_eq_block = action_names.strip().lower() == "block"
@@ -265,10 +268,16 @@ async def analyze_traffic_log_upload(
 			"hosts_by_requests": top_n(host_counter, topN),
 			"urls_by_requests": top_n(url_counter, topN),
 			"clients_by_requests": top_n(client_req_counter, topN),
-			"clients_by_download_bytes": top_n(client_download_bytes, topN),
-			"clients_by_upload_bytes": top_n(client_upload_bytes, topN),
-			"hosts_by_download_bytes": top_n(host_download_bytes, topN),
-			"hosts_by_upload_bytes": top_n(host_upload_bytes, topN),
+			# New data-centric keys
+			"clients_by_recv_bytes": top_n(client_recv_bytes, topN),
+			"clients_by_sent_bytes": top_n(client_sent_bytes, topN),
+			"hosts_by_recv_bytes": top_n(host_recv_bytes, topN),
+			"hosts_by_sent_bytes": top_n(host_sent_bytes, topN),
+			# Backward compatibility
+			"clients_by_download_bytes": top_n(client_recv_bytes, topN),
+			"clients_by_upload_bytes": top_n(client_sent_bytes, topN),
+			"hosts_by_download_bytes": top_n(host_recv_bytes, topN),
+			"hosts_by_upload_bytes": top_n(host_sent_bytes, topN),
 		},
 	}
 
