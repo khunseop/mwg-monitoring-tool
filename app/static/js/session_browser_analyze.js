@@ -72,8 +72,6 @@
 		ensureChart('sbChartHostDown', 'bar', { series: [{ name: 'bytes', data: sHostDown.data }], xaxis: { categories: sHostDown.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
 		const sHostUp = toBarSeriesFromPairs(top.hosts_by_srv_sent_bytes || top.hosts_by_upload_bytes || []);
 		ensureChart('sbChartHostUp', 'bar', { series: [{ name: 'bytes', data: sHostUp.data }], xaxis: { categories: sHostUp.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
-		const sUrls = toBarSeriesFromPairs(top.urls_by_requests || []);
-		ensureChart('sbChartUrls', 'bar', { series: [{ name: 'req', data: sUrls.data }], xaxis: { categories: sUrls.categories, labels: { rotate: -45, trim: true } } });
 		$('#sbCharts').show();
 	}
 

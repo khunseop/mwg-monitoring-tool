@@ -95,9 +95,6 @@
 		const sHostUp = toBarSeriesFromPairs(top.hosts_by_sent_bytes || top.hosts_by_upload_bytes || []);
 		ensureChart('tlaChartHostUp', 'bar', { series: [{ name: 'bytes', data: sHostUp.data }], xaxis: { categories: sHostUp.categories, labels: { rotate: -45 } }, yaxis: { labels: { formatter: v => humanBytes(v) } }, tooltip: { y: { formatter: v => humanBytes(v) } } });
 		// 7) 요청 상위 URL
-		const sUrls = toBarSeriesFromPairs(top.urls_by_requests || []);
-		ensureChart('tlaChartUrls', 'bar', { series: [{ name: 'req', data: sUrls.data }], xaxis: { categories: sUrls.categories, labels: { rotate: -45, trim: true } } });
-
 		$('#tlaCharts').show();
 	}
 
