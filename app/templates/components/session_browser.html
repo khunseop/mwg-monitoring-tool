@@ -90,6 +90,7 @@
         </div>
         
         <!-- 분석 섹션 (하단 자동 표시) -->
+        <hr>
         <div id="sbAnalyzeSection" class="mt-5" style="display:none;">
             <h4 class="title is-5">세션 분석</h4>
             <span id="sbAnalyzeStatus" class="tag is-light">대기</span>
@@ -100,25 +101,25 @@
                 <div class="column is-2"><div class="box has-text-centered"><p class="heading">총 세션</p><p class="title is-5" id="sbTotSessions">0</p></div></div>
                 <div class="column is-2"><div class="box has-text-centered"><p class="heading">클라이언트 수</p><p class="title is-5" id="sbClients">0</p></div></div>
                 <div class="column is-2"><div class="box has-text-centered"><p class="heading">호스트 수</p><p class="title is-5" id="sbHosts">0</p></div></div>
-                <div class="column is-3"><div class="box has-text-centered"><p class="heading">CL bytes received</p><p class="title is-6" id="sbRecv">0</p></div></div>
-                <div class="column is-3"><div class="box has-text-centered"><p class="heading">CL bytes sent</p><p class="title is-6" id="sbSent">0</p></div></div>
-                <div class="column is-3"><div class="box has-text-centered"><p class="heading">시작 시간</p><p class="title is-6" id="sbTimeStart">-</p></div></div>
-                <div class="column is-3"><div class="box has-text-centered"><p class="heading">종료 시간</p><p class="title is-6" id="sbTimeEnd">-</p></div></div>
+                <div class="column is-3"><div class="box has-text-centered"><p class="heading">받은 데이터</p><p class="title is-6" id="sbSent">0</p></div></div>
+                <div class="column is-3"><div class="box has-text-centered"><p class="heading">보낸 데이터</p><p class="title is-6" id="sbRecv">0</p></div></div>
+                <div class="column is-3"><div class="box has-text-centered"><p class="heading">처음 생성된 세션 시간</p><p class="title is-6" id="sbTimeStart">-</p></div></div>
+                <div class="column is-3"><div class="box has-text-centered"><p class="heading">마지막 생성된 세션 시간</p><p class="title is-6" id="sbTimeEnd">-</p></div></div>
             </div>
 
             <div id="sbCharts" style="display:none;">
-                <p class="mb-2 has-text-grey is-size-7">차트 막대를 클릭하면 항목 라벨(호스트/클라이언트/URL)을 복사합니다.</p>
+                <p class="mb-2 has-text-grey is-size-7">차트 막대를 클릭하면 항목 라벨(호스트/클라이언트)을 복사합니다.</p>
                 <div class="columns">
                     <div class="column is-6"><div class="box"><h5 class="title is-6">요청 상위 클라이언트</h5><div id="sbChartClientReq"></div></div></div>
                     <div class="column is-6"><div class="box"><h5 class="title is-6">요청 상위 호스트</h5><div id="sbChartHosts"></div></div></div>
                 </div>
                 <div class="columns">
-                    <div class="column is-6"><div class="box"><h5 class="title is-6">CL bytes received - Top clients</h5><div id="sbChartClientDown"></div></div></div>
-                    <div class="column is-6"><div class="box"><h5 class="title is-6">CL bytes sent - Top clients</h5><div id="sbChartClientUp"></div></div></div>
+                    <div class="column is-6"><div class="box"><h5 class="title is-6">받은 데이터 상위 클라이언트</h5><div id="sbChartClientUp"></div></div></div>
+                    <div class="column is-6"><div class="box"><h5 class="title is-6">보낸 데이터 상위 클라이언트</h5><div id="sbChartClientDown"></div></div></div>
                 </div>
                 <div class="columns">
-                    <div class="column is-6"><div class="box"><h5 class="title is-6">Server bytes received - Top hosts</h5><div id="sbChartHostDown"></div></div></div>
-                    <div class="column is-6"><div class="box"><h5 class="title is-6">Server bytes sent - Top hosts</h5><div id="sbChartHostUp"></div></div></div>
+                    <div class="column is-6"><div class="box"><h5 class="title is-6">받은 데이터 상위 호스트</h5><div id="sbChartHostDown"></div></div></div>
+                    <div class="column is-6"><div class="box"><h5 class="title is-6">보낸 데이터 상위 호스트</h5><div id="sbChartHostUp"></div></div></div>
                 </div>
             </div>
         </div>
