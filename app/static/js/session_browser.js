@@ -79,9 +79,28 @@ $(document).ready(function() {
 
     function updateTableVisibility() {
         try {
-            var $tbody = $('#sbTable tbody');
-            var rowCount = $tbody.find('tr').length;
-            var isEmpty = rowCount === 0 || ($tbody.find('td').first().hasClass('dataTables_empty'));
+            var displayed = 0;
+            try {
+                if (sb.dt && typeof sb.dt.rows === 'function') {
+                    var apiRows = sb.dt.rows({ filter: 'applied' });
+                    if (apiRows && typeof apiRows.count === 'function') {
+                        displayed = apiRows.count();
+                    } else if (apiRows && apiRows.data && typeof apiRows.data === 'function') {
+                        displayed = apiRows.data().length;
+                    }
+                }
+            } catch (e) { /* fall back to DOM check below */ }
+            if (displayed === 0) {
+                var $tbody = $('#sbTable tbody');
+                var $trs = $tbody.find('tr');
+                if ($trs.length === 0) {
+                    displayed = 0;
+                } else {
+                    var firstIsEmpty = $tbody.find('td').first().hasClass('dataTables_empty');
+                    displayed = firstIsEmpty ? 0 : $trs.length;
+                }
+            }
+            var isEmpty = (displayed === 0);
             if (isEmpty) { $('#sbTableWrap').hide(); $('#sbEmptyState').show(); }
             else { $('#sbEmptyState').hide(); $('#sbTableWrap').show(); try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {} }
         } catch (e) { /* ignore */ }
