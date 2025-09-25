@@ -255,8 +255,18 @@ $(document).ready(function() {
         // open in new tab to trigger download without blocking UI
         window.open(url, '_blank');
     });
-    $('#sbGroupSelect').on('change', function() { saveState(undefined); if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true); });
-    $('#sbProxySelect').on('change', function() { saveState(undefined); if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true); });
+    $('#sbGroupSelect').on('change', function() {
+        saveState(undefined);
+        if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true);
+        // If no proxies are selected for the new group, keep empty state visible until data arrives
+        try { if (getSelectedProxyIds().length === 0) { $('#sbTableWrap').hide(); $('#sbEmptyState').show(); } } catch (e) { /* ignore */ }
+    });
+    $('#sbProxySelect').on('change', function() {
+        saveState(undefined);
+        if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true);
+        // If user cleared selection, show empty state immediately
+        try { if (getSelectedProxyIds().length === 0) { $('#sbTableWrap').hide(); $('#sbEmptyState').show(); } } catch (e) { /* ignore */ }
+    });
 
     // Row click -> open detail modal
     $('#sbTable tbody').on('click', 'tr', function() {
