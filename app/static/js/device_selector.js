@@ -52,6 +52,18 @@
 				}
 			}
 
+			function selectAllCurrentProxiesIfNone() {
+				if (!$proxy || $proxy.length === 0) return;
+				var current = $proxy.val() || [];
+				if (current.length > 0) return;
+				var vals = $proxy.find('option').map(function() { return $(this).val(); }).get();
+				if (vals.length === 0) return;
+				try {
+					if (state.ts) { state.ts.setValue(vals, false); }
+					else { $proxy.find('option').prop('selected', true); $proxy.trigger('change'); }
+				} catch (e) { /* ignore */ }
+			}
+
 			function enhanceMultiSelect() {
 				if (!$proxy || $proxy.length === 0) return;
 				if (window.TomSelect) {
@@ -93,7 +105,8 @@
 								item: function(data, escape) { return '<div style="white-space:nowrap;">' + (data.text || '') + '</div>'; }
 							},
 							onInitialize: function() { $group[0]._tom = this; },
-							onChange: function() { try { $group.trigger('change'); } catch (e) { /* ignore */ } }
+							onChange: function() { try { $group.trigger('change'); } catch (e) { /* ignore */ } },
+							onDropdownClose: function() { selectAllCurrentProxiesIfNone(); }
 						});
 						state.gts = gts;
 					} catch (e) { /* ignore */ }
@@ -111,6 +124,8 @@
 						else { $proxy.find('option').prop('selected', true); $proxy.trigger('change'); }
 					} catch (e) { /* ignore */ }
 					});
+					// If user clicks the group select without changing value, still ensure proxies are selected
+					$group.on('click.devicesel', function() { selectAllCurrentProxiesIfNone(); });
 				}
 				if ($selectAll && $selectAll.length) {
 					$selectAll.off('.devicesel').on('change.devicesel', function() {

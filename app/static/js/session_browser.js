@@ -118,7 +118,7 @@ $(document).ready(function() {
                 // Trigger change so DeviceSelector repopulates proxies for selected group
                 $('#sbGroupSelect').trigger('change');
             }
-            if (Array.isArray(state.proxyIds)) {
+            if (Array.isArray(state.proxyIds) && state.proxyIds.length > 0) {
                 const strIds = state.proxyIds.map(id => String(id));
                 $('#sbProxySelect option').each(function() {
                     $(this).prop('selected', strIds.includes($(this).val()));
