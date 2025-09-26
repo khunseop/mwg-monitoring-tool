@@ -78,13 +78,7 @@ $(document).ready(function() {
     function getSelectedProxyIds() { return ($('#sbProxySelect').val() || []).map(v => parseInt(v, 10)); }
 
     function updateTableVisibility() {
-        try {
-            var $tbody = $('#sbTable tbody');
-            var rowCount = $tbody.find('tr').length;
-            var isEmpty = rowCount === 0 || ($tbody.find('td').first().hasClass('dataTables_empty'));
-            if (isEmpty) { $('#sbTableWrap').hide(); $('#sbEmptyState').show(); }
-            else { $('#sbEmptyState').hide(); $('#sbTableWrap').show(); try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) {} }
-        } catch (e) { /* ignore */ }
+        try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) { /* ignore */ }
     }
 
     function saveState(itemsForSave) {
@@ -98,8 +92,14 @@ $(document).ready(function() {
         } catch (e) { /* ignore */ }
         // If itemsForSave is provided, use it as-is (including empty array to CLEAR)
         var items = (itemsForSave !== undefined) ? (Array.isArray(itemsForSave) ? itemsForSave : undefined) : prevItems;
+        var groupVal;
+        try {
+            var gEl = $('#sbGroupSelect')[0];
+            if (gEl && gEl._tom && typeof gEl._tom.getValue === 'function') { groupVal = gEl._tom.getValue(); }
+            else { groupVal = $('#sbGroupSelect').val() || ''; }
+        } catch (e) { groupVal = $('#sbGroupSelect').val() || ''; }
         var state = {
-            groupId: $('#sbGroupSelect').val() || '',
+            groupId: groupVal || '',
             proxyIds: getSelectedProxyIds(),
             items: items,
             savedAt: Date.now()
@@ -114,15 +114,27 @@ $(document).ready(function() {
             if (!raw) return;
             const state = JSON.parse(raw);
             if (state.groupId !== undefined) {
-                $('#sbGroupSelect').val(state.groupId);
-                // Trigger change so DeviceSelector repopulates proxies for selected group
-                $('#sbGroupSelect').trigger('change');
+                var $g = $('#sbGroupSelect');
+                var gtom = ($g && $g[0]) ? $g[0]._tom : null;
+                if (gtom && typeof gtom.setValue === 'function') {
+                    try { gtom.setValue(String(state.groupId || ''), false); } catch (e) { /* ignore */ }
+                    try { $g.trigger('change'); } catch (e) { /* ignore */ }
+                } else {
+                    $g.val(state.groupId);
+                    // Trigger change so DeviceSelector repopulates proxies for selected group
+                    $g.trigger('change');
+                }
             }
-            if (Array.isArray(state.proxyIds)) {
-                const strIds = state.proxyIds.map(id => String(id));
-                $('#sbProxySelect option').each(function() {
-                    $(this).prop('selected', strIds.includes($(this).val()));
-                });
+            if (Array.isArray(state.proxyIds) && state.proxyIds.length > 0) {
+                const strIds = state.proxyIds.map(function(id){ return String(id); });
+                var $p = $('#sbProxySelect');
+                var ptom = ($p && $p[0]) ? $p[0]._tom : null;
+                if (ptom && typeof ptom.setValue === 'function') {
+                    try { ptom.setValue(strIds, false); } catch (e) { /* ignore */ }
+                } else {
+                    $p.find('option').each(function() { $(this).prop('selected', strIds.indexOf($(this).val()) !== -1); });
+                    try { $p.trigger('change'); } catch (e) { /* ignore */ }
+                }
             }
             // Do not restore cached items; rely on server-side data to persist last load
         } catch (e) { /* ignore */ }
@@ -236,8 +248,14 @@ $(document).ready(function() {
         // open in new tab to trigger download without blocking UI
         window.open(url, '_blank');
     });
-    $('#sbGroupSelect').on('change', function() { saveState(undefined); if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true); });
-    $('#sbProxySelect').on('change', function() { saveState(undefined); if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true); });
+    $('#sbGroupSelect').on('change', function() {
+        saveState(undefined);
+        if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true);
+    });
+    $('#sbProxySelect').on('change', function() {
+        saveState(undefined);
+        if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true);
+    });
 
     // Row click -> open detail modal
     $('#sbTable tbody').on('click', 'tr', function() {
@@ -250,9 +268,8 @@ $(document).ready(function() {
     });
 
     initTable();
-    // Show empty state initially
-    $('#sbTableWrap').hide();
-    $('#sbEmptyState').show();
+    // Always show table
+    $('#sbTableWrap').show();
     DeviceSelector.init({ 
         groupSelect: '#sbGroupSelect', 
         proxySelect: '#sbProxySelect', 

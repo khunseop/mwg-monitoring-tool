@@ -52,6 +52,27 @@
 				}
 			}
 
+			function selectAllCurrentProxiesIfNone() {
+				if (!$proxy || $proxy.length === 0) return;
+				var current = $proxy.val() || [];
+				if (current.length > 0) return;
+				var vals = $proxy.find('option').map(function() { return $(this).val(); }).get();
+				if (vals.length === 0) return;
+				try {
+					if (state.ts) { state.ts.setValue(vals, false); }
+					else { $proxy.find('option').prop('selected', true); $proxy.trigger('change'); }
+				} catch (e) { /* ignore */ }
+			}
+
+			function selectCurrentGroupProxies() {
+				if (!$proxy || $proxy.length === 0) return;
+				var vals = $proxy.find('option').map(function() { return $(this).val(); }).get();
+				try {
+					if (state.ts) { state.ts.setValue(vals, false); }
+					else { $proxy.find('option').prop('selected', true); $proxy.trigger('change'); }
+				} catch (e) { /* ignore */ }
+			}
+
 			function enhanceMultiSelect() {
 				if (!$proxy || $proxy.length === 0) return;
 				if (window.TomSelect) {
@@ -93,7 +114,8 @@
 								item: function(data, escape) { return '<div style="white-space:nowrap;">' + (data.text || '') + '</div>'; }
 							},
 							onInitialize: function() { $group[0]._tom = this; },
-							onChange: function() { try { $group.trigger('change'); } catch (e) { /* ignore */ } }
+						onChange: function() { try { $group.trigger('change'); } catch (e) { /* ignore */ } },
+							onDropdownClose: function() { selectAllCurrentProxiesIfNone(); }
 						});
 						state.gts = gts;
 					} catch (e) { /* ignore */ }
@@ -111,6 +133,8 @@
 						else { $proxy.find('option').prop('selected', true); $proxy.trigger('change'); }
 					} catch (e) { /* ignore */ }
 					});
+					// If user clicks the group select without changing value, still reconcile proxies for the visible group
+					$group.on('click.devicesel', function() { selectCurrentGroupProxies(); });
 				}
 				if ($selectAll && $selectAll.length) {
 					$selectAll.off('.devicesel').on('change.devicesel', function() {
@@ -132,11 +156,13 @@
 				enhanceMultiSelect(); 
 				bindEvents(); 
 				if (!allowAllGroups) {
-					var currentVal = $group && $group.length ? $group.val() : '';
-						if (!currentVal) {
+					// If no value has been set externally, default to first group once
+					var currentVal = '';
+					try { currentVal = ($group && $group.length) ? ($group[0]._tom ? $group[0]._tom.getValue() : $group.val()) : ''; } catch (e) { currentVal = $group.val(); }
+					if (!currentVal) {
 						var first = (state.groups && state.groups.length) ? String(state.groups[0].id) : '';
 						if (first) {
-								try { if (state.gts) { state.gts.setValue(first, false); } else { $group.val(first).trigger('change'); } } catch (e) { /* ignore */ }
+							try { if (state.gts) { state.gts.setValue(first, false); } else { $group.val(first).trigger('change'); } } catch (e) { /* ignore */ }
 						}
 					}
 				}
