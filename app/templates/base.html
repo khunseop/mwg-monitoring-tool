@@ -33,11 +33,11 @@
                         <a class="navbar-item {% if request.url.path == '/' or request.url.path.startswith('/resource') %}is-active{% endif %}" href="/resource">
                             자원사용률
                         </a>
-                        <a class="navbar-item {% if request.url.path.startswith('/traffic-logs') %}is-active{% endif %}" href="/traffic-logs">
-                            트래픽 로그
-                        </a>
                         <a class="navbar-item {% if request.url.path.startswith('/session') %}is-active{% endif %}" href="/session">
                             세션브라우저
+                        </a>
+                        <a class="navbar-item {% if request.url.path.startswith('/traffic-logs') %}is-active{% endif %}" href="/traffic-logs">
+                            트래픽 로그
                         </a>
                         <div class="navbar-item has-dropdown is-hoverable is-hidden-touch">
                             <a id="navSettings" class="navbar-link {% if request.url.path.startswith('/settings') %}is-active{% endif %}" href="/settings">설정</a>
