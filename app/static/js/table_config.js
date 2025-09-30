@@ -32,7 +32,7 @@
 		info: true,
 		responsive: false,
 		scrollX: true,
-		scrollY: 480,
+		scrollY: 800,
 		scrollCollapse: true,
 		orderCellsTop: true,
 		pageLength: 25,
