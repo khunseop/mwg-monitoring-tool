@@ -46,7 +46,15 @@
 		return { categories, data };
 	}
 
-	function renderSummary(summary){
+	function renderSummary(payload){
+		const summary = payload.summary || {};
+		const hosts = payload.target_hosts || [];
+
+		// New fields for analysis metadata
+		$('#sbAnalyzedAt').text(payload.analyzed_at ? fmtDt(payload.analyzed_at) : '-');
+		$('#sbTargetHosts').text(hosts.length > 0 ? hosts.join(', ') : '-');
+
+		// Existing summary fields
 		$('#sbTotSessions').text(summary.total_sessions || 0);
 		$('#sbClients').text(summary.unique_clients || 0);
 		$('#sbHosts').text(summary.unique_hosts || 0);
@@ -82,7 +90,7 @@
 			if(!raw) return;
 			const data = JSON.parse(raw);
 			if(!data || typeof data !== 'object') return;
-			renderSummary(data.summary || {});
+			renderSummary(data); // Pass the full object
 			renderCharts(data);
 			setStatus('저장된 분석 결과', 'is-light');
 			$('#sbAnalyzeSection').show();
@@ -100,7 +108,7 @@
 			const res = await fetch(`${API_BASE}/session-browser/analyze?${qs}`);
 			if(!res.ok){ const err = await res.json().catch(()=>({detail:'분석 실패'})); throw new Error(err.detail || '분석 실패'); }
 			const data = await res.json();
-			renderSummary(data.summary || {});
+			renderSummary(data); // Pass the full object
 			renderCharts(data);
 			saveResult(data);
 			$('#sbAnalyzeSection').show();
