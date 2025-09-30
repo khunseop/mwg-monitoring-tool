@@ -1,147 +1,72 @@
-## PPAT (Proxy Performance Analysis Tool)
+# PPAT (프록시 성능 분석 도구) 사용자 매뉴얼
 
-FastAPI 기반의 프록시 성능 분석/운영 도구입니다. 프록시/그룹 관리, 세션 브라우저 수집(SSH), 자원 사용률 수집(SNMP), 간단한 UI와 API 문서를 제공합니다.
+PPAT는 여러 프록시 서버의 상태와 성능을 한눈에 파악하고, 장애 원인을 신속하게 분석할 수 있도록 돕는 웹 기반 관리 도구입니다. 복잡한 명령어 없이 웹 UI를 통해 직관적으로 프록시를 운영하고 분석할 수 있습니다.
 
-### 구성 요소
-- FastAPI + SQLAlchemy + Pydantic v2
-- Templates(Jinja2) + Static assets
-- SQLite 기본(DB_URL로 교체 가능)
-- SNMP 수집(aiosnmp), SSH 수집(paramiko)
+## 주요 기능 소개
 
-### 빠른 시작
-1) Python 3.10+ 준비, 가상환경 권장
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-```
+PPAT는 다음과 같은 네 가지 핵심 기능을 제공합니다.
 
-2) 환경변수(.env 권장) 설정
-- `DATABASE_URL`: 기본 `sqlite:///./ppat.db`
-- `SESSION_TMP_DIR`: 세션 브라우저 임시파일 저장 경로(미설정 시 시스템 tmp 하위 `session_browser/`)
-- `CORS_ALLOW_ORIGINS`: 기본 `*` (쉼표로 다중 허용)
-- `CORS_ALLOW_CREDENTIALS`: 기본 `false` (와일드카드일 때 자동 비활성)
-- `ENABLE_DOCS`: 기본 `true` (API 문서 노출)
-- `PROXY_PASSWORD_KEY`: 프록시 비밀번호 암호화용 Fernet 키. 미설정 시 `./.secret/proxy_key.key` 자동 생성/사용. 컨테이너/배포 간 동일 키 유지 필요
+-   **⚙️ 설정 (프록시/그룹 관리)**: 모니터링할 프록시 서버와 그룹을 등록하고 관리합니다.
+-   **📊 자원 사용률**: 등록된 프록시들의 CPU, 메모리 등 시스템 자원 사용률을 실시간 그래프로 확인합니다.
+-   **👤 세션 브라우저**: 프록시 서버의 현재 활성 세션(접속자) 정보를 실시간으로 조회합니다.
+-   **📈 트래픽 로그 분석**: 대용량 프록시 로그 파일을 업로드하여 과부하 원인, 주요 접속자, 인기 사이트 등을 빠르게 분석합니다.
 
-3) 애플리케이션 실행
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+---
 
-4) UI/엔드포인트
-- 메인 설정 페이지: `/`
-- 자원 사용률 페이지: `/resource`
-- 세션 브라우저 페이지: `/session`
-- 트래픽 로그 페이지: `/traffic-logs`
-- 헬스체크: `/healthz`
-- API 라우트 프리픽스: `/api`
-- API 문서: `ENABLE_DOCS=true` 상태에서 자동 제공
+## 사용 방법
 
-트래픽 로그 페이지는 두 가지 방식을 제공합니다:
-- 원격 조회(SSH): 프록시에 설정된 로그 경로에서 head/tail로 조회(필터 포함)
-- 파일 업로드 분석: 로컬 로그파일을 업로드하여 대용량도 스트리밍으로 파싱/집계
+### 1. ⚙️ 프록시 설정 및 관리
 
-### 주요 기능
-- 프록시/그룹 CRUD
-- 세션 브라우저 수집(SSH) 및 임시파일(JSONL) 저장/조회(프록시별 최신 1개 배치 유지)
-- 자원 사용률 수집(SNMP 기본, 메모리는 선택적으로 SSH) 및 저장/조회
-- 트래픽 로그 업로드 분석(신규)
-  - 과부하 원인 파악에 유용한 집계 제공: 과다 다운로드/업로드, 요청 상위 클라이언트·호스트·URL, 차단 건수
-  - 호스트/클라이언트별 다운로드·업로드 바이트 합계, 요청 건수, 상위 Top N 분석
-  - 시간 범위 자동 계산(로그 내 earliest~latest)
-  - ApexCharts 기반 차트 시각화, 결과는 로컬 저장소(localStorage)에 보존되어 새로고침 시에도 유지
+가장 먼저 해야 할 일은 분석할 프록시 서버 정보를 등록하는 것입니다.
 
-### API - 트래픽 로그 업로드 분석
+1.  **그룹 추가**: 프록시를 관리하기 쉽도록 그룹을 먼저 만듭니다. (예: `서비스 A 프록시`, `개발용 프록시`)
+2.  **프록시 추가**: 생성한 그룹에 프록시 서버 정보를 추가합니다.
+    -   **호스트**: IP 주소 또는 도메인 이름
+    -   **사용자 이름/비밀번호**: SSH 접속 계정 정보
+    -   **SNMP 커뮤니티**: 자원 사용률 수집을 위한 SNMP Community String
+3.  **OID 설정**: `설정 > OID` 메뉴에서 CPU, 메모리 등 수집할 자원 지표의 SNMP OID를 설정합니다. 대부분의 경우 기본값을 사용할 수 있습니다.
 
-엔드포인트:
+> 📝 **팁**: 프록시 비밀번호는 안전하게 암호화되어 저장되므로 안심하고 사용할 수 있습니다.
 
-```
-POST /api/traffic-logs/analyze-upload?topN=20
-Content-Type: multipart/form-data
-Form fields:
-  - logfile: 업로드할 로그 파일 (필수)
-```
+### 2. 📊 자원 사용률 확인하기
 
-응답 예시(요약):
+프록시 등록을 마쳤다면, `자원 사용률` 페이지에서 성능을 실시간으로 모니터링할 수 있습니다.
 
-```json
-{
-  "summary": {
-    "total_lines": 12345,
-    "parsed_lines": 12000,
-    "unparsed_lines": 345,
-    "unique_clients": 87,
-    "unique_hosts": 213,
-    "total_recv_bytes": 123456789,
-    "total_sent_bytes": 987654321,
-    "blocked_requests": 42,
-    "time_range_start": "2025-09-24T10:00:00+09:00",
-    "time_range_end": "2025-09-24T12:00:00+09:00"
-  },
-  "top": {
-    "hosts_by_requests": [["example.com", 1234], ...],
-    "urls_by_requests": [["example.com/path", 456], ...],
-    "clients_by_requests": [["10.0.0.5", 789], ...],
-    "clients_by_download_bytes": [["10.0.0.5", 123456], ...],
-    "clients_by_upload_bytes": [["10.0.0.6", 98765], ...],
-    "hosts_by_download_bytes": [["cdn.example.com", 2222222], ...],
-    "hosts_by_upload_bytes": [["upload.example.com", 1111111], ...]
-  }
-}
-```
+-   **실시간 그래프**: 프록시별 CPU, 메모리 사용률 등의 변화를 시간대별 그래프로 보여줍니다. 특정 프록시가 과부하 상태인지 직관적으로 파악할 수 있습니다.
+-   **히트맵 테이블**: 현재 자원 사용률을 색상으로 표시하여 어떤 프록시의 어떤 자원이 높은 상태인지 한눈에 알 수 있습니다. (예: 빨간색은 위험, 녹색은 안정)
 
-비고:
-- `topN`은 1~100 사이 정수(기본 20)
-- 파일은 서버에 저장되지 않고 스트리밍으로 파싱만 수행
+### 3. 👤 세션 브라우저로 현재 접속자 보기
 
-### 자원 사용률(SSH 메모리)
-- OID 설정에서 `mem` 값을 `ssh` 또는 `ssh:<command>`로 지정하면 SSH로 메모리 사용률(%)을 수집합니다.
-  - 기본 명령은 다음과 같습니다:
-```bash
-awk '/MemTotal/ {total=$2} /MemAvailable/ {available=$2} END {printf "%.0f", 100 - (available / total * 100)}' /proc/meminfo
-```
-- 성능/타임아웃 환경변수:
-  - `RU_SSH_MAX_CONCURRENCY`: 동시 SSH 수집 개수(기본 8)
-  - `RU_SSH_TIMEOUT_SEC`: SSH 접속/명령 타임아웃 초(기본 5)
-- 검증(디버깅): 로그 레벨을 DEBUG로 올리면 다음 로그가 출력됩니다.
-  - `Using SSH mem for host=... oidSpec=ssh...`
-  - `SSH mem start host=...` / `SSH mem end host=... ms=... value=...`
+`세션 브라우저` 페이지에서는 "지금 이 순간 누가 프록시를 사용하고 있는지" 확인할 수 있습니다.
 
-### 윈도우 독립 실행 파일로 빌드 (PyInstaller)
+1.  **그룹 선택**: 조회하고 싶은 프록시가 속한 그룹을 선택합니다.
+2.  **프록시 선택**: 특정 프록시를 선택하거나, 그룹 내 여러 프록시를 선택하여 동시에 조회할 수 있습니다.
+3.  **수집 시작**: 버튼을 누르면 각 프록시 서버에 접속하여 현재 활성 세션 정보를 가져와 표로 보여줍니다.
+    -   이를 통해 비정상적으로 많은 세션을 차지하는 사용자를 찾거나 접속 현황을 파악할 수 있습니다.
 
-Windows에서 로컬 프로그램처럼 실행할 수 있는 `PPAT.exe`를 생성합니다.
+> 📁 **참고**: 조회된 세션 정보는 서버에 임시 파일로 저장되며, 프록시별로 가장 최근의 결과만 유지됩니다.
 
-1) 의존성 설치
-```powershell
-py -3.10 -m venv .venv
-.\.venv\Scripts\activate
-pip install -r requirements.txt
-pip install pyinstaller==6.11.0
-```
+### 4. 📈 트래픽 로그 분석하기
 
-2) 빌드 명령
-```powershell
-pyinstaller --name PPAT \
-  --onefile \
-  --noconsole \
-  --add-data "app/templates;app/templates" \
-  --add-data "app/static;app/static" \
-  --add-data "docs;docs" \
-  --collect-all uvicorn \
-  --collect-all fastapi_standalone_docs \
-  --collect-all aiosnmp \
-  --collect-all asyncio_dgram \
-  --collect-all pyasn1 \
-  --collect-all paramiko \
-  --collect-all pynacl \
-  --collect-all bcrypt \
-  --hidden-import "dotenv" \
-  --hidden-import "Jinja2" \
-  --hidden-import "cryptography.hazmat.bindings._rust" \
-  --additional-hooks-dir hooks \
-  run_app.py
-```
+프록시 서버의 로그 파일은 서버 과부하나 장애의 원인을 찾는 데 매우 중요합니다. `트래픽 로그` 페이지는 대용량 로그 파일을 쉽고 빠르게 분석할 수 있도록 도와줍니다.
 
-- 결과: `dist/PPAT.exe`
-- 실행 시 기본 브라우저가 자동으로 열리고 주소는 `http://127.0.0.1:8000/` 입니다.
-- 리소스 경로는 `app/utils/path_resolver.py` 에서 PyInstaller 번들을 고려해 처리합니다.
+-   **파일 업로드 분석 (권장)**:
+    1.  프록시 서버에서 로그 파일을 로컬 PC로 다운로드합니다.
+    2.  `트래픽 로그` 페이지에서 `로그 파일 업로드하여 분석하기` 탭을 선택하고 로그 파일을 업로드합니다.
+    3.  업로드가 완료되면 자동으로 분석이 시작되며, 잠시 후 결과가 화면에 나타납니다.
+
+-   **분석 결과**:
+    -   **요약**: 전체 로그 라인 수, 총 트래픽 양, 시간 범위 등 기본 정보
+    -   **상위 TOP N 분석**:
+        -   가장 많이 접속한 클라이언트 IP
+        -   가장 많이 요청된 호스트(웹사이트) 및 전체 URL
+        -   가장 많은 트래픽(다운로드/업로드)을 유발한 클라이언트 및 호스트
+    -   **시각화 차트**: 분석 결과를 막대그래프 등 시각적인 차트로 보여주어 경향을 쉽게 파악할 수 있습니다.
+
+> 💡 **활용 사례**: "갑자기 서버가 느려졌는데, 어떤 사용자가 트래픽을 많이 쓰고 있는지 확인하고 싶을 때" 이 기능을 사용하면 원인을 빠르게 찾을 수 있습니다.
+
+---
+
+## 개발자 정보
+
+소스 코드 기반 설치, 환경 설정, API 명세 등 기술적인 정보는 [개발자 가이드](./docs/DEVELOPER_GUIDE.md)를 참고하세요.
