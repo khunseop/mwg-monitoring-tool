@@ -95,6 +95,22 @@
             <p id="sbAnalyzeError" class="help is-danger" style="display:none;"></p>
 
             <div id="sbSummary" class="columns is-multiline" style="display:none;">
+                <div class="column is-12">
+                    <div class="columns">
+                        <div class="column is-3">
+                            <div class="box has-text-centered" style="height: 100%;">
+                                <p class="heading">분석 시간</p>
+                                <p class="title is-6" id="sbAnalyzedAt">-</p>
+                            </div>
+                        </div>
+                        <div class="column is-9">
+                            <div class="box" style="height: 100%;">
+                                <p class="heading">분석 대상</p>
+                                <p id="sbTargetHosts" class="is-size-7" style="height: 40px; overflow-y: auto;">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="column is-2"><div class="box has-text-centered"><p class="heading">총 세션</p><p class="title is-5" id="sbTotSessions">0</p></div></div>
                 <div class="column is-2"><div class="box has-text-centered"><p class="heading">클라이언트 수</p><p class="title is-5" id="sbClients">0</p></div></div>
                 <div class="column is-2"><div class="box has-text-centered"><p class="heading">호스트 수</p><p class="title is-5" id="sbHosts">0</p></div></div>

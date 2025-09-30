@@ -677,6 +677,9 @@ async def sessions_analyze(
     # Load latest batches
     rows: List[Dict[str, Any]] = _load_latest_rows_for_proxies(db, target_ids)
 
+    # Get unique hostnames from the loaded rows
+    target_hosts = sorted(list(set([row.get("host") for row in rows if row.get("host")])))
+
     # Aggregations
     from collections import Counter, defaultdict
 
@@ -771,6 +774,8 @@ async def sessions_analyze(
 
     # Build top sections with data-centric keys; keep old keys for backward compatibility
     result = {
+        "analyzed_at": now_kst().isoformat(),
+        "target_hosts": target_hosts,
         "summary": {
             "total_sessions": len(rows),
             "unique_clients": len(unique_clients),
