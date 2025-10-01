@@ -9,6 +9,9 @@ import re
 import warnings
 import time
 import logging
+import io
+from openpyxl import Workbook
+from openpyxl.styles import Font
 try:
     from cryptography.utils import CryptographyDeprecationWarning
     warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
@@ -409,17 +412,19 @@ def _filter_rows(rows: List[Dict[str, Any]], search: str | None) -> List[Dict[st
 
 def _sort_key_func(order_col: int | None):
     def sort_key(row: Dict[str, Any]):
+        # This mapping must match the order of columns in the DataTables `columns` option
         mapping = {
             0: (row.get("host") or ""),
             1: row.get("creation_time") or "",
-            2: row.get("user_name") or "",
-            3: row.get("client_ip") or "",
-            4: row.get("server_ip") or "",
-            5: row.get("cl_bytes_received") or -1,
-            6: row.get("cl_bytes_sent") or -1,
-            7: row.get("age_seconds") or -1,
-            8: row.get("url") or "",
-            9: 0,
+            2: (row.get("protocol") or ""),
+            3: row.get("user_name") or "",
+            4: row.get("client_ip") or "",
+            5: row.get("server_ip") or "",
+            6: row.get("cl_bytes_received") or -1,
+            7: row.get("cl_bytes_sent") or -1,
+            8: row.get("age_seconds") or -1,
+            9: (row.get("url") or ""),
+            10: 0,  # id column, not sortable
         }
         return mapping.get(order_col or 1)
     return sort_key
@@ -493,6 +498,7 @@ async def sessions_datatables(
         data.append([
             host,
             ct_str,
+            rec.get("protocol") or "",
             rec.get("user_name") or "",
             cip,
             rec.get("server_ip") or "",
@@ -535,6 +541,22 @@ async def sessions_export(
     group_id: int | None = Query(None),
     proxy_ids: str | None = Query(None),  # comma-separated
 ):
+    # Create an Excel workbook in memory
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sessions"
+
+    # Define headers
+    headers = [
+        "id", "프록시", "수집시각", "트랜잭션", "생성시각", "프로토콜", "Cust ID", "사용자",
+        "클라이언트 IP", "Client-side MWG IP", "Server-side MWG IP", "서버 IP",
+        "CL 수신(Bytes)", "CL 송신(Bytes)", "서버 수신(Bytes)", "서버 송신(Bytes)",
+        "Trxn Index", "Age(s)", "상태", "In Use", "URL",
+    ]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+
     # Require explicit selection
     target_ids: List[int] = []
     if proxy_ids:
@@ -542,120 +564,69 @@ async def sessions_export(
             target_ids = [int(x) for x in proxy_ids.split(",") if x.strip()]
         except Exception:
             target_ids = []
-    if not target_ids:
-        # Empty CSV with header
-        def row_iter_empty() -> Iterable[str]:
-            yield "\ufeff"
-            headers = [
-                "id","프록시","수집시각","트랜잭션","생성시각","프로토콜","Cust ID","사용자",
-                "클라이언트 IP","Client-side MWG IP","Server-side MWG IP","서버 IP",
-                "CL 수신(Bytes)","CL 송신(Bytes)","서버 수신(Bytes)","서버 송신(Bytes)",
-                "Trxn Index","Age(s)","상태","In Use","URL",
-            ]
-            yield ",".join(headers) + "\n"
-        filename = f"sessions_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}\.csv"
-        return StreamingResponse(row_iter_empty(), media_type="text/csv", headers={
-            "Content-Disposition": f"attachment; filename={filename}"
-        })
 
-    # Load rows
-    rows = _load_latest_rows_for_proxies(db, target_ids)
-    for r in rows:
-        pid = int(r.get("proxy_id") or 0)
-        idx = int(r.get("__line_index") or 0)
-        r["id"] = temp_store.build_record_id(pid, str(r.get("collected_at") or ""), idx)
+    if target_ids:
+        # Load rows
+        rows = _load_latest_rows_for_proxies(db, target_ids)
+        for r in rows:
+            pid = int(r.get("proxy_id") or 0)
+            idx = int(r.get("__line_index") or 0)
+            r["id"] = temp_store.build_record_id(pid, str(r.get("collected_at") or ""), idx)
 
-    # Filter
-    filtered = _filter_rows(rows, search)
+        # Filter
+        filtered = _filter_rows(rows, search)
 
-    # Order similarly to datatables
-    reverse = (order_dir or "desc").lower() == "desc"
-    try:
-        filtered.sort(key=_sort_key_func(order_col), reverse=reverse)
-    except Exception:
-        pass
+        # Order similarly to datatables
+        reverse = (order_dir or "desc").lower() == "desc"
+        try:
+            filtered.sort(key=_sort_key_func(order_col), reverse=reverse)
+        except Exception:
+            pass
 
-    def row_iter() -> Iterable[str]:
-        # Write UTF-8 BOM for Excel compatibility
-        yield "\ufeff"
-        headers = [
-            "id",
-            "프록시",
-            "수집시각",
-            "트랜잭션",
-            "생성시각",
-            "프로토콜",
-            "Cust ID",
-            "사용자",
-            "클라이언트 IP",
-            "Client-side MWG IP",
-            "Server-side MWG IP",
-            "서버 IP",
-            "CL 수신(Bytes)",
-            "CL 송신(Bytes)",
-            "서버 수신(Bytes)",
-            "서버 송신(Bytes)",
-            "Trxn Index",
-            "Age(s)",
-            "상태",
-            "In Use",
-            "URL",
-        ]
-        yield ",".join(headers) + "\n"
+        def to_kst_str(val: Any) -> str:
+            try:
+                if not val: return ""
+                dt = val if isinstance(val, datetime) else datetime.fromisoformat(str(val))
+                return dt.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S")
+            except (ValueError, TypeError):
+                return str(val or "")
 
+        # Write data rows
         for idx, rec in enumerate(filtered, start=1):
             host = rec.get("host") or f"#{rec.get('proxy_id')}"
-            def to_kst_str(val: Any) -> str:
-                try:
-                    if not val:
-                        return ""
-                    dt = datetime.fromisoformat(str(val))
-                    return dt.astimezone(KST_TZ).strftime("%Y-%m-%d %H:%M:%S")
-                except Exception:
-                    return ""
             collected_str = to_kst_str(rec.get("collected_at"))
             creation_str = to_kst_str(rec.get("creation_time"))
-            def esc(v: Any) -> str:
-                s = "" if v is None else str(v)
-                if '"' in s or "," in s or "\n" in s or "\r" in s:
-                    s = '"' + s.replace('"', '""') + '"'
-                return s
-            # normalize client ip for export
+
             try:
                 cip = rec.get("client_ip") or ""
                 if isinstance(cip, str) and re.match(r"^\d+\.\d+\.\d+\.\d+:\d+$", cip.strip()):
                     cip = cip.strip().rsplit(":", 1)[0]
             except Exception:
                 cip = rec.get("client_ip") or ""
-            row = [
-                esc(idx),
-                esc(host),
-                esc(collected_str),
-                esc(rec.get("transaction") or ""),
-                esc(creation_str),
-                esc(rec.get("protocol") or ""),
-                esc(rec.get("cust_id") or ""),
-                esc(rec.get("user_name") or ""),
-                esc(cip),
-                esc(rec.get("client_side_mwg_ip") or ""),
-                esc(rec.get("server_side_mwg_ip") or ""),
-                esc(rec.get("server_ip") or ""),
-                esc(rec.get("cl_bytes_received")),
-                esc(rec.get("cl_bytes_sent")),
-                esc(rec.get("srv_bytes_received")),
-                esc(rec.get("srv_bytes_sent")),
-                esc(rec.get("trxn_index")),
-                esc(rec.get("age_seconds")),
-                esc(rec.get("status") or ""),
-                esc(rec.get("in_use")),
-                esc(rec.get("url") or ""),
-            ]
-            yield ",".join(row) + "\n"
 
-    filename = f"sessions_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}\.csv"
-    return StreamingResponse(row_iter(), media_type="text/csv", headers={
-        "Content-Disposition": f"attachment; filename={filename}"
-    })
+            row_data = [
+                idx, host, collected_str, rec.get("transaction"), creation_str,
+                rec.get("protocol"), rec.get("cust_id"), rec.get("user_name"), cip,
+                rec.get("client_side_mwg_ip"), rec.get("server_side_mwg_ip"),
+                rec.get("server_ip"), rec.get("cl_bytes_received"), rec.get("cl_bytes_sent"),
+                rec.get("srv_bytes_received"), rec.get("srv_bytes_sent"),
+                rec.get("trxn_index"), rec.get("age_seconds"), rec.get("status"),
+                rec.get("in_use"), rec.get("url"),
+            ]
+            ws.append(row_data)
+
+    # Save to a virtual file
+    virtual_workbook = io.BytesIO()
+    wb.save(virtual_workbook)
+    virtual_workbook.seek(0)
+
+    filename = f"sessions_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+    return StreamingResponse(
+        virtual_workbook,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=\"{filename}\""}
+    )
 
 
 @router.get("/session-browser/analyze")

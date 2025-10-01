@@ -295,7 +295,7 @@ $(document).ready(function() {
                     }
                 }
             },
-            xaxis: { type: 'category', categories: xCategories },
+            xaxis: { type: 'category', categories: xCategories, position: 'top' },
             yaxis: { labels: { style: { fontSize: '11px' } } },
             tooltip: { y: { formatter: function(val, { seriesIndex, dataPointIndex }) {
                 const raw = (ru._heatRaw && ru._heatRaw[seriesIndex]) ? ru._heatRaw[seriesIndex][dataPointIndex] : null;
@@ -354,7 +354,7 @@ $(document).ready(function() {
 
     function startPolling() {
         if (ru.intervalId) return;
-        const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 30;
+        const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
         const periodMs = Math.max(5, intervalSec) * 1000;
         setRunning(true);
         collectOnce();

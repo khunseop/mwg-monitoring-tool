@@ -172,6 +172,7 @@ $(document).ready(function() {
                 columns: [
                     { title: '프록시' },
                     { title: '생성시각' },
+                    { title: '프로토콜' },
                     { title: '사용자' },
                     { title: '클라이언트 IP' },
                     { title: '서버 IP' },
@@ -185,12 +186,13 @@ $(document).ready(function() {
                     { targets: -1, visible: false, searchable: false },
                     { targets: 0, className: 'dt-nowrap' },
                     { targets: 1, className: 'dt-nowrap', render: function(data){ return (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(data) : data; } },
-                    { targets: 3, className: 'dt-nowrap mono' },
+                    { targets: 2, className: 'dt-nowrap' },
                     { targets: 4, className: 'dt-nowrap mono' },
-                    { targets: 5, className: 'dt-nowrap num', render: function(data){ return (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(data) : data; } },
+                    { targets: 5, className: 'dt-nowrap mono' },
                     { targets: 6, className: 'dt-nowrap num', render: function(data){ return (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(data) : data; } },
-                    { targets: 7, className: 'dt-nowrap', render: function(data){ return (window.AppUtils && AppUtils.formatSeconds) ? AppUtils.formatSeconds(data) : data; } },
-                    { targets: 8, className: 'dt-nowrap dt-ellipsis', width: '480px' }
+                    { targets: 7, className: 'dt-nowrap num', render: function(data){ return (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(data) : data; } },
+                    { targets: 8, className: 'dt-nowrap', render: function(data){ return (window.AppUtils && AppUtils.formatSeconds) ? AppUtils.formatSeconds(data) : data; } },
+                    { targets: 9, className: 'dt-nowrap dt-ellipsis', width: '480px' }
                 ],
                 createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
             });
@@ -250,11 +252,11 @@ $(document).ready(function() {
     });
     $('#sbGroupSelect').on('change', function() {
         saveState(undefined);
-        if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true);
+        // Do not auto-reload on selection change; user must click Load button
     });
     $('#sbProxySelect').on('change', function() {
         saveState(undefined);
-        if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true);
+        // Do not auto-reload on selection change; user must click Load button
     });
 
     // Row click -> open detail modal
