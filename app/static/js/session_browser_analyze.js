@@ -97,8 +97,11 @@
 		}catch(e){}
 	}
 
+	function clearResult(){ try{ localStorage.removeItem(STORAGE_KEY); }catch(e){} }
+
 	async function runAnalyze(opts){
 		clearError();
+		clearResult(); // Always clear previous results before starting
 		try{
 			const pids = (opts && Array.isArray(opts.proxyIds)) ? opts.proxyIds : [];
 			if(pids.length === 0){ showError('프록시를 선택하세요.'); return; }
