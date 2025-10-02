@@ -417,3 +417,14 @@ table.dataTable thead th.sorting_desc::after { content: '\u25BE'; color: var(--c
 td.num, th.num { text-align: right; }
 .tag.mono { font-variant-numeric: tabular-nums; }
 
+/* Styles for DataTables column filter row */
+tr.dt-filter-row {
+    background-color: #f9fafb;
+}
+.dt-filter-row th {
+    padding: 0.5rem 0.75rem !important;
+    border-width: 1px;
+}
+.dt-filter-input {
+    width: 100%;
+}

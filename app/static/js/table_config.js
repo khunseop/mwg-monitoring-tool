@@ -32,7 +32,6 @@
 		info: true,
 		responsive: false,
 		scrollX: true,
-		scrollY: 800,
 		scrollCollapse: true,
 		orderCellsTop: true,
 		pageLength: 25,
@@ -57,19 +56,94 @@
 		init: function(selectorOrElement, options){
 			var opts = TableConfig.mergeDefaults(options);
 			try{
-				if (typeof window.DataTable === 'function'){
-					var dt = new window.DataTable(selectorOrElement, opts);
-					setTimeout(function(){ TableConfig.applyBulmaStyles(dt); }, 0);
-					dt.on('draw', function(){ TableConfig.applyBulmaStyles(dt); });
-					return dt;
+				var useJquery = (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable);
+				if (!useJquery) {
+					if (typeof window.DataTable === 'function'){
+						var dt_vanilla = new window.DataTable(selectorOrElement, opts);
+						setTimeout(function(){ TableConfig.applyBulmaStyles(dt_vanilla); }, 0);
+						dt_vanilla.on('draw', function(){ TableConfig.applyBulmaStyles(dt_vanilla); });
+						return dt_vanilla;
+					}
+					return null;
 				}
-				if (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable){
-					var $el = window.jQuery(selectorOrElement);
-					var dtj = $el.DataTable(opts);
-					setTimeout(function(){ TableConfig.applyBulmaStyles(dtj); }, 0);
-					$el.on('draw.dt', function(){ TableConfig.applyBulmaStyles(dtj); });
-					return dtj;
+
+				var $table = window.jQuery(selectorOrElement);
+
+				if (opts.columnFiltering) {
+					var originalInitComplete = opts.initComplete;
+					opts.initComplete = function(settings, json) {
+						var api = this.api();
+						var $tableWrapper = window.jQuery(api.table().container());
+
+						var $visibleHeader = $tableWrapper.find('.dataTables_scrollHead thead');
+						if (!$visibleHeader.length) {
+							$visibleHeader = window.jQuery(api.table().header());
+						}
+
+						if ($visibleHeader.find('.dt-filter-row').length > 0) {
+							return;
+						}
+
+						var $filterRow = window.jQuery('<tr class="dt-filter-row"></tr>');
+						$visibleHeader.find('tr:first th').each(function() {
+							$filterRow.append('<th></th>');
+						});
+						$visibleHeader.append($filterRow);
+
+						$filterRow.find('th').each(function(index) {
+							var title = window.jQuery($visibleHeader.find('tr:first th').eq(index)).text();
+							window.jQuery(this).html('<input type="text" class="input is-small dt-filter-input" placeholder="' + title + ' 검색" />');
+						});
+
+						$filterRow.find('input').on('click', function(e) {
+							e.stopPropagation();
+						});
+
+						api.columns().every(function() {
+							var column = this;
+							var $input = window.jQuery('input', $visibleHeader.find('.dt-filter-row th').eq(column.index()));
+
+							if (!$input.length) return;
+
+							var columnSettings = api.settings()[0].aoColumns[column.index()];
+							if (!columnSettings.bSearchable) {
+								$input.parent().html('');
+								return;
+							}
+
+							var searchTimeout;
+							$input.on('keyup change', function(e) {
+								e.stopPropagation();
+								var that = this;
+								clearTimeout(searchTimeout);
+								searchTimeout = setTimeout(function() {
+									if (column.search() !== that.value) {
+										column.search(that.value).draw();
+									}
+								}, 350);
+							});
+
+							var state = api.state.loaded();
+							if (state && state.columns[column.index()] && state.columns[column.index()].search) {
+								var searchTerm = state.columns[column.index()].search.search;
+								if(searchTerm) {
+									$input.val(searchTerm);
+								}
+							}
+						});
+
+						if (typeof originalInitComplete === 'function') {
+							originalInitComplete.call(this, settings, json);
+						}
+					};
 				}
+
+				var dt = $table.DataTable(opts);
+				setTimeout(function(){ TableConfig.applyBulmaStyles(dt); }, 0);
+				$table.on('draw.dt', function(){ TableConfig.applyBulmaStyles(dt); });
+
+				return dt;
+
 			}catch(e){ /* ignore */ }
 			return null;
 		},
