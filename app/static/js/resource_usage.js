@@ -1,4 +1,21 @@
 $(document).ready(function() {
+    function formatBytes(bytes, decimals = 2, perSecond = false) {
+        if (bytes === 0) return '0 Bytes';
+        if (bytes === null || bytes === undefined) return '';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        let str = parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        if (perSecond) str += '/s';
+        return str;
+    }
+
+    function formatNumber(num) {
+        if (num === null || num === undefined) return '';
+        return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,');
+    }
+
     const ru = {
         intervalId: null,
         lastCumulativeByProxy: {},
@@ -272,10 +289,21 @@ $(document).ready(function() {
 
         const options = {
             chart: { type: 'heatmap', height: 700, animations: { enabled: false }, toolbar: { show: false } },
-            dataLabels: { enabled: true, style: { colors: ['#111827'] }, formatter: function(val, opts) {
+            dataLabels: { enabled: true, style: { colors: ['#111827'], fontSize: '11px' }, formatter: function(val, opts) {
                 const y = opts.seriesIndex; const x = opts.dataPointIndex;
                 const raw = (ru._heatRaw && ru._heatRaw[y]) ? ru._heatRaw[y][x] : null;
-                return raw == null ? '' : String(Math.round(raw));
+                if (raw == null) return '';
+                const metric = metrics[x];
+                if (!metric) return String(Math.round(raw));
+                const key = metric.key;
+                if (key === 'httpd' || key === 'httpsd' || key === 'ftpd') {
+                    const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
+                    return formatBytes(raw / intervalSec, 1, true);
+                }
+                if (key === 'cc' || key === 'cs') {
+                    return formatNumber(raw);
+                }
+                return String(Math.round(raw));
             } },
             colors: ["#12824C"],
             plotOptions: {
@@ -300,8 +328,21 @@ $(document).ready(function() {
             tooltip: { y: { formatter: function(val, { seriesIndex, dataPointIndex }) {
                 const raw = (ru._heatRaw && ru._heatRaw[seriesIndex]) ? ru._heatRaw[seriesIndex][dataPointIndex] : null;
                 if (raw == null) return 'N/A';
+
+                const metric = metrics[dataPointIndex];
+                let formattedRaw = String(Math.round(raw));
+                if (metric) {
+                    const key = metric.key;
+                    if (key === 'httpd' || key === 'httpsd' || key === 'ftpd') {
+                        const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
+                        formattedRaw = formatBytes(raw / intervalSec, 2, true);
+                    } else if (key === 'cc' || key === 'cs') {
+                        formattedRaw = formatNumber(raw);
+                    }
+                }
+
                 const percent = (val == null || val < 0) ? null : Math.round(val) + '% of threshold';
-                return percent ? `${raw} (${percent})` : String(raw);
+                return percent ? `${formattedRaw} (${percent})` : formattedRaw;
             } } },
             series: seriesData
         };
@@ -490,6 +531,17 @@ $(document).ready(function() {
     function renderMetricChart(metricKey) {
         const el = document.getElementById(`ruApex-${metricKey}`);
         if (!el) return;
+
+        function abbreviateNumber(value) {
+            if (value == null || typeof value !== 'number') return '0';
+            if (value < 1000) return value.toString();
+            const suffixes = ["", "k", "M", "B", "T"];
+            const i = Math.floor(Math.log10(value) / 3);
+            let num = (value / Math.pow(1000, i));
+            if (num === Math.floor(num)) { return num.toFixed(0) + suffixes[i]; }
+            return num.toFixed(1) + suffixes[i];
+        }
+
         const selectedProxyIds = getSelectedProxyIds();
         // Build union of timestamps
         const tsSet = new Set();
@@ -559,8 +611,36 @@ $(document).ready(function() {
             markers: { size: 0 },
             dataLabels: { enabled: false },
             xaxis: { type: 'datetime', labels: { datetimeUTC: false } },
-            yaxis: { decimalsInFloat: 0 },
-            tooltip: { shared: true, x: { format: 'HH:mm:ss' } },
+            yaxis: {
+                decimalsInFloat: 0,
+                labels: {
+                    formatter: function(val) {
+                        if (val == null) return '0';
+                        if (metricKey === 'http' || metricKey === 'https' || metricKey === 'ftp') {
+                            const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
+                            return formatBytes(val / intervalSec, 0, true);
+                        }
+                        if (metricKey === 'cc' || metricKey === 'cs') { return abbreviateNumber(val); }
+                        return val;
+                    }
+                }
+            },
+            tooltip: {
+                shared: false,
+                x: { format: 'HH:mm:ss' },
+                y: {
+                    formatter: function(val) {
+                        if (val == null) return 'N/A';
+                        if (metricKey === 'http' || metricKey === 'https' || metricKey === 'ftp') {
+                            const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
+                            return formatBytes(val / intervalSec, 2, true);
+                        }
+                        if (metricKey === 'cc' || metricKey === 'cs') { return formatNumber(Math.round(val)); }
+                        if (metricKey === 'cpu' || metricKey === 'mem') { return String(Math.round(val)); }
+                        return val;
+                    }
+                }
+            },
             legend: { show: true }
         };
 
