@@ -1,11 +1,31 @@
 $(document).ready(function() {
     function formatBytes(bytes, decimals = 2, perSecond = false) {
-        if (bytes === 0) return '0 Bytes';
-        if (bytes === null || bytes === undefined) return '';
+        // Handle invalid, null, or undefined inputs
+        if (bytes === null || bytes === undefined || isNaN(bytes)) return '';
+        // Treat negative values as 0, as negative traffic is not meaningful
+        if (bytes < 0) bytes = 0;
+
+        if (bytes === 0) {
+            let str = '0 Bytes';
+            if (perSecond) str += '/s';
+            return str;
+        }
+
         const k = 1024;
         const dm = decimals < 0 ? 0 : decimals;
         const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+        // Calculate the power of 1024 and clamp it to the available sizes
+        let i = Math.floor(Math.log(bytes) / Math.log(k));
+        if (i < 0) {
+            // This handles cases where 0 < bytes < 1
+            i = 0;
+        }
+        if (i >= sizes.length) {
+            // Cap at the largest unit (YB) for extremely large numbers
+            i = sizes.length - 1;
+        }
+
         let str = parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
         if (perSecond) str += '/s';
         return str;
@@ -626,7 +646,7 @@ $(document).ready(function() {
                 }
             },
             tooltip: {
-                shared: false,
+                shared: true,
                 x: { format: 'HH:mm:ss' },
                 y: {
                     formatter: function(val) {
