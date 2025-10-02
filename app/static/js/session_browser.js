@@ -167,6 +167,7 @@ $(document).ready(function() {
             };
             sb.dt = TableConfig.init('#sbTable', {
                 serverSide: true,
+                stateSave: true,
                 ajax: function(data, callback){ ajaxFn(data, callback); },
                 drawCallback: function(){ updateTableVisibility(); },
                 columns: [
@@ -278,7 +279,7 @@ $(document).ready(function() {
         selectAll: '#sbSelectAll',
         allowAllGroups: false,
         onData: function(data){ sb.groups = data.groups || []; sb.proxies = data.proxies || []; }
-    }).then(function(){ restoreState(); if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, true); });
+    }).then(function(){ restoreState(); if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, false); });
 
     // Cross-tab sync: update UI when other tabs modify stored state
     try {

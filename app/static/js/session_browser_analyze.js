@@ -97,6 +97,8 @@
 		}catch(e){}
 	}
 
+	function clearResult(){ try{ localStorage.removeItem(STORAGE_KEY); }catch(e){} }
+
 	async function runAnalyze(opts){
 		clearError();
 		try{
@@ -110,6 +112,7 @@
 			const data = await res.json();
 			renderSummary(data); // Pass the full object
 			renderCharts(data);
+			clearResult(); // Clear previous results only on success
 			saveResult(data);
 			$('#sbAnalyzeSection').show();
 			setStatus('완료', 'is-success');
