@@ -199,10 +199,13 @@ $(document).ready(function() {
             });
             setTimeout(function(){
                 TableConfig.adjustColumns(sb.dt);
+                // Ensure ColumnControl is bound via jQuery DataTables API wrapper
                 try {
-                    if (sb.dt && sb.dt['columnControl.bind']) {
-                        // Skip hidden id column at index 10
-                        sb.dt['columnControl.bind']({ skipColumns: [10] });
+                    if (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable){
+                        var api = window.jQuery('#sbTable').DataTable();
+                        if (api && api.columnControl && typeof api.columnControl.bind === 'function'){
+                            api.columnControl.bind({ skipColumns: [10] });
+                        }
                     }
                 } catch (e) { /* ignore */ }
             }, 0);

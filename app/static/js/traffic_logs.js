@@ -217,11 +217,18 @@
 		});
 		// Initialize DataTables via shared config
 		const dt = TableConfig.init('#tlTable', { order: [] });
-		setTimeout(function(){ TableConfig.adjustColumns(dt); }, 0);
-		// Header filters via ColumnControl
-		try{
-			if (dt && dt['columnControl.bind']){ dt['columnControl.bind']({}); }
-		}catch(e){ /* ignore */ }
+		setTimeout(function(){
+			TableConfig.adjustColumns(dt);
+			// Header filters via ColumnControl (ensure jQuery API wrapper)
+			try{
+				if (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable){
+					var api = window.jQuery('#tlTable').DataTable();
+					if (api && typeof api['columnControl.bind'] === 'function'){
+						api['columnControl.bind']({});
+					}
+				}
+			}catch(e){ /* ignore */ }
+		}, 0);
 		// Row click opens detail modal
 		$('#tlTable tbody').off('click', 'tr').on('click', 'tr', function(){
 			const rowIdx = $(this).data('row');
