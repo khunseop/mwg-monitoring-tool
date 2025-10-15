@@ -153,6 +153,18 @@ $(document).ready(function() {
                 if (data.search && data.search.value) {
                     params['search[value]'] = data.search.value;
                 }
+                // Per-column searches (ColumnControl)
+                try {
+                    if (Array.isArray(data.columns)) {
+                        for (var i = 0; i < data.columns.length; i++) {
+                            var c = data.columns[i] || {};
+                            var sv = c.search && typeof c.search.value !== 'undefined' ? c.search.value : '';
+                            if (sv && String(sv).length > 0) {
+                                params['columns[' + i + '][search][value]'] = sv;
+                            }
+                        }
+                    }
+                } catch (e) { /* ignore */ }
                 if (data.order && data.order.length > 0) {
                     params['order[0][column]'] = data.order[0].column;
                     params['order[0][dir]'] = data.order[0].dir;

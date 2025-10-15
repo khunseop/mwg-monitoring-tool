@@ -215,6 +215,9 @@
 			}).join('');
 			$body.append(`<tr data-row="${idx}">${tds}</tr>`);
 		});
+		// Ensure container visible before initializing filters
+		$('#tlResultParsed').show();
+		$('#tlResultRaw').hide();
 		// Initialize DataTables via shared config
 		const dt = TableConfig.init('#tlTable', { order: [], orderCellsTop: true, stateSave: true });
 		setTimeout(function(){
@@ -223,8 +226,29 @@
 			try{
 				if (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable){
 					var api = window.jQuery('#tlTable').DataTable();
-					if (api && typeof api['columnControl.bind'] === 'function'){
-						api['columnControl.bind']({ skipColumns: [] });
+					// Try plugin first
+					var bound = false;
+					try { if (api && typeof api.columnControl === 'function'){ api.columnControl({}); bound = true; } } catch (e) {}
+					try { if (api && api.columnControl && typeof api.columnControl.bind === 'function'){ api.columnControl.bind({}); bound = true; } } catch (e) {}
+					// Fallback: manually inject header filters if plugin is unavailable
+					if (!bound){
+						var $container = window.jQuery(api.table().container());
+						var $thead = $container.find('div.dt-scroll-head thead');
+						if($thead.length===0){ $thead = window.jQuery('#tlTable thead'); }
+						$thead.find('tr.cc-filters').remove();
+						var count = api.columns().count();
+						var $tr = window.jQuery('<tr class="cc-filters"></tr>');
+						for (var i=0;i<count;i++){
+							$tr.append('<th><input type="text" class="input is-small" placeholder="필터" style="width:100%"/></th>');
+						}
+						$thead.append($tr);
+						api.columns().every(function(colIdx){
+							var th = $tr.find('th').eq(colIdx);
+							var $inp = th.find('input');
+							// Prefill existing
+							try { var cur = api.column(colIdx).search() || ''; $inp.val(cur); } catch(e) {}
+							$inp.on('keyup change', function(){ api.column(colIdx).search(this.value || '').draw(); });
+						});
 					}
 				}
 			}catch(e){ /* ignore */ }
@@ -235,8 +259,7 @@
 			if (rowIdx == null) return;
 			showDetail(records[rowIdx] || {});
 		});
-		$('#tlResultParsed').show();
-		$('#tlResultRaw').hide();
+		// Already shown before init
 		$('#tlEmptyState').toggle(records.length === 0);
 		// Update last rendered signature to suppress redundant re-renders
 		try { LAST_RENDERED_HASH = JSON.stringify(records || []); } catch(e) { LAST_RENDERED_HASH = null; }
