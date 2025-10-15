@@ -153,6 +153,18 @@ $(document).ready(function() {
                 if (data.search && data.search.value) {
                     params['search[value]'] = data.search.value;
                 }
+                // Per-column searches (ColumnControl)
+                try {
+                    if (Array.isArray(data.columns)) {
+                        for (var i = 0; i < data.columns.length; i++) {
+                            var c = data.columns[i] || {};
+                            var sv = c.search && typeof c.search.value !== 'undefined' ? c.search.value : '';
+                            if (sv && String(sv).length > 0) {
+                                params['columns[' + i + '][search][value]'] = sv;
+                            }
+                        }
+                    }
+                } catch (e) { /* ignore */ }
                 if (data.order && data.order.length > 0) {
                     params['order[0][column]'] = data.order[0].column;
                     params['order[0][dir]'] = data.order[0].dir;
@@ -197,7 +209,18 @@ $(document).ready(function() {
                 ],
                 createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
             });
-            setTimeout(function(){ TableConfig.adjustColumns(sb.dt); }, 0);
+            setTimeout(function(){
+                TableConfig.adjustColumns(sb.dt);
+                // Ensure ColumnControl is bound via jQuery DataTables API wrapper
+                try {
+                    if (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable){
+                        var api = window.jQuery('#sbTable').DataTable();
+                        if (api && api.columnControl && typeof api.columnControl.bind === 'function'){
+                            api.columnControl.bind({ skipColumns: [10], trigger: 'enter' });
+                        }
+                    }
+                } catch (e) { /* ignore */ }
+            }, 0);
         } catch (e) {
             // Ignore DataTables init failures; selection UI will still work
         }

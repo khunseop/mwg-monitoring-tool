@@ -215,21 +215,30 @@
 			}).join('');
 			$body.append(`<tr data-row="${idx}">${tds}</tr>`);
 		});
+		// Ensure container visible before initializing filters
+		$('#tlResultParsed').show();
+		$('#tlResultRaw').hide();
 		// Initialize DataTables via shared config
-		const dt = TableConfig.init('#tlTable', { order: [] });
-		setTimeout(function(){ TableConfig.adjustColumns(dt); }, 0);
-		// Header filters via ColumnControl
-		try{
-			if (dt && dt['columnControl.bind']){ dt['columnControl.bind']({}); }
-		}catch(e){ /* ignore */ }
+		const dt = TableConfig.init('#tlTable', { order: [], orderCellsTop: true, stateSave: true });
+		setTimeout(function(){
+			TableConfig.adjustColumns(dt);
+			// Header filters via ColumnControl with Enter trigger (unified)
+			try{
+				if (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable){
+					var api = window.jQuery('#tlTable').DataTable();
+					if (api && api.columnControl && typeof api.columnControl.bind === 'function'){
+						api.columnControl.bind({ trigger: 'enter' });
+					}
+				}
+			}catch(e){ /* ignore */ }
+		}, 0);
 		// Row click opens detail modal
 		$('#tlTable tbody').off('click', 'tr').on('click', 'tr', function(){
 			const rowIdx = $(this).data('row');
 			if (rowIdx == null) return;
 			showDetail(records[rowIdx] || {});
 		});
-		$('#tlResultParsed').show();
-		$('#tlResultRaw').hide();
+		// Already shown before init
 		$('#tlEmptyState').toggle(records.length === 0);
 		// Update last rendered signature to suppress redundant re-renders
 		try { LAST_RENDERED_HASH = JSON.stringify(records || []); } catch(e) { LAST_RENDERED_HASH = null; }
