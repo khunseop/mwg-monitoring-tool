@@ -222,34 +222,12 @@
 		const dt = TableConfig.init('#tlTable', { order: [], orderCellsTop: true, stateSave: true });
 		setTimeout(function(){
 			TableConfig.adjustColumns(dt);
-			// Header filters via ColumnControl (ensure jQuery API wrapper)
+			// Header filters via ColumnControl with Enter trigger (unified)
 			try{
 				if (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable){
 					var api = window.jQuery('#tlTable').DataTable();
-					// Try plugin first
-					var bound = false;
-					try { if (api && typeof api.columnControl === 'function'){ api.columnControl({ trigger: 'debounce' }); bound = true; } } catch (e) {}
-					try { if (api && api.columnControl && typeof api.columnControl.bind === 'function'){ api.columnControl.bind({ trigger: 'debounce' }); bound = true; } } catch (e) {}
-					// Fallback: manually inject header filters if plugin is unavailable
-					if (!bound){
-						var $container = window.jQuery(api.table().container());
-						var $thead = $container.find('div.dt-scroll-head thead');
-						if($thead.length===0){ $thead = window.jQuery('#tlTable thead'); }
-						$thead.find('tr.cc-filters').remove();
-						var count = api.columns().count();
-						var $tr = window.jQuery('<tr class="cc-filters"></tr>');
-						for (var i=0;i<count;i++){
-							$tr.append('<th><input type="text" class="input is-small" placeholder="필터" style="width:100%"/></th>');
-						}
-						$thead.append($tr);
-						api.columns().every(function(colIdx){
-							var th = $tr.find('th').eq(colIdx);
-							var $inp = th.find('input');
-							// Prefill existing
-							try { var cur = api.column(colIdx).search() || ''; $inp.val(cur); } catch(e) {}
-						var apply = (function(){ var t; return function(v){ clearTimeout(t); t = setTimeout(function(){ api.column(colIdx).search(v||'').draw(); }, 300); }; })();
-						$inp.on('keyup change', function(){ apply(this.value || ''); });
-						});
+					if (api && api.columnControl && typeof api.columnControl.bind === 'function'){
+						api.columnControl.bind({ trigger: 'enter' });
 					}
 				}
 			}catch(e){ /* ignore */ }
