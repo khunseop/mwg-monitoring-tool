@@ -216,7 +216,7 @@
 			$body.append(`<tr data-row="${idx}">${tds}</tr>`);
 		});
 		// Initialize DataTables via shared config
-		const dt = TableConfig.init('#tlTable', { order: [] });
+		const dt = TableConfig.init('#tlTable', { order: [], orderCellsTop: true, stateSave: true });
 		setTimeout(function(){
 			TableConfig.adjustColumns(dt);
 			// Header filters via ColumnControl (ensure jQuery API wrapper)
@@ -224,7 +224,7 @@
 				if (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable){
 					var api = window.jQuery('#tlTable').DataTable();
 					if (api && typeof api['columnControl.bind'] === 'function'){
-						api['columnControl.bind']({});
+						api['columnControl.bind']({ skipColumns: [] });
 					}
 				}
 			}catch(e){ /* ignore */ }
