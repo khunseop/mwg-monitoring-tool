@@ -95,5 +95,18 @@
 <!-- Local ApexCharts (MIT) for heatmap -->
 <script src="/static/vendor/apexcharts/apexcharts.min.js"></script>
 <script src="/static/js/resource_usage.js"></script>
+
+<div class="modal" id="ruChartModal">
+    <div class="modal-background"></div>
+    <div class="modal-card" style="width: 90%; max-width: 1200px;">
+        <header class="modal-card-head">
+            <p class="modal-card-title" id="ruModalTitle"></p>
+            <button class="delete" aria-label="close"></button>
+        </header>
+        <section class="modal-card-body">
+            <div id="ruModalChart"></div>
+        </section>
+    </div>
+</div>
 {% endblock %}
 

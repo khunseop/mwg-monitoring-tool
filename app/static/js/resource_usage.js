@@ -439,14 +439,14 @@ $(document).ready(function() {
     $('#ruHeatmapWrap').hide();
     $('#ruEmptyState').show();
     Promise.all([
-        DeviceSelector.init({ 
-            groupSelect: '#ruGroupSelect', 
-            proxySelect: '#ruProxySelect', 
+        DeviceSelector.init({
+            groupSelect: '#ruGroupSelect',
+            proxySelect: '#ruProxySelect',
             selectAll: '#ruSelectAll',
             onData: function(data){ ru.groups = data.groups || []; ru.proxies = data.proxies || []; }
-        }), 
+        }),
         loadConfig()
-    ]).then(function(){ 
+    ]).then(function() {
         return restoreState();
     }).then(function(){
         // After restore, start or render based on persisted running flag
@@ -499,26 +499,40 @@ $(document).ready(function() {
         });
     }
 
-    function ensureApexChartsDom() {
-        const $wrap = $('#ruChartsWrap');
+    function ensureApexChartsDom(isModal = false, metricKey = null, height = 300) {
+        const selector = isModal ? `#ruModalChart` : '#ruChartsWrap';
+        const $wrap = $(selector);
         if ($wrap.length === 0) return false;
-        if ($wrap.data('initialized')) return true;
-        const metrics = ['cpu','mem','cc','cs','http','https','ftp'];
-        const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
-        $wrap.empty();
-        metrics.forEach(m => {
-            const panel = `
-                <div class="column is-12">
-                    <div class="ru-chart-panel" id="ruChartPanel-${m}" style="border:1px solid var(--border-color,#e5e7eb); border-radius:6px; padding:8px;">
-                        <div class="level" style="margin-bottom:6px;">
-                            <div class="level-left"><h5 class="title is-6" style="margin:0;">${titles[m]}</h5></div>
+
+        if (!isModal) {
+            if ($wrap.data('initialized')) return true;
+            const metrics = ['cpu','mem','cc','cs','http','https','ftp'];
+            const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
+            $wrap.empty();
+            metrics.forEach(m => {
+                const panel = `
+                    <div class="column is-12">
+                        <div class="ru-chart-panel" id="ruChartPanel-${m}" style="border:1px solid var(--border-color,#e5e7eb); border-radius:6px; padding:8px;">
+                            <div class="level" style="margin-bottom:6px;">
+                                <div class="level-left"><h5 class="title is-6" style="margin:0;">${titles[m]}</h5></div>
+                                <div class="level-right">
+                                    <a class="ru-chart-zoom-btn" data-metric="${m}" title="Zoom in">
+                                        <span class="icon"><i class="fas fa-search-plus"></i></span>
+                                    </a>
+                                </div>
+                            </div>
+                            <div id="ruApex-${m}" style="width:100%; height:${height}px;"></div>
                         </div>
-                        <div id="ruApex-${m}" style="width:100%; height:240px;"></div>
-                    </div>
-                </div>`;
-            $wrap.append(panel);
-        });
-        $wrap.data('initialized', true);
+                    </div>`;
+                $wrap.append(panel);
+            });
+            $wrap.data('initialized', true);
+        } else {
+            // For modal, just create one chart placeholder
+            $wrap.empty();
+            const placeholder = `<div id="ruApexModal-${metricKey}" style="width:100%; height:${height}px;"></div>`;
+            $wrap.append(placeholder);
+        }
         return true;
     }
 
@@ -543,13 +557,15 @@ $(document).ready(function() {
 
     function renderAllCharts() {
         if (!window.ApexCharts) return;
-        ensureApexChartsDom();
+        ensureApexChartsDom(false, null, 300); // Main charts with default height
         const metrics = ['cpu','mem','cc','cs','http','https','ftp'];
-        metrics.forEach(m => renderMetricChart(m));
+        metrics.forEach(m => renderMetricChart(m, false));
     }
 
-    function renderMetricChart(metricKey) {
-        const el = document.getElementById(`ruApex-${metricKey}`);
+    function renderMetricChart(metricKey, isModal = false) {
+        const height = isModal ? $(window).height() * 0.7 : 300;
+        const elId = isModal ? `ruApexModal-${metricKey}` : `ruApex-${metricKey}`;
+        const el = document.getElementById(elId);
         if (!el) return;
 
         function abbreviateNumber(value) {
@@ -612,7 +628,7 @@ $(document).ready(function() {
 
         const options = {
             chart: {
-                type: 'line', height: 240, animations: { enabled: false }, toolbar: { show: false },
+                type: 'line', height: height, animations: { enabled: false }, toolbar: { show: false },
                 events: {
                     legendClick: function(chartContext, seriesIndex, config) {
                         const proxyId = ru.seriesMap[metricKey] && ru.seriesMap[metricKey][seriesIndex];
@@ -623,12 +639,39 @@ $(document).ready(function() {
                             ru.legendState[metricKey][proxyId] = !prev;
                             saveLegendState();
                         }
+                    },
+                    mouseMove: function(event, chartContext, config) {
+                        // On mouse out, reset all opacities
+                        if (config.seriesIndex < 0) {
+                            (chartContext.w.globals.series || []).forEach((s, i) => {
+                                chartContext.updateSeries([{ data: s }], false);
+                            });
+                            chartContext.w.globals.dom.el.style.cursor = 'default';
+                            return;
+                        }
+                        // On hover, dim all series except the hovered one
+                        const seriesIndex = config.seriesIndex;
+                        (chartContext.w.globals.series || []).forEach((s, i) => {
+                            const newOpacity = (i === seriesIndex) ? 1 : 0.3;
+                            chartContext.w.globals.dom.el.querySelector(`.apexcharts-series[seriesName="${s.name.replace(/"/g, '\\"')}"]`).style.opacity = newOpacity;
+                        });
+                        chartContext.w.globals.dom.el.style.cursor = 'pointer';
+                    },
+                    mouseLeave: function(event, chartContext, config) {
+                        // Reset all opacities when mouse leaves the chart area
+                        (chartContext.w.globals.series || []).forEach((s, i) => {
+                           chartContext.w.globals.dom.el.querySelector(`.apexcharts-series[seriesName="${s.name.replace(/"/g, '\\"')}"]`).style.opacity = 1;
+                        });
+                        chartContext.w.globals.dom.el.style.cursor = 'default';
                     }
                 }
             },
             colors: colors,
-            stroke: { width: 2, curve: 'smooth' },
-            markers: { size: 0 },
+            stroke: { width: 2, curve: 'straight' },
+            markers: {
+                size: 4,
+                hover: { sizeOffset: 3 }
+            },
             dataLabels: { enabled: false },
             xaxis: { type: 'datetime', labels: { datetimeUTC: false } },
             yaxis: {
@@ -646,7 +689,8 @@ $(document).ready(function() {
                 }
             },
             tooltip: {
-                shared: true,
+                shared: false,
+                intersect: true,
                 x: { format: 'HH:mm:ss' },
                 y: {
                     formatter: function(val) {
@@ -664,19 +708,28 @@ $(document).ready(function() {
             legend: { show: true }
         };
 
-        if (!ru.charts[metricKey]) {
-            ru.charts[metricKey] = new ApexCharts(el, { ...options, series });
-            ru.charts[metricKey].render().then(() => {
-                // apply hidden state persistence
-                (ru.seriesMap[metricKey] || []).forEach((pid, i) => {
-                    if (ru.legendState[metricKey] && ru.legendState[metricKey][pid]) {
-                        try { ru.charts[metricKey].toggleSeries(series[i].name); } catch (e) {}
-                    }
-                });
+        const chartRef = isModal ? 'modalChart' : metricKey;
+        const chartInstance = isModal ? ru.modalChart : ru.charts[metricKey];
+
+        if (!chartInstance) {
+            const newChart = new ApexCharts(el, { ...options, series });
+            if (isModal) {
+                ru.modalChart = newChart;
+            } else {
+                ru.charts[metricKey] = newChart;
+            }
+            newChart.render().then(() => {
+                if (!isModal) {
+                    (ru.seriesMap[metricKey] || []).forEach((pid, i) => {
+                        if (ru.legendState[metricKey] && ru.legendState[metricKey][pid]) {
+                            try { newChart.toggleSeries(series[i].name); } catch (e) {}
+                        }
+                    });
+                }
             });
         } else {
-            ru.charts[metricKey].updateOptions({ colors }, false, true);
-            ru.charts[metricKey].updateSeries(series, true);
+            chartInstance.updateOptions({ ...options, colors }, false, true);
+            chartInstance.updateSeries(series, true);
         }
     }
 
@@ -685,5 +738,37 @@ $(document).ready(function() {
     ru.tsBuffer = loadBufferState();
     // initialize charts DOM for ApexCharts
     ensureApexChartsDom();
+
+    // ===============
+    // Modal Zoom Logic
+    // ===============
+    const $modal = $('#ruChartModal');
+    const $modalTitle = $('#ruModalTitle');
+    ru.modalChart = null;
+
+    function openModal(metricKey) {
+        const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
+        $modalTitle.text(titles[metricKey] || 'Chart');
+        const modalHeight = $(window).height() * 0.7;
+        ensureApexChartsDom(true, metricKey, modalHeight);
+        renderMetricChart(metricKey, true);
+        $modal.addClass('is-active');
+    }
+
+    function closeModal() {
+        $modal.removeClass('is-active');
+        if (ru.modalChart) {
+            ru.modalChart.destroy();
+            ru.modalChart = null;
+        }
+        $('#ruModalChart').empty();
+    }
+
+    $('#ruChartsWrap').on('click', '.ru-chart-zoom-btn', function() {
+        const metric = $(this).data('metric');
+        if (metric) openModal(metric);
+    });
+
+    $modal.find('.modal-background, .delete').on('click', closeModal);
 });
 
