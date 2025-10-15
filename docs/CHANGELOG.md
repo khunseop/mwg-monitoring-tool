@@ -1,5 +1,14 @@
 # 릴리즈 노트
 
+## v1.4.3
+- 테이블 컬럼별 필터 기능 추가
+  - 세션 브라우저, 트래픽 로그 테이블에 컬럼별 검색 필터 헤더 추가
+  - DataTables ColumnControl 플러그인 통합 (`dataTables.columnControl.min.js`)
+  - Enter 키를 눌러 필터 적용하는 방식으로 성능 최적화
+  - 트래픽 로그: 필터 상태를 브라우저에 자동 저장 (상태 유지 기능)
+  - 세션 브라우저: 동작 컬럼 제외하고 모든 컬럼에 필터 적용 가능
+  - 사용법: 테이블 헤더의 입력 필드에 검색어 입력 후 Enter 키 누름
+
 ## v1.4.2
 - 트래픽 로그: 파일 업로드 분석 기능 추가
   - API: `POST /api/traffic-logs/analyze-upload?topN=20` (multipart/form-data)
