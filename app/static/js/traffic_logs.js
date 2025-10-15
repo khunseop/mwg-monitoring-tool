@@ -215,13 +215,12 @@
 			}).join('');
 			$body.append(`<tr data-row="${idx}">${tds}</tr>`);
 		});
-		// Initialize DataTables via shared config
-		const dt = TableConfig.init('#tlTable', { order: [] });
+		// Initialize DataTables via shared config with column filter enabled
+		const dt = TableConfig.init('#tlTable', { 
+			order: [],
+			columnFilter: true
+		});
 		setTimeout(function(){ TableConfig.adjustColumns(dt); }, 0);
-		// Header filters via ColumnControl
-		try{
-			if (dt && dt['columnControl.bind']){ dt['columnControl.bind']({}); }
-		}catch(e){ /* ignore */ }
 		// Row click opens detail modal
 		$('#tlTable tbody').off('click', 'tr').on('click', 'tr', function(){
 			const rowIdx = $(this).data('row');

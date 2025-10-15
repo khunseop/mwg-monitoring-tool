@@ -168,6 +168,7 @@ $(document).ready(function() {
             sb.dt = TableConfig.init('#sbTable', {
                 serverSide: true,
                 stateSave: true,
+                columnFilter: true,
                 ajax: function(data, callback){ ajaxFn(data, callback); },
                 drawCallback: function(){ updateTableVisibility(); },
                 columns: [
