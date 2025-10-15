@@ -197,7 +197,15 @@ $(document).ready(function() {
                 ],
                 createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
             });
-            setTimeout(function(){ TableConfig.adjustColumns(sb.dt); }, 0);
+            setTimeout(function(){
+                TableConfig.adjustColumns(sb.dt);
+                try {
+                    if (sb.dt && sb.dt['columnControl.bind']) {
+                        // Skip hidden id column at index 10
+                        sb.dt['columnControl.bind']({ skipColumns: [10] });
+                    }
+                } catch (e) { /* ignore */ }
+            }, 0);
         } catch (e) {
             // Ignore DataTables init failures; selection UI will still work
         }

@@ -410,6 +410,51 @@ def _filter_rows(rows: List[Dict[str, Any]], search: str | None) -> List[Dict[st
     return [r for r in rows if include(r)]
 
 
+def _filter_rows_by_columns(rows: List[Dict[str, Any]], per_col: Dict[int, str]) -> List[Dict[str, Any]]:
+    """Apply DataTables-style per-column text filters.
+
+    The mapping of column index to row key must mirror the client-side columns order.
+    Only simple substring matching is applied for now to keep behavior predictable.
+    """
+    if not per_col:
+        return rows
+    # Column index mapping (0-based) aligned with session_browser.js `columns` order
+    col_to_key = {
+        0: "host",
+        1: "creation_time",
+        2: "protocol",
+        3: "user_name",
+        4: "client_ip",
+        5: "server_ip",
+        6: "cl_bytes_received",
+        7: "cl_bytes_sent",
+        8: "age_seconds",
+        9: "url",
+        # 10: id (hidden) -> ignore for filtering
+    }
+    out: List[Dict[str, Any]] = []
+    for row in rows:
+        include = True
+        for col_idx, query in per_col.items():
+            if col_idx == 10:
+                continue
+            key = col_to_key.get(col_idx)
+            if not key:
+                continue
+            q = (str(query or "")).strip()
+            if q == "":
+                continue
+            val = row.get(key)
+            text = str(val if val is not None else "")
+            # Case-insensitive substring match
+            if q.lower() not in text.lower():
+                include = False
+                break
+        if include:
+            out.append(row)
+    return out
+
+
 def _sort_key_func(order_col: int | None):
     def sort_key(row: Dict[str, Any]):
         # This mapping must match the order of columns in the DataTables `columns` option
@@ -461,7 +506,20 @@ async def sessions_datatables(
 
     records_total = len(rows)
 
-    filtered = _filter_rows(rows, search)
+    # Per-column filters (DataTables sends columns[i][search][value])
+    per_col: Dict[int, str] = {}
+    try:
+        # Attempt for first 11 columns (0..10). Extra indices are ignored.
+        for i in range(0, 11):
+            key = f"columns[{i}][search][value]"
+            val = request.query_params.get(key)
+            if val is not None and str(val).strip() != "":
+                per_col[i] = str(val)
+    except Exception:
+        per_col = {}
+
+    filtered = _filter_rows_by_columns(rows, per_col)
+    filtered = _filter_rows(filtered, search)
     records_filtered = len(filtered)
 
     # Ordering

@@ -376,6 +376,11 @@ table.dataTable thead th.sorting_desc::after { content: '\u25BE'; color: var(--c
 .dt-ellipsis { max-width: var(--dt-ellipsis-max, 420px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #sbTable td:nth-child(9), #sbTable th:nth-child(9) { max-width: 420px; }
 
+/* ColumnControl header filters */
+table.dataTable thead tr.cc-filters th { background: #fff; position: sticky; top: 0; z-index: 3; }
+table.dataTable thead tr.cc-filters input.input.is-small { height: 2em; padding: 0.25em 0.5em; }
+table.dataTable thead tr.cc-filters .select.is-small select { height: 2em; padding: 0.1em 1.6em 0.1em 0.5em; }
+
 /* Traffic Logs long text constraints */
 #tlTable td[data-col="url_path"],
 #tlTable td[data-col="url_parametersstring"],
