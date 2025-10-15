@@ -42,7 +42,7 @@ traffic_log_model.Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="PPAT",
     description="Proxy Performance Analysis Tool",
-    version="1.4.2"
+    version="1.4.3"
 )
 # Security/CORS middleware (configure via env)
 cors_origins = os.getenv("CORS_ALLOW_ORIGINS", "*")
