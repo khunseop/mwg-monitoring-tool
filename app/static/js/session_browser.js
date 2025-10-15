@@ -216,7 +216,7 @@ $(document).ready(function() {
                     if (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable){
                         var api = window.jQuery('#sbTable').DataTable();
                         if (api && api.columnControl && typeof api.columnControl.bind === 'function'){
-                            api.columnControl.bind({ skipColumns: [10] });
+                            api.columnControl.bind({ skipColumns: [10], trigger: 'enter' });
                         }
                     }
                 } catch (e) { /* ignore */ }

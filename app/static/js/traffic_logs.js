@@ -228,8 +228,8 @@
 					var api = window.jQuery('#tlTable').DataTable();
 					// Try plugin first
 					var bound = false;
-					try { if (api && typeof api.columnControl === 'function'){ api.columnControl({}); bound = true; } } catch (e) {}
-					try { if (api && api.columnControl && typeof api.columnControl.bind === 'function'){ api.columnControl.bind({}); bound = true; } } catch (e) {}
+					try { if (api && typeof api.columnControl === 'function'){ api.columnControl({ trigger: 'debounce' }); bound = true; } } catch (e) {}
+					try { if (api && api.columnControl && typeof api.columnControl.bind === 'function'){ api.columnControl.bind({ trigger: 'debounce' }); bound = true; } } catch (e) {}
 					// Fallback: manually inject header filters if plugin is unavailable
 					if (!bound){
 						var $container = window.jQuery(api.table().container());
@@ -247,7 +247,8 @@
 							var $inp = th.find('input');
 							// Prefill existing
 							try { var cur = api.column(colIdx).search() || ''; $inp.val(cur); } catch(e) {}
-							$inp.on('keyup change', function(){ api.column(colIdx).search(this.value || '').draw(); });
+						var apply = (function(){ var t; return function(v){ clearTimeout(t); t = setTimeout(function(){ api.column(colIdx).search(v||'').draw(); }, 300); }; })();
+						$inp.on('keyup change', function(){ apply(this.value || ''); });
 						});
 					}
 				}
