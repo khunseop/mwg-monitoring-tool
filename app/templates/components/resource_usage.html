@@ -81,12 +81,13 @@
         <div id="ruEmptyState" class="box empty-state" style="display:none;">
             현재 표시할 데이터가 없습니다. 상단에서 대상을 선택하고 "시작"을 클릭하세요.
         </div>
-        <div class="box">
-            <h4 class="title is-5">실시간 그래프</h4>
-            <div id="ruChartsWrap" class="columns is-multiline" data-initialized="false">
-                <!-- Charts will be injected per metric by resource_usage.js -->
-            </div>
-        </div>
+    </div>
+</div>
+
+<div class="box mt-5">
+    <h4 class="title is-5">실시간 그래프</h4>
+    <div id="ruChartsWrap" class="columns is-multiline" data-initialized="false">
+        <!-- Charts will be injected per metric by resource_usage.js -->
     </div>
 </div>
 
@@ -95,5 +96,18 @@
 <!-- Local ApexCharts (MIT) for heatmap -->
 <script src="/static/vendor/apexcharts/apexcharts.min.js"></script>
 <script src="/static/js/resource_usage.js"></script>
+
+<div class="modal" id="ruChartModal">
+    <div class="modal-background"></div>
+    <div class="modal-card" style="width: 90%; max-width: 1200px;">
+        <header class="modal-card-head">
+            <p class="modal-card-title" id="ruModalTitle"></p>
+            <button class="delete" aria-label="close"></button>
+        </header>
+        <section class="modal-card-body">
+            <div id="ruModalChart"></div>
+        </section>
+    </div>
+</div>
 {% endblock %}
 
