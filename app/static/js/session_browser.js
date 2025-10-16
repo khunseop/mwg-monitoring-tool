@@ -83,8 +83,8 @@ $(document).ready(function() {
 
         const gridOptions = {
             columnDefs: columnDefs,
-            rowModelType: 'serverSide',
-            serverSideDatasource: createServerSideDatasource(),
+            rowModelType: 'infinite',
+            datasource: createInfiniteDatasource(),
             pagination: true,
             paginationPageSize: 100,
             cacheBlockSize: 100,
@@ -109,19 +109,19 @@ $(document).ready(function() {
         agGrid.createGrid(gridDiv, gridOptions);
     }
 
-    function createServerSideDatasource() {
+    function createInfiniteDatasource() {
         return {
             getRows: (params) => {
                 const pids = getSelectedProxyIds().join(',');
                 if (!pids) {
-                    params.successCallback({ rowData: [], rowCount: 0 });
+                    params.successCallback([], 0);
                     return;
                 }
                 const request = {
-                    startRow: params.request.startRow,
-                    endRow: params.request.endRow,
-                    sortModel: params.request.sortModel,
-                    filterModel: params.request.filterModel,
+                    startRow: params.startRow,
+                    endRow: params.endRow,
+                    sortModel: params.sortModel,
+                    filterModel: params.filterModel,
                     proxy_ids: pids
                 };
 
@@ -156,7 +156,7 @@ $(document).ready(function() {
             data: JSON.stringify({ proxy_ids: proxyIds })
         }).then(res => {
             if (sb.gridApi) {
-                sb.gridApi.refreshServerSide({ purge: true });
+                sb.gridApi.setDatasource(createInfiniteDatasource());
             }
             if (res && res.failed && res.failed > 0) { showErr('일부 프록시 수집에 실패했습니다.'); }
             setStatus('완료');
