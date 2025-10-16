@@ -202,9 +202,6 @@ $(document).ready(function() {
     }).then(function(){
         initGrid();
         restoreState();
-        if (sb.gridApi) {
-            sb.gridApi.refreshServerSide({ purge: true });
-        }
     });
 
     try {
