@@ -156,7 +156,7 @@ $(document).ready(function() {
             data: JSON.stringify({ proxy_ids: proxyIds })
         }).then(res => {
             if (sb.gridApi) {
-                sb.gridApi.setDatasource(createInfiniteDatasource());
+                sb.gridApi.setGridOption('datasource', createInfiniteDatasource());
             }
             if (res && res.failed && res.failed > 0) { showErr('일부 프록시 수집에 실패했습니다.'); }
             setStatus('완료');
