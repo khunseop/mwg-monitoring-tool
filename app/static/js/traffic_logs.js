@@ -219,7 +219,22 @@
 		$('#tlResultParsed').show();
 		$('#tlResultRaw').hide();
 		// Initialize DataTables via shared config
-		const dt = TableConfig.init('#tlTable', { order: [], orderCellsTop: true, stateSave: true });
+		const dt = TableConfig.init('#tlTable', {
+            dom: "<'level'<'level-left'l><'level-right'f>>" +
+                 "<'level'<'level-left'><'level-right'<'buttons'B>>>" +
+                 "<'table-container't>" +
+                 "<'level'<'level-left'i><'level-right'p>>",
+            buttons: [{
+                text: '필터 초기화',
+                className: 'button is-light',
+                action: function ( e, dt, node, config ) {
+                    dt.search('').columns().search('').order('[[0, "desc"]]').draw();
+                }
+            }],
+            order: [],
+            orderCellsTop: true,
+            stateSave: true
+        });
 		setTimeout(function(){
 			TableConfig.adjustColumns(dt);
 			// Header filters via ColumnControl with Enter trigger (unified)

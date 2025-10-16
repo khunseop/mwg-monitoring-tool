@@ -178,6 +178,17 @@ $(document).ready(function() {
                     .fail(function(){ callback({ draw: data.draw, recordsTotal: 0, recordsFiltered: 0, data: [] }); });
             };
             sb.dt = TableConfig.init('#sbTable', {
+                dom: "<'level'<'level-left'l><'level-right'f>>" +
+                     "<'level'<'level-left'><'level-right'<'buttons'B>>>" +
+                     "<'table-container't>" +
+                     "<'level'<'level-left'i><'level-right'p>>",
+                buttons: [{
+                    text: '필터 초기화',
+                    className: 'button is-light',
+                    action: function ( e, dt, node, config ) {
+                        dt.search('').columns().search('').order('[[1, "desc"]]').draw();
+                    }
+                }],
                 serverSide: true,
                 stateSave: true,
                 ajax: function(data, callback){ ajaxFn(data, callback); },
