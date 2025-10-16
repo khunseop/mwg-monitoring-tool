@@ -487,6 +487,7 @@ async def sessions_ag_grid(
     if not target_ids:
         return {"rowCount": 0, "rows": []}
 
+    # Load latest rows from temp_store
     rows = _load_latest_rows_for_proxies(db, target_ids)
 
     # Filtering
