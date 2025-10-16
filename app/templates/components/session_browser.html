@@ -67,25 +67,7 @@
 
     <!-- 목록 섹션 -->
     <div id="sbListSection" class="mt-4">
-        <div class="table-container sb-table-wrap" id="sbTableWrap">
-            <table id="sbTable" class="table is-fullwidth is-striped is-hoverable">
-                <thead>
-                    <tr>
-                        <th>프록시</th>
-                        <th>생성시각</th>
-                        <th>프로토콜</th>
-                        <th>사용자</th>
-                        <th>클라이언트 IP</th>
-                        <th>서버 IP</th>
-                        <th>CL 수신</th>
-                        <th>CL 송신</th>
-                        <th>Age(s)</th>
-                        <th>URL</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
+        <div id="sbTableWrap" class="ag-theme-quartz" style="height: 800px; width: 100%;"></div>
         
         <!-- 분석 섹션 (하단 자동 표시) -->
         <hr>
@@ -140,11 +122,8 @@
     </div>
 </div>
 
-<!-- DataTables (local) -->
-<link rel="stylesheet" href="/static/vendor/datatables/datatables.min.css?v={{ request.app.version }}">
-<link rel="stylesheet" href="/static/vendor/datatables/columnControl/columnControl.dataTables.min.css?v={{ request.app.version }}">
-<script src="/static/vendor/datatables/datatables.min.js?v={{ request.app.version }}"></script>
-<script src="/static/vendor/datatables/columnControl/dataTables.columnControl.min.js?v={{ request.app.version }}"></script>
+<!-- AG Grid (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>
 
 <!-- ApexCharts (local) -->
 <script src="/static/vendor/apexcharts/apexcharts.min.js?v={{ request.app.version }}"></script>

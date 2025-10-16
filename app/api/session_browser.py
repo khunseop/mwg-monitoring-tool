@@ -455,131 +455,6 @@ def _filter_rows_by_columns(rows: List[Dict[str, Any]], per_col: Dict[int, str])
     return out
 
 
-def _sort_key_func(order_col: int | None):
-    def sort_key(row: Dict[str, Any]):
-        # This mapping must match the order of columns in the DataTables `columns` option
-        mapping = {
-            0: (row.get("host") or ""),
-            1: row.get("creation_time") or "",
-            2: (row.get("protocol") or ""),
-            3: row.get("user_name") or "",
-            4: row.get("client_ip") or "",
-            5: row.get("server_ip") or "",
-            6: row.get("cl_bytes_received") or -1,
-            7: row.get("cl_bytes_sent") or -1,
-            8: row.get("age_seconds") or -1,
-            9: (row.get("url") or ""),
-            10: 0,  # id column, not sortable
-        }
-        return mapping.get(order_col or 1)
-    return sort_key
-
-
-@router.get("/session-browser/datatables")
-async def sessions_datatables(
-    request: Request,
-    db: Session = Depends(get_db),
-    start: int = Query(0, ge=0),
-    length: int = Query(25, ge=1, le=1000),
-    search: str | None = Query(None, alias="search[value]"),
-    order_col: int | None = Query(None, alias="order[0][column]"),
-    order_dir: str | None = Query(None, alias="order[0][dir]"),
-    group_id: int | None = Query(None),
-    proxy_ids: str | None = Query(None),  # comma-separated
-):
-    # Require explicit selection: if no proxy_ids provided, return empty dataset
-    target_ids: List[int] = []
-    if proxy_ids:
-        try:
-            target_ids = [int(x) for x in proxy_ids.split(",") if x.strip()]
-        except Exception:
-            target_ids = []
-    if not target_ids:
-        try:
-            draw = int(request.query_params.get("draw", "0"))
-        except Exception:
-            draw = 0
-        return {"draw": draw, "recordsTotal": 0, "recordsFiltered": 0, "data": []}
-
-    # Load latest rows
-    rows = _load_latest_rows_for_proxies(db, target_ids)
-
-    records_total = len(rows)
-
-    # Per-column filters (DataTables sends columns[i][search][value])
-    per_col: Dict[int, str] = {}
-    try:
-        # Attempt for first 11 columns (0..10). Extra indices are ignored.
-        for i in range(0, 11):
-            key = f"columns[{i}][search][value]"
-            val = request.query_params.get(key)
-            if val is not None and str(val).strip() != "":
-                per_col[i] = str(val)
-    except Exception:
-        per_col = {}
-
-    filtered = _filter_rows_by_columns(rows, per_col)
-    filtered = _filter_rows(filtered, search)
-    records_filtered = len(filtered)
-
-    # Ordering
-    reverse = (order_dir or "desc").lower() == "desc"
-    try:
-        filtered.sort(key=_sort_key_func(order_col), reverse=reverse)
-    except Exception:
-        pass
-
-    # Pagination and build DataTables rows
-    # Rebuild page and assign stable ids using original order index when loading batch
-    page = filtered[start:start + length]
-    data: List[List[Any]] = []
-    for rec in page:
-        host = rec.get("host") or f"#{rec.get('proxy_id')}"
-        ct_str = rec.get("creation_time") or ""
-        cl_recv = rec.get("cl_bytes_received")
-        cl_sent = rec.get("cl_bytes_sent")
-        age_val = rec.get("age_seconds")
-        url_full = rec.get("url") or ""
-        url_short = url_full[:100] + ("…" if len(url_full) > 100 else "")
-        # Use stored '__line_index' if present; else 0
-        pid = int(rec.get("proxy_id") or 0)
-        collected_iso = str(rec.get("collected_at") or "")
-        line_index = int(rec.get("__line_index") or 0)
-        rid_val = temp_store.build_record_id(pid, collected_iso, line_index)
-        # Ensure client_ip without port for display
-        try:
-            cip = rec.get("client_ip") or ""
-            if isinstance(cip, str) and re.match(r"^\d+\.\d+\.\d+\.\d+:\d+$", cip.strip()):
-                cip = cip.strip().rsplit(":", 1)[0]
-        except Exception:
-            cip = rec.get("client_ip") or ""
-        data.append([
-            host,
-            ct_str,
-            rec.get("protocol") or "",
-            rec.get("user_name") or "",
-            cip,
-            rec.get("server_ip") or "",
-            str(cl_recv) if cl_recv is not None else "",
-            str(cl_sent) if cl_sent is not None else "",
-            str(age_val) if isinstance(age_val, int) and age_val >= 0 else "",
-            url_short,
-            rid_val,
-        ])
-
-    try:
-        draw = int(request.query_params.get("draw", "0"))
-    except Exception:
-        draw = 0
-
-    return {
-        "draw": draw,
-        "recordsTotal": records_total,
-        "recordsFiltered": records_filtered,
-        "data": data,
-    }
-
-
 @router.get("/session-browser/item/{record_id}")
 async def get_session_record(record_id: int, db: Session = Depends(get_db)):
     item = temp_store.read_item_by_id(record_id)
@@ -588,6 +463,63 @@ async def get_session_record(record_id: int, db: Session = Depends(get_db)):
     item = dict(item)
     item["id"] = record_id
     return _ensure_timestamps(item)
+
+
+@router.post("/session-browser/ag-grid")
+async def sessions_ag_grid(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    body = await request.json()
+    start_row = body.get("startRow", 0)
+    end_row = body.get("endRow", 100)
+    sort_model = body.get("sortModel", [])
+    filter_model = body.get("filterModel", {})
+    proxy_ids_str = body.get("proxy_ids")
+
+    target_ids: List[int] = []
+    if proxy_ids_str:
+        try:
+            target_ids = [int(x) for x in proxy_ids_str.split(",") if x.strip()]
+        except Exception:
+            target_ids = []
+
+    if not target_ids:
+        return {"rowCount": 0, "rows": []}
+
+    rows = _load_latest_rows_for_proxies(db, target_ids)
+
+    # Filtering
+    if filter_model:
+        for col, f in filter_model.items():
+            query = (f.get("filter") or "").lower()
+            if query:
+                rows = [r for r in rows if query in str(r.get(col) or "").lower()]
+
+    # Sorting
+    if sort_model:
+        for s in reversed(sort_model):
+            col = s["colId"]
+            direction = s["sort"]
+            rows.sort(
+                key=lambda r: (r.get(col) is None, r.get(col)),
+                reverse=(direction == "desc"),
+            )
+
+    # Pagination
+    paginated_rows = rows[start_row:end_row]
+
+    # Assign stable IDs
+    for r in paginated_rows:
+        pid = int(r.get("proxy_id") or 0)
+        collected_iso = str(r.get("collected_at") or "")
+        line_index = int(r.get("__line_index") or 0)
+        r["id"] = temp_store.build_record_id(pid, collected_iso, line_index)
+
+    return {
+        "rows": paginated_rows,
+        "rowCount": len(rows),
+    }
 
 
 @router.get("/session-browser/export")

@@ -5,6 +5,7 @@
 	let LAST_RENDERED_HASH = null;
 	let IS_RESTORING = false;
 	let CURRENT_VIEW = 'remote';
+	let gridApi = null; // AG Grid API
 	const COLS = [
 		"datetime","username","client_ip","url_destination_ip","timeintransaction",
 		"response_statuscode","cache_status","comm_name","url_protocol","url_host",
@@ -163,84 +164,89 @@
 		}
 	}
 
-	function destroyTableIfExists(){
-		const id = '#tlTable';
-		if($.fn.DataTable && $.fn.DataTable.isDataTable(id)){
-			$(id).DataTable().clear().destroy();
-		}
-		$('#tlTableHead').empty();
-		$('#tlTableBody').empty();
-	}
-
 	function renderParsed(records){
-		destroyTableIfExists();
-		const $head = $('#tlTableHead');
-		COLS.forEach(c => { $head.append(`<th>${c}</th>`); });
-		const $body = $('#tlTableBody');
-		records.forEach((r, idx) => {
-			const tds = COLS.map(c => {
-				let v = r[c];
-				if (v === null || v === undefined) v = '';
-				let formatted = v;
-				let orderVal = '';
-				if(c === 'datetime' || c === 'collected_at'){
-					var msOrder = null;
-					if (window.AppUtils && AppUtils.parseTrafficLogDateMs) { msOrder = AppUtils.parseTrafficLogDateMs(String(v)); }
-					if (msOrder == null) { var parsed = Date.parse(String(v)); msOrder = Number.isFinite(parsed) ? parsed : null; }
-					if (msOrder != null) orderVal = String(msOrder);
-					formatted = (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(v) : v;
-				}else if(c === 'response_statuscode'){
-					formatted = (window.AppUtils && AppUtils.renderStatusTag) ? AppUtils.renderStatusTag(v) : String(v);
-					var code = Number(v); if (Number.isFinite(code)) orderVal = String(code);
-				}else if(c === 'recv_byte' || c === 'sent_byte' || c === 'content_lenght'){
-					var b = Number(v);
-					if (Number.isFinite(b)) orderVal = String(b);
-					formatted = (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(v) : v;
-				}else if(c === 'timeintransaction'){
-					var num = Number(v);
-					if(Number.isFinite(num)){
-						var msVal = num < 1000 ? num * 1000 : num;
-						orderVal = String(msVal);
-						formatted = (window.AppUtils && AppUtils.formatDurationMs) ? AppUtils.formatDurationMs(msVal) : v;
+		const gridDiv = document.querySelector('#tlResultParsed');
+		if (gridApi) {
+			gridApi.destroy();
+			gridApi = null;
+		}
+		$(gridDiv).empty();
+
+		const columnDefs = COLS.map(c => {
+			const def = {
+				headerName: c,
+				field: c,
+				filter: 'agTextColumnFilter',
+				floatingFilter: true,
+				sortable: true,
+				resizable: true,
+			};
+
+			if (c === 'datetime' || c === 'collected_at') {
+				def.valueFormatter = p => (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(p.value) : p.value;
+				def.comparator = (valueA, valueB) => {
+					const parse = val => {
+						if (!val) return 0;
+						let ms = null;
+						if (window.AppUtils && AppUtils.parseTrafficLogDateMs) { ms = AppUtils.parseTrafficLogDateMs(String(val)); }
+						if (ms == null) { const parsed = Date.parse(String(val)); ms = Number.isFinite(parsed) ? parsed : null; }
+						return ms || 0;
+					};
+					return parse(valueA) - parse(valueB);
+				};
+			} else if (c === 'response_statuscode') {
+				def.cellRenderer = p => (window.AppUtils && AppUtils.renderStatusTag) ? AppUtils.renderStatusTag(p.value) : String(p.value);
+				def.comparator = (valueA, valueB) => Number(valueA) - Number(valueB);
+			} else if (c === 'recv_byte' || c === 'sent_byte' || c === 'content_lenght') {
+				def.valueFormatter = p => (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(p.value) : p.value;
+				def.type = 'numericColumn';
+				def.comparator = (valueA, valueB) => Number(valueA) - Number(valueB);
+			} else if (c === 'timeintransaction') {
+				def.valueFormatter = p => {
+					const num = Number(p.value);
+					if (Number.isFinite(num)) {
+						const msVal = num < 1000 ? num * 1000 : num;
+						return (window.AppUtils && AppUtils.formatDurationMs) ? AppUtils.formatDurationMs(msVal) : p.value;
 					}
+					return p.value;
+				};
+				def.comparator = (valueA, valueB) => {
+					const getMs = val => {
+						const num = Number(val);
+						return Number.isFinite(num) ? (num < 1000 ? num * 1000 : num) : 0;
+					};
+					return getMs(valueA) - getMs(valueB);
 				}
-				const isUrlish = (c === 'url_path' || c === 'url_parametersstring' || c === 'referer' || c === 'url_host' || c === 'user_agent');
-				const clsParts = ['dt-nowrap'];
-				if(c === 'recv_byte' || c === 'sent_byte' || c === 'content_lenght') clsParts.push('num');
-				if(c === 'response_statuscode') clsParts.push('mono');
-				const cls = clsParts.join(' ');
-				const content = isUrlish ? `<div class="dt-ellipsis">${String(formatted)}</div>` : (typeof formatted === 'string' ? formatted : String(formatted));
-				const orderAttr = orderVal !== '' ? ` data-order="${orderVal}"` : '';
-				return `<td class="${cls}" data-col="${c}"${orderAttr}>${content}</td>`;
-			}).join('');
-			$body.append(`<tr data-row="${idx}">${tds}</tr>`);
+			} else if (c === 'url_path' || c === 'url_parametersstring' || c === 'referer' || c === 'url_host' || c === 'user_agent') {
+				def.tooltipField = c;
+			}
+			return def;
 		});
-		// Ensure container visible before initializing filters
+
+		const gridOptions = {
+			columnDefs: columnDefs,
+			rowData: records,
+			defaultColDef: {
+				sortable: true,
+				resizable: true,
+				filter: 'agTextColumnFilter',
+				floatingFilter: true,
+				suppressHeaderMenuButton: true,
+			},
+			onCellClicked: (event) => {
+				showDetail(event.data || {});
+			},
+			onGridReady: (params) => {
+				gridApi = params.api;
+			},
+			domLayout: 'normal',
+		};
+
+		ag.grid.createGrid(gridDiv, gridOptions);
+
 		$('#tlResultParsed').show();
 		$('#tlResultRaw').hide();
-		// Initialize DataTables via shared config
-		const dt = TableConfig.init('#tlTable', { order: [], orderCellsTop: true, stateSave: true });
-		setTimeout(function(){
-			TableConfig.adjustColumns(dt);
-			// Header filters via ColumnControl with Enter trigger (unified)
-			try{
-				if (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable){
-					var api = window.jQuery('#tlTable').DataTable();
-					if (api && api.columnControl && typeof api.columnControl.bind === 'function'){
-						api.columnControl.bind({ trigger: 'enter' });
-					}
-				}
-			}catch(e){ /* ignore */ }
-		}, 0);
-		// Row click opens detail modal
-		$('#tlTable tbody').off('click', 'tr').on('click', 'tr', function(){
-			const rowIdx = $(this).data('row');
-			if (rowIdx == null) return;
-			showDetail(records[rowIdx] || {});
-		});
-		// Already shown before init
 		$('#tlEmptyState').toggle(records.length === 0);
-		// Update last rendered signature to suppress redundant re-renders
 		try { LAST_RENDERED_HASH = JSON.stringify(records || []); } catch(e) { LAST_RENDERED_HASH = null; }
 	}
 
@@ -268,7 +274,10 @@
 
 		setStatus('조회 중...', 'is-info');
 		// Clear current UI and cached results to ensure replacement semantics
-		destroyTableIfExists();
+		if(gridApi){
+			gridApi.destroy();
+			gridApi = null;
+		}
 		$('#tlResultParsed').hide();
 		$('#tlResultRaw').hide();
 		$('#tlEmptyState').hide();
@@ -368,4 +377,3 @@
 		}catch(err){ /* ignore */ }
 	});
 })();
-
