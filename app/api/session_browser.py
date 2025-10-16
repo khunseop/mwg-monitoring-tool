@@ -492,9 +492,32 @@ async def sessions_ag_grid(
     # Filtering
     if filter_model:
         for col, f in filter_model.items():
-            query = (f.get("filter") or "").lower()
-            if query:
-                rows = [r for r in rows if query in str(r.get(col) or "").lower()]
+            query = f.get("filter")
+            filter_type = f.get("type")
+
+            if query is None:
+                continue
+
+            query_str = str(query).lower()
+
+            def check(row_val):
+                row_val_str = str(row_val or "").lower()
+                if filter_type == "contains":
+                    return query_str in row_val_str
+                elif filter_type == "notContains":
+                    return query_str not in row_val_str
+                elif filter_type == "equals":
+                    return query_str == row_val_str
+                elif filter_type == "notEqual":
+                    return query_str != row_val_str
+                elif filter_type == "startsWith":
+                    return row_val_str.startswith(query_str)
+                elif filter_type == "endsWith":
+                    return row_val_str.endswith(query_str)
+                # Default to contains
+                return query_str in row_val_str
+
+            rows = [r for r in rows if check(r.get(col))]
 
     # Sorting
     if sort_model:

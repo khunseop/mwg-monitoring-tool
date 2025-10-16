@@ -106,7 +106,7 @@ $(document).ready(function() {
         };
 
         const gridDiv = document.querySelector('#sbTableWrap');
-        ag.grid.createGrid(gridDiv, gridOptions);
+        agGrid.createGrid(gridDiv, gridOptions);
     }
 
     function createServerSideDatasource() {

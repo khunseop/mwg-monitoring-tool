@@ -239,10 +239,10 @@
 			onGridReady: (params) => {
 				gridApi = params.api;
 			},
-			domLayout: 'normal',
+			domLayout: 'autoHeight',
 		};
 
-		ag.grid.createGrid(gridDiv, gridOptions);
+		agGrid.createGrid(gridDiv, gridOptions);
 
 		$('#tlResultParsed').show();
 		$('#tlResultRaw').hide();
