@@ -156,7 +156,7 @@ $(document).ready(function() {
             data: JSON.stringify({ proxy_ids: proxyIds })
         }).then(res => {
             if (sb.gridApi) {
-                sb.gridApi.setDatasource(createServerSideDatasource());
+                sb.gridApi.refreshServerSide({ purge: true });
             }
             if (res && res.failed && res.failed > 0) { showErr('일부 프록시 수집에 실패했습니다.'); }
             setStatus('완료');
@@ -193,17 +193,17 @@ $(document).ready(function() {
     $('#sbGroupSelect').on('change', function() { saveState(); });
     $('#sbProxySelect').on('change', function() { saveState(); });
 
-    initGrid();
-    DeviceSelector.init({ 
-        groupSelect: '#sbGroupSelect', 
-        proxySelect: '#sbProxySelect', 
+    DeviceSelector.init({
+        groupSelect: '#sbGroupSelect',
+        proxySelect: '#sbProxySelect',
         selectAll: '#sbSelectAll',
         allowAllGroups: false,
         onData: function(data){ sb.groups = data.groups || []; sb.proxies = data.proxies || []; }
     }).then(function(){
+        initGrid();
         restoreState();
         if (sb.gridApi) {
-            sb.gridApi.setDatasource(createServerSideDatasource());
+            sb.gridApi.refreshServerSide({ purge: true });
         }
     });
 

@@ -239,7 +239,9 @@
 			onGridReady: (params) => {
 				gridApi = params.api;
 			},
-			domLayout: 'autoHeight',
+			pagination: true,
+			paginationPageSize: 100,
+			paginationPageSizeSelector: [20, 50, 100, 500, 1000],
 		};
 
 		agGrid.createGrid(gridDiv, gridOptions);
