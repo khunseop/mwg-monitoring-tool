@@ -516,9 +516,7 @@ $(document).ready(function() {
                             <div class="level" style="margin-bottom:6px;">
                                 <div class="level-left"><h5 class="title is-6" style="margin:0;">${titles[m]}</h5></div>
                                 <div class="level-right">
-                                    <a class="ru-chart-zoom-btn" data-metric="${m}" title="Zoom in">
-                                        <span class="icon"><i class="fas fa-search-plus"></i></span>
-                                    </a>
+                                    <a class="button is-small ru-chart-zoom-btn" data-metric="${m}" title="Zoom in">확대</a>
                                 </div>
                             </div>
                             <div id="ruApex-${m}" style="width:100%; height:${height}px;"></div>
