@@ -381,9 +381,6 @@ def _load_latest_rows_for_proxies(db: Session, target_ids: List[int]) -> List[Di
     rows: List[Dict[str, Any]] = []
     for pid in target_ids:
         batch = temp_store.read_latest(pid)
-        if not batch:
-            logger.warning(f"session-browser: No data found for proxy_id={pid} in temp_store.")
-            continue
         for idx, rec in enumerate(batch):
             r = dict(rec)
             r.setdefault("proxy_id", pid)
@@ -548,6 +545,31 @@ async def sessions_ag_grid(
         "rowCount": len(rows),
     }
 
+
+def _sort_key_func(col_idx: int | None):
+    # Mirrors the col_to_key from _filter_rows_by_columns for consistency
+    col_to_key = {
+        0: "host", 1: "creation_time", 2: "protocol", 3: "user_name",
+        4: "client_ip", 5: "server_ip", 6: "cl_bytes_received",
+        7: "cl_bytes_sent", 8: "age_seconds", 9: "url",
+    }
+    key = col_to_key.get(col_idx or 0)
+    if not key:
+        return lambda r: r.get("id") or 0
+
+    # Handle numeric and date sorting correctly
+    if key in ("cl_bytes_received", "cl_bytes_sent", "age_seconds"):
+        return lambda r: (r.get(key) is None, r.get(key) or 0)
+    elif key == "creation_time":
+        def to_ts(v: Any) -> float:
+            try:
+                return datetime.fromisoformat(str(v)).timestamp() if v else 0
+            except (ValueError, TypeError):
+                return 0
+        return lambda r: (r.get(key) is None, to_ts(r.get(key)))
+
+    # Default to case-insensitive string sort
+    return lambda r: (r.get(key) is None, str(r.get(key) or "").lower())
 
 @router.get("/session-browser/export")
 async def sessions_export(

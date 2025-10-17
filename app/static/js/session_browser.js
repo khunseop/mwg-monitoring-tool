@@ -102,7 +102,8 @@ $(document).ready(function() {
             },
             onGridReady: (params) => {
                 sb.gridApi = params.api;
-            }
+            },
+            getRowId: (params) => params.data.id
         };
 
         const gridDiv = document.querySelector('#sbTableWrap');
