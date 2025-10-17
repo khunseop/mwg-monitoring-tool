@@ -1,5 +1,5 @@
 $(document).ready(function() {
-    const sb = { proxies: [], groups: [], gridApi: null };
+    const sb = { proxies: [], groups: [], gridApi: null, proxySelect: null };
     const STORAGE_KEY = 'sb_state_v1';
 
     function showErr(msg) { $('#sbError').text(msg).show(); }
@@ -11,7 +11,12 @@ $(document).ready(function() {
         if (isError) $t.addClass('is-danger'); else $t.addClass(text ? 'is-success' : 'is-light');
     }
 
-    function getSelectedProxyIds() { return ($('#sbProxySelect').val() || []).map(v => parseInt(v, 10)); }
+    function getSelectedProxyIds() {
+        if (sb.proxySelect && sb.proxySelect.getValue) {
+            return sb.proxySelect.getValue().map(v => parseInt(v, 10));
+        }
+        return ($('#sbProxySelect').val() || []).map(v => parseInt(v, 10));
+    }
 
     function saveState() {
         var groupVal;
@@ -47,11 +52,10 @@ $(document).ready(function() {
             }
             if (Array.isArray(state.proxyIds) && state.proxyIds.length > 0) {
                 const strIds = state.proxyIds.map(id => String(id));
-                var $p = $('#sbProxySelect');
-                var ptom = ($p && $p[0]) ? $p[0]._tom : null;
-                if (ptom && typeof ptom.setValue === 'function') {
-                    try { ptom.setValue(strIds, false); } catch (e) { /* ignore */ }
+                if (sb.proxySelect) {
+                    try { sb.proxySelect.setValue(strIds, false); } catch (e) { /* ignore */ }
                 } else {
+                    var $p = $('#sbProxySelect');
                     $p.find('option').each(function() { $(this).prop('selected', strIds.indexOf($(this).val()) !== -1); });
                     try { $p.trigger('change'); } catch (e) { /* ignore */ }
                 }
@@ -122,7 +126,7 @@ $(document).ready(function() {
                     success: function(response) {
                         params.successCallback(response.rows, response.rowCount);
                         if (response.errors && Object.keys(response.errors).length > 0) {
-                            const errorMsgs = Object.entries(response.errors).map(([pid, err]) => `프록시 ID ${pid}: ${err}`).join('\n');
+                            const errorMsgs = Object.entries(response.errors).map(([pid, err]) => `  - 프록시 ID ${pid}: ${err}`).join('\n');
                             showErr(`일부 프록시 수집 실패:\n${errorMsgs}`);
                             setStatus('완료 (오류 발생)', true);
                         } else {
@@ -130,9 +134,8 @@ $(document).ready(function() {
                         }
 
                         if (forceRefresh && window.SbAnalyze && typeof window.SbAnalyze.run === 'function') {
-                            const proxyIds = getSelectedProxyIds();
-                            window.SbAnalyze.run({ proxyIds: proxyIds });
                             $('#sbAnalyzeSection').show();
+                            window.SbAnalyze.run({ proxyIds: getSelectedProxyIds() });
                         }
                     },
                     error: function() {
@@ -148,7 +151,10 @@ $(document).ready(function() {
     function loadLatest() {
         clearErr();
         const proxyIds = getSelectedProxyIds();
-        if (proxyIds.length === 0) { showErr('프록시를 하나 이상 선택하세요.'); return; }
+        if (proxyIds.length === 0) {
+            showErr('프록시를 하나 이상 선택하세요.');
+            return;
+        }
 
         setStatus('수집 중...');
         if (sb.gridApi) {
@@ -192,7 +198,7 @@ $(document).ready(function() {
                 }
                 return resp.blob().then(blob => ({ blob, filename }));
             }
-            throw new Error('내보내기 실패');
+            return resp.text().then(text => { throw new Error(text || '내보내기 실패'); });
         })
         .then(({ blob, filename }) => {
             const url = window.URL.createObjectURL(blob);
@@ -215,7 +221,15 @@ $(document).ready(function() {
         proxySelect: '#sbProxySelect',
         selectAll: '#sbSelectAll',
         allowAllGroups: false,
-        onData: (data) => { sb.groups = data.groups || []; sb.proxies = data.proxies || []; }
+        onData: (data) => {
+            sb.groups = data.groups || [];
+            sb.proxies = data.proxies || [];
+            // Store the tom-select instance for later use
+            const proxyEl = document.querySelector('#sbProxySelect');
+            if (proxyEl && proxyEl.tomselect) {
+                sb.proxySelect = proxyEl.tomselect;
+            }
+        }
     }).then(() => {
         initGrid();
         restoreState();
