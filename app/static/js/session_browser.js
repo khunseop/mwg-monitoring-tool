@@ -122,6 +122,12 @@ $(document).ready(function() {
                     success: function(response) {
                         params.successCallback(response.rows, response.rowCount);
                         setStatus('완료');
+                        // Show analyze section after successful data load
+                        if (window.SbAnalyze && typeof window.SbAnalyze.run === 'function') {
+                            const proxyIds = getSelectedProxyIds();
+                            window.SbAnalyze.run({ proxyIds: proxyIds });
+                            $('#sbAnalyzeSection').show();
+                        }
                     },
                     error: function() {
                         params.failCallback();
@@ -142,30 +148,57 @@ $(document).ready(function() {
         if (sb.gridApi) {
             sb.gridApi.setDatasource(createInfiniteDatasource(true));
         }
-
         saveState();
-        try { if (window.SbAnalyze && typeof window.SbAnalyze.run === 'function') { window.SbAnalyze.run({ proxyIds: proxyIds }); $('#sbAnalyzeSection').show(); } } catch (e) { /* ignore */ }
     }
 
     $('#sbLoadBtn').on('click', loadLatest);
 
     $('#sbExportBtn').on('click', function() {
-        const params = {};
         const pids = getSelectedProxyIds().join(',');
-        if (pids) params.proxy_ids = pids;
-
-        if (sb.gridApi) {
-            const sortModel = sb.gridApi.getSortModel();
-            if (sortModel.length > 0) {
-                params['order[0][column]'] = sortModel[0].colId;
-                params['order[0][dir]'] = sortModel[0].sort;
-            }
-            const filterModel = sb.gridApi.getFilterModel();
-            const searchVal = Object.values(filterModel).map(f => f.filter).join(' ');
-            if (searchVal) params['search[value]'] = searchVal;
+        if (!pids) {
+            showErr('프록시를 하나 이상 선택하세요.');
+            return;
         }
 
-        window.open('/api/session-browser/export?' + $.param(params), '_blank');
+        const payload = {
+            proxy_ids: pids,
+            sortModel: sb.gridApi ? sb.gridApi.getSortModel() : [],
+            filterModel: sb.gridApi ? sb.gridApi.getFilterModel() : {}
+        };
+
+        // Use fetch for POST request with blob response
+        fetch('/api/session-browser/export', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(resp => {
+            if (resp.ok) {
+                const header = resp.headers.get('Content-Disposition');
+                const parts = header.split(';');
+                let filename = 'sessions_export.xlsx';
+                for (let i = 0; i < parts.length; i++) {
+                    if (parts[i].trim().startsWith('filename=')) {
+                        filename = parts[i].split('=')[1].replace(/"/g, '');
+                        break;
+                    }
+                }
+                return resp.blob().then(blob => ({ blob, filename }));
+            }
+            throw new Error('내보내기 실패');
+        })
+        .then(({ blob, filename }) => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        })
+        .catch(err => showErr(err.message));
     });
 
     $('#sbGroupSelect, #sbProxySelect').on('change', saveState);
