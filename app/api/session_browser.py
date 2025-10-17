@@ -381,6 +381,9 @@ def _load_latest_rows_for_proxies(db: Session, target_ids: List[int]) -> List[Di
     rows: List[Dict[str, Any]] = []
     for pid in target_ids:
         batch = temp_store.read_latest(pid)
+        if not batch:
+            logger.warning(f"session-browser: No data found for proxy_id={pid} in temp_store.")
+            continue
         for idx, rec in enumerate(batch):
             r = dict(rec)
             r.setdefault("proxy_id", pid)

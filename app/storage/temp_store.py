@@ -153,24 +153,16 @@ def list_batches(proxy_id: Optional[int] = None) -> List[Tuple[int, str]]:
 def read_latest(proxy_id: int) -> List[Dict[str, Any]]:
     """
     Return records from the latest batch for a proxy. Empty list if none.
+    This version explicitly finds the most recent batch file by name.
     """
-    directory = _proxy_dir(proxy_id)
-    latest_link = os.path.join(directory, "latest")
-    path: Optional[str] = None
-    try:
-        with open(latest_link, "r", encoding="utf-8") as f:
-            fn = f.read().strip()
-            if fn:
-                path = os.path.join(directory, fn)
-    except Exception:
-        pass
-    if not path or not os.path.exists(path):
-        batches = list_batches(proxy_id)
-        if batches:
-            _, path = batches[0]
-    if not path or not os.path.exists(path):
+    batches = list_batches(proxy_id)
+    if not batches:
         return []
-    return list(_iter_jsonl(path))
+    # list_batches already sorts by filename descending, so the first is the latest
+    latest_batch_path = batches[0][1]
+    if not latest_batch_path or not os.path.exists(latest_batch_path):
+        return []
+    return list(_iter_jsonl(latest_batch_path))
 
 
 def _iso_to_unix_seconds(iso_str: str) -> int:
