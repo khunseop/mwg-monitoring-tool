@@ -84,7 +84,7 @@ $(document).ready(function() {
         const gridOptions = {
             columnDefs: columnDefs,
             rowModelType: 'infinite',
-            datasource: createInfiniteDatasource(),
+            datasource: createInfiniteDatasource(false),
             pagination: true,
             paginationPageSize: 100,
             cacheBlockSize: 100,
@@ -110,7 +110,7 @@ $(document).ready(function() {
         agGrid.createGrid(gridDiv, gridOptions);
     }
 
-    function createInfiniteDatasource() {
+    function createInfiniteDatasource(force) {
         return {
             getRows: (params) => {
                 const pids = getSelectedProxyIds().join(',');
@@ -123,50 +123,54 @@ $(document).ready(function() {
                     endRow: params.endRow,
                     sortModel: params.sortModel,
                     filterModel: params.filterModel,
-                    proxy_ids: pids
+                    proxy_ids: pids,
+                    force: !!force
                 };
 
                 $.ajax({
-                    url: '/api/session-browser/ag-grid',
+                    url: '/api/session-browser/data',
                     method: 'POST',
                     contentType: 'application/json',
                     data: JSON.stringify(request),
                     success: function(response) {
-                        params.successCallback({
-                            rowData: response.rows,
-                            rowCount: response.rowCount
-                        });
+                        params.successCallback(response.rows, response.rowCount);
+                        setStatus('완료');
                     },
                     error: function() {
                         params.failCallback();
+                        setStatus('오류', true);
+                        showErr('데이터를 불러오지 못했습니다.');
                     }
                 });
             }
         };
     }
 
-    function loadLatest() {
+    function loadLatest(force) {
         clearErr();
         const proxyIds = getSelectedProxyIds();
         if (proxyIds.length === 0) { showErr('프록시를 하나 이상 선택하세요.'); return; }
-        setStatus('수집 중...');
-        return $.ajax({
-            url: '/api/session-browser/collect',
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ proxy_ids: proxyIds })
-        }).then(res => {
+
+        if (force) {
+            setStatus('수집 중...');
+            // When forcing, we want to signal the datasource to force a refresh on the next getRows
+            // The simplest way is to create a new datasource with the force flag and apply it.
+            // AG Grid will then call getRows on this new datasource.
             if (sb.gridApi) {
-                sb.gridApi.setGridOption('datasource', createInfiniteDatasource());
+                const ds = createInfiniteDatasource(true);
+                sb.gridApi.setDatasource(ds);
             }
-            if (res && res.failed && res.failed > 0) { showErr('일부 프록시 수집에 실패했습니다.'); }
-            setStatus('완료');
-            saveState();
-            try { if (window.SbAnalyze && typeof window.SbAnalyze.run === 'function') { window.SbAnalyze.run({ proxyIds: proxyIds }); $('#sbAnalyzeSection').show(); } } catch (e) { /* ignore */ }
-        }).catch(() => { setStatus('오류', true); showErr('수집 요청 중 오류가 발생했습니다.'); });
+        } else {
+            // For a simple refresh without re-collecting, just purge the cache
+            if (sb.gridApi) {
+                sb.gridApi.refreshInfiniteCache();
+            }
+        }
+        saveState();
+        try { if (window.SbAnalyze && typeof window.SbAnalyze.run === 'function') { window.SbAnalyze.run({ proxyIds: proxyIds }); $('#sbAnalyzeSection').show(); } } catch (e) { /* ignore */ }
     }
 
-    $('#sbLoadBtn').on('click', function() { loadLatest(); });
+    $('#sbLoadBtn').on('click', function() { loadLatest(true); });
     $('#sbExportBtn').on('click', function() {
         const params = {};
         const pids = getSelectedProxyIds().join(',');
@@ -211,7 +215,7 @@ $(document).ready(function() {
             if (e.key === STORAGE_KEY) {
                 restoreState();
                 if (sb.gridApi) {
-                    sb.gridApi.setDatasource(createServerSideDatasource());
+                    sb.gridApi.refreshInfiniteCache();
                 }
             }
         });

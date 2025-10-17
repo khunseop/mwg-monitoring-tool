@@ -224,249 +224,8 @@ def _collect_for_proxy(proxy: Proxy, cfg: SessionBrowserConfigModel) -> Tuple[in
         return proxy.id, None, str(e)
 
 
-@router.post("/session-browser/collect", response_model=CollectResponse)
-async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db)):
-    if not payload.proxy_ids or len(payload.proxy_ids) == 0:
-        raise HTTPException(status_code=400, detail="proxy_ids is required and cannot be empty")
-
-    cfg = _get_cfg(db)
-
-    query = db.query(Proxy).filter(Proxy.is_active == True).filter(Proxy.id.in_(payload.proxy_ids))
-    proxies: List[Proxy] = query.all()
-    if not proxies:
-        return CollectResponse(requested=0, succeeded=0, failed=0, errors={}, items=[])
-
-    errors: Dict[int, str] = {}
-
-    # Replacement semantics now happen at temp-store level by creating a new batch per proxy
-    t_overall_start = time.perf_counter()
-    collected_at_ts = now_kst()
-    per_proxy_records: Dict[int, List[Dict[str, Any]]] = {}
-
-    t_fetch_parse_start = time.perf_counter()
-    with ThreadPoolExecutor(max_workers=cfg.max_workers or 4) as executor:
-        future_to_proxy = {executor.submit(_collect_for_proxy, p, cfg): p for p in proxies}
-        for future in as_completed(future_to_proxy):
-            proxy = future_to_proxy[future]
-            try:
-                proxy_id, records, err = future.result()
-                if err:
-                    errors[proxy_id] = err
-                    continue
-                enriched: List[Dict[str, Any]] = []
-                for rec in records or []:
-                    row = {
-                        "proxy_id": proxy_id,
-                        "transaction": rec.get("transaction"),
-                        "creation_time": rec.get("creation_time"),
-                        "protocol": rec.get("protocol"),
-                        "cust_id": rec.get("cust_id"),
-                        "user_name": rec.get("user_name"),
-                        "client_ip": rec.get("client_ip"),
-                        "client_side_mwg_ip": rec.get("client_side_mwg_ip"),
-                        "server_side_mwg_ip": rec.get("server_side_mwg_ip"),
-                        "server_ip": rec.get("server_ip"),
-                        "cl_bytes_received": rec.get("cl_bytes_received"),
-                        "cl_bytes_sent": rec.get("cl_bytes_sent"),
-                        "srv_bytes_received": rec.get("srv_bytes_received"),
-                        "srv_bytes_sent": rec.get("srv_bytes_sent"),
-                        "trxn_index": rec.get("trxn_index"),
-                        "age_seconds": rec.get("age_seconds"),
-                        "status": rec.get("status"),
-                        "in_use": rec.get("in_use"),
-                        "url": rec.get("url"),
-                        "raw_line": rec.get("raw_line"),
-                        # enrich for UI convenience
-                        "host": proxy.host,
-                    }
-                    enriched.append(row)
-                per_proxy_records[proxy_id] = enriched
-            except Exception as e:
-                errors[proxy.id] = str(e)
-
-    t_fetch_parse_end = time.perf_counter()
-
-    # Write temp batches per proxy for real-time use
-    t_tmp_write_start = time.perf_counter()
-    total_written = 0
-    for pid, rows in per_proxy_records.items():
-        try:
-            temp_store.write_batch(pid, collected_at_ts, rows)
-            total_written += len(rows or [])
-        except Exception as e:
-            errors[pid] = str(e)
-    t_tmp_write_end = time.perf_counter()
-
-    # Keep only the latest batch per proxy to avoid accumulation
-    try:
-        temp_store.cleanup_old_batches(retain_per_proxy=1)
-    except Exception:
-        pass
-
-    logger.info(
-        "session-collect: proxies=%d ok=%d fail=%d records=%d delete_ms=%.1f fetch_parse_ms=%.1f db_insert_ms=%.1f total_ms=%.1f",
-        len(proxies),
-        len(proxies) - len(errors),
-        len(errors),
-        total_written,
-        0.0,
-        (t_fetch_parse_end - t_fetch_parse_start) * 1000.0,
-        (t_tmp_write_end - t_tmp_write_start) * 1000.0,
-        (time.perf_counter() - t_overall_start) * 1000.0,
-    )
-
-    return CollectResponse(
-        requested=len(proxies),
-        succeeded=len(proxies) - len(errors),
-        failed=len(errors),
-        errors=errors,
-        # Keep payload light; UI reloads from server-side table anyway
-        items=[],
-    )
-
-
-@router.get("/session-browser", response_model=List[SessionRecordSchema])
-async def list_sessions(
-    db: Session = Depends(get_db),
-    limit: int = Query(100, ge=1, le=1000),
-    offset: int = Query(0, ge=0),
-):
-    # Aggregate latest batches across all proxies
-    rows: List[Dict[str, Any]] = []
-    proxies = db.query(Proxy).filter(Proxy.is_active == True).all()
-    for p in proxies:
-        latest = temp_store.read_latest(p.id)
-        for idx, rec in enumerate(latest):
-            item = dict(rec)
-            item.setdefault("proxy_id", p.id)
-            # build stable numeric id: proxy + collected_at + line index
-            rid = temp_store.build_record_id(p.id, str(item.get("collected_at") or ""), idx)
-            item["id"] = rid
-            rows.append(_ensure_timestamps(item))
-    # Sort by collected_at desc then id asc
-    def _to_sort_ts(v: Any) -> float:
-        try:
-            if not v:
-                return 0.0
-            return datetime.fromisoformat(str(v)).timestamp()
-        except Exception:
-            return 0.0
-    rows.sort(key=lambda r: (_to_sort_ts(r.get("collected_at")), r.get("id") or 0), reverse=True)
-    sliced = rows[offset:offset + limit]
-    return [SessionRecordSchema(**r) for r in sliced]
-
-
-@router.get("/session-browser/latest/{proxy_id}", response_model=List[SessionRecordSchema])
-async def latest_sessions(proxy_id: int, db: Session = Depends(get_db)):
-    latest = temp_store.read_latest(proxy_id)
-    out: List[SessionRecordSchema] = []
-    for idx, rec in enumerate(latest):
-        r = dict(rec)
-        r.setdefault("proxy_id", proxy_id)
-        rid = temp_store.build_record_id(proxy_id, str(r.get("collected_at") or ""), idx)
-        r["id"] = rid
-        out.append(SessionRecordSchema(**_ensure_timestamps(r)))
-    return out
-
-
- 
-
-
-# DataTables server-side endpoint for large datasets
-def _load_latest_rows_for_proxies(db: Session, target_ids: List[int]) -> List[Dict[str, Any]]:
-    host_map: Dict[int, str] = {}
-    if target_ids:
-        for p in db.query(Proxy).filter(Proxy.id.in_(target_ids)).all():
-            host_map[p.id] = p.host
-    rows: List[Dict[str, Any]] = []
-    for pid in target_ids:
-        batch = temp_store.read_latest(pid)
-        for idx, rec in enumerate(batch):
-            r = dict(rec)
-            r.setdefault("proxy_id", pid)
-            r.setdefault("host", host_map.get(pid, f"#{pid}"))
-            r["__line_index"] = idx
-            # Normalize client_ip by dropping ephemeral port if present
-            try:
-                cip = r.get("client_ip")
-                if isinstance(cip, str) and re.match(r"^\d+\.\d+\.\d+\.\d+:\d+$", cip.strip()):
-                    r["client_ip"] = cip.strip().rsplit(":", 1)[0]
-            except Exception:
-                pass
-            rows.append(r)
-    return rows
-
-
-def _filter_rows(rows: List[Dict[str, Any]], search: str | None) -> List[Dict[str, Any]]:
-    if not search:
-        return rows
-    s = str(search).lower()
-    def include(row: Dict[str, Any]) -> bool:
-        for key in ("transaction", "user_name", "client_ip", "server_ip", "protocol", "status", "url", "host"):
-            val = row.get(key)
-            if val is not None and s in str(val).lower():
-                return True
-        return False
-    return [r for r in rows if include(r)]
-
-
-def _filter_rows_by_columns(rows: List[Dict[str, Any]], per_col: Dict[int, str]) -> List[Dict[str, Any]]:
-    """Apply DataTables-style per-column text filters.
-
-    The mapping of column index to row key must mirror the client-side columns order.
-    Only simple substring matching is applied for now to keep behavior predictable.
-    """
-    if not per_col:
-        return rows
-    # Column index mapping (0-based) aligned with session_browser.js `columns` order
-    col_to_key = {
-        0: "host",
-        1: "creation_time",
-        2: "protocol",
-        3: "user_name",
-        4: "client_ip",
-        5: "server_ip",
-        6: "cl_bytes_received",
-        7: "cl_bytes_sent",
-        8: "age_seconds",
-        9: "url",
-        # 10: id (hidden) -> ignore for filtering
-    }
-    out: List[Dict[str, Any]] = []
-    for row in rows:
-        include = True
-        for col_idx, query in per_col.items():
-            if col_idx == 10:
-                continue
-            key = col_to_key.get(col_idx)
-            if not key:
-                continue
-            q = (str(query or "")).strip()
-            if q == "":
-                continue
-            val = row.get(key)
-            text = str(val if val is not None else "")
-            # Case-insensitive substring match
-            if q.lower() not in text.lower():
-                include = False
-                break
-        if include:
-            out.append(row)
-    return out
-
-
-@router.get("/session-browser/item/{record_id}")
-async def get_session_record(record_id: int, db: Session = Depends(get_db)):
-    item = temp_store.read_item_by_id(record_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="Record not found")
-    item = dict(item)
-    item["id"] = record_id
-    return _ensure_timestamps(item)
-
-
-@router.post("/session-browser/ag-grid")
-async def sessions_ag_grid(
+@router.post("/session-browser/data")
+async def sessions_data(
     request: Request,
     db: Session = Depends(get_db),
 ):
@@ -476,6 +235,7 @@ async def sessions_ag_grid(
     sort_model = body.get("sortModel", [])
     filter_model = body.get("filterModel", {})
     proxy_ids_str = body.get("proxy_ids")
+    force_refresh = body.get("force", False)
 
     target_ids: List[int] = []
     if proxy_ids_str:
@@ -487,6 +247,29 @@ async def sessions_ag_grid(
     if not target_ids:
         return {"rowCount": 0, "rows": []}
 
+    cfg = _get_cfg(db)
+    proxies = db.query(Proxy).filter(Proxy.id.in_(target_ids), Proxy.is_active == True).all()
+    proxy_map = {p.id: p for p in proxies}
+
+    # --- Integrated Collect Logic ---
+    if force_refresh:
+        with ThreadPoolExecutor(max_workers=cfg.max_workers or 4) as executor:
+            future_to_proxy_id = {executor.submit(_collect_for_proxy, proxy_map[pid], cfg): pid for pid in target_ids if pid in proxy_map}
+
+            for future in as_completed(future_to_proxy_id):
+                proxy_id = future_to_proxy_id[future]
+                try:
+                    _, records, err = future.result()
+                    if not err and records is not None:
+                        temp_store.write_batch(proxy_id, now_kst(), records)
+                except Exception as e:
+                    logger.error(f"Failed to collect session for proxy {proxy_id}: {e}")
+        try:
+            temp_store.cleanup_old_batches(retain_per_proxy=1)
+        except Exception:
+            pass
+    # --- End Integrated Collect ---
+
     # Load latest rows from temp_store
     rows = _load_latest_rows_for_proxies(db, target_ids)
 
@@ -495,29 +278,17 @@ async def sessions_ag_grid(
         for col, f in filter_model.items():
             query = f.get("filter")
             filter_type = f.get("type")
-
-            if query is None:
-                continue
-
+            if query is None: continue
             query_str = str(query).lower()
-
             def check(row_val):
                 row_val_str = str(row_val or "").lower()
-                if filter_type == "contains":
-                    return query_str in row_val_str
-                elif filter_type == "notContains":
-                    return query_str not in row_val_str
-                elif filter_type == "equals":
-                    return query_str == row_val_str
-                elif filter_type == "notEqual":
-                    return query_str != row_val_str
-                elif filter_type == "startsWith":
-                    return row_val_str.startswith(query_str)
-                elif filter_type == "endsWith":
-                    return row_val_str.endswith(query_str)
-                # Default to contains
+                if filter_type == "contains": return query_str in row_val_str
+                elif filter_type == "notContains": return query_str not in row_val_str
+                elif filter_type == "equals": return query_str == row_val_str
+                elif filter_type == "notEqual": return query_str != row_val_str
+                elif filter_type == "startsWith": return row_val_str.startswith(query_str)
+                elif filter_type == "endsWith": return row_val_str.endswith(query_str)
                 return query_str in row_val_str
-
             rows = [r for r in rows if check(r.get(col))]
 
     # Sorting
@@ -525,10 +296,7 @@ async def sessions_ag_grid(
         for s in reversed(sort_model):
             col = s["colId"]
             direction = s["sort"]
-            rows.sort(
-                key=lambda r: (r.get(col) is None, r.get(col)),
-                reverse=(direction == "desc"),
-            )
+            rows.sort(key=lambda r: (r.get(col) is None, r.get(col)), reverse=(direction == "desc"))
 
     # Pagination
     paginated_rows = rows[start_row:end_row]
@@ -570,6 +338,7 @@ def _sort_key_func(col_idx: int | None):
 
     # Default to case-insensitive string sort
     return lambda r: (r.get(key) is None, str(r.get(key) or "").lower())
+
 
 @router.get("/session-browser/export")
 async def sessions_export(
