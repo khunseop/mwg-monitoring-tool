@@ -27,11 +27,8 @@ $(document).ready(function() {
             savedAt: Date.now()
         };
 
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        } catch (e) {
-            setStatus('로컬 저장 실패', true);
-        }
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+        catch (e) { setStatus('로컬 저장 실패', true); }
     }
 
     function restoreState() {
@@ -43,15 +40,13 @@ $(document).ready(function() {
                 var $g = $('#sbGroupSelect');
                 var gtom = ($g && $g[0]) ? $g[0]._tom : null;
                 if (gtom && typeof gtom.setValue === 'function') {
-                    try { gtom.setValue(String(state.groupId || ''), false); } catch (e) { /* ignore */ }
-                    try { $g.trigger('change'); } catch (e) { /* ignore */ }
+                    try { gtom.setValue(String(state.groupId || ''), false); $g.trigger('change'); } catch (e) { /* ignore */ }
                 } else {
-                    $g.val(state.groupId);
-                    $g.trigger('change');
+                    $g.val(state.groupId).trigger('change');
                 }
             }
             if (Array.isArray(state.proxyIds) && state.proxyIds.length > 0) {
-                const strIds = state.proxyIds.map(function(id){ return String(id); });
+                const strIds = state.proxyIds.map(id => String(id));
                 var $p = $('#sbProxySelect');
                 var ptom = ($p && $p[0]) ? $p[0]._tom : null;
                 if (ptom && typeof ptom.setValue === 'function') {
@@ -89,28 +84,20 @@ $(document).ready(function() {
             paginationPageSize: 100,
             cacheBlockSize: 100,
             onCellClicked: (event) => {
-                const itemId = event.data.id;
-                if (!itemId) return;
-                $.getJSON(`/api/session-browser/item/${itemId}`)
-                    .done(function(item){ fillDetailModal(item || {}); openSbModal(); })
-                    .fail(function(){ showErr('상세를 불러오지 못했습니다.'); });
+                if (!event.data || !event.data.id) return;
+                $.getJSON(`/api/session-browser/item/${event.data.id}`)
+                    .done(item => { fillDetailModal(item || {}); openSbModal(); })
+                    .fail(() => showErr('상세를 불러오지 못했습니다.'));
             },
-            defaultColDef: {
-                sortable: true,
-                resizable: true,
-                suppressHeaderMenuButton: true,
-            },
-            onGridReady: (params) => {
-                sb.gridApi = params.api;
-            },
+            defaultColDef: { sortable: true, resizable: true, suppressHeaderMenuButton: true },
+            onGridReady: (params) => { sb.gridApi = params.api; },
             getRowId: (params) => params.data.id
         };
 
-        const gridDiv = document.querySelector('#sbTableWrap');
-        agGrid.createGrid(gridDiv, gridOptions);
+        agGrid.createGrid(document.querySelector('#sbTableWrap'), gridOptions);
     }
 
-    function createInfiniteDatasource(force) {
+    function createInfiniteDatasource(forceRefresh) {
         return {
             getRows: (params) => {
                 const pids = getSelectedProxyIds().join(',');
@@ -124,7 +111,7 @@ $(document).ready(function() {
                     sortModel: params.sortModel,
                     filterModel: params.filterModel,
                     proxy_ids: pids,
-                    force: !!force
+                    force: !!forceRefresh
                 };
 
                 $.ajax({
@@ -146,31 +133,22 @@ $(document).ready(function() {
         };
     }
 
-    function loadLatest(force) {
+    function loadLatest() {
         clearErr();
         const proxyIds = getSelectedProxyIds();
         if (proxyIds.length === 0) { showErr('프록시를 하나 이상 선택하세요.'); return; }
 
-        if (force) {
-            setStatus('수집 중...');
-            // When forcing, we want to signal the datasource to force a refresh on the next getRows
-            // The simplest way is to create a new datasource with the force flag and apply it.
-            // AG Grid will then call getRows on this new datasource.
-            if (sb.gridApi) {
-                const ds = createInfiniteDatasource(true);
-                sb.gridApi.setDatasource(ds);
-            }
-        } else {
-            // For a simple refresh without re-collecting, just purge the cache
-            if (sb.gridApi) {
-                sb.gridApi.refreshInfiniteCache();
-            }
+        setStatus('수집 중...');
+        if (sb.gridApi) {
+            sb.gridApi.setDatasource(createInfiniteDatasource(true));
         }
+
         saveState();
         try { if (window.SbAnalyze && typeof window.SbAnalyze.run === 'function') { window.SbAnalyze.run({ proxyIds: proxyIds }); $('#sbAnalyzeSection').show(); } } catch (e) { /* ignore */ }
     }
 
-    $('#sbLoadBtn').on('click', function() { loadLatest(true); });
+    $('#sbLoadBtn').on('click', loadLatest);
+
     $('#sbExportBtn').on('click', function() {
         const params = {};
         const pids = getSelectedProxyIds().join(',');
@@ -178,45 +156,36 @@ $(document).ready(function() {
 
         if (sb.gridApi) {
             const sortModel = sb.gridApi.getSortModel();
-            if (sortModel && sortModel.length > 0) {
-                params['order[0][column]'] = sortModel[0].colId; // Adapt to old export format if needed
+            if (sortModel.length > 0) {
+                params['order[0][column]'] = sortModel[0].colId;
                 params['order[0][dir]'] = sortModel[0].sort;
             }
             const filterModel = sb.gridApi.getFilterModel();
-            let searchVal = [];
-            for (const col in filterModel) {
-                searchVal.push(filterModel[col].filter);
-            }
-            if (searchVal.length > 0) params['search[value]'] = searchVal.join(' ');
+            const searchVal = Object.values(filterModel).map(f => f.filter).join(' ');
+            if (searchVal) params['search[value]'] = searchVal;
         }
 
-        const qs = $.param(params);
-        const url = '/api/session-browser/export' + (qs ? ('?' + qs) : '');
-        window.open(url, '_blank');
+        window.open('/api/session-browser/export?' + $.param(params), '_blank');
     });
 
-    $('#sbGroupSelect').on('change', function() { saveState(); });
-    $('#sbProxySelect').on('change', function() { saveState(); });
+    $('#sbGroupSelect, #sbProxySelect').on('change', saveState);
 
     DeviceSelector.init({
         groupSelect: '#sbGroupSelect',
         proxySelect: '#sbProxySelect',
         selectAll: '#sbSelectAll',
         allowAllGroups: false,
-        onData: function(data){ sb.groups = data.groups || []; sb.proxies = data.proxies || []; }
-    }).then(function(){
+        onData: (data) => { sb.groups = data.groups || []; sb.proxies = data.proxies || []; }
+    }).then(() => {
         initGrid();
         restoreState();
     });
 
     try {
         window.addEventListener('storage', function(e) {
-            if (!e) return;
             if (e.key === STORAGE_KEY) {
                 restoreState();
-                if (sb.gridApi) {
-                    sb.gridApi.refreshInfiniteCache();
-                }
+                if (sb.gridApi) sb.gridApi.refreshInfiniteCache();
             }
         });
     } catch (e) { /* ignore */ }
