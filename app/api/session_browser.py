@@ -24,7 +24,6 @@ from app.utils.ssh import ssh_exec
 from app.database.database import get_db
 from app.models.proxy import Proxy
 from app.models.session_browser_config import SessionBrowserConfig as SessionBrowserConfigModel
-from app.schemas.session_record import SessionRecord as SessionRecordSchema
 from app.services.session_browser_config import get_or_create_config as _get_cfg_service
 from app.utils.crypto import decrypt_string_if_encrypted
 from app.storage import temp_store
@@ -129,10 +128,11 @@ async def sessions_data(request: Request, db: Session = Depends(get_db)):
     sort_model, filter_model = body.get("sortModel", []), body.get("filterModel", {})
     proxy_ids_str, force_refresh = body.get("proxy_ids"), body.get("force", False)
     target_ids = [int(x) for x in proxy_ids_str.split(",") if x.strip()] if proxy_ids_str else []
-    if not target_ids: return {"rowCount": 0, "rows": []}
+    if not target_ids: return {"rowCount": 0, "rows": [], "errors": {}}
 
     cfg = _get_cfg(db)
     proxies = {p.id: p for p in db.query(Proxy).filter(Proxy.id.in_(target_ids), Proxy.is_active == True).all()}
+    errors = {}
 
     if force_refresh:
         with ThreadPoolExecutor(max_workers=cfg.max_workers or 4) as executor:
@@ -141,8 +141,14 @@ async def sessions_data(request: Request, db: Session = Depends(get_db)):
                 pid = future_map[future]
                 try:
                     _, records, err = future.result()
-                    if not err and records is not None: temp_store.write_batch(pid, now_kst(), records)
-                except Exception as e: logger.error(f"Failed to collect for proxy {pid}: {e}")
+                    if err:
+                        errors[pid] = str(err)
+                        continue
+                    if records is not None:
+                        temp_store.write_batch(pid, now_kst(), records)
+                except Exception as e:
+                    errors[pid] = str(e)
+                    logger.error(f"Failed to collect for proxy {pid}: {e}")
         try: temp_store.cleanup_old_batches(retain_per_proxy=1)
         except Exception: pass
 
@@ -162,7 +168,7 @@ async def sessions_data(request: Request, db: Session = Depends(get_db)):
     paginated_rows = filtered_rows[start_row:end_row]
     for r in paginated_rows:
         r["id"] = temp_store.build_record_id(r["proxy_id"], str(r.get("collected_at") or ""), r["__line_index"])
-    return {"rows": paginated_rows, "rowCount": len(filtered_rows)}
+    return {"rows": paginated_rows, "rowCount": len(filtered_rows), "errors": errors}
 
 @router.get("/session-browser/item/{record_id}")
 async def get_session_record(record_id: int, db: Session = Depends(get_db)):

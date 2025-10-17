@@ -121,9 +121,15 @@ $(document).ready(function() {
                     data: JSON.stringify(request),
                     success: function(response) {
                         params.successCallback(response.rows, response.rowCount);
-                        setStatus('완료');
-                        // Show analyze section after successful data load
-                        if (window.SbAnalyze && typeof window.SbAnalyze.run === 'function') {
+                        if (response.errors && Object.keys(response.errors).length > 0) {
+                            const errorMsgs = Object.entries(response.errors).map(([pid, err]) => `프록시 ID ${pid}: ${err}`).join('\n');
+                            showErr(`일부 프록시 수집 실패:\n${errorMsgs}`);
+                            setStatus('완료 (오류 발생)', true);
+                        } else {
+                            setStatus('완료');
+                        }
+
+                        if (forceRefresh && window.SbAnalyze && typeof window.SbAnalyze.run === 'function') {
                             const proxyIds = getSelectedProxyIds();
                             window.SbAnalyze.run({ proxyIds: proxyIds });
                             $('#sbAnalyzeSection').show();
@@ -166,7 +172,6 @@ $(document).ready(function() {
             filterModel: sb.gridApi ? sb.gridApi.getFilterModel() : {}
         };
 
-        // Use fetch for POST request with blob response
         fetch('/api/session-browser/export', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -175,12 +180,14 @@ $(document).ready(function() {
         .then(resp => {
             if (resp.ok) {
                 const header = resp.headers.get('Content-Disposition');
-                const parts = header.split(';');
                 let filename = 'sessions_export.xlsx';
-                for (let i = 0; i < parts.length; i++) {
-                    if (parts[i].trim().startsWith('filename=')) {
-                        filename = parts[i].split('=')[1].replace(/"/g, '');
-                        break;
+                if (header) {
+                    const parts = header.split(';');
+                    for (let i = 0; i < parts.length; i++) {
+                        if (parts[i].trim().startsWith('filename=')) {
+                            filename = parts[i].split('=')[1].replace(/"/g, '');
+                            break;
+                        }
                     }
                 }
                 return resp.blob().then(blob => ({ blob, filename }));
