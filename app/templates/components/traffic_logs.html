@@ -72,14 +72,7 @@
 		표시할 로그가 없습니다. 상단에서 옵션을 설정하고 "로그 불러오기"를 클릭하세요.
 	</div>
 
-	<div id="tlResultParsed" class="table-container sb-table-wrap" style="display:none;">
-		<table id="tlTable" class="table is-fullwidth is-striped is-hoverable">
-			<thead>
-				<tr id="tlTableHead"></tr>
-			</thead>
-			<tbody id="tlTableBody"></tbody>
-		</table>
-	</div>
+	<div id="trafficLogsGrid" class="ag-theme-balham" style="height: 800px; width: 100%; display:none;"></div>
 	</div> <!-- /#tlRemoteSection -->
 
 <!-- 업로드 분석 섹션 -->
@@ -148,14 +141,12 @@
 	</div> <!-- /#tlaSection -->
 </div>
 
-<!-- DataTables (local) -->
-<link rel="stylesheet" href="/static/vendor/datatables/datatables.min.css?v={{ request.app.version }}">
-<link rel="stylesheet" href="/static/vendor/datatables/columnControl/columnControl.dataTables.min.css?v={{ request.app.version }}">
-<script src="/static/vendor/datatables/datatables.min.js?v={{ request.app.version }}"></script>
-<script src="/static/vendor/datatables/columnControl/dataTables.columnControl.min.js?v={{ request.app.version }}"></script>
+<!-- AG-Grid (local) -->
+<script src="/static/js/lib/ag-grid-community.min.js?v={{ request.app.version }}"></script>
 <!-- ApexCharts (local) -->
 <script src="/static/vendor/apexcharts/apexcharts.min.js?v={{ request.app.version }}"></script>
 
+<script src="/static/js/traffic_logs_grid.js?v={{ request.app.version }}"></script>
 <script src="/static/js/traffic_logs.js?v={{ request.app.version }}"></script>
 <script src="/static/js/traffic_logs_analyze.js?v={{ request.app.version }}"></script>
 

@@ -89,39 +89,39 @@ def get_proxy_traffic_logs(
 	truncated = len(lines) >= min(limit, len(lines)) and len(lines) == limit
 
 	if not parsed:
-		return TrafficLogResponse(proxy_id=proxy_id, lines=lines, records=None, truncated=truncated, count=len(lines))
+		return TrafficLogResponse(proxy_id=proxy_id, lines=lines, records=None, truncated=truncated, count=len(lines), headers=[])
 
-	records: List[TrafficLogRecord] = []
-	to_insert: List[Dict[str, Any]] = []
-	collected_ts = datetime.utcnow()
+	records: List[Dict[str, Any]] = []
+	headers = []
+	# Attempt to parse the first line to get headers
+	if lines:
+		try:
+			first_rec = parse_log_line(lines[0])
+			headers = list(first_rec.keys())
+		except Exception:
+			# Fallback to a default header if parsing fails
+			headers = ["log_line"]
+
 	for ln in lines:
 		try:
 			rec_dict = parse_log_line(ln)
-			records.append(TrafficLogRecord(**rec_dict))
-			row = {
-				"proxy_id": proxy_id,
-				"collected_at": collected_ts,
-			}
-			row.update(rec_dict)
-			to_insert.append(row)
+			records.append(rec_dict)
 		except Exception:
-			records.append(TrafficLogRecord(url_path=ln))
-	# Optional replacement semantics per request scope: if head/tail fetch is used, we choose to append current snapshot.
-	# For analysis and detail view, we persist snapshot rows.
-	if to_insert:
-		try:
-			# Replacement semantics for parsed snapshot: keep only latest records for this proxy
-			# Clear existing rows to avoid accumulation
-			db.query(TrafficLogModel).filter(TrafficLogModel.proxy_id == proxy_id).delete(synchronize_session=False)
-			# Use bulk insert for performance
-			db.bulk_insert_mappings(TrafficLogModel, to_insert)
-			db.commit()
-		except Exception:
-			# Fallback to row-by-row on error
-			for r in to_insert:
-				db.add(TrafficLogModel(**r))
-			db.commit()
-	return TrafficLogResponse(proxy_id=proxy_id, lines=None, records=records, truncated=truncated, count=len(records))
+			# If parsing fails, treat the whole line as a single field
+			records.append({"log_line": ln})
+
+	# The DB persistence part can be removed if not strictly needed for this view
+	# or adapted to the new structure. For now, we focus on the response for the grid.
+
+	return TrafficLogResponse(
+		proxy_id=proxy_id,
+		lines=None, # Not needed for parsed view
+		raw_lines=lines, # Send raw lines for the detail view
+		records=records,
+		headers=headers,
+		truncated=truncated,
+		count=len(records)
+	)
 
 
 @router.get("/traffic-logs/item/{record_id}", response_model=TrafficLogDB)
