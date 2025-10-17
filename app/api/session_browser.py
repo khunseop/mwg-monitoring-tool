@@ -372,7 +372,17 @@ async def latest_sessions(proxy_id: int, db: Session = Depends(get_db)):
  
 
 
-# DataTables server-side endpoint for large datasets
+# AG-Grid server-side endpoint for large datasets
+from pydantic import BaseModel
+
+class AgGridRequest(BaseModel):
+    startRow: int
+    endRow: int
+    sortModel: List[Dict[str, str]] = []
+    filterModel: Dict[str, Any] = {}
+    proxy_ids: List[int] = []
+    force: bool = False
+
 def _load_latest_rows_for_proxies(db: Session, target_ids: List[int]) -> List[Dict[str, Any]]:
     host_map: Dict[int, str] = {}
     if target_ids:
@@ -383,9 +393,8 @@ def _load_latest_rows_for_proxies(db: Session, target_ids: List[int]) -> List[Di
         batch = temp_store.read_latest(pid)
         for idx, rec in enumerate(batch):
             r = dict(rec)
-            r.setdefault("proxy_id", pid)
+            r["id"] = temp_store.build_record_id(pid, str(r.get("collected_at") or ""), idx)
             r.setdefault("host", host_map.get(pid, f"#{pid}"))
-            r["__line_index"] = idx
             # Normalize client_ip by dropping ephemeral port if present
             try:
                 cip = r.get("client_ip")
@@ -396,189 +405,101 @@ def _load_latest_rows_for_proxies(db: Session, target_ids: List[int]) -> List[Di
             rows.append(r)
     return rows
 
-
-def _filter_rows(rows: List[Dict[str, Any]], search: str | None) -> List[Dict[str, Any]]:
-    if not search:
+def _apply_aggrid_sort(rows: List[Dict[str, Any]], sort_model: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+    if not sort_model:
         return rows
-    s = str(search).lower()
-    def include(row: Dict[str, Any]) -> bool:
-        for key in ("transaction", "user_name", "client_ip", "server_ip", "protocol", "status", "url", "host"):
-            val = row.get(key)
-            if val is not None and s in str(val).lower():
-                return True
-        return False
-    return [r for r in rows if include(r)]
 
+    for sort_item in reversed(sort_model):
+        col_id = sort_item.get("colId")
+        sort_dir = sort_item.get("sort")
+        if not col_id:
+            continue
 
-def _filter_rows_by_columns(rows: List[Dict[str, Any]], per_col: Dict[int, str]) -> List[Dict[str, Any]]:
-    """Apply DataTables-style per-column text filters.
+        def sort_key(row):
+            val = row.get(col_id)
+            if val is None:
+                # Handle None values to sort consistently
+                return (0, "") if isinstance(val, (int, float)) else ""
+            if isinstance(val, str):
+                return val.lower()
+            return val
 
-    The mapping of column index to row key must mirror the client-side columns order.
-    Only simple substring matching is applied for now to keep behavior predictable.
-    """
-    if not per_col:
+        rows.sort(key=sort_key, reverse=(sort_dir == "desc"))
+    return rows
+
+def _apply_aggrid_filter(rows: List[Dict[str, Any]], filter_model: Dict[str, Any]) -> List[Dict[str, Any]]:
+    if not filter_model:
         return rows
-    # Column index mapping (0-based) aligned with session_browser.js `columns` order
-    col_to_key = {
-        0: "host",
-        1: "creation_time",
-        2: "protocol",
-        3: "user_name",
-        4: "client_ip",
-        5: "server_ip",
-        6: "cl_bytes_received",
-        7: "cl_bytes_sent",
-        8: "age_seconds",
-        9: "url",
-        # 10: id (hidden) -> ignore for filtering
-    }
-    out: List[Dict[str, Any]] = []
-    for row in rows:
-        include = True
-        for col_idx, query in per_col.items():
-            if col_idx == 10:
-                continue
-            key = col_to_key.get(col_idx)
-            if not key:
-                continue
-            q = (str(query or "")).strip()
-            if q == "":
-                continue
-            val = row.get(key)
-            text = str(val if val is not None else "")
-            # Case-insensitive substring match
-            if q.lower() not in text.lower():
-                include = False
-                break
-        if include:
-            out.append(row)
-    return out
 
+    filtered_rows = rows
+    for col_id, filter_item in filter_model.items():
+        filter_type = filter_item.get("filterType")
 
-def _sort_key_func(order_col: int | None):
-    def sort_key(row: Dict[str, Any]):
-        # This mapping must match the order of columns in the DataTables `columns` option
-        mapping = {
-            0: (row.get("host") or ""),
-            1: row.get("creation_time") or "",
-            2: (row.get("protocol") or ""),
-            3: row.get("user_name") or "",
-            4: row.get("client_ip") or "",
-            5: row.get("server_ip") or "",
-            6: row.get("cl_bytes_received") or -1,
-            7: row.get("cl_bytes_sent") or -1,
-            8: row.get("age_seconds") or -1,
-            9: (row.get("url") or ""),
-            10: 0,  # id column, not sortable
-        }
-        return mapping.get(order_col or 1)
-    return sort_key
+        if filter_type == "text":
+            value = (filter_item.get("filter") or "").lower()
+            op = filter_item.get("type") # contains, notContains, equals, etc.
 
+            def text_filter(row):
+                cell_value = str(row.get(col_id, "")).lower()
+                if op == 'contains': return value in cell_value
+                if op == 'notContains': return value not in cell_value
+                if op == 'equals': return value == cell_value
+                if op == 'notEqual': return value != cell_value
+                if op == 'startsWith': return cell_value.startswith(value)
+                if op == 'endsWith': return cell_value.endswith(value)
+                return False
+            filtered_rows = [row for row in filtered_rows if text_filter(row)]
 
-@router.get("/session-browser/datatables")
-async def sessions_datatables(
-    request: Request,
-    db: Session = Depends(get_db),
-    start: int = Query(0, ge=0),
-    length: int = Query(25, ge=1, le=1000),
-    search: str | None = Query(None, alias="search[value]"),
-    order_col: int | None = Query(None, alias="order[0][column]"),
-    order_dir: str | None = Query(None, alias="order[0][dir]"),
-    group_id: int | None = Query(None),
-    proxy_ids: str | None = Query(None),  # comma-separated
-):
-    # Require explicit selection: if no proxy_ids provided, return empty dataset
-    target_ids: List[int] = []
-    if proxy_ids:
-        try:
-            target_ids = [int(x) for x in proxy_ids.split(",") if x.strip()]
-        except Exception:
-            target_ids = []
-    if not target_ids:
-        try:
-            draw = int(request.query_params.get("draw", "0"))
-        except Exception:
-            draw = 0
-        return {"draw": draw, "recordsTotal": 0, "recordsFiltered": 0, "data": []}
+        elif filter_type == "number":
+            value = filter_item.get("filter")
+            op = filter_item.get("type")
 
-    # Load latest rows
-    rows = _load_latest_rows_for_proxies(db, target_ids)
+            def number_filter(row):
+                cell_value = row.get(col_id)
+                if cell_value is None: return False
+                try:
+                    cell_value = float(cell_value)
+                    num_value = float(value)
+                    if op == 'equals': return cell_value == num_value
+                    if op == 'notEqual': return cell_value != num_value
+                    if op == 'lessThan': return cell_value < num_value
+                    if op == 'lessThanOrEqual': return cell_value <= num_value
+                    if op == 'greaterThan': return cell_value > num_value
+                    if op == 'greaterThanOrEqual': return cell_value >= num_value
+                except (ValueError, TypeError):
+                    return False
+                return False
+            filtered_rows = [row for row in filtered_rows if number_filter(row)]
 
-    records_total = len(rows)
+    return filtered_rows
 
-    # Per-column filters (DataTables sends columns[i][search][value])
-    per_col: Dict[int, str] = {}
-    try:
-        # Attempt for first 11 columns (0..10). Extra indices are ignored.
-        for i in range(0, 11):
-            key = f"columns[{i}][search][value]"
-            val = request.query_params.get(key)
-            if val is not None and str(val).strip() != "":
-                per_col[i] = str(val)
-    except Exception:
-        per_col = {}
+@router.post("/session-browser/data")
+async def sessions_aggrid_data(payload: AgGridRequest, db: Session = Depends(get_db)):
+    # If force is true, trigger a collection first.
+    if payload.force and payload.proxy_ids:
+        # This is an async call, but we'll wait for it to complete.
+        # In a real high-load scenario, you might make this a background task.
+        await collect_sessions(CollectRequest(proxy_ids=payload.proxy_ids), db)
 
-    filtered = _filter_rows_by_columns(rows, per_col)
-    filtered = _filter_rows(filtered, search)
-    records_filtered = len(filtered)
+    # Proceed to fetch, filter, sort, and paginate data
+    if not payload.proxy_ids:
+        return {"rows": [], "lastRow": 0}
 
-    # Ordering
-    reverse = (order_dir or "desc").lower() == "desc"
-    try:
-        filtered.sort(key=_sort_key_func(order_col), reverse=reverse)
-    except Exception:
-        pass
+    all_rows = _load_latest_rows_for_proxies(db, payload.proxy_ids)
 
-    # Pagination and build DataTables rows
-    # Rebuild page and assign stable ids using original order index when loading batch
-    page = filtered[start:start + length]
-    data: List[List[Any]] = []
-    for rec in page:
-        host = rec.get("host") or f"#{rec.get('proxy_id')}"
-        ct_str = rec.get("creation_time") or ""
-        cl_recv = rec.get("cl_bytes_received")
-        cl_sent = rec.get("cl_bytes_sent")
-        age_val = rec.get("age_seconds")
-        url_full = rec.get("url") or ""
-        url_short = url_full[:100] + ("…" if len(url_full) > 100 else "")
-        # Use stored '__line_index' if present; else 0
-        pid = int(rec.get("proxy_id") or 0)
-        collected_iso = str(rec.get("collected_at") or "")
-        line_index = int(rec.get("__line_index") or 0)
-        rid_val = temp_store.build_record_id(pid, collected_iso, line_index)
-        # Ensure client_ip without port for display
-        try:
-            cip = rec.get("client_ip") or ""
-            if isinstance(cip, str) and re.match(r"^\d+\.\d+\.\d+\.\d+:\d+$", cip.strip()):
-                cip = cip.strip().rsplit(":", 1)[0]
-        except Exception:
-            cip = rec.get("client_ip") or ""
-        data.append([
-            host,
-            ct_str,
-            rec.get("protocol") or "",
-            rec.get("user_name") or "",
-            cip,
-            rec.get("server_ip") or "",
-            str(cl_recv) if cl_recv is not None else "",
-            str(cl_sent) if cl_sent is not None else "",
-            str(age_val) if isinstance(age_val, int) and age_val >= 0 else "",
-            url_short,
-            rid_val,
-        ])
+    filtered_rows = _apply_aggrid_filter(all_rows, payload.filterModel)
+    sorted_rows = _apply_aggrid_sort(filtered_rows, payload.sortModel)
 
-    try:
-        draw = int(request.query_params.get("draw", "0"))
-    except Exception:
-        draw = 0
+    # Pagination
+    paginated_rows = sorted_rows[payload.startRow : payload.endRow]
 
-    return {
-        "draw": draw,
-        "recordsTotal": records_total,
-        "recordsFiltered": records_filtered,
-        "data": data,
-    }
+    # lastRow is used by AG-Grid to know when to stop asking for more rows.
+    # If the number of rows is less than the endRow, we're at the last page.
+    last_row = -1
+    if len(sorted_rows) <= payload.endRow:
+        last_row = len(sorted_rows)
 
+    return {"rows": paginated_rows, "lastRow": last_row}
 
 @router.get("/session-browser/item/{record_id}")
 async def get_session_record(record_id: int, db: Session = Depends(get_db)):
@@ -589,16 +510,13 @@ async def get_session_record(record_id: int, db: Session = Depends(get_db)):
     item["id"] = record_id
     return _ensure_timestamps(item)
 
+class ExportRequest(BaseModel):
+    proxy_ids: List[int] = []
+    sortModel: List[Dict[str, str]] = []
+    filterModel: Dict[str, Any] = {}
 
-@router.get("/session-browser/export")
-async def sessions_export(
-    db: Session = Depends(get_db),
-    search: str | None = Query(None, alias="search[value]"),
-    order_col: int | None = Query(None, alias="order[0][column]"),
-    order_dir: str | None = Query(None, alias="order[0][dir]"),
-    group_id: int | None = Query(None),
-    proxy_ids: str | None = Query(None),  # comma-separated
-):
+@router.post("/session-browser/export")
+async def sessions_export(payload: ExportRequest, db: Session = Depends(get_db)):
     # Create an Excel workbook in memory
     wb = Workbook()
     ws = wb.active
@@ -615,31 +533,11 @@ async def sessions_export(
     for cell in ws[1]:
         cell.font = Font(bold=True)
 
-    # Require explicit selection
-    target_ids: List[int] = []
-    if proxy_ids:
-        try:
-            target_ids = [int(x) for x in proxy_ids.split(",") if x.strip()]
-        except Exception:
-            target_ids = []
-
-    if target_ids:
-        # Load rows
-        rows = _load_latest_rows_for_proxies(db, target_ids)
-        for r in rows:
-            pid = int(r.get("proxy_id") or 0)
-            idx = int(r.get("__line_index") or 0)
-            r["id"] = temp_store.build_record_id(pid, str(r.get("collected_at") or ""), idx)
-
-        # Filter
-        filtered = _filter_rows(rows, search)
-
-        # Order similarly to datatables
-        reverse = (order_dir or "desc").lower() == "desc"
-        try:
-            filtered.sort(key=_sort_key_func(order_col), reverse=reverse)
-        except Exception:
-            pass
+    rows = []
+    if payload.proxy_ids:
+        rows = _load_latest_rows_for_proxies(db, payload.proxy_ids)
+        filtered_rows = _apply_aggrid_filter(rows, payload.filterModel)
+        sorted_rows = _apply_aggrid_sort(filtered_rows, payload.sortModel)
 
         def to_kst_str(val: Any) -> str:
             try:
@@ -650,7 +548,7 @@ async def sessions_export(
                 return str(val or "")
 
         # Write data rows
-        for idx, rec in enumerate(filtered, start=1):
+        for idx, rec in enumerate(sorted_rows, start=1):
             host = rec.get("host") or f"#{rec.get('proxy_id')}"
             collected_str = to_kst_str(rec.get("collected_at"))
             creation_str = to_kst_str(rec.get("creation_time"))

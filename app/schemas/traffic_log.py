@@ -40,8 +40,10 @@ class TrafficLogRecord(BaseModel):
 
 class TrafficLogResponse(BaseModel):
 	proxy_id: int
-	lines: List[str] | None = None
-	records: List[TrafficLogRecord] | None = None
+	lines: Optional[List[str]] = None
+	raw_lines: Optional[List[str]] = None # For detail view
+	records: Optional[List[dict]] = None # Use dict for dynamic keys
+	headers: List[str] = []
 	truncated: bool = False
 	count: int
 
