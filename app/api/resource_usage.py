@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import Dict, Any, List, Tuple
-from datetime import timedelta
+from typing import Dict, Any, List, Tuple, Optional
+from datetime import timedelta, datetime
 import asyncio
 from asyncio import Semaphore
 from app.utils.time import now_kst
@@ -37,6 +37,15 @@ logger = logging.getLogger(__name__)
 
 SUPPORTED_KEYS = {"cpu", "mem", "cc", "cs", "http", "https", "ftp"}
 
+# Interface MBPS calculation constants
+IF_IN_OCTETS_OID = "1.3.6.1.2.1.2.2.1.10"  # ifInOctets
+IF_OUT_OCTETS_OID = "1.3.6.1.2.1.2.2.1.16"  # ifOutOctets
+IF_DESCR_OID = "1.3.6.1.2.1.2.2.1.2"  # ifDescr
+COUNTER32_MAX = 4294967295  # 2^32 - 1
+
+# Cache for previous counter values: {(proxy_id, interface_index): (in_octets, out_octets, timestamp)}
+_INTERFACE_COUNTER_CACHE: Dict[Tuple[int, int], Tuple[int, int, float]] = {}
+
 
 async def _snmp_get(host: str, port: int, community: str, oid: str, timeout_sec: int = 2) -> float | None:
     try:
@@ -48,6 +57,120 @@ async def _snmp_get(host: str, port: int, community: str, oid: str, timeout_sec:
     except Exception as exc:
         if logger.isEnabledFor(logging.DEBUG):
             logger.exception(f"[resource_usage] SNMP get failed host={host} oid={oid}: {exc}")
+        return None
+
+
+async def _snmp_walk(host: str, port: int, community: str, oid: str, timeout_sec: int = 5) -> Dict[int, int]:
+    """
+    Walk SNMP OID and return a dictionary mapping interface index to counter value.
+    Returns {interface_index: counter_value}
+    """
+    result: Dict[int, int] = {}
+    try:
+        async with Snmp(host=host, port=port, community=community, timeout=timeout_sec) as snmp:
+            values = await snmp.walk(oid)
+            if values:
+                for v in values:
+                    try:
+                        # OID format: 1.3.6.1.2.1.2.2.1.10.{interface_index}
+                        oid_str = str(v.oid)
+                        parts = oid_str.split('.')
+                        if len(parts) > 0:
+                            interface_index = int(parts[-1])
+                            counter_value = int(v.value)
+                            result[interface_index] = counter_value
+                    except (ValueError, IndexError) as e:
+                        if logger.isEnabledFor(logging.DEBUG):
+                            logger.debug(f"[resource_usage] Failed to parse SNMP walk result oid={oid_str}: {e}")
+                        continue
+    except Exception as exc:
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.exception(f"[resource_usage] SNMP walk failed host={host} oid={oid}: {exc}")
+    return result
+
+
+def _calculate_mbps(current: int, previous: int, time_diff_sec: float) -> float:
+    """
+    Calculate MBPS from counter difference, handling 32-bit counter wraps.
+    """
+    if time_diff_sec <= 0:
+        return 0.0
+    
+    # Handle counter wrap: if current < previous, counter wrapped
+    if current < previous:
+        diff = (COUNTER32_MAX + 1 - previous) + current
+    else:
+        diff = current - previous
+    
+    # Convert octets to bits, then to megabits per second
+    # (diff octets * 8 bits/octet) / (time_diff_sec * 1,000,000 bits/Mbit)
+    mbps = (diff * 8.0) / (time_diff_sec * 1_000_000.0)
+    return max(0.0, mbps)
+
+
+async def _collect_interface_mbps(proxy: Proxy, community: str) -> Optional[Dict[str, Dict[str, float]]]:
+    """
+    Collect interface MBPS for all interfaces using SNMP 32-bit counters.
+    Returns {interface_index: {"in_mbps": float, "out_mbps": float}} or None if failed.
+    """
+    try:
+        # Walk to get all interface counters
+        in_octets_task = _snmp_walk(proxy.host, 161, community, IF_IN_OCTETS_OID)
+        out_octets_task = _snmp_walk(proxy.host, 161, community, IF_OUT_OCTETS_OID)
+        
+        in_octets_dict, out_octets_dict = await asyncio.gather(in_octets_task, out_octets_task)
+        
+        if not in_octets_dict and not out_octets_dict:
+            return None
+        
+        # Get all interface indices
+        all_indices = set(in_octets_dict.keys()) | set(out_octets_dict.keys())
+        if not all_indices:
+            return None
+        
+        current_time = monotonic()
+        result: Dict[str, Dict[str, float]] = {}
+        
+        for if_index in all_indices:
+            current_in = in_octets_dict.get(if_index, 0)
+            current_out = out_octets_dict.get(if_index, 0)
+            
+            cache_key = (proxy.id, if_index)
+            cached = _INTERFACE_COUNTER_CACHE.get(cache_key)
+            
+            if cached:
+                prev_in, prev_out, prev_time = cached
+                time_diff = current_time - prev_time
+                
+                # Only calculate if we have valid time difference (at least 1 second)
+                if time_diff >= 1.0:
+                    in_mbps = _calculate_mbps(current_in, prev_in, time_diff)
+                    out_mbps = _calculate_mbps(current_out, prev_out, time_diff)
+                    result[str(if_index)] = {
+                        "in_mbps": round(in_mbps, 3),
+                        "out_mbps": round(out_mbps, 3)
+                    }
+                else:
+                    # Too soon, use previous values if available
+                    result[str(if_index)] = {
+                        "in_mbps": 0.0,
+                        "out_mbps": 0.0
+                    }
+            else:
+                # First collection, no previous data
+                result[str(if_index)] = {
+                    "in_mbps": 0.0,
+                    "out_mbps": 0.0
+                }
+            
+            # Update cache
+            _INTERFACE_COUNTER_CACHE[cache_key] = (current_in, current_out, current_time)
+        
+        return result if result else None
+        
+    except Exception as exc:
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.exception(f"[resource_usage] Interface MBPS collection failed host={proxy.host}: {exc}")
         return None
 
 
@@ -150,6 +273,8 @@ async def _ssh_get_mem_percent(proxy: Proxy, spec: str, timeout_sec: int = _SSH_
 
 async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str) -> Tuple[int, Dict[str, Any] | None, str | None]:
     result: Dict[str, Any] = {k: None for k in SUPPORTED_KEYS}
+    result["interface_mbps"] = None
+    
     tasks: list = []
     keys: list[str] = []
     for key, oid in oids.items():
@@ -164,6 +289,11 @@ async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str)
         else:
             keys.append(key)
             tasks.append(_snmp_get(proxy.host, 161, community, oid))
+
+    # Always collect interface MBPS
+    interface_mbps_task = _collect_interface_mbps(proxy, community)
+    tasks.append(interface_mbps_task)
+    keys.append("interface_mbps")
 
     if tasks:
         values = await asyncio.gather(*tasks, return_exceptions=True)
@@ -205,6 +335,9 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
                 errors[proxy_id] = err
                 continue
             
+            interface_mbps_data = metrics.get("interface_mbps")
+            interface_mbps_json = json.dumps(interface_mbps_data) if interface_mbps_data else None
+            
             model = ResourceUsageModel(
                 proxy_id=proxy_id,
                 cpu=metrics.get("cpu"),
@@ -214,6 +347,7 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
                 http=metrics.get("http"),
                 https=metrics.get("https"),
                 ftp=metrics.get("ftp"),
+                interface_mbps=interface_mbps_json,
                 community=payload.community,
                 oids_raw=json.dumps(payload.oids),
                 collected_at=now_kst(),

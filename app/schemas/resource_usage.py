@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Dict, List, Literal
 from datetime import datetime
+import json
 from .base import TimestampModel
 
 
@@ -12,6 +13,7 @@ class ResourceUsageBase(BaseModel):
     http: Optional[float] = None
     https: Optional[float] = None
     ftp: Optional[float] = None
+    interface_mbps: Optional[Dict[str, Dict[str, float]]] = None  # {interface_index: {"in_mbps": float, "out_mbps": float}}
 
 
 class ResourceUsage(ResourceUsageBase, TimestampModel):
@@ -20,6 +22,18 @@ class ResourceUsage(ResourceUsageBase, TimestampModel):
     community: Optional[str] = None
     oids_raw: Optional[str] = None
     collected_at: datetime
+
+    @field_validator('interface_mbps', mode='before')
+    @classmethod
+    def parse_interface_mbps(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except Exception:
+                return None
+        return v
 
     class Config:
         from_attributes = True

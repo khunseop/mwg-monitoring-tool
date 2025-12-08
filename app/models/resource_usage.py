@@ -19,6 +19,9 @@ class ResourceUsage(Base):
     https = Column(Float, nullable=True)
     ftp = Column(Float, nullable=True)
 
+    # Interface MBPS: JSON string mapping interface index to {"in_mbps": float, "out_mbps": float}
+    interface_mbps = Column(Text, nullable=True)
+
     # SNMP context
     community = Column(String, nullable=True)
     oids_raw = Column(Text, nullable=True)  # json string of oid mapping used for collection
