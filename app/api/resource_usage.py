@@ -150,21 +150,23 @@ async def _collect_interface_mbps(proxy: Proxy, community: str) -> Optional[Dict
                         "in_mbps": round(in_mbps, 3),
                         "out_mbps": round(out_mbps, 3)
                     }
+                    # Update cache only when we have valid time difference and calculated MBPS
+                    _INTERFACE_COUNTER_CACHE[cache_key] = (current_in, current_out, current_time)
                 else:
-                    # Too soon, use previous values if available
+                    # Too soon, don't update cache to allow time to accumulate
+                    # Return None or 0.0 to indicate insufficient time has passed
                     result[str(if_index)] = {
                         "in_mbps": 0.0,
                         "out_mbps": 0.0
                     }
             else:
-                # First collection, no previous data
+                # First collection, no previous data - initialize cache
                 result[str(if_index)] = {
                     "in_mbps": 0.0,
                     "out_mbps": 0.0
                 }
-            
-            # Update cache
-            _INTERFACE_COUNTER_CACHE[cache_key] = (current_in, current_out, current_time)
+                # Initialize cache for next collection
+                _INTERFACE_COUNTER_CACHE[cache_key] = (current_in, current_out, current_time)
         
         return result if result else None
         
