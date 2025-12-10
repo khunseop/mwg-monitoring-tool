@@ -70,15 +70,21 @@ async def _snmp_walk(host: str, port: int, community: str, oid: str, timeout_sec
         async with Snmp(host=host, port=port, community=community, timeout=timeout_sec) as snmp:
             values = await snmp.walk(oid)
             if values:
+                # Base OID has 10 parts (e.g., 1.3.6.1.2.1.2.2.1.10)
+                base_oid_parts = len(oid.split('.'))
                 for v in values:
                     try:
                         # OID format: 1.3.6.1.2.1.2.2.1.10.{interface_index}
                         oid_str = str(v.oid)
                         parts = oid_str.split('.')
-                        if len(parts) > 0:
+                        # Verify OID has more parts than base OID (base + interface_index)
+                        if len(parts) > base_oid_parts:
                             interface_index = int(parts[-1])
                             counter_value = int(v.value)
                             result[interface_index] = counter_value
+                        else:
+                            if logger.isEnabledFor(logging.DEBUG):
+                                logger.debug(f"[resource_usage] Invalid OID structure: {oid_str} (expected more than {base_oid_parts} parts)")
                     except (ValueError, IndexError) as e:
                         if logger.isEnabledFor(logging.DEBUG):
                             logger.debug(f"[resource_usage] Failed to parse SNMP walk result oid={oid_str}: {e}")

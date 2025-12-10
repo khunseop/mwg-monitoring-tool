@@ -54,14 +54,22 @@ def update_resource_config(payload: ResourceConfigBase, db: Session = Depends(ge
     cfg.community = payload.community
     # Store oids; also embed thresholds and selected_interfaces (single source of truth)
     oids = payload.oids or {}
-    thresholds = payload.thresholds or {}
-    selected_interfaces = payload.selected_interfaces or []
-    # Preserve previous thresholds/selected_interfaces when client sends empty values
+    
+    # Check which fields were actually set in the payload (not just default values)
+    payload_dict = payload.model_dump(exclude_unset=True)
+    thresholds_provided = 'thresholds' in payload_dict
+    selected_interfaces_provided = 'selected_interfaces' in payload_dict
+    
+    # Use provided values, or preserve previous values if not provided
+    thresholds = payload.thresholds if thresholds_provided else {}
+    selected_interfaces = payload.selected_interfaces if selected_interfaces_provided else []
+    
+    # Preserve previous thresholds/selected_interfaces when client doesn't provide them
     try:
         current = json.loads(cfg.oids_json or '{}')
-        if not thresholds and isinstance(current, dict) and isinstance(current.get('__thresholds__'), dict):
+        if not thresholds_provided and isinstance(current, dict) and isinstance(current.get('__thresholds__'), dict):
             thresholds = current.get('__thresholds__') or {}
-        if not selected_interfaces and isinstance(current, dict) and isinstance(current.get('__selected_interfaces__'), list):
+        if not selected_interfaces_provided and isinstance(current, dict) and isinstance(current.get('__selected_interfaces__'), list):
             selected_interfaces = current.get('__selected_interfaces__') or []
     except Exception:
         pass
