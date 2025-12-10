@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- 섹션 탭 -->
+<div class="tabs is-boxed mb-4">
+    <ul>
+        <li class="is-active" data-target="proxy-list-section">
+            <a>프록시 목록</a>
+        </li>
+        <li data-target="proxy-groups-section">
+            <a>프록시 그룹</a>
+        </li>
+    </ul>
+</div>
+
+<!-- 프록시 목록 섹션 -->
+<div id="proxy-list-section" class="tab-content is-active">
+    <div class="box">
+        <div class="level">
+            <div class="level-left">
+                <div class="level-item">
+                    <h3 class="title is-4">프록시 목록</h3>
+                </div>
+            </div>
+            <div class="level-right">
+                <div class="level-item">
+                    <div class="buttons">
+                        <button class="button is-primary" onclick="openModal('proxy')">프록시 추가</button>
+                        <button class="button is-link is-light" onclick="openBulkProxyModal()">일괄 등록</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-container mt-4">
+            <table class="table is-fullwidth is-hoverable">
+                <thead>
+                    <tr>
+                        <th>호스트</th>
+                        <th>그룹</th>
+                        <th>상태</th>
+                        <th>설명</th>
+                        <th>작업</th>
+                    </tr>
+                </thead>
+                <tbody id="proxyTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 프록시 그룹 섹션 -->
+<div id="proxy-groups-section" class="tab-content">
+    <div class="box">
+        <div class="level">
+            <div class="level-left">
+                <div class="level-item">
+                    <h3 class="title is-4">프록시 그룹</h3>
+                </div>
+            </div>
+            <div class="level-right">
+                <div class="level-item">
+                    <button class="button is-primary" onclick="openModal('group')">
+                        그룹 추가
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-container mt-4">
+            <table class="table is-fullwidth is-hoverable">
+                <thead>
+                    <tr>
+                        <th>그룹명</th>
+                        <th>설명</th>
+                        <th>프록시 수</th>
+                        <th>작업</th>
+                    </tr>
+                </thead>
+                <tbody id="groupTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 프록시 일괄 등록 모달 -->
+<div class="modal" id="bulkProxyModal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">프록시 일괄 등록</p>
+            <button class="delete" aria-label="close" onclick="closeBulkProxyModal()"></button>
+        </header>
+        <section class="modal-card-body">
+            <div class="content">
+                <p>아래 형식으로 한 줄에 하나씩 입력하세요:</p>
+                <pre><code>host,username,password[,group_name][,traffic_log_path][,is_active(true|false)][,description]</code></pre>
+                <p class="is-size-7" style="color: var(--color-text-muted);">그룹명이 존재하지 않으면 해당 행은 오류로 처리됩니다.</p>
+            </div>
+            <div class="field">
+                <label class="label">CSV 입력</label>
+                <div class="control">
+                    <textarea class="textarea" id="bulkProxyInput" placeholder="ex)
+proxy-01.local,admin,pass123,서울센터,/var/log/proxy/traffic.log,true,서울센터 1호기
+10.0.0.5,root,Secret!,,,,false,임시 서버" rows="10"></textarea>
+                </div>
+                <p class="help">빈 값은 생략하거나 비워둘 수 있습니다. 공백만 있는 값은 무시됩니다.</p>
+            </div>
+        </section>
+        <footer class="modal-card-foot">
+            <button class="button is-primary" onclick="submitBulkProxies()">등록</button>
+            <button class="button" onclick="closeBulkProxyModal()">취소</button>
+        </footer>
+    </div>
+</div>
+
+<!-- 프록시 추가/수정 모달 -->
+<div class="modal" id="proxyModal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">프록시 서버</p>
+            <button class="delete" aria-label="close" onclick="closeModal('proxy')"></button>
+        </header>
+        <section class="modal-card-body">
+            <form id="proxyForm" onsubmit="return false;">
+                <input type="hidden" id="proxyId">
+                <div class="field">
+                    <label class="label">호스트</label>
+                    <div class="control">
+                        <input class="input" type="text" id="host" required>
+                    </div>
+                </div>
+                
+                <div class="field">
+                    <label class="label">사용자명</label>
+                    <div class="control">
+                        <input class="input" type="text" id="username" required>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label">비밀번호</label>
+                    <div class="control">
+                        <input class="input" type="password" id="password" required>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label">트래픽 로그 경로</label>
+                    <div class="control">
+                        <input class="input" type="text" id="traffic_log_path" placeholder="예: /var/log/proxy/traffic.log">
+                    </div>
+                    <p class="help">프록시별 실제 로그 파일의 절대 경로를 입력하세요.</p>
+                </div>
+                <div class="field">
+                    <label class="label">그룹</label>
+                    <div class="control">
+                        <div class="select">
+                            <select id="group_id">
+                                <option value="">그룹 선택</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label">설명 (선택)</label>
+                    <div class="control">
+                        <textarea class="textarea" id="description"></textarea>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="checkbox">
+                        <input type="checkbox" id="is_active" checked>
+                        활성화
+                    </label>
+                </div>
+            </form>
+        </section>
+        <footer class="modal-card-foot">
+            <button class="button is-primary" onclick="saveProxy()">저장</button>
+            <button class="button" onclick="closeModal('proxy')">취소</button>
+        </footer>
+    </div>
+</div>
+
+<!-- 그룹 추가/수정 모달 -->
+<div class="modal" id="groupModal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">프록시 그룹</p>
+            <button class="delete" aria-label="close" onclick="closeModal('group')"></button>
+        </header>
+        <section class="modal-card-body">
+            <form id="groupForm" onsubmit="return false;">
+                <input type="hidden" id="groupId">
+                <div class="field">
+                    <label class="label">그룹명</label>
+                    <div class="control">
+                        <input class="input" type="text" id="groupName" required>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label">설명</label>
+                    <div class="control">
+                        <textarea class="textarea" id="groupDescription"></textarea>
+                    </div>
+                </div>
+            </form>
+        </section>
+        <footer class="modal-card-foot">
+            <button class="button is-primary" onclick="saveGroup()">저장</button>
+            <button class="button" onclick="closeModal('group')">취소</button>
+        </footer>
+    </div>
+</div>
+
+<script src="/static/js/proxy_management.js?v={{ request.app.version }}"></script>
+{% endblock %}

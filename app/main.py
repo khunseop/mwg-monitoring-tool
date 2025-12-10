@@ -97,6 +97,10 @@ async def read_resource_history(request: Request):
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url="/resource?tab=history", status_code=301)
 
+@app.get("/proxy")
+async def read_proxy_management(request: Request):
+    return templates.TemplateResponse("components/proxy_management.html", {"request": request})
+
 @app.get("/settings")
 async def read_settings(request: Request):
     return templates.TemplateResponse("components/settings.html", {"request": request})
