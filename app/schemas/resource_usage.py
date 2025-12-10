@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, Dict, List, Literal
+from typing import Optional, Dict, List, Literal, Union
 from datetime import datetime
 import json
 from .base import TimestampModel
@@ -13,7 +13,7 @@ class ResourceUsageBase(BaseModel):
     http: Optional[float] = None
     https: Optional[float] = None
     ftp: Optional[float] = None
-    interface_mbps: Optional[Dict[str, Dict[str, float]]] = None  # {interface_index: {"in_mbps": float, "out_mbps": float}}
+    interface_mbps: Optional[Dict[str, Dict[str, Union[float, str]]]] = None  # {interface_index: {"in_mbps": float, "out_mbps": float, "name": str}}
 
 
 class ResourceUsage(ResourceUsageBase, TimestampModel):

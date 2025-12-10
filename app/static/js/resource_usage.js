@@ -195,6 +195,9 @@ $(document).ready(function() {
     }
 
     function updateTable(items) {
+        // Store latest data for interface name lookup
+        ru.lastData = items || [];
+        
         const rows = [];
         const allInterfaceIndices = new Set();
         
@@ -248,6 +251,19 @@ $(document).ready(function() {
             ? cachedConfig.selected_interfaces.map(String)
             : Array.from(allInterfaceIndices).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
         
+        // Build interface name mapping from collected data
+        const interfaceNames = {};
+        (items || []).forEach(row => {
+            if (row.interface_mbps && typeof row.interface_mbps === 'object') {
+                Object.keys(row.interface_mbps).forEach(ifIndex => {
+                    const ifData = row.interface_mbps[ifIndex];
+                    if (ifData && typeof ifData === 'object' && ifData.name) {
+                        interfaceNames[ifIndex] = ifData.name;
+                    }
+                });
+            }
+        });
+        
         // Build metrics: basic metrics first, then interface metrics
         const basicMetrics = [
             { key: 'cpu', title: 'CPU' },
@@ -259,10 +275,10 @@ $(document).ready(function() {
             { key: 'ftpd', title: 'FTP Δ' },
         ];
         
-        // Add interface metrics
+        // Add interface metrics with names
         const interfaceMetrics = selectedInterfaces.map(ifIndex => ({
             key: `if_${ifIndex}`,
-            title: `IF${ifIndex}`,
+            title: interfaceNames[ifIndex] || `IF${ifIndex}`,
             ifIndex: ifIndex
         }));
         
@@ -656,10 +672,25 @@ $(document).ready(function() {
                 ? selectedInterfaces 
                 : Array.from(allInterfaceIndices).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
             
+            // Get interface names from latest data if available
+            const interfaceNames = {};
+            if (ru.lastData && Array.isArray(ru.lastData)) {
+                ru.lastData.forEach(row => {
+                    if (row.interface_mbps && typeof row.interface_mbps === 'object') {
+                        Object.keys(row.interface_mbps).forEach(ifIndex => {
+                            const ifData = row.interface_mbps[ifIndex];
+                            if (ifData && typeof ifData === 'object' && ifData.name) {
+                                interfaceNames[ifIndex] = ifData.name;
+                            }
+                        });
+                    }
+                });
+            }
+            
             const metrics = [...basicMetrics, ...interfacesToShow.map(ifIndex => `if_${ifIndex}`)];
             const titles = { ...basicTitles };
             interfacesToShow.forEach(ifIndex => {
-                titles[`if_${ifIndex}`] = `IF${ifIndex}`;
+                titles[`if_${ifIndex}`] = interfaceNames[ifIndex] || `IF${ifIndex}`;
             });
             $wrap.empty();
             metrics.forEach(m => {
@@ -928,7 +959,20 @@ $(document).ready(function() {
         const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
         if (metricKey.startsWith('if_')) {
             const ifIndex = metricKey.replace('if_', '');
-            $modalTitle.text(`인터페이스 ${ifIndex} 회선사용률`);
+            // Try to get interface name from latest data
+            let ifName = `IF${ifIndex}`;
+            if (ru.lastData && Array.isArray(ru.lastData)) {
+                for (const row of ru.lastData) {
+                    if (row.interface_mbps && typeof row.interface_mbps === 'object') {
+                        const ifData = row.interface_mbps[ifIndex];
+                        if (ifData && typeof ifData === 'object' && ifData.name) {
+                            ifName = ifData.name;
+                            break;
+                        }
+                    }
+                }
+            }
+            $modalTitle.text(`${ifName} 회선사용률`);
         } else {
             $modalTitle.text(titles[metricKey] || 'Chart');
         }
