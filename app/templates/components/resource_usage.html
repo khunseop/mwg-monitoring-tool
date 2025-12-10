@@ -13,91 +13,87 @@
 </div>
 
 <div id="realtime-tab" class="tab-content">
-<div class="box">
-    <h3 class="title is-4">자원사용률 모니터링</h3>
-
-    <div class="accordion is-open" id="ruSelectAccordion">
-        <div class="accordion-header">
-            <h4>대상 선택</h4>
+<!-- 필터/설정 섹션 -->
+<div class="box mb-4">
+    <div class="level mb-4">
+        <div class="level-left">
+            <div class="level-item">
+                <h3 class="title is-4 mb-0">자원사용률 모니터링</h3>
+            </div>
         </div>
-        <div class="accordion-body">
-            <div class="columns is-multiline">
-                <div class="column is-2">
-                    <div class="field">
-                        <label class="label">그룹</label>
-                        <div class="control">
-                            <div class="select is-fullwidth">
-                                <select id="ruGroupSelect">
-                                    <option value="">전체</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
+        <div class="level-right">
+            <div class="level-item">
+                <div class="field has-addons">
+                    <p class="control">
+                        <span class="button is-static">주기(초)</span>
+                    </p>
+                    <p class="control">
+                        <input class="input" id="ruIntervalSec" type="number" min="5" step="1" value="60">
+                    </p>
                 </div>
-                <div class="column is-10">
-                    <div class="field">
-                        <div class="level mb-3">
-                            <div class="level-left">
-                                <div class="level-item">
-                                    <label class="label mb-0">프록시 선택</label>
-                                </div>
-                            </div>
-                            <div class="level-right">
-                                <div class="level-item">
-                                    <label class="checkbox">
-                                        <input type="checkbox" id="ruSelectAll"> 모두 선택
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="control">
-                            <select id="ruProxySelect" multiple class="ts-fullwidth"></select>
-                        </div>
-                    </div>
+            </div>
+            <div class="level-item">
+                <div class="buttons">
+                    <button class="button is-primary" id="ruStartBtn">시작</button>
+                    <button class="button is-danger" id="ruStopBtn" disabled>중지</button>
+                    <span id="ruStatus" class="tag is-light ml-2">정지됨</span>
                 </div>
             </div>
         </div>
     </div>
+    <p id="ruError" class="help is-danger" style="display:none;"></p>
 
-    <div class="column is-12">
-        <div class="level">
-            <div class="level-left">
-                <div class="level-item">
-                    <div class="field has-addons">
-                        <p class="control">
-                            <span class="button is-static">주기(초)</span>
-                        </p>
-                        <p class="control">
-                            <input class="input" id="ruIntervalSec" type="number" min="5" step="1" value="60">
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <div class="level-right">
-                <div class="level-item">
-                    <div class="buttons">
-                        <button class="button is-primary" id="ruStartBtn">시작</button>
-                        <button class="button is-danger" id="ruStopBtn" disabled>중지</button>
-                        <span id="ruStatus" class="tag is-light ml-2">정지됨</span>
+    <div class="columns is-multiline">
+        <div class="column is-2">
+            <div class="field">
+                <label class="label">그룹</label>
+                <div class="control">
+                    <div class="select is-fullwidth">
+                        <select id="ruGroupSelect">
+                            <option value="">전체</option>
+                        </select>
                     </div>
                 </div>
             </div>
         </div>
-        <p id="ruError" class="help is-danger" style="display:none;"></p>
-    </div>
-
-    <div class="mt-4">
-        <div id="ruHeatmapWrap" style="overflow-x: auto; overflow-y: hidden;">
-            <div id="ruHeatmapEl" style="min-width: 800px;"></div>
-        </div>
-        <div id="ruEmptyState" class="box empty-state" style="display:none;">
-            현재 표시할 데이터가 없습니다. 상단에서 대상을 선택하고 "시작"을 클릭하세요.
+        <div class="column is-10">
+            <div class="field">
+                <div class="level mb-3">
+                    <div class="level-left">
+                        <div class="level-item">
+                            <label class="label mb-0">프록시 선택</label>
+                        </div>
+                    </div>
+                    <div class="level-right">
+                        <div class="level-item">
+                            <label class="checkbox">
+                                <input type="checkbox" id="ruSelectAll"> 모두 선택
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="control">
+                    <select id="ruProxySelect" multiple class="ts-fullwidth"></select>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<div class="box mt-5">
-    <h4 class="title is-5">실시간 그래프</h4>
+<!-- 히트맵 섹션 -->
+<div class="box mb-4">
+    <h4 class="title is-5 mb-4">자원 사용률 히트맵</h4>
+    <div id="ruHeatmapWrap" style="overflow-x: auto; overflow-y: hidden;">
+        <div id="ruHeatmapEl" style="min-width: 800px;"></div>
+    </div>
+    <div id="ruEmptyState" class="empty-state" style="display:none; padding: 2rem;">
+        현재 표시할 데이터가 없습니다. 상단에서 대상을 선택하고 "시작"을 클릭하세요.
+    </div>
+</div>
+
+<!-- 실시간 그래프 섹션 -->
+<div class="box">
+    <h4 class="title is-5 mb-4">실시간 그래프</h4>
     <div id="ruChartsWrap" class="columns is-multiline" data-initialized="false">
         <!-- Charts will be injected per metric by resource_usage.js -->
     </div>
@@ -124,50 +120,44 @@
 </div>
 
 <div id="history-tab" class="tab-content" style="display:none;">
-<div class="box">
-    <h3 class="title is-4">자원사용률 이력 조회</h3>
-    
-    <div class="accordion is-open" id="ruHistoryAccordion">
-        <div class="accordion-header">
-            <h4>조회 조건</h4>
+<!-- 조회 조건 섹션 -->
+<div class="box mb-4">
+    <div class="level mb-4">
+        <div class="level-left">
+            <div class="level-item">
+                <h3 class="title is-4 mb-0">자원사용률 이력 조회</h3>
+            </div>
         </div>
-        <div class="accordion-body">
-            <div class="columns is-multiline">
-                <div class="column is-3">
-                    <div class="field">
-                        <label class="label">프록시 선택</label>
-                        <div class="control">
-                            <select id="ruHistoryProxySelect" class="ts-fullwidth">
-                                <option value="">전체</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="column is-3">
-                    <div class="field">
-                        <label class="label">시작 시간</label>
-                        <div class="control">
-                            <input class="input" id="ruHistoryStartTime" type="datetime-local">
-                        </div>
-                    </div>
-                </div>
-                <div class="column is-3">
-                    <div class="field">
-                        <label class="label">종료 시간</label>
-                        <div class="control">
-                            <input class="input" id="ruHistoryEndTime" type="datetime-local">
-                        </div>
-                    </div>
-                </div>
-                <div class="column is-3">
-                    <div class="field">
-                        <label class="label">&nbsp;</label>
-                        <div class="control">
-                            <button class="button is-primary is-fullwidth" id="ruHistorySearchBtn">조회</button>
-                        </div>
-                    </div>
+    </div>
+    
+    <div class="columns is-multiline">
+        <div class="column is-3">
+            <div class="field">
+                <label class="label">프록시 선택</label>
+                <div class="control">
+                    <select id="ruHistoryProxySelect" class="ts-fullwidth">
+                        <option value="">전체</option>
+                    </select>
                 </div>
             </div>
+        </div>
+        <div class="column is-3">
+            <div class="field">
+                <label class="label">시작 시간</label>
+                <div class="control">
+                    <input class="input" id="ruHistoryStartTime" type="datetime-local">
+                </div>
+            </div>
+        </div>
+        <div class="column is-3">
+            <div class="field">
+                <label class="label">종료 시간</label>
+                <div class="control">
+                    <input class="input" id="ruHistoryEndTime" type="datetime-local">
+                </div>
+            </div>
+        </div>
+        <div class="column is-3">
             <div class="field">
                 <label class="label">최대 조회 개수</label>
                 <div class="control">
@@ -176,18 +166,28 @@
             </div>
         </div>
     </div>
+    <div class="level">
+        <div class="level-left"></div>
+        <div class="level-right">
+            <div class="level-item">
+                <button class="button is-primary" id="ruHistorySearchBtn">조회</button>
+            </div>
+        </div>
+    </div>
     
-    <div id="ruHistoryLoading" class="has-text-centered" style="display:none;">
+    <div id="ruHistoryLoading" class="has-text-centered mt-4" style="display:none;">
         <p class="help">조회 중...</p>
     </div>
     
-    <div id="ruHistoryError" class="help is-danger" style="display:none;"></div>
-    
-    <div id="ruHistoryResults" style="display:none;">
-        <div class="mt-4">
-            <p id="ruHistoryCount" class="help"></p>
-        </div>
-        <div class="table-container mt-4" style="max-height: 600px; overflow-y: auto;">
+    <div id="ruHistoryError" class="help is-danger mt-4" style="display:none;"></div>
+</div>
+
+<!-- 결과 섹션 -->
+<div id="ruHistoryResults" style="display:none;">
+    <div class="box mb-4">
+        <h4 class="title is-5 mb-4">조회 결과</h4>
+        <p id="ruHistoryCount" class="help mb-4"></p>
+        <div class="table-container" style="max-height: 600px; overflow-y: auto;">
             <table class="table is-striped is-fullwidth is-hoverable">
                 <thead>
                     <tr>
@@ -207,10 +207,11 @@
                 </tbody>
             </table>
         </div>
-        <div id="ruHistoryChartWrap" class="mt-4" style="display:none;">
-            <h5 class="title is-6">이력 그래프</h5>
-            <div id="ruHistoryChart" style="width:100%; height:400px;"></div>
-        </div>
+    </div>
+    
+    <div id="ruHistoryChartWrap" class="box" style="display:none;">
+        <h4 class="title is-5 mb-4">이력 그래프</h4>
+        <div id="ruHistoryChart" style="width:100%; height:400px;"></div>
     </div>
 </div>
 </div>

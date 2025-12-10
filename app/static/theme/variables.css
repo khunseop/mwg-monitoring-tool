@@ -1,0 +1,65 @@
+/* CSS Variables and Design Tokens */
+
+@font-face {
+    font-family: "Inter Var";
+    src: url("/static/theme/fonts/Inter-Variable.woff2") format("woff2");
+    font-weight: 100 900;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Pretendard Var";
+    src: url("/static/theme/fonts/PretendardVariable.woff2") format("woff2");
+    font-weight: 100 900;
+    font-display: swap;
+    unicode-range: U+AC00-D7A3, U+1100-11FF, U+3130-318F; /* Hangul */
+}
+
+/* Design Tokens */
+:root {
+    /* Colors */
+    --color-bg: #f7f8fa;
+    --color-surface: #ffffff;
+    --color-text: #0f172a; /* slate-900 */
+    --color-text-muted: #64748b; /* slate-500 */
+    --color-border: #e5e7eb; /* gray-200 */
+    --color-primary: #2563eb; /* blue-600 */
+    --color-primary-contrast: #ffffff;
+
+    /* Border Radius */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(2, 6, 23, 0.06);
+    --shadow-md: 0 6px 18px rgba(2, 6, 23, 0.08);
+    --shadow-lg: 0 18px 30px rgba(2, 6, 23, 0.12);
+
+    /* Typography */
+    --font-sans: "Inter Var", "Pretendard Var", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Helvetica Neue", Arial, sans-serif;
+    --font-size-base: 15px;
+    --line-height-base: 1.55;
+
+    /* Bulma overrides */
+    --bulma-scheme-brightness: light;
+    --bulma-scheme-main-l: 100%;
+    --bulma-background-l: 96%;
+    --bulma-text-l: 29%;
+    --bulma-modal-card-body-background-color: var(--bulma-scheme-main);
+
+    /* DataTables */
+    --dt-row-hover: 255, 255, 255;
+}
+
+/* Force light scheme even when OS is dark */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bulma-scheme-brightness: light;
+        --bulma-scheme-main-l: 100%;
+        --bulma-background-l: 96%;
+        --bulma-text-l: 29%;
+        --bulma-modal-card-body-background-color: var(--bulma-scheme-main);
+    }
+    body { color-scheme: light; }
+}

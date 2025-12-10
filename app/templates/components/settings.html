@@ -40,26 +40,12 @@
 
 <!-- 리소스 설정 탭 -->
 <div id="resource-config" class="tab-panel">
-    <div class="box">
-        <h3 class="title is-4">리소스 설정</h3>
-
-        <div class="level">
+    <!-- 헤더 -->
+    <div class="box mb-4">
+        <div class="level mb-4">
             <div class="level-left">
                 <div class="level-item">
-                    <div class="box is-compact">
-                        <div class="field is-horizontal mb-0">
-                            <div class="field-label is-normal" style="min-width: 9rem;">
-                                <label class="label mb-0">Community String</label>
-                            </div>
-                            <div class="field-body">
-                                <div class="field mb-0">
-                                    <div class="control">
-                                        <input class="input" id="cfgCommunity" type="text" placeholder="public" value="public">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <h3 class="title is-4 mb-0">리소스 설정</h3>
                 </div>
             </div>
             <div class="level-right">
@@ -72,125 +58,129 @@
             </div>
         </div>
 
+        <div class="field is-horizontal">
+            <div class="field-label is-normal" style="min-width: 9rem;">
+                <label class="label">Community String</label>
+            </div>
+            <div class="field-body">
+                <div class="field">
+                    <div class="control">
+                        <input class="input" id="cfgCommunity" type="text" placeholder="public" value="public">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OID 설정 섹션 -->
+    <div class="box mb-4">
+        <h4 class="title is-5 mb-4">OID 설정</h4>
         <div class="columns is-multiline">
-            <div class="column is-12">
-                <div class="accordion is-open">
-                    <div class="accordion-header"><h4>OID 설정</h4></div>
-                    <div class="accordion-body">
-                        <div class="columns is-multiline">
-                            <div class="column is-4">
-                                <div class="field">
-                                    <label class="label">cpu OID</label>
-                                    <input class="input" id="cfgOidCpu" placeholder="1.3.6.1.x">
-                                </div>
-                            </div>
-                            <div class="column is-4">
-                                <div class="field">
-                                    <label class="label">mem OID</label>
-                                    <input class="input" id="cfgOidMem" placeholder="1.3.6.1.x">
-                                </div>
-                            </div>
-                            <div class="column is-4">
-                                <div class="field">
-                                    <label class="label">cc OID</label>
-                                    <input class="input" id="cfgOidCc" placeholder="1.3.6.1.x">
-                                </div>
-                            </div>
-                            <div class="column is-4">
-                                <div class="field">
-                                    <label class="label">cs OID</label>
-                                    <input class="input" id="cfgOidCs" placeholder="1.3.6.1.x">
-                                </div>
-                            </div>
-                            <div class="column is-4">
-                                <div class="field">
-                                    <label class="label">http OID (누적)</label>
-                                    <input class="input" id="cfgOidHttp" placeholder="1.3.6.1.x">
-                                </div>
-                            </div>
-                            <div class="column is-4">
-                                <div class="field">
-                                    <label class="label">https OID (누적)</label>
-                                    <input class="input" id="cfgOidHttps" placeholder="1.3.6.1.x">
-                                </div>
-                            </div>
-                            <div class="column is-4">
-                                <div class="field">
-                                    <label class="label">ftp OID (누적)</label>
-                                    <input class="input" id="cfgOidFtp" placeholder="1.3.6.1.x">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+            <div class="column is-4">
+                <div class="field">
+                    <label class="label">cpu OID</label>
+                    <input class="input" id="cfgOidCpu" placeholder="1.3.6.1.x">
                 </div>
             </div>
-            <div class="column is-12">
-                <div class="accordion is-open">
-                    <div class="accordion-header"><h4>임계치 설정</h4></div>
-                    <div class="accordion-body">
-                        <p class="mb-3" style="color: var(--color-text-muted);">각 항목의 경고 임계치를 설정합니다. 비워두면 자동 스케일링만 사용합니다.</p>
-                        <div class="columns is-multiline">
-                            <div class="column is-3">
-                                <div class="field">
-                                    <label class="label">CPU 임계치</label>
-                                    <input class="input" id="cfgThrCpu" type="number" step="1" min="0" placeholder="예: 80">
-                                </div>
-                            </div>
-                            <div class="column is-3">
-                                <div class="field">
-                                    <label class="label">MEM 임계치</label>
-                                    <input class="input" id="cfgThrMem" type="number" step="1" min="0" placeholder="예: 80">
-                                </div>
-                            </div>
-                            <div class="column is-3">
-                                <div class="field">
-                                    <label class="label">CC 임계치</label>
-                                    <input class="input" id="cfgThrCc" type="number" step="1" min="0" placeholder="숫자">
-                                </div>
-                            </div>
-                            <div class="column is-3">
-                                <div class="field">
-                                    <label class="label">CS 임계치</label>
-                                    <input class="input" id="cfgThrCs" type="number" step="1" min="0" placeholder="숫자">
-                                </div>
-                            </div>
-                            <div class="column is-3">
-                                <div class="field">
-                                    <label class="label">HTTP Δ 임계치</label>
-                                    <input class="input" id="cfgThrHttp" type="number" step="1" min="0" placeholder="초당 요청 수">
-                                </div>
-                            </div>
-                            <div class="column is-3">
-                                <div class="field">
-                                    <label class="label">HTTPS Δ 임계치</label>
-                                    <input class="input" id="cfgThrHttps" type="number" step="1" min="0" placeholder="초당 요청 수">
-                                </div>
-                            </div>
-                            <div class="column is-3">
-                                <div class="field">
-                                    <label class="label">FTP Δ 임계치</label>
-                                    <input class="input" id="cfgThrFtp" type="number" step="1" min="0" placeholder="초당 요청 수">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+            <div class="column is-4">
+                <div class="field">
+                    <label class="label">mem OID</label>
+                    <input class="input" id="cfgOidMem" placeholder="1.3.6.1.x">
                 </div>
             </div>
-            <div class="column is-12">
-                <div class="accordion is-open">
-                    <div class="accordion-header"><h4>회선사용률 인터페이스 선택</h4></div>
-                    <div class="accordion-body">
-                        <p class="mb-3" style="color: var(--color-text-muted);">표시할 인터페이스를 선택하세요. 비워두면 모든 인터페이스가 표시됩니다.</p>
-                        <div class="field">
-                            <label class="label">인터페이스 인덱스 (쉼표로 구분)</label>
-                            <div class="control">
-                                <input class="input" id="cfgSelectedInterfaces" type="text" placeholder="예: 1,2,3 또는 비워두기">
-                            </div>
-                            <p class="help">인터페이스 인덱스를 쉼표로 구분하여 입력하세요. 비워두면 수집된 모든 인터페이스가 표시됩니다.</p>
-                        </div>
-                    </div>
+            <div class="column is-4">
+                <div class="field">
+                    <label class="label">cc OID</label>
+                    <input class="input" id="cfgOidCc" placeholder="1.3.6.1.x">
                 </div>
             </div>
+            <div class="column is-4">
+                <div class="field">
+                    <label class="label">cs OID</label>
+                    <input class="input" id="cfgOidCs" placeholder="1.3.6.1.x">
+                </div>
+            </div>
+            <div class="column is-4">
+                <div class="field">
+                    <label class="label">http OID (누적)</label>
+                    <input class="input" id="cfgOidHttp" placeholder="1.3.6.1.x">
+                </div>
+            </div>
+            <div class="column is-4">
+                <div class="field">
+                    <label class="label">https OID (누적)</label>
+                    <input class="input" id="cfgOidHttps" placeholder="1.3.6.1.x">
+                </div>
+            </div>
+            <div class="column is-4">
+                <div class="field">
+                    <label class="label">ftp OID (누적)</label>
+                    <input class="input" id="cfgOidFtp" placeholder="1.3.6.1.x">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 임계치 설정 섹션 -->
+    <div class="box mb-4">
+        <h4 class="title is-5 mb-4">임계치 설정</h4>
+        <p class="mb-4" style="color: var(--color-text-muted);">각 항목의 경고 임계치를 설정합니다. 비워두면 자동 스케일링만 사용합니다.</p>
+        <div class="columns is-multiline">
+            <div class="column is-3">
+                <div class="field">
+                    <label class="label">CPU 임계치</label>
+                    <input class="input" id="cfgThrCpu" type="number" step="1" min="0" placeholder="예: 80">
+                </div>
+            </div>
+            <div class="column is-3">
+                <div class="field">
+                    <label class="label">MEM 임계치</label>
+                    <input class="input" id="cfgThrMem" type="number" step="1" min="0" placeholder="예: 80">
+                </div>
+            </div>
+            <div class="column is-3">
+                <div class="field">
+                    <label class="label">CC 임계치</label>
+                    <input class="input" id="cfgThrCc" type="number" step="1" min="0" placeholder="숫자">
+                </div>
+            </div>
+            <div class="column is-3">
+                <div class="field">
+                    <label class="label">CS 임계치</label>
+                    <input class="input" id="cfgThrCs" type="number" step="1" min="0" placeholder="숫자">
+                </div>
+            </div>
+            <div class="column is-3">
+                <div class="field">
+                    <label class="label">HTTP Δ 임계치</label>
+                    <input class="input" id="cfgThrHttp" type="number" step="1" min="0" placeholder="초당 요청 수">
+                </div>
+            </div>
+            <div class="column is-3">
+                <div class="field">
+                    <label class="label">HTTPS Δ 임계치</label>
+                    <input class="input" id="cfgThrHttps" type="number" step="1" min="0" placeholder="초당 요청 수">
+                </div>
+            </div>
+            <div class="column is-3">
+                <div class="field">
+                    <label class="label">FTP Δ 임계치</label>
+                    <input class="input" id="cfgThrFtp" type="number" step="1" min="0" placeholder="초당 요청 수">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 인터페이스 선택 섹션 -->
+    <div class="box">
+        <h4 class="title is-5 mb-4">회선사용률 인터페이스 선택</h4>
+        <p class="mb-4" style="color: var(--color-text-muted);">표시할 인터페이스를 선택하세요. 비워두면 모든 인터페이스가 표시됩니다.</p>
+        <div class="field">
+            <label class="label">인터페이스 인덱스 (쉼표로 구분)</label>
+            <div class="control">
+                <input class="input" id="cfgSelectedInterfaces" type="text" placeholder="예: 1,2,3 또는 비워두기">
+            </div>
+            <p class="help">인터페이스 인덱스를 쉼표로 구분하여 입력하세요. 비워두면 수집된 모든 인터페이스가 표시됩니다.</p>
         </div>
     </div>
 </div>

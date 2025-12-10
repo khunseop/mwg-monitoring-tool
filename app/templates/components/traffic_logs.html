@@ -1,152 +1,182 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="box">
-	<h3 class="title is-4">트래픽 로그</h3>
+<!-- 탭: 원격 조회 / 파일 업로드 분석 (딥링크: ?view=remote|upload) -->
+<div class="tabs is-boxed mb-4" id="tlTabs">
+	<ul>
+		<li class="is-active"><a href="#" data-view="remote">원격 조회(SSH)</a></li>
+		<li><a href="#" data-view="upload">파일 업로드 분석</a></li>
+	</ul>
+</div>
 
-	<!-- 탭: 원격 조회 / 파일 업로드 분석 (딥링크: ?view=remote|upload) -->
-	<div class="tabs is-boxed mb-3" id="tlTabs">
-		<ul>
-			<li class="is-active"><a href="#" data-view="remote">원격 조회(SSH)</a></li>
-			<li><a href="#" data-view="upload">파일 업로드 분석</a></li>
-		</ul>
-	</div>
+<!-- 원격 조회 섹션 -->
+<div id="tlRemoteSection">
+	<!-- 제어 헤더 -->
+	<div class="box mb-4">
+		<div class="level mb-4">
+			<div class="level-left">
+				<div class="level-item">
+					<h3 class="title is-4 mb-0">트래픽 로그 조회</h3>
+				</div>
+			</div>
+			<div class="level-right">
+				<div class="level-item">
+					<div class="buttons">
+						<button class="button is-primary" id="tlLoadBtn">조회</button>
+						<span id="tlStatus" class="tag is-light ml-2">대기</span>
+					</div>
+				</div>
+			</div>
+		</div>
+		<p id="tlError" class="help is-danger" style="display:none;"></p>
 
-	<!-- 원격 조회 섹션 -->
-	<div id="tlRemoteSection">
-	<div class="columns is-vcentered">
-		<div class="column is-3">
-			<div class="field">
-				<label class="label">프록시</label>
-				<div class="control">
+		<div class="columns is-vcentered">
+			<div class="column is-3">
+				<div class="field">
+					<label class="label">프록시</label>
+					<div class="control">
+						<div class="select is-fullwidth">
+							<select id="tlProxySelect">
+								<option value="">프록시 선택</option>
+							</select>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="column is-3">
+				<div class="field">
+					<label class="label">검색어 (고정문자열)</label>
+					<input class="input" id="tlQuery" maxlength="256" placeholder="예: login">
+				</div>
+			</div>
+			<div class="column is-2">
+				<div class="field">
+					<label class="label">라인 제한</label>
+					<input class="input" id="tlLimit" type="number" min="1" max="1000" value="200">
+				</div>
+			</div>
+			<div class="column is-2">
+				<div class="field">
+					<label class="label">방향</label>
 					<div class="select is-fullwidth">
-						<select id="tlProxySelect">
-							<option value="">프록시 선택</option>
+						<select id="tlDirection">
+							<option value="tail" selected>tail</option>
+							<option value="head">head</option>
 						</select>
 					</div>
 				</div>
 			</div>
 		</div>
-		<div class="column is-3">
-			<div class="field">
-				<label class="label">검색어 (고정문자열)</label>
-				<input class="input" id="tlQuery" maxlength="256" placeholder="예: login">
-			</div>
-		</div>
-		<div class="column is-2">
-			<div class="field">
-				<label class="label">라인 제한</label>
-				<input class="input" id="tlLimit" type="number" min="1" max="1000" value="200">
-			</div>
-		</div>
-		<div class="column is-1">
-			<div class="field">
-				<label class="label">방향</label>
-				<div class="select is-fullwidth">
-					<select id="tlDirection">
-						<option value="tail" selected>tail</option>
-						<option value="head">head</option>
-					</select>
-				</div>
-			</div>
-		</div>
-		<div class="column is-3">
-			<div class="field">
-				<div class="buttons is-right mt-4">
-					<button class="button is-primary" id="tlLoadBtn">조회</button>
-					<span id="tlStatus" class="tag is-light">대기</span>
-				</div>
-				<p id="tlError" class="help is-danger" style="display:none;"></p>
-			</div>
-		</div>
 	</div>
 
-
-	<div id="tlResultRaw" class="box" style="display:none;">
+	<!-- 결과 섹션 -->
+	<div id="tlResultRaw" class="box mb-4" style="display:none;">
+		<h4 class="title is-5 mb-4">원시 로그</h4>
 		<pre id="tlRawPre"></pre>
 	</div>
 
-
-
-	<div id="tlEmptyState" class="box empty-state" style="display:none;">
-		표시할 로그가 없습니다. 상단에서 옵션을 설정하고 "로그 불러오기"를 클릭하세요.
+	<div id="tlEmptyState" class="box empty-state mb-4" style="display:none;">
+		표시할 로그가 없습니다. 상단에서 옵션을 설정하고 "조회"를 클릭하세요.
 	</div>
 
-	<div id="tlResultParsed" class="table-container sb-table-wrap" style="display:none;">
-		<table id="tlTable" class="table is-fullwidth is-striped is-hoverable">
-			<thead>
-				<tr id="tlTableHead"></tr>
-			</thead>
-			<tbody id="tlTableBody"></tbody>
-		</table>
+	<div id="tlResultParsed" class="box" style="display:none;">
+		<h4 class="title is-5 mb-4">파싱된 로그</h4>
+		<div class="table-container sb-table-wrap">
+			<table id="tlTable" class="table is-fullwidth is-striped is-hoverable">
+				<thead>
+					<tr id="tlTableHead"></tr>
+				</thead>
+				<tbody id="tlTableBody"></tbody>
+			</table>
+		</div>
 	</div>
-	</div> <!-- /#tlRemoteSection -->
+</div> <!-- /#tlRemoteSection -->
 
 <!-- 업로드 분석 섹션 -->
 <div id="tlaSection" style="display:none;">
-	<div class="columns is-vcentered">
-		<div class="column is-7">
-			<div class="field">
-				<label class="label">로그 파일</label>
-				<div class="file has-name is-fullwidth" id="tlaFileWrap">
-					<label class="file-label">
-						<input class="file-input" type="file" id="tlaFile" accept=".log,text/plain">
-						<span class="file-cta">
-							<span class="file-icon"><i class="fas fa-upload"></i></span>
-							<span class="file-label">로그 파일 선택…</span>
-						</span>
-						<span class="file-name" id="tlaFileName">선택된 파일 없음</span>
-					</label>
+	<!-- 제어 헤더 -->
+	<div class="box mb-4">
+		<div class="level mb-4">
+			<div class="level-left">
+				<div class="level-item">
+					<h3 class="title is-4 mb-0">트래픽 로그 분석</h3>
+				</div>
+			</div>
+			<div class="level-right">
+				<div class="level-item">
+					<div class="buttons">
+						<button class="button is-primary" id="tlaAnalyzeBtn">업로드 분석</button>
+						<span id="tlaStatus" class="tag is-light ml-2">대기</span>
+					</div>
 				</div>
 			</div>
 		</div>
-		<div class="column is-2">
-			<div class="field">
-				<label class="label">Top N</label>
-				<input class="input" type="number" id="tlaTopN" min="1" max="100" value="20">
-			</div>
-		</div>
-		<div class="column is-3">
-			<div class="field">
-				<div class="buttons is-right mt-4">
-					<button class="button is-primary" id="tlaAnalyzeBtn">업로드 분석</button>
-					<span id="tlaStatus" class="tag is-light">대기</span>
+		<p id="tlaError" class="help is-danger" style="display:none;"></p>
+
+		<div class="columns is-vcentered">
+			<div class="column is-7">
+				<div class="field">
+					<label class="label">로그 파일</label>
+					<div class="file has-name is-fullwidth" id="tlaFileWrap">
+						<label class="file-label">
+							<input class="file-input" type="file" id="tlaFile" accept=".log,text/plain">
+							<span class="file-cta">
+								<span class="file-icon"><i class="fas fa-upload"></i></span>
+								<span class="file-label">로그 파일 선택…</span>
+							</span>
+							<span class="file-name" id="tlaFileName">선택된 파일 없음</span>
+						</label>
+					</div>
 				</div>
-				<p id="tlaError" class="help is-danger" style="display:none;"></p>
+			</div>
+			<div class="column is-2">
+				<div class="field">
+					<label class="label">Top N</label>
+					<input class="input" type="number" id="tlaTopN" min="1" max="100" value="20">
+				</div>
 			</div>
 		</div>
 	</div>
 
-	<div id="tlaSummary" class="columns is-multiline" style="display:none;">
-		<div class="column is-2"><div class="box has-text-centered"><p class="heading">총 라인</p><p class="title is-5" id="tlaTotalLines">0</p></div></div>
-		<div class="column is-2"><div class="box has-text-centered"><p class="heading">파싱 성공</p><p class="title is-5" id="tlaParsed">0</p></div></div>
-		<div class="column is-2"><div class="box has-text-centered"><p class="heading">파싱 실패</p><p class="title is-5" id="tlaUnparsed">0</p></div></div>
-		<div class="column is-2"><div class="box has-text-centered"><p class="heading">클라이언트 수</p><p class="title is-5" id="tlaClients">0</p></div></div>
-		<div class="column is-2"><div class="box has-text-centered"><p class="heading">호스트 수</p><p class="title is-5" id="tlaHosts">0</p></div></div>
-		<div class="column is-2"><div class="box has-text-centered"><p class="heading">차단 로그 수</p><p class="title is-5" id="tlaBlocked">0</p></div></div>
-		<div class="column is-3"><div class="box has-text-centered"><p class="heading">받은 데이터</p><p class="title is-6" id="tlaRecv">0</p></div></div>
-		<div class="column is-3"><div class="box has-text-centered"><p class="heading">보낸 데이터</p><p class="title is-6" id="tlaSent">0</p></div></div>
-		<div class="column is-3"><div class="box has-text-centered"><p class="heading">로그 시작 시간</p><p class="title is-6" id="tlaTimeStart">-</p></div></div>
-		<div class="column is-3"><div class="box has-text-centered"><p class="heading">로그 종료 시간</p><p class="title is-6" id="tlaTimeEnd">-</p></div></div>
+	<!-- 요약 섹션 -->
+	<div id="tlaSummary" style="display:none;">
+		<div class="box mb-4">
+			<h4 class="title is-5 mb-4">분석 요약</h4>
+			<div class="columns is-multiline">
+				<div class="column is-2"><div class="box has-text-centered"><p class="heading">총 라인</p><p class="title is-5" id="tlaTotalLines">0</p></div></div>
+				<div class="column is-2"><div class="box has-text-centered"><p class="heading">파싱 성공</p><p class="title is-5" id="tlaParsed">0</p></div></div>
+				<div class="column is-2"><div class="box has-text-centered"><p class="heading">파싱 실패</p><p class="title is-5" id="tlaUnparsed">0</p></div></div>
+				<div class="column is-2"><div class="box has-text-centered"><p class="heading">클라이언트 수</p><p class="title is-5" id="tlaClients">0</p></div></div>
+				<div class="column is-2"><div class="box has-text-centered"><p class="heading">호스트 수</p><p class="title is-5" id="tlaHosts">0</p></div></div>
+				<div class="column is-2"><div class="box has-text-centered"><p class="heading">차단 로그 수</p><p class="title is-5" id="tlaBlocked">0</p></div></div>
+				<div class="column is-3"><div class="box has-text-centered"><p class="heading">받은 데이터</p><p class="title is-6" id="tlaRecv">0</p></div></div>
+				<div class="column is-3"><div class="box has-text-centered"><p class="heading">보낸 데이터</p><p class="title is-6" id="tlaSent">0</p></div></div>
+				<div class="column is-3"><div class="box has-text-centered"><p class="heading">로그 시작 시간</p><p class="title is-6" id="tlaTimeStart">-</p></div></div>
+				<div class="column is-3"><div class="box has-text-centered"><p class="heading">로그 종료 시간</p><p class="title is-6" id="tlaTimeEnd">-</p></div></div>
+			</div>
+		</div>
 	</div>
 
+	<!-- 차트 섹션 -->
 	<div id="tlaCharts" style="display:none;">
-		<p class="mb-2 has-text-grey is-size-7">차트 막대를 클릭하면 항목 라벨(호스트/클라이언트)을 복사합니다.</p>
-		<div class="columns">
-			<div class="column is-6"><div class="box"><h5 class="title is-6">요청 상위 클라이언트</h5><div id="tlaChartClientReq"></div></div></div>
-			<div class="column is-6"><div class="box"><h5 class="title is-6">요청 상위 호스트</h5><div id="tlaChartHosts"></div></div></div>
+		<div class="box">
+			<h4 class="title is-5 mb-4">분석 차트</h4>
+			<p class="mb-4 has-text-grey is-size-7">차트 막대를 클릭하면 항목 라벨(호스트/클라이언트)을 복사합니다.</p>
+			<div class="columns">
+				<div class="column is-6"><div class="box"><h5 class="title is-6">요청 상위 클라이언트</h5><div id="tlaChartClientReq"></div></div></div>
+				<div class="column is-6"><div class="box"><h5 class="title is-6">요청 상위 호스트</h5><div id="tlaChartHosts"></div></div></div>
+			</div>
+			<div class="columns">
+				<div class="column is-6"><div class="box"><h5 class="title is-6">받은 데이터 상위 클라이언트</h5><div id="tlaChartClientDown"></div></div></div>
+				<div class="column is-6"><div class="box"><h5 class="title is-6">보낸 데이터 상위 클라이언트</h5><div id="tlaChartClientUp"></div></div></div>
+			</div>
+			<div class="columns">
+				<div class="column is-6"><div class="box"><h5 class="title is-6">받은 데이터 상위 호스트</h5><div id="tlaChartHostDown"></div></div></div>
+				<div class="column is-6"><div class="box"><h5 class="title is-6">보낸 데이터 상위 호스트</h5><div id="tlaChartHostUp"></div></div></div>
+			</div>
 		</div>
-		<div class="columns">
-			<div class="column is-6"><div class="box"><h5 class="title is-6">받은 데이터 상위 클라이언트</h5><div id="tlaChartClientDown"></div></div></div>
-			<div class="column is-6"><div class="box"><h5 class="title is-6">보낸 데이터 상위 클라이언트</h5><div id="tlaChartClientUp"></div></div></div>
-		</div>
-		<div class="columns">
-			<div class="column is-6"><div class="box"><h5 class="title is-6">받은 데이터 상위 호스트</h5><div id="tlaChartHostDown"></div></div></div>
-			<div class="column is-6"><div class="box"><h5 class="title is-6">보낸 데이터 상위 호스트</h5><div id="tlaChartHostUp"></div></div></div>
-		</div>
-		
-	</div> <!-- /#tlaSection -->
-</div>
+	</div>
+</div> <!-- /#tlaSection -->
 
 <!-- DataTables (local) -->
 <link rel="stylesheet" href="/static/vendor/datatables/datatables.min.css?v={{ request.app.version }}">

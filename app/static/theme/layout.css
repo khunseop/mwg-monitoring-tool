@@ -1,0 +1,51 @@
+/* Layout Styles */
+
+html { 
+    font-size: var(--font-size-base); 
+    height: 100%; 
+}
+
+body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    line-height: var(--line-height-base);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100%;
+    color-scheme: light;
+}
+
+/* Basic layout */
+.section { 
+    padding: 1.5rem;
+    background: var(--color-bg);
+    min-height: 100vh;
+}
+
+.container { 
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Utility classes */
+.mt-4 { margin-top: 1.25rem !important; }
+.mb-3 { margin-bottom: 0.75rem !important; }
+.mb-0 { margin-bottom: 0 !important; }
+
+/* Tab content */
+.tab-content { display: none; }
+.tab-content.is-active { display: block; }
+
+.tab-panel { display: none; }
+.tab-panel.is-active { display: block; }
+
+/* Table container */
+.table-container { max-height: 600px; overflow-y: auto; }
+.sb-table-wrap { overflow-x: auto; overflow-y: hidden; max-height: none; }
+
+/* Footer */
+.footer { background: var(--color-bg); }
+
+/* Empty state */
+.empty-state { text-align: center; color: var(--color-text-muted); }

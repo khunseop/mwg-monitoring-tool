@@ -1,0 +1,26 @@
+/* Typography Styles */
+
+/* Titles */
+.title { 
+    color: var(--color-text); 
+}
+
+.title strong { 
+    font-weight: 600; 
+}
+
+/* Formatting helpers */
+.mono { 
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; 
+    font-variant-numeric: tabular-nums; 
+}
+
+.num { 
+    text-align: right; 
+    font-variant-numeric: tabular-nums; 
+}
+
+td.num, 
+th.num { 
+    text-align: right; 
+}
