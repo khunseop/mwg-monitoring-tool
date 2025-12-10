@@ -158,11 +158,19 @@ $(document).ready(function() {
             const out = {};
             Object.keys(obj).forEach(pid => {
                 const byMetric = obj[pid] || {};
-                out[pid] = { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [], interface_mbps: [] };
+                out[pid] = { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [] };
+                // Process basic metrics
                 Object.keys(out[pid]).forEach(m => {
                     const arr = Array.isArray(byMetric[m]) ? byMetric[m] : [];
                     // keep within window and type-safe
                     out[pid][m] = arr.filter(p => p && typeof p.x === 'number' && typeof p.y === 'number');
+                });
+                // Process interface metrics (dynamic keys starting with if_)
+                Object.keys(byMetric).forEach(m => {
+                    if (m.startsWith('if_') && !out[pid][m]) {
+                        const arr = Array.isArray(byMetric[m]) ? byMetric[m] : [];
+                        out[pid][m] = arr.filter(p => p && typeof p.x === 'number' && typeof p.y === 'number');
+                    }
                 });
             });
             return out;
@@ -188,6 +196,9 @@ $(document).ready(function() {
 
     function updateTable(items) {
         const rows = [];
+        const allInterfaceIndices = new Set();
+        
+        // First pass: collect all interface indices and process rows
         (items || []).forEach(row => {
             const last = ru.lastCumulativeByProxy[row.proxy_id] || {};
             const deltas = { http: null, https: null, ftp: null };
@@ -204,20 +215,11 @@ $(document).ready(function() {
                 ftp: typeof row.ftp === 'number' ? row.ftp : last.ftp,
             };
             
-            // Calculate total interface MBPS (sum of all interfaces' in_mbps + out_mbps)
-            let totalMbps = null;
+            // Collect all interface indices
             if (row.interface_mbps && typeof row.interface_mbps === 'object') {
-                let sum = 0;
-                let hasData = false;
-                Object.values(row.interface_mbps).forEach(ifData => {
-                    if (ifData && typeof ifData === 'object') {
-                        const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
-                        const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
-                        sum += inMbps + outMbps;
-                        hasData = true;
-                    }
+                Object.keys(row.interface_mbps).forEach(ifIndex => {
+                    allInterfaceIndices.add(ifIndex);
                 });
-                if (hasData) totalMbps = sum;
             }
             
             rows.push({
@@ -229,7 +231,7 @@ $(document).ready(function() {
                 httpd: deltas.http,
                 httpsd: deltas.https,
                 ftpd: deltas.ftp,
-                interface_mbps: totalMbps,
+                interface_mbps: row.interface_mbps || null, // Keep full interface data
             });
         });
 
@@ -241,7 +243,13 @@ $(document).ready(function() {
             return na.localeCompare(nb);
         });
 
-        const metrics = [
+        // Get selected interfaces from config (empty means all)
+        const selectedInterfaces = (cachedConfig && cachedConfig.selected_interfaces && cachedConfig.selected_interfaces.length > 0)
+            ? cachedConfig.selected_interfaces.map(String)
+            : Array.from(allInterfaceIndices).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+        
+        // Build metrics: basic metrics first, then interface metrics
+        const basicMetrics = [
             { key: 'cpu', title: 'CPU' },
             { key: 'mem', title: 'MEM' },
             { key: 'cc', title: 'CC' },
@@ -249,15 +257,40 @@ $(document).ready(function() {
             { key: 'httpd', title: 'HTTP Δ' },
             { key: 'httpsd', title: 'HTTPS Δ' },
             { key: 'ftpd', title: 'FTP Δ' },
-            { key: 'interface_mbps', title: '회선사용률' },
         ];
+        
+        // Add interface metrics
+        const interfaceMetrics = selectedInterfaces.map(ifIndex => ({
+            key: `if_${ifIndex}`,
+            title: `IF${ifIndex}`,
+            ifIndex: ifIndex
+        }));
+        
+        const metrics = [...basicMetrics, ...interfaceMetrics];
 
         const maxByMetric = {};
         metrics.forEach(m => {
-            const vals = rows
-                .map(r => r[m.key])
-                .filter(v => typeof v === 'number' && isFinite(v) && v >= 0)
-                .sort((a, b) => a - b);
+            let vals;
+            if (m.key.startsWith('if_')) {
+                // For interface metrics, extract from interface_mbps data
+                const ifIndex = m.ifIndex;
+                vals = rows
+                    .map(r => {
+                        if (!r.interface_mbps || typeof r.interface_mbps !== 'object') return null;
+                        const ifData = r.interface_mbps[ifIndex];
+                        if (!ifData || typeof ifData !== 'object') return null;
+                        const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
+                        const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
+                        return inMbps + outMbps;
+                    })
+                    .filter(v => typeof v === 'number' && isFinite(v) && v >= 0)
+                    .sort((a, b) => a - b);
+            } else {
+                vals = rows
+                    .map(r => r[m.key])
+                    .filter(v => typeof v === 'number' && isFinite(v) && v >= 0)
+                    .sort((a, b) => a - b);
+            }
             let max = 0;
             if (vals.length > 0) {
                 const idx = Math.max(0, Math.floor(vals.length * 0.95) - 1);
@@ -276,7 +309,21 @@ $(document).ready(function() {
         const data = [];
         rows.forEach((r, y) => {
             metrics.forEach((m, x) => {
-                const raw = r[m.key];
+                let raw = null;
+                if (m.key.startsWith('if_')) {
+                    // Extract interface data
+                    const ifIndex = m.ifIndex;
+                    if (r.interface_mbps && typeof r.interface_mbps === 'object') {
+                        const ifData = r.interface_mbps[ifIndex];
+                        if (ifData && typeof ifData === 'object') {
+                            const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
+                            const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
+                            raw = inMbps + outMbps;
+                        }
+                    }
+                } else {
+                    raw = r[m.key];
+                }
                 if (typeof raw === 'number' && isFinite(raw)) {
                     const ratio = raw <= 0 ? 0 : raw / (maxByMetric[m.key] || 1);
                     data.push({ value: [x, y, ratio], raw: raw });
@@ -296,7 +343,7 @@ $(document).ready(function() {
             if (metricKey === 'httpd') return 'http';
             if (metricKey === 'httpsd') return 'https';
             if (metricKey === 'ftpd') return 'ftp';
-            if (metricKey === 'interface_mbps') return 'interface_mbps';
+            if (metricKey.startsWith('if_')) return 'interface_mbps'; // Use same threshold for all interfaces
             return metricKey;
         }
         const scaleForCol = metrics.map(m => {
@@ -327,8 +374,18 @@ $(document).ready(function() {
         ru._heatRaw.reverse();
         seriesData.reverse();
 
+        // Calculate dynamic width based on number of columns
+        const minColWidth = 80;
+        const baseWidth = Math.max(800, xCategories.length * minColWidth);
+        
         const options = {
-            chart: { type: 'heatmap', height: 700, animations: { enabled: false }, toolbar: { show: false } },
+            chart: { 
+                type: 'heatmap', 
+                height: 700,
+                width: baseWidth,
+                animations: { enabled: false }, 
+                toolbar: { show: false }
+            },
             dataLabels: { enabled: true, style: { colors: ['#111827'], fontSize: '11px' }, formatter: function(val, opts) {
                 const y = opts.seriesIndex; const x = opts.dataPointIndex;
                 const raw = (ru._heatRaw && ru._heatRaw[y]) ? ru._heatRaw[y][x] : null;
@@ -343,7 +400,7 @@ $(document).ready(function() {
                 if (key === 'cc' || key === 'cs') {
                     return formatNumber(raw);
                 }
-                if (key === 'interface_mbps') {
+                if (key.startsWith('if_')) {
                     return raw.toFixed(2) + ' Mbps';
                 }
                 return String(Math.round(raw));
@@ -366,7 +423,17 @@ $(document).ready(function() {
                     }
                 }
             },
-            xaxis: { type: 'category', categories: xCategories, position: 'top' },
+            xaxis: { 
+                type: 'category', 
+                categories: xCategories, 
+                position: 'top',
+                labels: { 
+                    rotate: -45,
+                    rotateAlways: false,
+                    style: { fontSize: '10px' },
+                    maxHeight: 100
+                }
+            },
             yaxis: { labels: { style: { fontSize: '11px' } } },
             tooltip: { y: { formatter: function(val, { seriesIndex, dataPointIndex }) {
                 const raw = (ru._heatRaw && ru._heatRaw[seriesIndex]) ? ru._heatRaw[seriesIndex][dataPointIndex] : null;
@@ -381,7 +448,7 @@ $(document).ready(function() {
                     formattedRaw = formatBytes(raw / intervalSec, 2, true);
                 } else if (key === 'cc' || key === 'cs') {
                     formattedRaw = formatNumber(raw);
-                } else if (key === 'interface_mbps') {
+                } else if (key.startsWith('if_')) {
                     formattedRaw = raw.toFixed(2) + ' Mbps';
                 }
                 }
@@ -496,22 +563,16 @@ $(document).ready(function() {
             const rawTs = row.collected_at ? new Date(row.collected_at).getTime() : now;
             // quantize to bucket to align across proxies in same cycle
             const ts = Math.floor(rawTs / ru.timeBucketMs) * ru.timeBucketMs;
-            ru.tsBuffer[proxyId] = ru.tsBuffer[proxyId] || { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [], interface_mbps: [] };
+            ru.tsBuffer[proxyId] = ru.tsBuffer[proxyId] || { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [] };
             
-            // Calculate total interface MBPS for timeseries
-            let totalMbps = null;
+            // Initialize interface buffers dynamically
             if (row.interface_mbps && typeof row.interface_mbps === 'object') {
-                let sum = 0;
-                let hasData = false;
-                Object.values(row.interface_mbps).forEach(ifData => {
-                    if (ifData && typeof ifData === 'object') {
-                        const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
-                        const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
-                        sum += inMbps + outMbps;
-                        hasData = true;
+                Object.keys(row.interface_mbps).forEach(ifIndex => {
+                    const key = `if_${ifIndex}`;
+                    if (!ru.tsBuffer[proxyId][key]) {
+                        ru.tsBuffer[proxyId][key] = [];
                     }
                 });
-                if (hasData) totalMbps = sum;
             }
             
             ['cpu','mem','cc','cs','http','https','ftp'].forEach(k => {
@@ -531,18 +592,28 @@ $(document).ready(function() {
                 }
             });
             
-            // Add interface_mbps to buffer
-            if (totalMbps !== null && typeof totalMbps === 'number') {
-                const arr = ru.tsBuffer[proxyId].interface_mbps;
-                const last = arr[arr.length - 1];
-                if (last && last.x === ts) {
-                    arr[arr.length - 1] = { x: ts, y: totalMbps };
-                } else {
-                    arr.push({ x: ts, y: totalMbps });
-                }
-                if (ru.tsBuffer[proxyId].interface_mbps.length > ru.bufferMaxPoints) {
-                    ru.tsBuffer[proxyId].interface_mbps.shift();
-                }
+            // Add interface data to buffer (per interface)
+            if (row.interface_mbps && typeof row.interface_mbps === 'object') {
+                Object.keys(row.interface_mbps).forEach(ifIndex => {
+                    const ifData = row.interface_mbps[ifIndex];
+                    if (ifData && typeof ifData === 'object') {
+                        const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
+                        const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
+                        const totalMbps = inMbps + outMbps;
+                        const key = `if_${ifIndex}`;
+                        const arr = ru.tsBuffer[proxyId][key] || [];
+                        const last = arr[arr.length - 1];
+                        if (last && last.x === ts) {
+                            arr[arr.length - 1] = { x: ts, y: totalMbps };
+                        } else {
+                            arr.push({ x: ts, y: totalMbps });
+                        }
+                        ru.tsBuffer[proxyId][key] = arr;
+                        if (arr.length > ru.bufferMaxPoints) {
+                            arr.shift();
+                        }
+                    }
+                });
             }
         });
         // prune old points (defensively skip null/invalid)
@@ -562,8 +633,34 @@ $(document).ready(function() {
 
         if (!isModal) {
             if ($wrap.data('initialized')) return true;
-            const metrics = ['cpu','mem','cc','cs','http','https','ftp','interface_mbps'];
-            const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP', interface_mbps: '회선사용률' };
+            const basicMetrics = ['cpu','mem','cc','cs','http','https','ftp'];
+            const basicTitles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
+            
+            // Get selected interfaces from config
+            const selectedInterfaces = (cachedConfig && cachedConfig.selected_interfaces && cachedConfig.selected_interfaces.length > 0)
+                ? cachedConfig.selected_interfaces.map(String)
+                : [];
+            
+            // Collect all interface indices from buffer
+            const allInterfaceIndices = new Set();
+            Object.keys(ru.tsBuffer || {}).forEach(pid => {
+                Object.keys(ru.tsBuffer[pid] || {}).forEach(key => {
+                    if (key.startsWith('if_')) {
+                        const ifIndex = key.replace('if_', '');
+                        allInterfaceIndices.add(ifIndex);
+                    }
+                });
+            });
+            
+            const interfacesToShow = selectedInterfaces.length > 0 
+                ? selectedInterfaces 
+                : Array.from(allInterfaceIndices).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+            
+            const metrics = [...basicMetrics, ...interfacesToShow.map(ifIndex => `if_${ifIndex}`)];
+            const titles = { ...basicTitles };
+            interfacesToShow.forEach(ifIndex => {
+                titles[`if_${ifIndex}`] = `IF${ifIndex}`;
+            });
             $wrap.empty();
             metrics.forEach(m => {
                 const panel = `
@@ -612,7 +709,31 @@ $(document).ready(function() {
     function renderAllCharts() {
         if (!window.ApexCharts) return;
         ensureApexChartsDom(false, null, 300); // Main charts with default height
-        const metrics = ['cpu','mem','cc','cs','http','https','ftp','interface_mbps'];
+        
+        // Get selected interfaces from config
+        const selectedInterfaces = (cachedConfig && cachedConfig.selected_interfaces && cachedConfig.selected_interfaces.length > 0)
+            ? cachedConfig.selected_interfaces.map(String)
+            : [];
+        
+        // Collect all interface indices from buffer
+        const allInterfaceIndices = new Set();
+        Object.keys(ru.tsBuffer || {}).forEach(pid => {
+            Object.keys(ru.tsBuffer[pid] || {}).forEach(key => {
+                if (key.startsWith('if_')) {
+                    const ifIndex = key.replace('if_', '');
+                    allInterfaceIndices.add(ifIndex);
+                }
+            });
+        });
+        
+        const interfacesToShow = selectedInterfaces.length > 0 
+            ? selectedInterfaces 
+            : Array.from(allInterfaceIndices).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+        
+        const basicMetrics = ['cpu','mem','cc','cs','http','https','ftp'];
+        const interfaceMetrics = interfacesToShow.map(ifIndex => `if_${ifIndex}`);
+        const metrics = [...basicMetrics, ...interfaceMetrics];
+        
         metrics.forEach(m => renderMetricChart(m, false));
     }
 
@@ -636,7 +757,8 @@ $(document).ready(function() {
         // Build union of timestamps
         const tsSet = new Set();
         selectedProxyIds.forEach(pid => {
-            const series = (ru.tsBuffer[pid] && ru.tsBuffer[pid][metricKey]) ? ru.tsBuffer[pid][metricKey] : [];
+            const buffer = ru.tsBuffer[pid] || {};
+            const series = buffer[metricKey] || [];
             series.forEach(p => { if (p && typeof p.x === 'number') tsSet.add(p.x); });
         });
         const labelsMs = Array.from(tsSet).sort((a,b) => a-b);
@@ -738,7 +860,7 @@ $(document).ready(function() {
                             return formatBytes(val / intervalSec, 0, true);
                         }
                         if (metricKey === 'cc' || metricKey === 'cs') { return abbreviateNumber(val); }
-                        if (metricKey === 'interface_mbps') { return val.toFixed(1) + ' Mbps'; }
+                        if (metricKey.startsWith('if_')) { return val.toFixed(1) + ' Mbps'; }
                         return val;
                     }
                 }
@@ -756,7 +878,7 @@ $(document).ready(function() {
                         }
                         if (metricKey === 'cc' || metricKey === 'cs') { return formatNumber(Math.round(val)); }
                         if (metricKey === 'cpu' || metricKey === 'mem') { return String(Math.round(val)); }
-                        if (metricKey === 'interface_mbps') { return val.toFixed(2) + ' Mbps'; }
+                        if (metricKey.startsWith('if_')) { return val.toFixed(2) + ' Mbps'; }
                         return val;
                     }
                 }
@@ -803,8 +925,13 @@ $(document).ready(function() {
     ru.modalChart = null;
 
     function openModal(metricKey) {
-        const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP', interface_mbps: '회선사용률' };
-        $modalTitle.text(titles[metricKey] || 'Chart');
+        const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
+        if (metricKey.startsWith('if_')) {
+            const ifIndex = metricKey.replace('if_', '');
+            $modalTitle.text(`인터페이스 ${ifIndex} 회선사용률`);
+        } else {
+            $modalTitle.text(titles[metricKey] || 'Chart');
+        }
         const modalHeight = $(window).height() * 0.7;
         ensureApexChartsDom(true, metricKey, modalHeight);
         renderMetricChart(metricKey, true);

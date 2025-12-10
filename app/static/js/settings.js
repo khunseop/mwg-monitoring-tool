@@ -198,6 +198,9 @@ function loadResourceConfig() {
             $('#cfgThrHttp').val(th.http ?? '');
             $('#cfgThrHttps').val(th.https ?? '');
             $('#cfgThrFtp').val(th.ftp ?? '');
+            // Load selected interfaces
+            const selectedInterfaces = cfg.selected_interfaces || [];
+            $('#cfgSelectedInterfaces').val(selectedInterfaces.join(','));
             $('#cfgStatus').removeClass('is-danger').addClass('is-success').text('불러오기 완료');
         })
         .fail(() => {
@@ -223,6 +226,12 @@ function saveResourceConfig() {
         return n < 0 ? 0 : n;
     }
 
+    // Parse selected interfaces
+    const selectedInterfacesRaw = ($('#cfgSelectedInterfaces').val() || '').trim();
+    const selectedInterfaces = selectedInterfacesRaw
+        ? selectedInterfacesRaw.split(',').map(s => s.trim()).filter(s => s.length > 0)
+        : [];
+    
     const payload = {
         community: ($('#cfgCommunity').val() || 'public').toString(),
         oids: {
@@ -242,7 +251,8 @@ function saveResourceConfig() {
             http: numOrUndef('#cfgThrHttp'),
             https: numOrUndef('#cfgThrHttps'),
             ftp: numOrUndef('#cfgThrFtp'),
-        }
+        },
+        selected_interfaces: selectedInterfaces
     };
     Object.keys(payload.oids).forEach(k => { if (!payload.oids[k]) delete payload.oids[k]; });
     Object.keys(payload.thresholds).forEach(k => { if (payload.thresholds[k] == null || !Number.isFinite(payload.thresholds[k])) delete payload.thresholds[k]; });
