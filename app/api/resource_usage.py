@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Tuple, Optional
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 import asyncio
 from asyncio import Semaphore
-from app.utils.time import now_kst
+from app.utils.time import now_kst, KST_TZ
 import json
 import os
 import logging
@@ -498,17 +498,28 @@ async def get_resource_usage_history(
             raise HTTPException(status_code=400, detail="Invalid proxy_ids format. Use comma-separated integers.")
     
     # 시간 범위 필터링
+    # 프론트엔드에서 보낸 UTC 시간을 KST로 변환하여 데이터베이스의 KST 시간과 비교
     if start_time:
         try:
-            start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
-            query = query.filter(ResourceUsageModel.collected_at >= start_dt)
+            # ISO 8601 형식 파싱 (UTC로 가정)
+            start_dt_utc = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+            # UTC 시간을 timezone-aware로 만들고 KST로 변환
+            if start_dt_utc.tzinfo is None:
+                start_dt_utc = start_dt_utc.replace(tzinfo=timezone.utc)
+            start_dt_kst = start_dt_utc.astimezone(KST_TZ)
+            query = query.filter(ResourceUsageModel.collected_at >= start_dt_kst)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid start_time format. Use ISO 8601 format.")
     
     if end_time:
         try:
-            end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
-            query = query.filter(ResourceUsageModel.collected_at <= end_dt)
+            # ISO 8601 형식 파싱 (UTC로 가정)
+            end_dt_utc = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+            # UTC 시간을 timezone-aware로 만들고 KST로 변환
+            if end_dt_utc.tzinfo is None:
+                end_dt_utc = end_dt_utc.replace(tzinfo=timezone.utc)
+            end_dt_kst = end_dt_utc.astimezone(KST_TZ)
+            query = query.filter(ResourceUsageModel.collected_at <= end_dt_kst)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid end_time format. Use ISO 8601 format.")
     

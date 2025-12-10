@@ -110,6 +110,10 @@ $(document).ready(function() {
             return;
         }
 
+        // datetime-local 입력은 로컬 시간대(한국 시간)로 입력되므로,
+        // new Date()로 파싱하면 로컬 시간대로 해석되고,
+        // toISOString()으로 UTC로 변환됩니다.
+        // 백엔드에서 이 UTC 시간을 KST로 변환하여 데이터베이스의 KST 시간과 비교합니다.
         const startDateTime = new Date(startTime).toISOString();
         const endDateTime = new Date(endTime).toISOString();
 
