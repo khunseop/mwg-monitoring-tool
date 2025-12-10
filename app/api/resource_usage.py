@@ -52,11 +52,13 @@ async def _snmp_get(host: str, port: int, community: str, oid: str, timeout_sec:
         async with Snmp(host=host, port=port, community=community, timeout=timeout_sec) as snmp:
             values = await snmp.get(oid)
             if values and len(values) > 0:
-                return float(values[0].value)
+                value = float(values[0].value)
+                logger.debug(f"[resource_usage] SNMP get success host={host} oid={oid} value={value}")
+                return value
+            logger.warning(f"[resource_usage] SNMP get returned no values host={host} oid={oid}")
             return None
     except Exception as exc:
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.exception(f"[resource_usage] SNMP get failed host={host} oid={oid}: {exc}")
+        logger.warning(f"[resource_usage] SNMP get failed host={host} oid={oid}: {exc}")
         return None
 
 
@@ -83,15 +85,14 @@ async def _snmp_walk(host: str, port: int, community: str, oid: str, timeout_sec
                             counter_value = int(v.value)
                             result[interface_index] = counter_value
                         else:
-                            if logger.isEnabledFor(logging.DEBUG):
-                                logger.debug(f"[resource_usage] Invalid OID structure: {oid_str} (expected more than {base_oid_parts} parts)")
+                            logger.debug(f"[resource_usage] Invalid OID structure: {oid_str} (expected more than {base_oid_parts} parts)")
                     except (ValueError, IndexError) as e:
-                        if logger.isEnabledFor(logging.DEBUG):
-                            logger.debug(f"[resource_usage] Failed to parse SNMP walk result oid={oid_str}: {e}")
+                        logger.debug(f"[resource_usage] Failed to parse SNMP walk result oid={oid_str}: {e}")
                         continue
     except Exception as exc:
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.exception(f"[resource_usage] SNMP walk failed host={host} oid={oid}: {exc}")
+        logger.warning(f"[resource_usage] SNMP walk failed host={host} oid={oid}: {exc}")
+    if result:
+        logger.debug(f"[resource_usage] SNMP walk success host={host} oid={oid} interfaces={len(result)}")
     return result
 
 
@@ -118,15 +119,14 @@ async def _snmp_walk_string(host: str, port: int, community: str, oid: str, time
                             string_value = str(v.value).strip()
                             result[interface_index] = string_value
                         else:
-                            if logger.isEnabledFor(logging.DEBUG):
-                                logger.debug(f"[resource_usage] Invalid OID structure: {oid_str} (expected more than {base_oid_parts} parts)")
+                            logger.debug(f"[resource_usage] Invalid OID structure: {oid_str} (expected more than {base_oid_parts} parts)")
                     except (ValueError, IndexError) as e:
-                        if logger.isEnabledFor(logging.DEBUG):
-                            logger.debug(f"[resource_usage] Failed to parse SNMP walk result oid={oid_str}: {e}")
+                        logger.debug(f"[resource_usage] Failed to parse SNMP walk result oid={oid_str}: {e}")
                         continue
     except Exception as exc:
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.exception(f"[resource_usage] SNMP walk failed host={host} oid={oid}: {exc}")
+        logger.warning(f"[resource_usage] SNMP walk failed host={host} oid={oid}: {exc}")
+    if result:
+        logger.debug(f"[resource_usage] SNMP walk string success host={host} oid={oid} interfaces={len(result)}")
     return result
 
 
@@ -216,11 +216,12 @@ async def _collect_interface_mbps(proxy: Proxy, community: str) -> Optional[Dict
                 # Initialize cache for next collection
                 _INTERFACE_COUNTER_CACHE[cache_key] = (current_in, current_out, current_time)
         
+        if result:
+            logger.info(f"[resource_usage] Interface MBPS collection success host={proxy.host} proxy_id={proxy.id} interfaces={len(result)}")
         return result if result else None
         
     except Exception as exc:
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.exception(f"[resource_usage] Interface MBPS collection failed host={proxy.host}: {exc}")
+        logger.warning(f"[resource_usage] Interface MBPS collection failed host={proxy.host} proxy_id={proxy.id}: {exc}")
         return None
 
 
@@ -269,10 +270,10 @@ def _ssh_exec_and_parse_mem(host: str, port: int, username: str, password: str |
                 return 1000.0
             return val
         except Exception:
+            logger.warning(f"[resource_usage] SSH exec parse failed host={host} cmd={command} stdout={stdout_str[:100]}")
             return None
     except Exception as exc:
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.exception(f"[resource_usage] SSH exec failed host={host} cmd={command}: {exc}")
+        logger.warning(f"[resource_usage] SSH exec failed host={host} cmd={command}: {exc}")
         return None
     finally:
         try:
@@ -300,8 +301,7 @@ async def _ssh_get_mem_percent(proxy: Proxy, spec: str, timeout_sec: int = _SSH_
     loop = asyncio.get_running_loop()
     async with _SSH_SEMAPHORE:
         t0 = monotonic()
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"[resource_usage] SSH mem start host={proxy.host} port={getattr(proxy, 'port', 22)} user={proxy.username} cmd={cmd}")
+        logger.debug(f"[resource_usage] SSH mem start host={proxy.host} port={getattr(proxy, 'port', 22)} user={proxy.username} cmd={cmd}")
         value = await loop.run_in_executor(
             None,
             lambda: _ssh_exec_and_parse_mem(
@@ -314,8 +314,11 @@ async def _ssh_get_mem_percent(proxy: Proxy, spec: str, timeout_sec: int = _SSH_
             ),
         )
         t1 = monotonic()
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"[resource_usage] SSH mem end host={proxy.host} ms={(t1 - t0) * 1000:.1f} value={value}")
+        elapsed_ms = (t1 - t0) * 1000
+        if value is not None:
+            logger.info(f"[resource_usage] SSH mem success host={proxy.host} proxy_id={proxy.id} ms={elapsed_ms:.1f} value={value:.2f}%")
+        else:
+            logger.warning(f"[resource_usage] SSH mem failed host={proxy.host} proxy_id={proxy.id} ms={elapsed_ms:.1f}")
     if value is not None:
         _MEM_CACHE[key] = (value, now + _MEM_CACHE_TTL_SEC)
     return value
@@ -332,8 +335,7 @@ async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str)
             continue
         # Special handling for memory via SSH
         if key == "mem" and isinstance(oid, str) and oid.lower().strip().startswith("ssh"):
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"[resource_usage] Using SSH mem for host={proxy.host} oidSpec={oid}")
+            logger.debug(f"[resource_usage] Using SSH mem for host={proxy.host} proxy_id={proxy.id} oidSpec={oid}")
             keys.append(key)
             tasks.append(_ssh_get_mem_percent(proxy, oid))
         else:
@@ -362,10 +364,13 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
     if not payload.community:
         raise HTTPException(status_code=400, detail="community is required")
 
+    logger.info(f"[resource_usage] Collect request received proxy_ids={payload.proxy_ids} oids={list(payload.oids.keys())}")
+    
     query = db.query(Proxy).filter(Proxy.is_active == True).filter(Proxy.id.in_(payload.proxy_ids))
     proxies: List[Proxy] = query.all()
 
     if not proxies:
+        logger.warning(f"[resource_usage] No active proxies found for ids={payload.proxy_ids}")
         return CollectResponse(requested=0, succeeded=0, failed=0, errors={}, items=[])
 
     errors: Dict[int, str] = {}
@@ -414,6 +419,10 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
     # Enforce 30-day retention after successful commit
     _enforce_resource_usage_retention(db, days=30)
 
+    logger.info(f"[resource_usage] Collect completed requested={len(proxies)} succeeded={len(collected_models)} failed={len(errors)}")
+    if errors:
+        logger.warning(f"[resource_usage] Collection errors: {errors}")
+
     return CollectResponse(
         requested=len(proxies),
         succeeded=len(collected_models),
@@ -453,6 +462,68 @@ async def latest_resource_usage(proxy_id: int, db: Session = Depends(get_db)):
     if not row:
         raise HTTPException(status_code=404, detail="No resource usage found for proxy")
     return row
+
+
+@router.get("/resource-usage/history", response_model=List[ResourceUsageSchema])
+async def get_resource_usage_history(
+    db: Session = Depends(get_db),
+    proxy_id: Optional[int] = Query(None, description="프록시 ID (선택사항)"),
+    proxy_ids: Optional[str] = Query(None, description="프록시 ID 목록 (쉼표로 구분)"),
+    start_time: Optional[str] = Query(None, description="시작 시간 (ISO 8601 형식, 예: 2024-01-01T00:00:00)"),
+    end_time: Optional[str] = Query(None, description="종료 시간 (ISO 8601 형식)"),
+    limit: int = Query(1000, ge=1, le=10000, description="최대 조회 개수"),
+    offset: int = Query(0, ge=0, description="오프셋"),
+):
+    """
+    자원사용률 이력을 조회합니다.
+    
+    - proxy_id: 특정 프록시의 이력만 조회
+    - proxy_ids: 여러 프록시의 이력을 조회 (쉼표로 구분된 ID 목록)
+    - start_time: 시작 시간 (ISO 8601 형식)
+    - end_time: 종료 시간 (ISO 8601 형식)
+    - limit: 최대 조회 개수 (기본값: 1000, 최대: 10000)
+    - offset: 오프셋 (페이지네이션용)
+    """
+    query = db.query(ResourceUsageModel)
+    
+    # 프록시 필터링
+    if proxy_id:
+        query = query.filter(ResourceUsageModel.proxy_id == proxy_id)
+    elif proxy_ids:
+        try:
+            ids = [int(x.strip()) for x in proxy_ids.split(',') if x.strip()]
+            if ids:
+                query = query.filter(ResourceUsageModel.proxy_id.in_(ids))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid proxy_ids format. Use comma-separated integers.")
+    
+    # 시간 범위 필터링
+    if start_time:
+        try:
+            start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+            query = query.filter(ResourceUsageModel.collected_at >= start_dt)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid start_time format. Use ISO 8601 format.")
+    
+    if end_time:
+        try:
+            end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+            query = query.filter(ResourceUsageModel.collected_at <= end_dt)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid end_time format. Use ISO 8601 format.")
+    
+    # 정렬 및 페이지네이션
+    rows = (
+        query
+        .order_by(ResourceUsageModel.collected_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    
+    logger.info(f"[resource_usage] History query proxy_id={proxy_id} proxy_ids={proxy_ids} start={start_time} end={end_time} limit={limit} offset={offset} result_count={len(rows)}")
+    
+    return rows
 
 
 # series endpoint removed; UI uses collect + latest buffering

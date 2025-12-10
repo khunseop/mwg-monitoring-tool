@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="box">
+    <h3 class="title is-4">자원사용률 이력 조회</h3>
+    
+    <div class="accordion is-open" id="ruHistoryAccordion">
+        <div class="accordion-header">
+            <h4>조회 조건</h4>
+        </div>
+        <div class="accordion-body">
+            <div class="columns is-multiline">
+                <div class="column is-3">
+                    <div class="field">
+                        <label class="label">프록시 선택</label>
+                        <div class="control">
+                            <select id="ruHistoryProxySelect" class="ts-fullwidth">
+                                <option value="">전체</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="column is-3">
+                    <div class="field">
+                        <label class="label">시작 시간</label>
+                        <div class="control">
+                            <input class="input" id="ruHistoryStartTime" type="datetime-local">
+                        </div>
+                    </div>
+                </div>
+                <div class="column is-3">
+                    <div class="field">
+                        <label class="label">종료 시간</label>
+                        <div class="control">
+                            <input class="input" id="ruHistoryEndTime" type="datetime-local">
+                        </div>
+                    </div>
+                </div>
+                <div class="column is-3">
+                    <div class="field">
+                        <label class="label">&nbsp;</label>
+                        <div class="control">
+                            <button class="button is-primary is-fullwidth" id="ruHistorySearchBtn">조회</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="field">
+                <label class="label">최대 조회 개수</label>
+                <div class="control">
+                    <input class="input" id="ruHistoryLimit" type="number" min="1" max="10000" value="1000">
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="ruHistoryLoading" class="has-text-centered" style="display:none;">
+        <p class="help">조회 중...</p>
+    </div>
+    
+    <div id="ruHistoryError" class="help is-danger" style="display:none;"></div>
+    
+    <div id="ruHistoryResults" style="display:none;">
+        <div class="mt-4">
+            <p id="ruHistoryCount" class="help"></p>
+        </div>
+        <div class="table-container mt-4" style="max-height: 600px; overflow-y: auto;">
+            <table class="table is-striped is-fullwidth is-hoverable">
+                <thead>
+                    <tr>
+                        <th>수집 시간</th>
+                        <th>프록시</th>
+                        <th>CPU (%)</th>
+                        <th>MEM (%)</th>
+                        <th>CC</th>
+                        <th>CS</th>
+                        <th>HTTP</th>
+                        <th>HTTPS</th>
+                        <th>FTP</th>
+                        <th>인터페이스 MBPS</th>
+                    </tr>
+                </thead>
+                <tbody id="ruHistoryTableBody">
+                </tbody>
+            </table>
+        </div>
+        <div id="ruHistoryChartWrap" class="mt-4" style="display:none;">
+            <h5 class="title is-6">이력 그래프</h5>
+            <div id="ruHistoryChart" style="width:100%; height:400px;"></div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/vendor/apexcharts/apexcharts.min.js"></script>
+<script src="/static/js/resource_history.js"></script>
+{% endblock %}

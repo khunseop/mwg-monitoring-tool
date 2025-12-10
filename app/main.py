@@ -29,9 +29,13 @@ from app.database.database import SessionLocal
 from app.models.proxy import Proxy as ProxyModel
 from app.utils.crypto import encrypt_string
 from app.utils.path_resolver import get_templates_dir, get_static_dir, get_docs_dir
+from app.utils.logging_config import setup_logging
 
 # Load environment variables from .env
 load_dotenv(override=False)
+
+# 로깅 초기화 (환경변수 로드 후 가장 먼저 실행)
+setup_logging()
 
 proxy.Base.metadata.create_all(bind=engine)
 resource_usage_model.Base.metadata.create_all(bind=engine)
@@ -86,6 +90,10 @@ async def read_root(request: Request):
 @app.get("/resource")
 async def read_resource(request: Request):
     return templates.TemplateResponse("components/resource_usage.html", {"request": request})
+
+@app.get("/resource-history")
+async def read_resource_history(request: Request):
+    return templates.TemplateResponse("components/resource_history.html", {"request": request})
 
 @app.get("/settings")
 async def read_settings(request: Request):
