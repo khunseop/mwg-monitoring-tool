@@ -59,7 +59,27 @@
 <!-- 세션 테이블 섹션 -->
 <div id="sbListSection">
     <div class="box mb-4">
-        <h4 class="title is-5 mb-4">세션 목록</h4>
+        <div class="level mb-4">
+            <div class="level-left">
+                <div class="level-item">
+                    <h4 class="title is-5 mb-0">세션 목록</h4>
+                </div>
+            </div>
+            <div class="level-right">
+                <div class="level-item">
+                    <div class="field has-addons">
+                        <div class="control">
+                            <input class="input is-small" type="text" id="sbQuickFilter" placeholder="전체 검색..." style="width: 200px;">
+                        </div>
+                        <div class="control">
+                            <button class="button is-small" id="sbClearFilters" title="모든 필터 삭제">
+                                <span>필터 초기화</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="sb-table-wrap" id="sbTableWrap" style="height: 600px;">
             <div id="sbTableGrid" style="height: 100%; width: 100%;"></div>
         </div>

@@ -211,8 +211,10 @@
 			rowData: records,
 			defaultColDef: {
 				sortable: true,
-				filter: true,
+				filter: 'agTextColumnFilter',
+				filterParams: { applyButton: true, clearButton: true },
 				resizable: true,
+				minWidth: 100
 			},
 			rowModelType: 'clientSide',
 			pagination: true,
@@ -221,15 +223,27 @@
 			enableSorting: true,
 			animateRows: false,
 			suppressRowClickSelection: false,
+			headerHeight: 50,
 			overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">표시할 로그가 없습니다.<br><small style="margin-top: 8px; display: block;">프록시를 선택하고 "조회" 버튼을 클릭하세요.</small></div>',
 			onGridReady: function(params) {
 				tlGridApi = params.api;
 				if (params.columnApi) {
 					tlGridColumnApi = params.columnApi;
 				}
-				if (tlGridApi && tlGridApi.sizeColumnsToFit) {
-					tlGridApi.sizeColumnsToFit();
-				}
+				// 컬럼 너비 자동 조절 (헤더 텍스트가 잘리지 않도록)
+				setTimeout(function() {
+					if (tlGridApi) {
+						var allColumnIds = [];
+						tlGridApi.getColumns().forEach(function(column) {
+							allColumnIds.push(column.getColId());
+						});
+						if (tlGridApi.autoSizeColumns) {
+							tlGridApi.autoSizeColumns(allColumnIds, { skipHeader: false });
+						} else if (tlGridApi.sizeColumnsToFit) {
+							tlGridApi.sizeColumnsToFit();
+						}
+					}
+				}, 200);
 			},
 			onRowClicked: function(params) {
 				showDetail(params.data || {});
@@ -311,6 +325,20 @@
 			saveState(Array.isArray(data.records) ? data.records : []);
 			const suffix = data.truncated ? ' (truncated)' : '';
 			setStatus(`완료 - ${data.count} 라인${suffix}`, 'is-success');
+			// 컬럼 너비 자동 조절 (헤더 텍스트가 잘리지 않도록)
+			setTimeout(function() {
+				if (tlGridApi) {
+					var allColumnIds = [];
+					tlGridApi.getColumns().forEach(function(column) {
+						allColumnIds.push(column.getColId());
+					});
+					if (tlGridApi.autoSizeColumns) {
+						tlGridApi.autoSizeColumns(allColumnIds, { skipHeader: false });
+					} else if (tlGridApi.sizeColumnsToFit) {
+						tlGridApi.sizeColumnsToFit();
+					}
+				}
+			}, 300);
 		}catch(e){
 			showError(e.message || String(e));
 			setStatus('실패', 'is-danger');
@@ -360,6 +388,24 @@
 		}
 		applyViewFromQuery();
 		$('#tlTabs').on('click', 'a[data-view]', function(e){ e.preventDefault(); var v = $(this).data('view'); setView(String(v || 'remote'), true); });
+		
+		// Quick filter (전체 검색)
+		$('#tlQuickFilter').on('input', function() {
+			var filterText = $(this).val();
+			if (tlGridApi) {
+				tlGridApi.setGridOption('quickFilterText', filterText);
+			}
+		});
+		
+		// 필터 초기화 버튼
+		$('#tlClearFilters').on('click', function() {
+			if (tlGridApi) {
+				tlGridApi.setFilterModel(null);
+				tlGridApi.setGridOption('quickFilterText', '');
+				$('#tlQuickFilter').val('');
+			}
+		});
+		
 		// Save selection changes
 		$('#tlProxySelect, #tlQuery, #tlLimit, #tlDirection').on('change keyup', function(){ saveState(undefined); });
 		$('#tlLoadBtn').on('click', loadLogs);

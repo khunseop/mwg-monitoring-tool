@@ -177,6 +177,22 @@ $(document).ready(function() {
                     };
                 });
                 sb.gridApi.setGridOption('rowData', rowData);
+                // 컬럼 너비 자동 조절 (헤더 텍스트가 잘리지 않도록)
+                setTimeout(function() {
+                    if (sb.gridApi) {
+                        var allColumnIds = [];
+                        sb.gridApi.getColumns().forEach(function(column) {
+                            if (column.getColDef().field !== 'id') {
+                                allColumnIds.push(column.getColId());
+                            }
+                        });
+                        if (sb.gridApi.autoSizeColumns) {
+                            sb.gridApi.autoSizeColumns(allColumnIds, { skipHeader: false });
+                        } else if (sb.gridApi.sizeColumnsToFit) {
+                            sb.gridApi.sizeColumnsToFit();
+                        }
+                    }
+                }, 200);
             }
         }).fail(function() {
             if (sb.gridApi) {
@@ -193,8 +209,10 @@ $(document).ready(function() {
                 rowData: [],
                 defaultColDef: {
                     sortable: true,
-                    filter: true,
+                    filter: 'agTextColumnFilter',
+                    filterParams: { applyButton: true, clearButton: true },
                     resizable: true,
+                    minWidth: 100
                 },
                 rowModelType: 'clientSide',
                 pagination: true,
@@ -203,12 +221,30 @@ $(document).ready(function() {
                 enableSorting: true,
                 animateRows: false,
                 suppressRowClickSelection: false,
+                headerHeight: 50,
                 overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">표시할 세션이 없습니다.<br><small style="margin-top: 8px; display: block;">프록시를 선택하고 "세션 불러오기" 버튼을 클릭하세요.</small></div>',
                 onGridReady: function(params) {
                     sb.gridApi = params.api;
                     if (params.columnApi) {
                         sb.gridColumnApi = params.columnApi;
                     }
+                    // 컬럼 너비 자동 조절 (헤더 텍스트가 잘리지 않도록)
+                    setTimeout(function() {
+                        if (sb.gridApi) {
+                            var allColumnIds = [];
+                            sb.gridApi.getColumns().forEach(function(column) {
+                                if (column.getColDef().field !== 'id') {
+                                    allColumnIds.push(column.getColId());
+                                }
+                            });
+                            if (sb.gridApi.autoSizeColumns) {
+                                // 헤더 텍스트를 기준으로 자동 크기 조절
+                                sb.gridApi.autoSizeColumns(allColumnIds, { skipHeader: false });
+                            } else if (sb.gridApi.sizeColumnsToFit) {
+                                sb.gridApi.sizeColumnsToFit();
+                            }
+                        }
+                    }, 200);
                     updateTableVisibility();
                     // 초기 데이터 로드
                     loadGridData();
@@ -290,6 +326,23 @@ $(document).ready(function() {
         // open in new tab to trigger download without blocking UI
         window.open(url, '_blank');
     });
+    // Quick filter (전체 검색)
+    $('#sbQuickFilter').on('input', function() {
+        var filterText = $(this).val();
+        if (sb.gridApi) {
+            sb.gridApi.setGridOption('quickFilterText', filterText);
+        }
+    });
+    
+    // 필터 초기화 버튼
+    $('#sbClearFilters').on('click', function() {
+        if (sb.gridApi) {
+            sb.gridApi.setFilterModel(null);
+            sb.gridApi.setGridOption('quickFilterText', '');
+            $('#sbQuickFilter').val('');
+        }
+    });
+    
     $('#sbGroupSelect').on('change', function() {
         saveState(undefined);
         // 그룹 변경 시 그리드 데이터 다시 로드
