@@ -158,7 +158,7 @@ $(document).ready(function() {
             const out = {};
             Object.keys(obj).forEach(pid => {
                 const byMetric = obj[pid] || {};
-                out[pid] = { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [] };
+                out[pid] = { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [], interface_mbps: [] };
                 Object.keys(out[pid]).forEach(m => {
                     const arr = Array.isArray(byMetric[m]) ? byMetric[m] : [];
                     // keep within window and type-safe
@@ -203,6 +203,23 @@ $(document).ready(function() {
                 https: typeof row.https === 'number' ? row.https : last.https,
                 ftp: typeof row.ftp === 'number' ? row.ftp : last.ftp,
             };
+            
+            // Calculate total interface MBPS (sum of all interfaces' in_mbps + out_mbps)
+            let totalMbps = null;
+            if (row.interface_mbps && typeof row.interface_mbps === 'object') {
+                let sum = 0;
+                let hasData = false;
+                Object.values(row.interface_mbps).forEach(ifData => {
+                    if (ifData && typeof ifData === 'object') {
+                        const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
+                        const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
+                        sum += inMbps + outMbps;
+                        hasData = true;
+                    }
+                });
+                if (hasData) totalMbps = sum;
+            }
+            
             rows.push({
                 proxy_id: row.proxy_id,
                 cpu: typeof row.cpu === 'number' ? row.cpu : null,
@@ -212,6 +229,7 @@ $(document).ready(function() {
                 httpd: deltas.http,
                 httpsd: deltas.https,
                 ftpd: deltas.ftp,
+                interface_mbps: totalMbps,
             });
         });
 
@@ -231,6 +249,7 @@ $(document).ready(function() {
             { key: 'httpd', title: 'HTTP Δ' },
             { key: 'httpsd', title: 'HTTPS Δ' },
             { key: 'ftpd', title: 'FTP Δ' },
+            { key: 'interface_mbps', title: '회선사용률' },
         ];
 
         const maxByMetric = {};
@@ -277,6 +296,7 @@ $(document).ready(function() {
             if (metricKey === 'httpd') return 'http';
             if (metricKey === 'httpsd') return 'https';
             if (metricKey === 'ftpd') return 'ftp';
+            if (metricKey === 'interface_mbps') return 'interface_mbps';
             return metricKey;
         }
         const scaleForCol = metrics.map(m => {
@@ -323,6 +343,9 @@ $(document).ready(function() {
                 if (key === 'cc' || key === 'cs') {
                     return formatNumber(raw);
                 }
+                if (key === 'interface_mbps') {
+                    return raw.toFixed(2) + ' Mbps';
+                }
                 return String(Math.round(raw));
             } },
             colors: ["#12824C"],
@@ -353,12 +376,14 @@ $(document).ready(function() {
                 let formattedRaw = String(Math.round(raw));
                 if (metric) {
                     const key = metric.key;
-                    if (key === 'httpd' || key === 'httpsd' || key === 'ftpd') {
-                        const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
-                        formattedRaw = formatBytes(raw / intervalSec, 2, true);
-                    } else if (key === 'cc' || key === 'cs') {
-                        formattedRaw = formatNumber(raw);
-                    }
+                if (key === 'httpd' || key === 'httpsd' || key === 'ftpd') {
+                    const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
+                    formattedRaw = formatBytes(raw / intervalSec, 2, true);
+                } else if (key === 'cc' || key === 'cs') {
+                    formattedRaw = formatNumber(raw);
+                } else if (key === 'interface_mbps') {
+                    formattedRaw = raw.toFixed(2) + ' Mbps';
+                }
                 }
 
                 const percent = (val == null || val < 0) ? null : Math.round(val) + '% of threshold';
@@ -471,7 +496,24 @@ $(document).ready(function() {
             const rawTs = row.collected_at ? new Date(row.collected_at).getTime() : now;
             // quantize to bucket to align across proxies in same cycle
             const ts = Math.floor(rawTs / ru.timeBucketMs) * ru.timeBucketMs;
-            ru.tsBuffer[proxyId] = ru.tsBuffer[proxyId] || { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [] };
+            ru.tsBuffer[proxyId] = ru.tsBuffer[proxyId] || { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [], interface_mbps: [] };
+            
+            // Calculate total interface MBPS for timeseries
+            let totalMbps = null;
+            if (row.interface_mbps && typeof row.interface_mbps === 'object') {
+                let sum = 0;
+                let hasData = false;
+                Object.values(row.interface_mbps).forEach(ifData => {
+                    if (ifData && typeof ifData === 'object') {
+                        const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
+                        const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
+                        sum += inMbps + outMbps;
+                        hasData = true;
+                    }
+                });
+                if (hasData) totalMbps = sum;
+            }
+            
             ['cpu','mem','cc','cs','http','https','ftp'].forEach(k => {
                 const v = row[k];
                 if (typeof v === 'number') {
@@ -488,6 +530,20 @@ $(document).ready(function() {
                     }
                 }
             });
+            
+            // Add interface_mbps to buffer
+            if (totalMbps !== null && typeof totalMbps === 'number') {
+                const arr = ru.tsBuffer[proxyId].interface_mbps;
+                const last = arr[arr.length - 1];
+                if (last && last.x === ts) {
+                    arr[arr.length - 1] = { x: ts, y: totalMbps };
+                } else {
+                    arr.push({ x: ts, y: totalMbps });
+                }
+                if (ru.tsBuffer[proxyId].interface_mbps.length > ru.bufferMaxPoints) {
+                    ru.tsBuffer[proxyId].interface_mbps.shift();
+                }
+            }
         });
         // prune old points (defensively skip null/invalid)
         const cutoff = now - ru.bufferWindowMs;
@@ -506,8 +562,8 @@ $(document).ready(function() {
 
         if (!isModal) {
             if ($wrap.data('initialized')) return true;
-            const metrics = ['cpu','mem','cc','cs','http','https','ftp'];
-            const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
+            const metrics = ['cpu','mem','cc','cs','http','https','ftp','interface_mbps'];
+            const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP', interface_mbps: '회선사용률' };
             $wrap.empty();
             metrics.forEach(m => {
                 const panel = `
@@ -556,7 +612,7 @@ $(document).ready(function() {
     function renderAllCharts() {
         if (!window.ApexCharts) return;
         ensureApexChartsDom(false, null, 300); // Main charts with default height
-        const metrics = ['cpu','mem','cc','cs','http','https','ftp'];
+        const metrics = ['cpu','mem','cc','cs','http','https','ftp','interface_mbps'];
         metrics.forEach(m => renderMetricChart(m, false));
     }
 
@@ -682,6 +738,7 @@ $(document).ready(function() {
                             return formatBytes(val / intervalSec, 0, true);
                         }
                         if (metricKey === 'cc' || metricKey === 'cs') { return abbreviateNumber(val); }
+                        if (metricKey === 'interface_mbps') { return val.toFixed(1) + ' Mbps'; }
                         return val;
                     }
                 }
@@ -699,6 +756,7 @@ $(document).ready(function() {
                         }
                         if (metricKey === 'cc' || metricKey === 'cs') { return formatNumber(Math.round(val)); }
                         if (metricKey === 'cpu' || metricKey === 'mem') { return String(Math.round(val)); }
+                        if (metricKey === 'interface_mbps') { return val.toFixed(2) + ' Mbps'; }
                         return val;
                     }
                 }
@@ -745,7 +803,7 @@ $(document).ready(function() {
     ru.modalChart = null;
 
     function openModal(metricKey) {
-        const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
+        const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP', interface_mbps: '회선사용률' };
         $modalTitle.text(titles[metricKey] || 'Chart');
         const modalHeight = $(window).height() * 0.7;
         ensureApexChartsDom(true, metricKey, modalHeight);
