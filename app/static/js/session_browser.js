@@ -1,5 +1,5 @@
 $(document).ready(function() {
-    const sb = { proxies: [], groups: [], dt: null };
+    const sb = { proxies: [], groups: [], gridApi: null, gridColumnApi: null };
     const STORAGE_KEY = 'sb_state_v1';
 
     // Helpers for robust localStorage persistence
@@ -78,7 +78,7 @@ $(document).ready(function() {
     function getSelectedProxyIds() { return ($('#sbProxySelect').val() || []).map(v => parseInt(v, 10)); }
 
     function updateTableVisibility() {
-        try { if (sb.dt && sb.dt.columns && sb.dt.columns.adjust) { sb.dt.columns.adjust(); } } catch (e) { /* ignore */ }
+        try { if (sb.gridApi && sb.gridApi.sizeColumnsToFit) { sb.gridApi.sizeColumnsToFit(); } } catch (e) { /* ignore */ }
     }
 
     function saveState(itemsForSave) {
@@ -140,89 +140,107 @@ $(document).ready(function() {
         } catch (e) { /* ignore */ }
     }
 
-    function initTable() {
-        if (sb.dt) return;
-        try {
-            var ajaxFn = function(data, callback) {
-                // DataTables -> backend query params
-                var params = {
-                    draw: data.draw,
-                    start: data.start,
-                    length: data.length,
+    function createDataSource() {
+        return {
+            getRows: function(params) {
+                var proxyIds = getSelectedProxyIds();
+                if (proxyIds.length === 0) {
+                    // 프록시가 선택되지 않은 경우에도 빈 결과 반환 (overlayNoRowsTemplate이 표시됨)
+                    params.success({ rowData: [], rowCount: 0 });
+                    return;
+                }
+
+                // Build query params for ag-grid server-side
+                var requestParams = {
+                    startRow: params.request.startRow,
+                    endRow: params.request.endRow,
+                    proxy_ids: proxyIds.join(',')
                 };
-                if (data.search && data.search.value) {
-                    params['search[value]'] = data.search.value;
+
+                // Add sort model
+                if (params.request.sortModel && params.request.sortModel.length > 0) {
+                    requestParams.sortModel = JSON.stringify(params.request.sortModel);
                 }
-                // Per-column searches (ColumnControl)
-                try {
-                    if (Array.isArray(data.columns)) {
-                        for (var i = 0; i < data.columns.length; i++) {
-                            var c = data.columns[i] || {};
-                            var sv = c.search && typeof c.search.value !== 'undefined' ? c.search.value : '';
-                            if (sv && String(sv).length > 0) {
-                                params['columns[' + i + '][search][value]'] = sv;
-                            }
-                        }
+
+                // Add filter model
+                if (params.request.filterModel && Object.keys(params.request.filterModel).length > 0) {
+                    requestParams.filterModel = JSON.stringify(params.request.filterModel);
+                }
+
+                // Add quick filter
+                if (params.request.quickFilterText) {
+                    requestParams.quickFilterText = params.request.quickFilterText;
+                }
+
+                $.ajax({
+                    url: '/api/session-browser/datatables',
+                    method: 'GET',
+                    data: requestParams
+                }).done(function(response) {
+                    params.success({
+                        rowData: response.rowData || [],
+                        rowCount: response.rowCount || 0
+                    });
+                }).fail(function() {
+                    params.fail();
+                });
+            }
+        };
+    }
+
+    function initTable() {
+        if (sb.gridApi) return;
+        try {
+            var gridOptions = {
+                columnDefs: AgGridConfig.getSessionBrowserColumns(),
+                defaultColDef: {
+                    sortable: true,
+                    filter: true,
+                    resizable: true,
+                },
+                rowModelType: 'serverSide',
+                serverSideInfiniteScroll: true,
+                cacheBlockSize: 25,
+                pagination: true,
+                paginationPageSize: 25,
+                enableFilter: true,
+                enableSorting: true,
+                animateRows: false,
+                suppressRowClickSelection: false,
+                overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">표시할 세션이 없습니다.<br><small style="margin-top: 8px; display: block;">프록시를 선택하고 "세션 불러오기" 버튼을 클릭하세요.</small></div>',
+                onGridReady: function(params) {
+                    sb.gridApi = params.api;
+                    if (params.columnApi) {
+                        sb.gridColumnApi = params.columnApi;
                     }
-                } catch (e) { /* ignore */ }
-                if (data.order && data.order.length > 0) {
-                    params['order[0][column]'] = data.order[0].column;
-                    params['order[0][dir]'] = data.order[0].dir;
+                    // Set datasource after grid is ready
+                    var datasource = createDataSource();
+                    if (typeof params.api.setServerSideDatasource === 'function') {
+                        params.api.setServerSideDatasource(datasource);
+                    } else if (typeof params.api.setGridOption === 'function') {
+                        params.api.setGridOption('datasource', datasource);
+                    }
+                    updateTableVisibility();
+                },
+                onRowClicked: function(params) {
+                    var itemId = params.data.id;
+                    if (!itemId) return;
+                    $.getJSON('/api/session-browser/item/' + itemId)
+                        .done(function(item){ fillDetailModal(item || {}); openSbModal(); })
+                        .fail(function(){ showErr('상세를 불러오지 못했습니다.'); });
                 }
-                var g = $('#sbGroupSelect').val();
-                if (g) params.group_id = g;
-                var pids = ($('#sbProxySelect').val() || []).join(',');
-                if (pids) params.proxy_ids = pids;
-                $.ajax({ url: '/api/session-browser/datatables', method: 'GET', data: params })
-                    .done(function(res){ callback(res); })
-                    .fail(function(){ callback({ draw: data.draw, recordsTotal: 0, recordsFiltered: 0, data: [] }); });
             };
-            sb.dt = TableConfig.init('#sbTable', {
-                serverSide: true,
-                stateSave: true,
-                ajax: function(data, callback){ ajaxFn(data, callback); },
-                drawCallback: function(){ updateTableVisibility(); },
-                columns: [
-                    { title: '프록시' },
-                    { title: '생성시각' },
-                    { title: '프로토콜' },
-                    { title: '사용자' },
-                    { title: '클라이언트 IP' },
-                    { title: '서버 IP' },
-                    { title: 'CL 수신' },
-                    { title: 'CL 송신' },
-                    { title: 'Age(s)' },
-                    { title: 'URL' },
-                    { title: 'id', visible: false }
-                ],
-                columnDefs: [
-                    { targets: -1, visible: false, searchable: false },
-                    { targets: 0, className: 'dt-nowrap' },
-                    { targets: 1, className: 'dt-nowrap', render: function(data){ return (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(data) : data; } },
-                    { targets: 2, className: 'dt-nowrap' },
-                    { targets: 4, className: 'dt-nowrap mono' },
-                    { targets: 5, className: 'dt-nowrap mono' },
-                    { targets: 6, className: 'dt-nowrap num', render: function(data){ return (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(data) : data; } },
-                    { targets: 7, className: 'dt-nowrap num', render: function(data){ return (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(data) : data; } },
-                    { targets: 8, className: 'dt-nowrap', render: function(data){ return (window.AppUtils && AppUtils.formatSeconds) ? AppUtils.formatSeconds(data) : data; } },
-                    { targets: 9, className: 'dt-nowrap dt-ellipsis', width: '480px' }
-                ],
-                createdRow: function(row, data) { $(row).attr('data-item-id', data[data.length - 1]); }
-            });
-            setTimeout(function(){
-                TableConfig.adjustColumns(sb.dt);
-                // Ensure ColumnControl is bound via jQuery DataTables API wrapper
-                try {
-                    if (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable){
-                        var api = window.jQuery('#sbTable').DataTable();
-                        if (api && api.columnControl && typeof api.columnControl.bind === 'function'){
-                            api.columnControl.bind({ skipColumns: [10], trigger: 'enter' });
-                        }
-                    }
-                } catch (e) { /* ignore */ }
-            }, 0);
+
+            var gridDiv = document.querySelector('#sbTableGrid');
+            if (gridDiv && window.agGrid) {
+                if (typeof window.agGrid.createGrid === 'function') {
+                    sb.gridApi = window.agGrid.createGrid(gridDiv, gridOptions);
+                } else if (window.agGrid.Grid) {
+                    new window.agGrid.Grid(gridDiv, gridOptions);
+                }
+            }
         } catch (e) {
-            // Ignore DataTables init failures; selection UI will still work
+            console.error('ag-grid init failed:', e);
         }
     }
 
@@ -239,8 +257,15 @@ $(document).ready(function() {
             contentType: 'application/json',
             data: JSON.stringify({ proxy_ids: proxyIds })
         }).then(res => {
-            // On collect, simply reload table from DB via server-side ajax
-            if (sb.dt && sb.dt.ajax) { sb.dt.ajax.reload(null, false); }
+            // On collect, reload grid data
+            if (sb.gridApi) { 
+                var datasource = createDataSource();
+                if (typeof sb.gridApi.setServerSideDatasource === 'function') {
+                    sb.gridApi.setServerSideDatasource(datasource);
+                } else if (typeof sb.gridApi.setGridOption === 'function') {
+                    sb.gridApi.setGridOption('datasource', datasource);
+                }
+            }
             $('#sbEmptyState').hide();
             $('#sbTableWrap').show();
             if (res && res.failed && res.failed > 0) { showErr('일부 프록시 수집에 실패했습니다.'); }
@@ -259,16 +284,23 @@ $(document).ready(function() {
         if (g) params.group_id = g;
         const pids = ($('#sbProxySelect').val() || []).join(',');
         if (pids) params.proxy_ids = pids;
-        const searchVal = (sb.dt && sb.dt.search) ? (typeof sb.dt.search === 'function' ? sb.dt.search() : '') : '';
-        if (searchVal) params['search[value]'] = searchVal;
-        // carry over ordering
-        try {
-            const order = sb.dt && sb.dt.order ? (typeof sb.dt.order === 'function' ? sb.dt.order() : []) : [];
-            if (order && order.length > 0) {
-                params['order[0][column]'] = order[0][0];
-                params['order[0][dir]'] = order[0][1];
+        // Get quick filter from ag-grid if available
+        if (sb.gridApi) {
+            const quickFilter = sb.gridApi.getQuickFilter();
+            if (quickFilter) params['search[value]'] = quickFilter;
+            // Get sort model
+            const sortModel = sb.gridApi.getSortModel();
+            if (sortModel && sortModel.length > 0) {
+                // Convert ag-grid sort model to DataTables format for export endpoint
+                const colMapping = { 'host': 0, 'creation_time': 1, 'protocol': 2, 'user_name': 3, 'client_ip': 4, 'server_ip': 5, 'cl_bytes_received': 6, 'cl_bytes_sent': 7, 'age_seconds': 8, 'url': 9 };
+                const colId = sortModel[0].colId;
+                const colIdx = colMapping[colId];
+                if (colIdx !== undefined) {
+                    params['order[0][column]'] = colIdx;
+                    params['order[0][dir]'] = sortModel[0].sort === 'desc' ? 'desc' : 'asc';
+                }
             }
-        } catch (e) {}
+        }
         const qs = $.param(params);
         const url = '/api/session-browser/export' + (qs ? ('?' + qs) : '');
         // open in new tab to trigger download without blocking UI
@@ -283,16 +315,6 @@ $(document).ready(function() {
         // Do not auto-reload on selection change; user must click Load button
     });
 
-    // Row click -> open detail modal
-    $('#sbTable tbody').on('click', 'tr', function() {
-        const itemId = $(this).attr('data-item-id');
-        if (!itemId) return;
-        // Fetch full row from backend to avoid relying on client cache
-        $.getJSON(`/api/session-browser/item/${itemId}`)
-            .done(function(item){ fillDetailModal(item || {}); openSbModal(); })
-            .fail(function(){ showErr('상세를 불러오지 못했습니다.'); });
-    });
-
     initTable();
     // Always show table
     $('#sbTableWrap').show();
@@ -302,7 +324,17 @@ $(document).ready(function() {
         selectAll: '#sbSelectAll',
         allowAllGroups: false,
         onData: function(data){ sb.groups = data.groups || []; sb.proxies = data.proxies || []; }
-    }).then(function(){ restoreState(); if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, false); });
+    }).then(function(){ 
+        restoreState(); 
+        if (sb.gridApi) {
+            var datasource = createDataSource();
+            if (typeof sb.gridApi.setServerSideDatasource === 'function') {
+                sb.gridApi.setServerSideDatasource(datasource);
+            } else if (typeof sb.gridApi.setGridOption === 'function') {
+                sb.gridApi.setGridOption('datasource', datasource);
+            }
+        }
+    });
 
     // Cross-tab sync: update UI when other tabs modify stored state
     try {
@@ -310,7 +342,14 @@ $(document).ready(function() {
             if (!e) return;
             if (e.key === STORAGE_KEY) {
                 restoreState();
-                if (sb.dt && sb.dt.ajax) sb.dt.ajax.reload(null, false);
+                if (sb.gridApi) {
+                    var datasource = createDataSource();
+                    if (typeof sb.gridApi.setServerSideDatasource === 'function') {
+                        sb.gridApi.setServerSideDatasource(datasource);
+                    } else if (typeof sb.gridApi.setGridOption === 'function') {
+                        sb.gridApi.setGridOption('datasource', datasource);
+                    }
+                }
             }
         });
     } catch (e) { /* ignore */ }

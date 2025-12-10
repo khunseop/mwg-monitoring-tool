@@ -479,11 +479,10 @@ def _sort_key_func(order_col: int | None):
 async def sessions_datatables(
     request: Request,
     db: Session = Depends(get_db),
-    start: int = Query(0, ge=0),
-    length: int = Query(25, ge=1, le=1000),
-    search: str | None = Query(None, alias="search[value]"),
-    order_col: int | None = Query(None, alias="order[0][column]"),
-    order_dir: str | None = Query(None, alias="order[0][dir]"),
+    startRow: int = Query(0, ge=0, alias="startRow"),
+    endRow: int = Query(100, ge=1, alias="endRow"),
+    sortModel: str | None = Query(None, alias="sortModel"),
+    filterModel: str | None = Query(None, alias="filterModel"),
     group_id: int | None = Query(None),
     proxy_ids: str | None = Query(None),  # comma-separated
 ):
@@ -495,44 +494,88 @@ async def sessions_datatables(
         except Exception:
             target_ids = []
     if not target_ids:
-        try:
-            draw = int(request.query_params.get("draw", "0"))
-        except Exception:
-            draw = 0
-        return {"draw": draw, "recordsTotal": 0, "recordsFiltered": 0, "data": []}
+        return {"rowData": [], "rowCount": 0}
 
     # Load latest rows
     rows = _load_latest_rows_for_proxies(db, target_ids)
 
     records_total = len(rows)
+    filtered = rows
 
-    # Per-column filters (DataTables sends columns[i][search][value])
-    per_col: Dict[int, str] = {}
-    try:
-        # Attempt for first 11 columns (0..10). Extra indices are ignored.
-        for i in range(0, 11):
-            key = f"columns[{i}][search][value]"
-            val = request.query_params.get(key)
-            if val is not None and str(val).strip() != "":
-                per_col[i] = str(val)
-    except Exception:
-        per_col = {}
+    # Parse filterModel (ag-grid format: JSON string)
+    if filterModel:
+        try:
+            import json
+            filter_dict = json.loads(filterModel)
+            # Apply filters from filterModel
+            for col_id, filter_config in filter_dict.items():
+                if isinstance(filter_config, dict) and "filter" in filter_config:
+                    filter_value = str(filter_config.get("filter", "")).strip().lower()
+                    if filter_value:
+                        # Map column IDs to row keys
+                        col_to_key = {
+                            "host": "host",
+                            "creation_time": "creation_time",
+                            "protocol": "protocol",
+                            "user_name": "user_name",
+                            "client_ip": "client_ip",
+                            "server_ip": "server_ip",
+                            "cl_bytes_received": "cl_bytes_received",
+                            "cl_bytes_sent": "cl_bytes_sent",
+                            "age_seconds": "age_seconds",
+                            "url": "url",
+                        }
+                        key = col_to_key.get(col_id)
+                        if key:
+                            filtered = [
+                                r for r in filtered
+                                if key in r and filter_value in str(r.get(key, "")).lower()
+                            ]
+        except Exception:
+            pass
 
-    filtered = _filter_rows_by_columns(rows, per_col)
-    filtered = _filter_rows(filtered, search)
+    # Apply global quick filter if present (ag-grid quickFilterText)
+    quick_filter = request.query_params.get("quickFilterText")
+    if quick_filter:
+        filtered = _filter_rows(filtered, quick_filter)
+
     records_filtered = len(filtered)
 
-    # Ordering
-    reverse = (order_dir or "desc").lower() == "desc"
-    try:
-        filtered.sort(key=_sort_key_func(order_col), reverse=reverse)
-    except Exception:
-        pass
+    # Parse sortModel (ag-grid format: JSON string)
+    if sortModel:
+        try:
+            import json
+            sort_list = json.loads(sortModel)
+            if isinstance(sort_list, list) and len(sort_list) > 0:
+                sort_item = sort_list[0]
+                col_id = sort_item.get("colId", "")
+                sort_dir = sort_item.get("sort", "asc")
+                # Map column IDs to sort keys
+                col_to_sort_key = {
+                    "host": lambda r: (r.get("host") or ""),
+                    "creation_time": lambda r: r.get("creation_time") or "",
+                    "protocol": lambda r: (r.get("protocol") or ""),
+                    "user_name": lambda r: r.get("user_name") or "",
+                    "client_ip": lambda r: r.get("client_ip") or "",
+                    "server_ip": lambda r: r.get("server_ip") or "",
+                    "cl_bytes_received": lambda r: r.get("cl_bytes_received") or -1,
+                    "cl_bytes_sent": lambda r: r.get("cl_bytes_sent") or -1,
+                    "age_seconds": lambda r: r.get("age_seconds") or -1,
+                    "url": lambda r: (r.get("url") or ""),
+                }
+                sort_key_func = col_to_sort_key.get(col_id)
+                if sort_key_func:
+                    reverse = sort_dir.lower() == "desc"
+                    filtered.sort(key=sort_key_func, reverse=reverse)
+        except Exception:
+            pass
 
-    # Pagination and build DataTables rows
-    # Rebuild page and assign stable ids using original order index when loading batch
-    page = filtered[start:start + length]
-    data: List[List[Any]] = []
+    # Pagination
+    page_size = endRow - startRow
+    page = filtered[startRow:endRow]
+
+    # Build ag-grid row data (object format, not array)
+    row_data: List[Dict[str, Any]] = []
     for rec in page:
         host = rec.get("host") or f"#{rec.get('proxy_id')}"
         ct_str = rec.get("creation_time") or ""
@@ -540,7 +583,6 @@ async def sessions_datatables(
         cl_sent = rec.get("cl_bytes_sent")
         age_val = rec.get("age_seconds")
         url_full = rec.get("url") or ""
-        url_short = url_full[:100] + ("…" if len(url_full) > 100 else "")
         # Use stored '__line_index' if present; else 0
         pid = int(rec.get("proxy_id") or 0)
         collected_iso = str(rec.get("collected_at") or "")
@@ -553,30 +595,24 @@ async def sessions_datatables(
                 cip = cip.strip().rsplit(":", 1)[0]
         except Exception:
             cip = rec.get("client_ip") or ""
-        data.append([
-            host,
-            ct_str,
-            rec.get("protocol") or "",
-            rec.get("user_name") or "",
-            cip,
-            rec.get("server_ip") or "",
-            str(cl_recv) if cl_recv is not None else "",
-            str(cl_sent) if cl_sent is not None else "",
-            str(age_val) if isinstance(age_val, int) and age_val >= 0 else "",
-            url_short,
-            rid_val,
-        ])
-
-    try:
-        draw = int(request.query_params.get("draw", "0"))
-    except Exception:
-        draw = 0
+        
+        row_data.append({
+            "host": host,
+            "creation_time": ct_str,
+            "protocol": rec.get("protocol") or "",
+            "user_name": rec.get("user_name") or "",
+            "client_ip": cip,
+            "server_ip": rec.get("server_ip") or "",
+            "cl_bytes_received": cl_recv,
+            "cl_bytes_sent": cl_sent,
+            "age_seconds": age_val,
+            "url": url_full,
+            "id": rid_val,
+        })
 
     return {
-        "draw": draw,
-        "recordsTotal": records_total,
-        "recordsFiltered": records_filtered,
-        "data": data,
+        "rowData": row_data,
+        "rowCount": records_filtered,
     }
 
 

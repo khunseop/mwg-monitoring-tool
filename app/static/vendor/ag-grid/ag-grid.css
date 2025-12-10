@@ -1,0 +1,5 @@
+/* Minimal AG Grid theme helpers (placeholder). Replace with official files offline. */
+.ag-root-wrapper{border:1px solid #e5e7eb;border-radius:.5rem}
+.ag-theme-quartz{--ag-header-background-color:#f9fafb;--ag-odd-row-background-color:#fff;--ag-row-hover-color:#f3f4f6}
+.ag-theme-quartz .ag-header{background:var(--ag-header-background-color)}
+

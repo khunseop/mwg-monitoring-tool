@@ -20,7 +20,8 @@
     background-color: #f8fafc; 
 }
 
-/* Session browser table specifics */
+/* Session browser table specifics - DEPRECATED: Replaced by ag-grid */
+/* 
 #sbTable { 
     min-width: 1200px; 
 }
@@ -39,8 +40,10 @@
 #sbTable th:nth-child(9) { 
     max-width: 420px; 
 }
+*/
 
-/* DataTables customization */
+/* DataTables customization - DEPRECATED: Replaced by ag-grid */
+/* 
 .dataTables_wrapper { 
     font-size: 0.95rem; 
 }
@@ -113,7 +116,6 @@
     background: #f8fafc; 
 }
 
-/* Sorting icons */
 table.dataTable thead .sorting,
 table.dataTable thead .sorting_asc,
 table.dataTable thead .sorting_desc { 
@@ -145,7 +147,6 @@ table.dataTable thead th.sorting_desc::after {
     color: var(--color-primary); 
 }
 
-/* ColumnControl header filters */
 table.dataTable thead tr.cc-filters th { 
     background: #fff; 
     position: sticky; 
@@ -162,8 +163,66 @@ table.dataTable thead tr.cc-filters .select.is-small select {
     height: 2em; 
     padding: 0.1em 1.6em 0.1em 0.5em; 
 }
+*/
 
-/* Traffic Logs long text constraints */
+/* ag-grid customization */
+.ag-theme-quartz {
+    --ag-font-family: inherit;
+    --ag-font-size: 0.95rem;
+    --ag-header-height: 40px;
+    --ag-row-height: 36px;
+    --ag-border-color: var(--color-border);
+    --ag-header-background-color: #f9fafb;
+    --ag-odd-row-background-color: transparent;
+    --ag-row-hover-color: #f8fafc;
+    --ag-selected-row-background-color: color-mix(in srgb, var(--color-primary) 8%, white);
+    --ag-range-selection-background-color: color-mix(in srgb, var(--color-primary) 12%, white);
+}
+
+.ag-theme-quartz .ag-header-cell {
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.ag-theme-quartz .ag-cell {
+    color: var(--bulma-text);
+}
+
+.ag-theme-quartz .ag-cell.mono {
+    font-family: 'Courier New', monospace;
+}
+
+.ag-theme-quartz .ag-cell.num {
+    text-align: right;
+}
+
+/* ag-grid pagination styling */
+.ag-theme-quartz .ag-paging-panel {
+    border-top: 1px solid var(--color-border);
+    padding: 0.75rem 0;
+    color: var(--color-text-muted);
+}
+
+.ag-theme-quartz .ag-paging-button {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text);
+    margin: 0 2px;
+    padding: 0.25rem 0.5rem;
+}
+
+.ag-theme-quartz .ag-paging-button:hover {
+    background: #f8fafc;
+}
+
+.ag-theme-quartz .ag-paging-button.ag-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Traffic Logs long text constraints - DEPRECATED: Replaced by ag-grid */
+/* 
 #tlTable td[data-col="url_path"],
 #tlTable td[data-col="url_parametersstring"],
 #tlTable td[data-col="referer"],
@@ -171,6 +230,7 @@ table.dataTable thead tr.cc-filters .select.is-small select {
 #tlTable td[data-col="user_agent"] { 
     max-width: 420px; 
 }
+*/
 
 /* Utility classes */
 .dt-nowrap { 
@@ -203,4 +263,25 @@ table.dataTable thead tr.cc-filters .select.is-small select {
     max-height: 60vh; 
     overflow: auto; 
     white-space: pre; 
+}
+
+/* ag-grid empty state overlay */
+.ag-theme-quartz .ag-overlay-no-rows-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 200px;
+}
+
+.ag-theme-quartz .ag-overlay-no-rows-center {
+    padding: 20px;
+    text-align: center;
+    color: var(--color-text-muted);
+}
+
+.ag-theme-quartz .ag-overlay-no-rows-center small {
+    display: block;
+    margin-top: 8px;
+    opacity: 0.8;
 }

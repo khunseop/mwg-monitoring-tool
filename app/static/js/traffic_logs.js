@@ -5,6 +5,8 @@
 	let LAST_RENDERED_HASH = null;
 	let IS_RESTORING = false;
 	let CURRENT_VIEW = 'remote';
+	let tlGridApi = null;
+	let tlGridColumnApi = null;
 	const COLS = [
 		"datetime","username","client_ip","url_destination_ip","timeintransaction",
 		"response_statuscode","cache_status","comm_name","url_protocol","url_host",
@@ -164,82 +166,66 @@
 	}
 
 	function destroyTableIfExists(){
-		const id = '#tlTable';
-		if($.fn.DataTable && $.fn.DataTable.isDataTable(id)){
-			$(id).DataTable().clear().destroy();
+		if(tlGridApi){
+			tlGridApi.destroy();
+			tlGridApi = null;
+			tlGridColumnApi = null;
 		}
-		$('#tlTableHead').empty();
-		$('#tlTableBody').empty();
 	}
 
 	function renderParsed(records){
 		destroyTableIfExists();
-		const $head = $('#tlTableHead');
-		COLS.forEach(c => { $head.append(`<th>${c}</th>`); });
-		const $body = $('#tlTableBody');
-		records.forEach((r, idx) => {
-			const tds = COLS.map(c => {
-				let v = r[c];
-				if (v === null || v === undefined) v = '';
-				let formatted = v;
-				let orderVal = '';
-				if(c === 'datetime' || c === 'collected_at'){
-					var msOrder = null;
-					if (window.AppUtils && AppUtils.parseTrafficLogDateMs) { msOrder = AppUtils.parseTrafficLogDateMs(String(v)); }
-					if (msOrder == null) { var parsed = Date.parse(String(v)); msOrder = Number.isFinite(parsed) ? parsed : null; }
-					if (msOrder != null) orderVal = String(msOrder);
-					formatted = (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(v) : v;
-				}else if(c === 'response_statuscode'){
-					formatted = (window.AppUtils && AppUtils.renderStatusTag) ? AppUtils.renderStatusTag(v) : String(v);
-					var code = Number(v); if (Number.isFinite(code)) orderVal = String(code);
-				}else if(c === 'recv_byte' || c === 'sent_byte' || c === 'content_lenght'){
-					var b = Number(v);
-					if (Number.isFinite(b)) orderVal = String(b);
-					formatted = (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(v) : v;
-				}else if(c === 'timeintransaction'){
-					var num = Number(v);
-					if(Number.isFinite(num)){
-						var msVal = num < 1000 ? num * 1000 : num;
-						orderVal = String(msVal);
-						formatted = (window.AppUtils && AppUtils.formatDurationMs) ? AppUtils.formatDurationMs(msVal) : v;
-					}
-				}
-				const isUrlish = (c === 'url_path' || c === 'url_parametersstring' || c === 'referer' || c === 'url_host' || c === 'user_agent');
-				const clsParts = ['dt-nowrap'];
-				if(c === 'recv_byte' || c === 'sent_byte' || c === 'content_lenght') clsParts.push('num');
-				if(c === 'response_statuscode') clsParts.push('mono');
-				const cls = clsParts.join(' ');
-				const content = isUrlish ? `<div class="dt-ellipsis">${String(formatted)}</div>` : (typeof formatted === 'string' ? formatted : String(formatted));
-				const orderAttr = orderVal !== '' ? ` data-order="${orderVal}"` : '';
-				return `<td class="${cls}" data-col="${c}"${orderAttr}>${content}</td>`;
-			}).join('');
-			$body.append(`<tr data-row="${idx}">${tds}</tr>`);
-		});
-		// Ensure container visible before initializing filters
+		
+		// Ensure container visible
 		$('#tlResultParsed').show();
 		$('#tlResultRaw').hide();
-		// Initialize DataTables via shared config
-		const dt = TableConfig.init('#tlTable', { order: [], orderCellsTop: true, stateSave: true });
-		setTimeout(function(){
-			TableConfig.adjustColumns(dt);
-			// Header filters via ColumnControl with Enter trigger (unified)
-			try{
-				if (window.jQuery && window.jQuery.fn && window.jQuery.fn.DataTable){
-					var api = window.jQuery('#tlTable').DataTable();
-					if (api && api.columnControl && typeof api.columnControl.bind === 'function'){
-						api.columnControl.bind({ trigger: 'enter' });
-					}
-				}
-			}catch(e){ /* ignore */ }
-		}, 0);
-		// Row click opens detail modal
-		$('#tlTable tbody').off('click', 'tr').on('click', 'tr', function(){
-			const rowIdx = $(this).data('row');
-			if (rowIdx == null) return;
-			showDetail(records[rowIdx] || {});
-		});
-		// Already shown before init
 		$('#tlEmptyState').toggle(records.length === 0);
+		
+		if (records.length === 0) {
+			try { LAST_RENDERED_HASH = JSON.stringify(records || []); } catch(e) { LAST_RENDERED_HASH = null; }
+			return;
+		}
+
+		// Initialize ag-grid with client-side row model
+		var gridOptions = {
+			columnDefs: AgGridConfig.getTrafficLogColumns(),
+			rowData: records,
+			defaultColDef: {
+				sortable: true,
+				filter: true,
+				resizable: true,
+			},
+			rowModelType: 'clientSide',
+			pagination: true,
+			paginationPageSize: 25,
+			enableFilter: true,
+			enableSorting: true,
+			animateRows: false,
+			suppressRowClickSelection: false,
+			overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">표시할 로그가 없습니다.<br><small style="margin-top: 8px; display: block;">프록시를 선택하고 "조회" 버튼을 클릭하세요.</small></div>',
+			onGridReady: function(params) {
+				tlGridApi = params.api;
+				if (params.columnApi) {
+					tlGridColumnApi = params.columnApi;
+				}
+				if (tlGridApi && tlGridApi.sizeColumnsToFit) {
+					tlGridApi.sizeColumnsToFit();
+				}
+			},
+			onRowClicked: function(params) {
+				showDetail(params.data || {});
+			}
+		};
+
+		var gridDiv = document.querySelector('#tlTableGrid');
+		if (gridDiv && window.agGrid) {
+			if (typeof window.agGrid.createGrid === 'function') {
+				tlGridApi = window.agGrid.createGrid(gridDiv, gridOptions);
+			} else if (window.agGrid.Grid) {
+				new window.agGrid.Grid(gridDiv, gridOptions);
+			}
+		}
+		
 		// Update last rendered signature to suppress redundant re-renders
 		try { LAST_RENDERED_HASH = JSON.stringify(records || []); } catch(e) { LAST_RENDERED_HASH = null; }
 	}
