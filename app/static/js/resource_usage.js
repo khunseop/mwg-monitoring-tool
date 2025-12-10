@@ -36,6 +36,26 @@ $(document).ready(function() {
         return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,');
     }
 
+    // 32-bit counter wrap 처리 상수 및 함수
+    const COUNTER32_MAX = 4294967295; // 2^32 - 1
+    
+    function calculateDeltaWithWrap(current, previous) {
+        if (typeof current !== 'number' || typeof previous !== 'number') return null;
+        if (current < previous) {
+            // Counter wrapped: (MAX + 1 - previous) + current
+            return (COUNTER32_MAX + 1 - previous) + current;
+        }
+        return current - previous;
+    }
+    
+    // 프록시 트래픽 델타를 Mbps로 변환하는 함수
+    function calculateTrafficMbps(current, previous, intervalSec) {
+        const deltaBytes = calculateDeltaWithWrap(current, previous);
+        if (deltaBytes === null || deltaBytes < 0 || intervalSec <= 0) return null;
+        // Convert bytes to Mbps: (delta_bytes * 8 bits/byte) / (intervalSec * 1,000,000 bits/Mbit)
+        return (deltaBytes * 8.0) / (intervalSec * 1_000_000.0);
+    }
+
     const ru = {
         intervalId: null,
         lastCumulativeByProxy: {},
@@ -202,14 +222,16 @@ $(document).ready(function() {
         const allInterfaceIndices = new Set();
         
         // First pass: collect all interface indices and process rows
+        const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
         (items || []).forEach(row => {
             const last = ru.lastCumulativeByProxy[row.proxy_id] || {};
             const deltas = { http: null, https: null, ftp: null };
             ['http','https','ftp'].forEach(k => {
                 const v = row[k];
                 if (typeof v === 'number' && typeof last[k] === 'number') {
-                    const d = v - last[k];
-                    deltas[k] = (d >= 0) ? d : null;
+                    // 32-bit counter wrap 처리 및 Mbps 변환
+                    const mbps = calculateTrafficMbps(v, last[k], intervalSec);
+                    deltas[k] = (mbps !== null && mbps >= 0) ? mbps : null;
                 }
             });
             ru.lastCumulativeByProxy[row.proxy_id] = {
@@ -410,8 +432,8 @@ $(document).ready(function() {
                 if (!metric) return String(Math.round(raw));
                 const key = metric.key;
                 if (key === 'httpd' || key === 'httpsd' || key === 'ftpd') {
-                    const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
-                    return formatBytes(raw / intervalSec, 1, true);
+                    // 이미 Mbps 단위로 변환된 값
+                    return raw.toFixed(2) + ' Mbps';
                 }
                 if (key === 'cc' || key === 'cs') {
                     return formatNumber(raw);
@@ -460,8 +482,8 @@ $(document).ready(function() {
                 if (metric) {
                     const key = metric.key;
                 if (key === 'httpd' || key === 'httpsd' || key === 'ftpd') {
-                    const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
-                    formattedRaw = formatBytes(raw / intervalSec, 2, true);
+                    // 이미 Mbps 단위로 변환된 값
+                    formattedRaw = raw.toFixed(2) + ' Mbps';
                 } else if (key === 'cc' || key === 'cs') {
                     formattedRaw = formatNumber(raw);
                 } else if (key.startsWith('if_')) {
@@ -591,7 +613,8 @@ $(document).ready(function() {
                 });
             }
             
-            ['cpu','mem','cc','cs','http','https','ftp'].forEach(k => {
+            const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
+            ['cpu','mem','cc','cs'].forEach(k => {
                 const v = row[k];
                 if (typeof v === 'number') {
                     const arr = ru.tsBuffer[proxyId][k];
@@ -604,6 +627,39 @@ $(document).ready(function() {
                     }
                     if (ru.tsBuffer[proxyId][k].length > ru.bufferMaxPoints) {
                         ru.tsBuffer[proxyId][k].shift();
+                    }
+                }
+            });
+            
+            // 프록시 트래픽(http, https, ftp)은 누적값을 Mbps로 변환하여 저장
+            ['http','https','ftp'].forEach(k => {
+                const v = row[k];
+                if (typeof v === 'number') {
+                    const arr = ru.tsBuffer[proxyId][k];
+                    const lastCumulative = ru.lastCumulativeByProxy[proxyId] || {};
+                    const prevCumulative = lastCumulative[k];
+                    
+                    let mbpsValue = null;
+                    if (typeof prevCumulative === 'number') {
+                        // 이전 누적값이 있으면 델타 계산 및 Mbps 변환
+                        mbpsValue = calculateTrafficMbps(v, prevCumulative, intervalSec);
+                    }
+                    
+                    // 누적값 업데이트
+                    ru.lastCumulativeByProxy[proxyId] = ru.lastCumulativeByProxy[proxyId] || {};
+                    ru.lastCumulativeByProxy[proxyId][k] = v;
+                    
+                    // Mbps 값이 유효한 경우에만 버퍼에 저장
+                    if (mbpsValue !== null && mbpsValue >= 0) {
+                        const last = arr[arr.length - 1];
+                        if (last && last.x === ts) {
+                            arr[arr.length - 1] = { x: ts, y: mbpsValue };
+                        } else {
+                            arr.push({ x: ts, y: mbpsValue });
+                        }
+                        if (ru.tsBuffer[proxyId][k].length > ru.bufferMaxPoints) {
+                            ru.tsBuffer[proxyId][k].shift();
+                        }
                     }
                 }
             });
@@ -807,19 +863,7 @@ $(document).ready(function() {
                 const idx = labelToIndex.get(p.x);
                 if (idx !== undefined) values[idx] = (typeof p.y === 'number') ? p.y : null;
             });
-            if (metricKey === 'http' || metricKey === 'https' || metricKey === 'ftp') {
-                let prev = null;
-                for (let i = 0; i < values.length; i++) {
-                    const v = values[i];
-                    if (typeof v === 'number' && typeof prev === 'number') {
-                        const d = v - prev;
-                        values[i] = (d >= 0) ? d : null;
-                    } else {
-                        values[i] = null;
-                    }
-                    if (typeof v === 'number') prev = v;
-                }
-            }
+            // http/https/ftp는 이미 Mbps로 변환되어 버퍼에 저장되어 있으므로 추가 처리 불필요
             if (values.some(v => typeof v === 'number')) {
                 const proxyMeta = (ru.proxies || []).find(p => String(p.id) === String(proxyId));
                 const proxyLabel = proxyMeta ? proxyMeta.host : `#${proxyId}`;
@@ -887,8 +931,8 @@ $(document).ready(function() {
                     formatter: function(val) {
                         if (val == null) return '0';
                         if (metricKey === 'http' || metricKey === 'https' || metricKey === 'ftp') {
-                            const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
-                            return formatBytes(val / intervalSec, 0, true);
+                            // 이미 Mbps 단위로 변환된 값
+                            return val.toFixed(1) + ' Mbps';
                         }
                         if (metricKey === 'cc' || metricKey === 'cs') { return abbreviateNumber(val); }
                         if (metricKey.startsWith('if_')) { return val.toFixed(1) + ' Mbps'; }
@@ -904,8 +948,8 @@ $(document).ready(function() {
                     formatter: function(val) {
                         if (val == null) return 'N/A';
                         if (metricKey === 'http' || metricKey === 'https' || metricKey === 'ftp') {
-                            const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
-                            return formatBytes(val / intervalSec, 2, true);
+                            // 이미 Mbps 단위로 변환된 값
+                            return val.toFixed(2) + ' Mbps';
                         }
                         if (metricKey === 'cc' || metricKey === 'cs') { return formatNumber(Math.round(val)); }
                         if (metricKey === 'cpu' || metricKey === 'mem') { return String(Math.round(val)); }
