@@ -146,28 +146,47 @@
 	}
 
 	async function fetchProxies(){
-		const res = await fetch(`${API_BASE}/proxies?limit=500&offset=0`);
-		if(!res.ok){ throw new Error('프록시 목록을 불러오지 못했습니다'); }
-		return await res.json();
+		try {
+			const res = await fetch(`${API_BASE}/proxies?limit=500&offset=0`);
+			if(!res.ok){ 
+				throw new Error('프록시 목록을 불러오지 못했습니다'); 
+			}
+			const data = await res.json();
+			console.log('[TrafficLogs] Loaded proxies:', Array.isArray(data) ? data.length : 0, 'active:', Array.isArray(data) ? data.filter(function(p) { return p && p.is_active; }).length : 0);
+			return data;
+		} catch (err) {
+			console.error('[TrafficLogs] Failed to load proxies:', err);
+			throw err;
+		}
 	}
 
 	function populateProxySelect(proxies){
 		const $sel = $('#tlProxySelect');
 		$sel.find('option:not([value=""])').remove();
-		const active = proxies.filter(p => p.is_active);
-		active.forEach(p => {
-			const labelBase = p.group_name ? `${p.host} (${p.group_name})` : p.host;
-			const label = p.traffic_log_path ? labelBase : `${labelBase} · 경로 미설정`;
-			$sel.append(`<option value="${p.id}">${label}</option>`);
-		});
-		if($sel.find('option').length === 1){
-			$sel.append('<option disabled>활성화된 프록시가 없습니다</option>');
+		const active = proxies.filter(p => p && p.is_active);
+		if (active.length === 0) {
+			$sel.append('<option value="" disabled>프록시가 없습니다</option>');
+			showError('프록시가 등록되어 있지 않거나 활성화된 프록시가 없습니다. 설정 > 프록시 관리에서 프록시를 등록하거나 활성화하세요.');
+		} else {
+			active.forEach(p => {
+				const labelBase = p.group_name ? `${p.host} (${p.group_name})` : p.host;
+				const label = p.traffic_log_path ? labelBase : `${labelBase} · 경로 미설정`;
+				$sel.append(`<option value="${p.id}">${label}</option>`);
+			});
+			clearError();
 		}
+		console.log('[TrafficLogs] populateProxySelect - active:', active.length, 'total:', proxies.length);
 	}
 
 	function destroyTableIfExists(){
 		if(tlGridApi){
-			tlGridApi.destroy();
+			try {
+				if (typeof tlGridApi.destroy === 'function') {
+					tlGridApi.destroy();
+				}
+			} catch (e) {
+				console.error('[TrafficLogs] Failed to destroy grid:', e);
+			}
 			tlGridApi = null;
 			tlGridColumnApi = null;
 		}
@@ -219,11 +238,19 @@
 
 		var gridDiv = document.querySelector('#tlTableGrid');
 		if (gridDiv && window.agGrid) {
-			if (typeof window.agGrid.createGrid === 'function') {
-				tlGridApi = window.agGrid.createGrid(gridDiv, gridOptions);
-			} else if (window.agGrid.Grid) {
-				new window.agGrid.Grid(gridDiv, gridOptions);
+			try {
+				if (typeof window.agGrid.createGrid === 'function') {
+					tlGridApi = window.agGrid.createGrid(gridDiv, gridOptions);
+				} else if (window.agGrid.Grid) {
+					new window.agGrid.Grid(gridDiv, gridOptions);
+				}
+				console.log('[TrafficLogs] ag-grid initialized successfully');
+			} catch (e) {
+				console.error('[TrafficLogs] ag-grid init failed:', e);
+				showError('테이블 초기화 실패: ' + (e.message || String(e)));
 			}
+		} else {
+			console.warn('[TrafficLogs] ag-grid not available or grid div not found');
 		}
 		
 		// Update last rendered signature to suppress redundant re-renders
@@ -240,9 +267,15 @@
 	async function loadLogs(){
 		clearError();
 		const proxyId = $('#tlProxySelect').val();
-		if(!proxyId){ showError('프록시를 선택하세요'); return; }
-		const selected = PROXIES.find(p => String(p.id) === String(proxyId));
-		if(!selected){ showError('프록시 정보를 찾을 수 없습니다'); return; }
+		if(!proxyId || proxyId === ''){ 
+			showError('프록시를 선택하세요'); 
+			return; 
+		}
+		const selected = PROXIES.find(p => p && String(p.id) === String(proxyId));
+		if(!selected){ 
+			showError('프록시 정보를 찾을 수 없습니다'); 
+			return; 
+		}
 		if(!selected.traffic_log_path){
 			showError('선택한 프록시에 트래픽 로그 경로가 설정되어 있지 않습니다. 설정 > 프록시 수정에서 경로를 지정하세요.');
 			return;
@@ -292,9 +325,14 @@
 			const proxies = await fetchProxies();
 			PROXIES = Array.isArray(proxies) ? proxies : [];
 			populateProxySelect(PROXIES);
-			setStatus('대기', 'is-light');
+			if (PROXIES.length === 0 || PROXIES.filter(function(p) { return p && p.is_active; }).length === 0) {
+				setStatus('프록시 없음', 'is-warning');
+			} else {
+				setStatus('대기', 'is-light');
+			}
 		}catch(e){
-			showError('프록시 목록 로딩 실패');
+			console.error('[TrafficLogs] Failed to initialize:', e);
+			showError('프록시 목록 로딩 실패: ' + (e.message || String(e)));
 			setStatus('실패', 'is-danger');
 		}
 		// Restore previous state and results after proxies are loaded

@@ -140,52 +140,49 @@ $(document).ready(function() {
         } catch (e) { /* ignore */ }
     }
 
-    function createDataSource() {
-        return {
-            getRows: function(params) {
-                var proxyIds = getSelectedProxyIds();
-                if (proxyIds.length === 0) {
-                    // 프록시가 선택되지 않은 경우에도 빈 결과 반환 (overlayNoRowsTemplate이 표시됨)
-                    params.success({ rowData: [], rowCount: 0 });
-                    return;
-                }
-
-                // Build query params for ag-grid server-side
-                var requestParams = {
-                    startRow: params.request.startRow,
-                    endRow: params.request.endRow,
-                    proxy_ids: proxyIds.join(',')
-                };
-
-                // Add sort model
-                if (params.request.sortModel && params.request.sortModel.length > 0) {
-                    requestParams.sortModel = JSON.stringify(params.request.sortModel);
-                }
-
-                // Add filter model
-                if (params.request.filterModel && Object.keys(params.request.filterModel).length > 0) {
-                    requestParams.filterModel = JSON.stringify(params.request.filterModel);
-                }
-
-                // Add quick filter
-                if (params.request.quickFilterText) {
-                    requestParams.quickFilterText = params.request.quickFilterText;
-                }
-
-                $.ajax({
-                    url: '/api/session-browser/datatables',
-                    method: 'GET',
-                    data: requestParams
-                }).done(function(response) {
-                    params.success({
-                        rowData: response.rowData || [],
-                        rowCount: response.rowCount || 0
-                    });
-                }).fail(function() {
-                    params.fail();
-                });
+    function loadGridData() {
+        var proxyIds = getSelectedProxyIds();
+        if (proxyIds.length === 0) {
+            if (sb.gridApi) {
+                sb.gridApi.setGridOption('rowData', []);
             }
-        };
+            return;
+        }
+
+        // 모든 데이터를 한 번에 불러와서 클라이언트사이드에서 처리
+        $.ajax({
+            url: '/api/session-browser/datatables',
+            method: 'GET',
+            data: {
+                startRow: 0,
+                endRow: 10000, // 충분히 큰 값으로 모든 데이터 가져오기
+                proxy_ids: proxyIds.join(',')
+            }
+        }).done(function(response) {
+            if (sb.gridApi) {
+                // 데이터 변환 (ag-grid 형식으로)
+                var rowData = (response.rowData || []).map(function(rec) {
+                    return {
+                        host: rec.host || '',
+                        creation_time: rec.creation_time || '',
+                        protocol: rec.protocol || '',
+                        user_name: rec.user_name || '',
+                        client_ip: rec.client_ip || '',
+                        server_ip: rec.server_ip || '',
+                        cl_bytes_received: rec.cl_bytes_received,
+                        cl_bytes_sent: rec.cl_bytes_sent,
+                        age_seconds: rec.age_seconds,
+                        url: rec.url || '',
+                        id: rec.id
+                    };
+                });
+                sb.gridApi.setGridOption('rowData', rowData);
+            }
+        }).fail(function() {
+            if (sb.gridApi) {
+                sb.gridApi.setGridOption('rowData', []);
+            }
+        });
     }
 
     function initTable() {
@@ -193,14 +190,13 @@ $(document).ready(function() {
         try {
             var gridOptions = {
                 columnDefs: AgGridConfig.getSessionBrowserColumns(),
+                rowData: [],
                 defaultColDef: {
                     sortable: true,
                     filter: true,
                     resizable: true,
                 },
-                rowModelType: 'serverSide',
-                serverSideInfiniteScroll: true,
-                cacheBlockSize: 25,
+                rowModelType: 'clientSide',
                 pagination: true,
                 paginationPageSize: 25,
                 enableFilter: true,
@@ -213,14 +209,9 @@ $(document).ready(function() {
                     if (params.columnApi) {
                         sb.gridColumnApi = params.columnApi;
                     }
-                    // Set datasource after grid is ready
-                    var datasource = createDataSource();
-                    if (typeof params.api.setServerSideDatasource === 'function') {
-                        params.api.setServerSideDatasource(datasource);
-                    } else if (typeof params.api.setGridOption === 'function') {
-                        params.api.setGridOption('datasource', datasource);
-                    }
                     updateTableVisibility();
+                    // 초기 데이터 로드
+                    loadGridData();
                 },
                 onRowClicked: function(params) {
                     var itemId = params.data.id;
@@ -258,14 +249,7 @@ $(document).ready(function() {
             data: JSON.stringify({ proxy_ids: proxyIds })
         }).then(res => {
             // On collect, reload grid data
-            if (sb.gridApi) { 
-                var datasource = createDataSource();
-                if (typeof sb.gridApi.setServerSideDatasource === 'function') {
-                    sb.gridApi.setServerSideDatasource(datasource);
-                } else if (typeof sb.gridApi.setGridOption === 'function') {
-                    sb.gridApi.setGridOption('datasource', datasource);
-                }
-            }
+            loadGridData();
             $('#sbEmptyState').hide();
             $('#sbTableWrap').show();
             if (res && res.failed && res.failed > 0) { showErr('일부 프록시 수집에 실패했습니다.'); }
@@ -308,11 +292,13 @@ $(document).ready(function() {
     });
     $('#sbGroupSelect').on('change', function() {
         saveState(undefined);
-        // Do not auto-reload on selection change; user must click Load button
+        // 그룹 변경 시 그리드 데이터 다시 로드
+        loadGridData();
     });
     $('#sbProxySelect').on('change', function() {
         saveState(undefined);
-        // Do not auto-reload on selection change; user must click Load button
+        // 프록시 선택 변경 시 그리드 데이터 다시 로드
+        loadGridData();
     });
 
     initTable();
@@ -323,17 +309,29 @@ $(document).ready(function() {
         proxySelect: '#sbProxySelect', 
         selectAll: '#sbSelectAll',
         allowAllGroups: false,
-        onData: function(data){ sb.groups = data.groups || []; sb.proxies = data.proxies || []; }
-    }).then(function(){ 
-        restoreState(); 
-        if (sb.gridApi) {
-            var datasource = createDataSource();
-            if (typeof sb.gridApi.setServerSideDatasource === 'function') {
-                sb.gridApi.setServerSideDatasource(datasource);
-            } else if (typeof sb.gridApi.setGridOption === 'function') {
-                sb.gridApi.setGridOption('datasource', datasource);
+        onData: function(data){ 
+            sb.groups = data.groups || []; 
+            sb.proxies = data.proxies || [];
+            console.log('[SessionBrowser] DeviceSelector onData - groups:', sb.groups.length, 'proxies:', sb.proxies.length);
+            var activeProxies = sb.proxies.filter(function(p) { return p && p.is_active; });
+            console.log('[SessionBrowser] Active proxies:', activeProxies.length);
+            
+            // 프록시가 없을 때 안내 메시지 표시
+            if (!sb.proxies || sb.proxies.length === 0) {
+                $('#sbError').text('프록시가 등록되어 있지 않습니다. 설정 > 프록시 관리에서 프록시를 등록하세요.').show();
+            } else if (activeProxies.length === 0) {
+                $('#sbError').text('활성화된 프록시가 없습니다. 설정 > 프록시 관리에서 프록시를 활성화하세요.').show();
+            } else {
+                $('#sbError').hide();
             }
         }
+    }).then(function(){ 
+        console.log('[SessionBrowser] DeviceSelector initialized');
+        restoreState(); 
+        // Grid가 준비되면 데이터 로드 (onGridReady에서 처리됨)
+    }).catch(function(err) {
+        console.error('[SessionBrowser] DeviceSelector init failed:', err);
+        $('#sbError').text('프록시 목록을 불러오는 중 오류가 발생했습니다: ' + (err.message || String(err))).show();
     });
 
     // Cross-tab sync: update UI when other tabs modify stored state
@@ -342,14 +340,7 @@ $(document).ready(function() {
             if (!e) return;
             if (e.key === STORAGE_KEY) {
                 restoreState();
-                if (sb.gridApi) {
-                    var datasource = createDataSource();
-                    if (typeof sb.gridApi.setServerSideDatasource === 'function') {
-                        sb.gridApi.setServerSideDatasource(datasource);
-                    } else if (typeof sb.gridApi.setGridOption === 'function') {
-                        sb.gridApi.setGridOption('datasource', datasource);
-                    }
-                }
+                loadGridData();
             }
         });
     } catch (e) { /* ignore */ }
