@@ -1,6 +1,18 @@
 {% extends "base.html" %}
 
 {% block content %}
+<div class="tabs is-boxed mb-4">
+    <ul>
+        <li class="is-active" data-tab="realtime">
+            <a>실시간 모니터링</a>
+        </li>
+        <li data-tab="history">
+            <a>이력 조회</a>
+        </li>
+    </ul>
+</div>
+
+<div id="realtime-tab" class="tab-content">
 <div class="box">
     <h3 class="title is-4">자원사용률 모니터링</h3>
 
@@ -109,5 +121,134 @@
         </section>
     </div>
 </div>
+</div>
+
+<div id="history-tab" class="tab-content" style="display:none;">
+<div class="box">
+    <h3 class="title is-4">자원사용률 이력 조회</h3>
+    
+    <div class="accordion is-open" id="ruHistoryAccordion">
+        <div class="accordion-header">
+            <h4>조회 조건</h4>
+        </div>
+        <div class="accordion-body">
+            <div class="columns is-multiline">
+                <div class="column is-3">
+                    <div class="field">
+                        <label class="label">프록시 선택</label>
+                        <div class="control">
+                            <select id="ruHistoryProxySelect" class="ts-fullwidth">
+                                <option value="">전체</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="column is-3">
+                    <div class="field">
+                        <label class="label">시작 시간</label>
+                        <div class="control">
+                            <input class="input" id="ruHistoryStartTime" type="datetime-local">
+                        </div>
+                    </div>
+                </div>
+                <div class="column is-3">
+                    <div class="field">
+                        <label class="label">종료 시간</label>
+                        <div class="control">
+                            <input class="input" id="ruHistoryEndTime" type="datetime-local">
+                        </div>
+                    </div>
+                </div>
+                <div class="column is-3">
+                    <div class="field">
+                        <label class="label">&nbsp;</label>
+                        <div class="control">
+                            <button class="button is-primary is-fullwidth" id="ruHistorySearchBtn">조회</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="field">
+                <label class="label">최대 조회 개수</label>
+                <div class="control">
+                    <input class="input" id="ruHistoryLimit" type="number" min="1" max="10000" value="1000">
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="ruHistoryLoading" class="has-text-centered" style="display:none;">
+        <p class="help">조회 중...</p>
+    </div>
+    
+    <div id="ruHistoryError" class="help is-danger" style="display:none;"></div>
+    
+    <div id="ruHistoryResults" style="display:none;">
+        <div class="mt-4">
+            <p id="ruHistoryCount" class="help"></p>
+        </div>
+        <div class="table-container mt-4" style="max-height: 600px; overflow-y: auto;">
+            <table class="table is-striped is-fullwidth is-hoverable">
+                <thead>
+                    <tr>
+                        <th>수집 시간</th>
+                        <th>프록시</th>
+                        <th>CPU (%)</th>
+                        <th>MEM (%)</th>
+                        <th>CC</th>
+                        <th>CS</th>
+                        <th>HTTP</th>
+                        <th>HTTPS</th>
+                        <th>FTP</th>
+                        <th>인터페이스 MBPS</th>
+                    </tr>
+                </thead>
+                <tbody id="ruHistoryTableBody">
+                </tbody>
+            </table>
+        </div>
+        <div id="ruHistoryChartWrap" class="mt-4" style="display:none;">
+            <h5 class="title is-6">이력 그래프</h5>
+            <div id="ruHistoryChart" style="width:100%; height:400px;"></div>
+        </div>
+    </div>
+</div>
+</div>
+
+<script>
+// 탭 전환 기능
+$(document).ready(function() {
+    // 탭 클릭 이벤트 핸들러
+    function switchTab(tabName) {
+        // 모든 탭 비활성화
+        $('.tabs li').removeClass('is-active');
+        // 모든 탭 콘텐츠 숨기기
+        $('.tab-content').hide();
+        
+        // 선택된 탭 활성화
+        $('.tabs li[data-tab="' + tabName + '"]').addClass('is-active');
+        // 선택된 탭 콘텐츠 표시
+        $('#' + tabName + '-tab').show();
+    }
+    
+    // 탭 클릭 이벤트 바인딩
+    $('.tabs li').on('click', function(e) {
+        e.preventDefault();
+        const tab = $(this).data('tab');
+        switchTab(tab);
+    });
+    
+    // URL 파라미터로 탭 전환 (예: /resource?tab=history)
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get('tab');
+    if (tabParam === 'history') {
+        switchTab('history');
+    } else {
+        // 기본값: 실시간 모니터링 탭 표시
+        switchTab('realtime');
+    }
+});
+</script>
+<script src="/static/js/resource_history.js"></script>
 {% endblock %}
 

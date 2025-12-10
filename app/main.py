@@ -93,7 +93,9 @@ async def read_resource(request: Request):
 
 @app.get("/resource-history")
 async def read_resource_history(request: Request):
-    return templates.TemplateResponse("components/resource_history.html", {"request": request})
+    # 자원사용률 이력은 이제 자원사용률 페이지의 하위 탭으로 통합됨
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/resource?tab=history", status_code=301)
 
 @app.get("/settings")
 async def read_settings(request: Request):
