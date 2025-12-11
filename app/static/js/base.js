@@ -90,10 +90,20 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
   
-    // ESC 키 → 모든 모달 닫기
-    document.addEventListener("keydown", event => {
-      if (event.key === "Escape") {
-        closeAllModals();
-      }
+      // ESC 키 → 모든 모달 닫기
+      document.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+          closeAllModals();
+        }
+      });
     });
-  });
+
+// 네비바 자원사용률 수집 인디케이터 업데이트 함수
+window.updateNavbarIndicator = function(isCollecting) {
+    const $indicator = $('#ruNavIndicator');
+    if (isCollecting) {
+        $indicator.show();
+    } else {
+        $indicator.hide();
+    }
+};

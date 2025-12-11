@@ -69,7 +69,8 @@ $(document).ready(function() {
         bufferWindowMs: 60 * 60 * 1000, // last 1 hour
         bufferMaxPoints: 600,
         timeBucketMs: 1000, // quantize to seconds to align x-axis across proxies
-        legendState: {} // { [metricKey]: { [proxyId]: hiddenBoolean } }
+        legendState: {}, // { [metricKey]: { [proxyId]: hiddenBoolean } }
+        isCollecting: false // 수집 진행 중 상태
     };
     const STORAGE_KEY = 'ru_state_v1';
     const LEGEND_STORAGE_KEY = 'ru_legend_v1';
@@ -505,12 +506,23 @@ $(document).ready(function() {
     }
 
     function collectOnce() {
+        // 이미 수집 중이면 중복 실행 방지
+        if (ru.isCollecting) return;
+        
         clearRuError();
         const proxyIds = getSelectedProxyIds();
         if (proxyIds.length === 0) { showRuError('프록시를 하나 이상 선택하세요.'); return; }
         const community = (cachedConfig && cachedConfig.community) ? cachedConfig.community.toString() : 'public';
         const oids = (cachedConfig && cachedConfig.oids) ? cachedConfig.oids : {};
         if (Object.keys(oids).length === 0) { showRuError('설정된 OID가 없습니다. 설정 페이지를 확인하세요.'); return; }
+        
+        // 수집 시작 상태 업데이트
+        ru.isCollecting = true;
+        if (typeof window.updateNavbarIndicator === 'function') {
+            window.updateNavbarIndicator(true);
+        }
+        
+        // 비동기로 수집 실행 (UI 블로킹 방지)
         return $.ajax({
             url: '/api/resource-usage/collect',
             method: 'POST',
@@ -522,7 +534,7 @@ $(document).ready(function() {
             if (Array.isArray(items)) { saveState(items); } else { saveState(undefined); }
             if (res && res.failed && res.failed > 0) { showRuError('일부 프록시 수집에 실패했습니다.'); }
             // Fetch latest rows from DB to ensure consistency and append to buffer
-            fetchLatestForProxies(proxyIds).then(latestRows => {
+            return fetchLatestForProxies(proxyIds).then(latestRows => {
                 // filter invalid latest rows
                 const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
                 bufferAppendBatch(valid);
@@ -535,7 +547,15 @@ $(document).ready(function() {
                 saveBufferState();
                 renderAllCharts();
             });
-        }).catch(() => { showRuError('수집 요청 중 오류가 발생했습니다.'); });
+        }).catch(() => { 
+            showRuError('수집 요청 중 오류가 발생했습니다.'); 
+        }).finally(() => {
+            // 수집 종료 상태 업데이트
+            ru.isCollecting = false;
+            if (typeof window.updateNavbarIndicator === 'function') {
+                window.updateNavbarIndicator(false);
+            }
+        });
     }
 
     function fetchLatestForProxies(proxyIds) {
@@ -548,7 +568,7 @@ $(document).ready(function() {
         const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
         const periodMs = Math.max(5, intervalSec) * 1000;
         setRunning(true);
-        collectOnce();
+        // 즉시 수집하지 않고 주기만 설정 (다음 주기까지 대기)
         ru.intervalId = setInterval(() => { collectOnce(); }, periodMs);
     }
     function stopPolling() {
