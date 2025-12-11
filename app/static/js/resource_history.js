@@ -50,10 +50,15 @@ $(document).ready(function() {
         }
     }
 
-    // Set default time range (last 24 hours)
+    // Set default time range (last 24 hours in KST)
     function setDefaultTimeRange() {
+        // 현재 시간을 KST로 가져오기
+        // 브라우저의 로컬 시간대를 KST로 가정하거나, UTC+9로 계산
         const now = new Date();
-        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        // 브라우저 로컬 시간대를 KST로 가정 (대부분의 사용자가 한국에 있으므로)
+        // 또는 UTC+9로 명시적으로 계산
+        const nowKST = new Date(now.getTime() + (now.getTimezoneOffset() + 9 * 60) * 60 * 1000);
+        const yesterdayKST = new Date(nowKST.getTime() - 24 * 60 * 60 * 1000);
         
         const formatDateTimeLocal = (date) => {
             const year = date.getFullYear();
@@ -64,8 +69,8 @@ $(document).ready(function() {
             return `${year}-${month}-${day}T${hours}:${minutes}`;
         };
         
-        $('#ruHistoryEndTime').val(formatDateTimeLocal(now));
-        $('#ruHistoryStartTime').val(formatDateTimeLocal(yesterday));
+        $('#ruHistoryEndTime').val(formatDateTimeLocal(nowKST));
+        $('#ruHistoryStartTime').val(formatDateTimeLocal(yesterdayKST));
     }
 
     // Format datetime for display
@@ -110,12 +115,25 @@ $(document).ready(function() {
             return;
         }
 
-        // datetime-local 입력은 로컬 시간대(한국 시간)로 입력되므로,
-        // new Date()로 파싱하면 로컬 시간대로 해석되고,
-        // toISOString()으로 UTC로 변환됩니다.
-        // 백엔드에서 이 UTC 시간을 KST로 변환하여 데이터베이스의 KST 시간과 비교합니다.
-        const startDateTime = new Date(startTime).toISOString();
-        const endDateTime = new Date(endTime).toISOString();
+        // datetime-local 입력값을 KST(UTC+9)로 명시적으로 해석하여 UTC로 변환
+        // datetime-local 형식: "YYYY-MM-DDTHH:mm"
+        function convertKSTToUTC(datetimeLocal) {
+            // 입력값을 파싱 (예: "2024-01-01T12:00")
+            const [datePart, timePart] = datetimeLocal.split('T');
+            const [year, month, day] = datePart.split('-').map(Number);
+            const [hours, minutes] = timePart.split(':').map(Number);
+            
+            // KST(UTC+9)로 해석하여 Date 객체 생성
+            // Date 객체는 내부적으로 UTC로 저장되므로, KST 시간에서 9시간을 빼서 UTC로 변환
+            const kstDate = new Date(Date.UTC(year, month - 1, day, hours, minutes));
+            // KST는 UTC+9이므로 9시간을 빼서 UTC로 변환
+            const utcDate = new Date(kstDate.getTime() - 9 * 60 * 60 * 1000);
+            
+            return utcDate.toISOString();
+        }
+        
+        const startDateTime = convertKSTToUTC(startTime);
+        const endDateTime = convertKSTToUTC(endTime);
 
         $('#ruHistoryLoading').show();
         $('#ruHistoryError').hide();

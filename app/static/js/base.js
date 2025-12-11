@@ -90,13 +90,13 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
   
-      // ESC 키 → 모든 모달 닫기
-      document.addEventListener("keydown", event => {
-        if (event.key === "Escape") {
-          closeAllModals();
-        }
-      });
+    // ESC 키 → 모든 모달 닫기
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") {
+        closeAllModals();
+      }
     });
+  });
 
 // 전역 자원사용률 수집 상태 관리
 window.ResourceUsageCollector = {
