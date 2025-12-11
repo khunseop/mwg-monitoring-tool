@@ -58,6 +58,7 @@ $(document).ready(function() {
 
     const ru = {
         intervalId: null,
+        taskId: null, // 백그라운드 작업 ID
         lastCumulativeByProxy: {},
         proxies: [],
         groups: [],
@@ -70,7 +71,7 @@ $(document).ready(function() {
         bufferMaxPoints: 600,
         timeBucketMs: 1000, // quantize to seconds to align x-axis across proxies
         legendState: {}, // { [metricKey]: { [proxyId]: hiddenBoolean } }
-        isCollecting: false // 수집 진행 중 상태
+        _wsHandlerAdded: false // 웹소켓 핸들러 추가 여부
     };
     const STORAGE_KEY = 'ru_state_v1';
     const LEGEND_STORAGE_KEY = 'ru_legend_v1';
@@ -505,75 +506,111 @@ $(document).ready(function() {
         else { $('#ruEmptyState').hide(); $('#ruHeatmapWrap').show(); }
     }
 
-    function collectOnce() {
-        // 이미 수집 중이면 중복 실행 방지
-        if (ru.isCollecting) return;
-        
-        clearRuError();
-        const proxyIds = getSelectedProxyIds();
-        if (proxyIds.length === 0) { showRuError('프록시를 하나 이상 선택하세요.'); return; }
-        const community = (cachedConfig && cachedConfig.community) ? cachedConfig.community.toString() : 'public';
-        const oids = (cachedConfig && cachedConfig.oids) ? cachedConfig.oids : {};
-        if (Object.keys(oids).length === 0) { showRuError('설정된 OID가 없습니다. 설정 페이지를 확인하세요.'); return; }
-        
-        // 수집 시작 상태 업데이트
-        ru.isCollecting = true;
-        if (typeof window.updateNavbarIndicator === 'function') {
-            window.updateNavbarIndicator(true);
-        }
-        
-        // 비동기로 수집 실행 (UI 블로킹 방지)
-        return $.ajax({
-            url: '/api/resource-usage/collect',
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ proxy_ids: proxyIds, community: community, oids: oids })
-        }).then(res => {
-            const items = (res && Array.isArray(res.items)) ? res.items : [];
-            updateTable(items);
-            if (Array.isArray(items)) { saveState(items); } else { saveState(undefined); }
-            if (res && res.failed && res.failed > 0) { showRuError('일부 프록시 수집에 실패했습니다.'); }
-            // Fetch latest rows from DB to ensure consistency and append to buffer
-            return fetchLatestForProxies(proxyIds).then(latestRows => {
-                // filter invalid latest rows
-                const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
-                bufferAppendBatch(valid);
-                saveBufferState();
-                renderAllCharts();
-            }).catch(() => {
-                // fallback: use returned items
-                const valid = (items || []).filter(r => r && r.proxy_id && r.collected_at);
-                bufferAppendBatch(valid);
-                saveBufferState();
-                renderAllCharts();
-            });
-        }).catch(() => { 
-            showRuError('수집 요청 중 오류가 발생했습니다.'); 
-        }).finally(() => {
-            // 수집 종료 상태 업데이트
-            ru.isCollecting = false;
-            if (typeof window.updateNavbarIndicator === 'function') {
-                window.updateNavbarIndicator(false);
-            }
-        });
-    }
+    // collectOnce는 더 이상 사용하지 않음 (백그라운드 작업으로 대체)
+    // 하지만 수동 수집 버튼이 있다면 유지할 수 있음
 
     function fetchLatestForProxies(proxyIds) {
         const reqs = (proxyIds || []).map(id => $.getJSON(`/api/resource-usage/latest/${id}`).catch(() => null));
         return Promise.all(reqs).then(rows => rows.filter(r => r && r.id));
     }
 
-    function startPolling() {
+    async function startPolling() {
         if (ru.intervalId) return;
+        
+        const proxyIds = getSelectedProxyIds();
+        if (proxyIds.length === 0) { 
+            showRuError('프록시를 하나 이상 선택하세요.'); 
+            return; 
+        }
+        
+        const community = (cachedConfig && cachedConfig.community) ? cachedConfig.community.toString() : 'public';
+        const oids = (cachedConfig && cachedConfig.oids) ? cachedConfig.oids : {};
+        if (Object.keys(oids).length === 0) { 
+            showRuError('설정된 OID가 없습니다. 설정 페이지를 확인하세요.'); 
+            return; 
+        }
+        
         const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
-        const periodMs = Math.max(5, intervalSec) * 1000;
-        setRunning(true);
-        // 즉시 수집하지 않고 주기만 설정 (다음 주기까지 대기)
-        ru.intervalId = setInterval(() => { collectOnce(); }, periodMs);
+        
+        try {
+            // 백그라운드 수집 시작
+            const response = await $.ajax({
+                url: '/api/resource-usage/background/start',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    proxy_ids: proxyIds,
+                    community: community,
+                    oids: oids,
+                    interval_sec: intervalSec
+                })
+            });
+            
+            ru.taskId = response.task_id;
+            setRunning(true);
+            ru.intervalId = 'background'; // 백그라운드 작업 표시
+            
+            // 웹소켓을 통해 수집 완료 시 데이터 갱신 핸들러 등록
+            if (window.ResourceUsageCollector) {
+                window.ResourceUsageCollector.onCollectionComplete = function(taskId, data) {
+                    if (taskId === ru.taskId) {
+                        const currentProxyIds = getSelectedProxyIds();
+                        fetchLatestForProxies(currentProxyIds).then(latestRows => {
+                            const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
+                            bufferAppendBatch(valid);
+                            saveBufferState();
+                            renderAllCharts();
+                            // 최신 데이터로 테이블 업데이트
+                            if (valid.length > 0) {
+                                updateTable(valid);
+                            }
+                        }).catch(() => {});
+                    }
+                };
+            }
+        } catch (error) {
+            console.error('[resource_usage] Failed to start background collection:', error);
+            showRuError('백그라운드 수집 시작에 실패했습니다.');
+        }
     }
-    function stopPolling() {
-        if (ru.intervalId) { clearInterval(ru.intervalId); ru.intervalId = null; }
-        setRunning(false);
+    
+    async function stopPolling() {
+        if (!ru.taskId) {
+            ru.intervalId = null;
+            setRunning(false);
+            return;
+        }
+        
+        const taskIdToStop = ru.taskId;
+        
+        try {
+            await $.ajax({
+                url: '/api/resource-usage/background/stop',
+                method: 'POST',
+                data: { task_id: taskIdToStop }
+            });
+            
+            ru.taskId = null;
+            ru.intervalId = null;
+            setRunning(false);
+            
+            // 전역 상태도 업데이트
+            if (window.ResourceUsageCollector) {
+                window.ResourceUsageCollector.setCollecting(false);
+                window.ResourceUsageCollector.taskId = null;
+            }
+        } catch (error) {
+            console.error('[resource_usage] Failed to stop background collection:', error);
+            // 에러가 나도 로컬 상태는 업데이트
+            ru.taskId = null;
+            ru.intervalId = null;
+            setRunning(false);
+            
+            if (window.ResourceUsageCollector) {
+                window.ResourceUsageCollector.setCollecting(false);
+                window.ResourceUsageCollector.taskId = null;
+            }
+        }
     }
 
     $('#ruStartBtn').on('click', function() { startPolling(); });
@@ -602,12 +639,25 @@ $(document).ready(function() {
         // After restore, start or render based on persisted running flag
         try {
             const running = localStorage.getItem(RUN_STORAGE_KEY) === '1';
-            if (running) {
+            // 백그라운드 작업 상태 확인
+            if (window.ResourceUsageCollector && window.ResourceUsageCollector.taskId) {
+                ru.taskId = window.ResourceUsageCollector.taskId;
+                setRunning(true);
+                ru.intervalId = 'background';
+            } else if (running) {
                 // ensure we actually have proxies before first collect
-                if (getSelectedProxyIds().length === 0) { renderAllCharts(); setRunning(false); }
-                else { startPolling(); }
-            } else { renderAllCharts(); }
-        } catch (e) { renderAllCharts(); }
+                if (getSelectedProxyIds().length === 0) { 
+                    renderAllCharts(); 
+                    setRunning(false); 
+                } else { 
+                    startPolling(); 
+                }
+            } else { 
+                renderAllCharts(); 
+            }
+        } catch (e) { 
+            renderAllCharts(); 
+        }
     });
 
     // =====================

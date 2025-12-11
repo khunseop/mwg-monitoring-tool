@@ -98,12 +98,185 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     });
 
-// 네비바 자원사용률 수집 인디케이터 업데이트 함수
-window.updateNavbarIndicator = function(isCollecting) {
-    const $indicator = $('#ruNavIndicator');
-    if (isCollecting) {
-        $indicator.show();
-    } else {
-        $indicator.hide();
+// 전역 자원사용률 수집 상태 관리
+window.ResourceUsageCollector = {
+    ws: null,
+    isCollecting: false,
+    taskId: null,
+    reconnectAttempts: 0,
+    maxReconnectAttempts: 5,
+    reconnectDelay: 3000,
+    
+    // 웹소켓 연결
+    connect: function() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/resource-usage/status`;
+        
+        try {
+            this.ws = new WebSocket(wsUrl);
+            
+            this.ws.onopen = () => {
+                console.log('[ResourceUsageCollector] WebSocket connected');
+                this.reconnectAttempts = 0;
+                // 현재 상태 확인
+                if (this.isCollecting && this.taskId) {
+                    this.checkStatus();
+                }
+            };
+            
+            this.ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    this.handleMessage(message);
+                } catch (e) {
+                    console.error('[ResourceUsageCollector] Failed to parse message:', e);
+                }
+            };
+            
+            this.ws.onerror = (error) => {
+                console.error('[ResourceUsageCollector] WebSocket error:', error);
+            };
+            
+            this.ws.onclose = () => {
+                console.log('[ResourceUsageCollector] WebSocket closed');
+                this.ws = null;
+                // 자동 재연결 (수집 중일 때만, 또는 항상 재연결 시도)
+                if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                    this.reconnectAttempts++;
+                    setTimeout(() => {
+                        if (this.isCollecting || this.reconnectAttempts <= this.maxReconnectAttempts) {
+                            this.connect();
+                        }
+                    }, this.reconnectDelay);
+                } else {
+                    // 최대 재연결 시도 횟수 초과 시 재설정
+                    this.reconnectAttempts = 0;
+                }
+            };
+        } catch (e) {
+            console.error('[ResourceUsageCollector] Failed to create WebSocket:', e);
+        }
+    },
+    
+    // 메시지 처리
+    handleMessage: function(message) {
+        if (message.type === 'collection_status') {
+            if (message.status === 'collecting') {
+                this.setCollecting(true);
+            } else if (message.status === 'completed') {
+                // 수집 완료 콜백 호출
+                if (typeof this.onCollectionComplete === 'function') {
+                    this.onCollectionComplete(message.task_id, message.data);
+                }
+                // 완료 후에도 계속 실행 중이면 collecting 상태 유지
+                if (this.isCollecting) {
+                    // 다음 주기까지 대기 중이므로 collecting 상태 유지
+                    return;
+                }
+            } else if (message.status === 'error') {
+                console.error('[ResourceUsageCollector] Collection error:', message.data);
+                // 에러가 나도 계속 실행 중이면 상태 유지
+            } else if (message.status === 'stopped') {
+                this.setCollecting(false);
+                this.taskId = null;
+            } else if (message.status === 'started') {
+                this.setCollecting(true);
+                this.taskId = message.task_id;
+            }
+        } else if (message.type === 'initial_status') {
+            // 초기 상태 복원
+            const status = message.data;
+            if (status.tasks && Object.keys(status.tasks).length > 0) {
+                const runningTasks = Object.values(status.tasks).filter(t => t.status === 'running');
+                if (runningTasks.length > 0) {
+                    this.setCollecting(true);
+                    this.taskId = Object.keys(status.tasks)[0];
+                }
+            }
+        }
+    },
+    
+    // 수집 완료 콜백 (외부에서 설정 가능)
+    onCollectionComplete: null,
+    
+    // 수집 상태 설정
+    setCollecting: function(isCollecting) {
+        this.isCollecting = isCollecting;
+        // localStorage에 저장 (전역 상태)
+        try {
+            localStorage.setItem('ru_collecting', isCollecting ? '1' : '0');
+            if (this.taskId) {
+                localStorage.setItem('ru_task_id', this.taskId);
+            } else {
+                localStorage.removeItem('ru_task_id');
+            }
+        } catch (e) {
+            console.error('[ResourceUsageCollector] Failed to save state:', e);
+        }
+        this.updateNavbarIndicator();
+    },
+    
+    // 네비바 인디케이터 업데이트
+    updateNavbarIndicator: function() {
+        const $indicator = $('#ruNavIndicator');
+        if (this.isCollecting) {
+            $indicator.show();
+        } else {
+            $indicator.hide();
+        }
+    },
+    
+    // 상태 확인
+    checkStatus: function() {
+        if (!this.taskId) return;
+        fetch(`/api/resource-usage/background/status?task_id=${this.taskId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'running') {
+                    this.setCollecting(true);
+                } else {
+                    this.setCollecting(false);
+                }
+            })
+            .catch(e => console.error('[ResourceUsageCollector] Failed to check status:', e));
+    },
+    
+    // 초기화
+    init: function() {
+        // localStorage에서 상태 복원
+        try {
+            const saved = localStorage.getItem('ru_collecting');
+            const savedTaskId = localStorage.getItem('ru_task_id');
+            if (saved === '1' && savedTaskId) {
+                this.isCollecting = true;
+                this.taskId = savedTaskId;
+            }
+        } catch (e) {
+            console.error('[ResourceUsageCollector] Failed to restore state:', e);
+        }
+        
+        this.updateNavbarIndicator();
+        this.connect();
+        
+        // 페이지 언로드 시 웹소켓 정리
+        window.addEventListener('beforeunload', () => {
+            if (this.ws) {
+                this.ws.close();
+            }
+        });
     }
 };
+
+// 네비바 인디케이터 업데이트 함수 (하위 호환성)
+window.updateNavbarIndicator = function(isCollecting) {
+    if (window.ResourceUsageCollector) {
+        window.ResourceUsageCollector.setCollecting(isCollecting);
+    }
+};
+
+// 페이지 로드 시 초기화
+$(document).ready(function() {
+    if (window.ResourceUsageCollector) {
+        window.ResourceUsageCollector.init();
+    }
+});

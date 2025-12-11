@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Tuple, Optional
 from datetime import timedelta, datetime, timezone
@@ -25,6 +25,8 @@ from app.schemas.resource_usage import (
     CollectRequest,
     CollectResponse,
 )
+from app.utils.background_collector import background_collector
+from pydantic import BaseModel
 
 # aiosnmp import for SNMP operations
 from aiosnmp import Snmp
@@ -550,4 +552,107 @@ def _enforce_resource_usage_retention(db: Session, days: int = 30) -> None:
         except Exception:
             pass
         return
+
+
+# 백그라운드 수집 관련 스키마
+class StartBackgroundCollectRequest(BaseModel):
+    proxy_ids: List[int]
+    community: str
+    oids: Dict[str, str]
+    interval_sec: int
+
+
+class BackgroundCollectStatusResponse(BaseModel):
+    task_id: str
+    status: str
+    started_at: Optional[str] = None
+    proxy_ids: Optional[List[int]] = None
+    interval_sec: Optional[int] = None
+
+
+@router.post("/resource-usage/background/start", response_model=BackgroundCollectStatusResponse)
+async def start_background_collection(payload: StartBackgroundCollectRequest):
+    """백그라운드 수집 작업 시작"""
+    if not payload.oids:
+        raise HTTPException(status_code=400, detail="oids mapping is required")
+    if not payload.proxy_ids or len(payload.proxy_ids) == 0:
+        raise HTTPException(status_code=400, detail="proxy_ids is required and cannot be empty")
+    if not payload.community:
+        raise HTTPException(status_code=400, detail="community is required")
+    if payload.interval_sec < 5:
+        raise HTTPException(status_code=400, detail="interval_sec must be at least 5 seconds")
+    
+    # 고유한 task_id 생성 (프록시 ID와 설정 기반)
+    task_id = f"ru_{hash(tuple(sorted(payload.proxy_ids)) + (payload.community,) + tuple(sorted(payload.oids.items())))}"
+    
+    # 이미 실행 중이면 기존 작업 반환
+    if background_collector.is_running(task_id):
+        status = background_collector.get_status(task_id)
+        return BackgroundCollectStatusResponse(
+            task_id=task_id,
+            status="running",
+            started_at=status.get("started_at"),
+            proxy_ids=status.get("proxy_ids"),
+            interval_sec=status.get("interval_sec")
+        )
+    
+    # 백그라운드 작업 시작
+    await background_collector.start_collection(
+        task_id=task_id,
+        proxy_ids=payload.proxy_ids,
+        community=payload.community,
+        oids=payload.oids,
+        interval_sec=payload.interval_sec
+    )
+    
+    status = background_collector.get_status(task_id)
+    return BackgroundCollectStatusResponse(
+        task_id=task_id,
+        status="started",
+        started_at=status.get("started_at"),
+        proxy_ids=status.get("proxy_ids"),
+        interval_sec=status.get("interval_sec")
+    )
+
+
+@router.post("/resource-usage/background/stop")
+async def stop_background_collection(task_id: str = Query(..., description="수집 작업 ID")):
+    """백그라운드 수집 작업 중지"""
+    await background_collector.stop_collection(task_id)
+    return {"status": "stopped", "task_id": task_id}
+
+
+@router.get("/resource-usage/background/status", response_model=Dict[str, Any])
+async def get_background_collection_status(task_id: Optional[str] = Query(None, description="수집 작업 ID (선택사항)")):
+    """백그라운드 수집 상태 조회"""
+    return background_collector.get_status(task_id)
+
+
+@router.websocket("/ws/resource-usage/status")
+async def websocket_collection_status(websocket: WebSocket):
+    """웹소켓을 통한 수집 상태 실시간 전송"""
+    await websocket.accept()
+    await background_collector.register_websocket(websocket)
+    
+    try:
+        # 현재 상태 전송
+        status = background_collector.get_status()
+        await websocket.send_json({
+            "type": "initial_status",
+            "data": status
+        })
+        
+        # 클라이언트로부터 메시지 수신 대기 (연결 유지)
+        while True:
+            try:
+                data = await websocket.receive_text()
+                # 필요시 클라이언트 요청 처리
+                if data == "ping":
+                    await websocket.send_json({"type": "pong"})
+            except WebSocketDisconnect:
+                break
+    except Exception as e:
+        logger.error(f"[resource_usage] WebSocket error: {e}", exc_info=True)
+    finally:
+        await background_collector.unregister_websocket(websocket)
 
