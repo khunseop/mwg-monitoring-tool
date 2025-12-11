@@ -163,6 +163,9 @@ window.ResourceUsageCollector = {
         if (message.type === 'collection_status') {
             if (message.status === 'collecting') {
                 this.setCollecting(true);
+                if (message.task_id) {
+                    this.taskId = message.task_id;
+                }
             } else if (message.status === 'completed') {
                 // 수집 완료 콜백 호출
                 if (typeof this.onCollectionComplete === 'function') {
@@ -178,10 +181,27 @@ window.ResourceUsageCollector = {
                 // 에러가 나도 계속 실행 중이면 상태 유지
             } else if (message.status === 'stopped') {
                 this.setCollecting(false);
+                const stoppedTaskId = this.taskId;
                 this.taskId = null;
+                // resource_usage.js의 상태도 업데이트
+                if (window.ru && window.ru.taskId === stoppedTaskId) {
+                    window.ru.taskId = null;
+                    window.ru.intervalId = null;
+                    if (typeof window.setRunning === 'function') {
+                        window.setRunning(false);
+                    }
+                }
             } else if (message.status === 'started') {
                 this.setCollecting(true);
                 this.taskId = message.task_id;
+                // resource_usage.js의 상태도 업데이트
+                if (window.ru) {
+                    window.ru.taskId = message.task_id;
+                    window.ru.intervalId = 'background';
+                    if (typeof window.setRunning === 'function') {
+                        window.setRunning(true);
+                    }
+                }
             }
         } else if (message.type === 'initial_status') {
             // 초기 상태 복원
@@ -191,6 +211,14 @@ window.ResourceUsageCollector = {
                 if (runningTasks.length > 0) {
                     this.setCollecting(true);
                     this.taskId = Object.keys(status.tasks)[0];
+                    // resource_usage.js의 상태도 업데이트
+                    if (window.ru) {
+                        window.ru.taskId = this.taskId;
+                        window.ru.intervalId = 'background';
+                        if (typeof window.setRunning === 'function') {
+                            window.setRunning(true);
+                        }
+                    }
                 }
             }
         }

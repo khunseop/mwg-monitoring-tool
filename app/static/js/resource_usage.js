@@ -73,6 +73,9 @@ $(document).ready(function() {
         legendState: {}, // { [metricKey]: { [proxyId]: hiddenBoolean } }
         _wsHandlerAdded: false // 웹소켓 핸들러 추가 여부
     };
+    
+    // 전역으로 노출 (웹소켓 핸들러에서 접근 가능하도록)
+    window.ru = ru;
     const STORAGE_KEY = 'ru_state_v1';
     const LEGEND_STORAGE_KEY = 'ru_legend_v1';
     const BUFFER_STORAGE_KEY = 'ru_buffer_v1';
@@ -92,6 +95,9 @@ $(document).ready(function() {
         }
         try { localStorage.setItem(RUN_STORAGE_KEY, running ? '1' : '0'); } catch (e) { /* ignore */ }
     }
+    
+    // 전역으로 노출 (웹소켓 핸들러에서 접근 가능하도록)
+    window.setRunning = setRunning;
 
     // Selection UI is now handled by shared DeviceSelector
 
@@ -550,8 +556,12 @@ $(document).ready(function() {
             setRunning(true);
             ru.intervalId = 'background'; // 백그라운드 작업 표시
             
-            // 웹소켓을 통해 수집 완료 시 데이터 갱신 핸들러 등록
+            // 전역 상태도 업데이트
             if (window.ResourceUsageCollector) {
+                window.ResourceUsageCollector.setCollecting(true);
+                window.ResourceUsageCollector.taskId = response.task_id;
+                
+                // 웹소켓을 통해 수집 완료 시 데이터 갱신 핸들러 등록
                 window.ResourceUsageCollector.onCollectionComplete = function(taskId, data) {
                     if (taskId === ru.taskId) {
                         const currentProxyIds = getSelectedProxyIds();
@@ -587,7 +597,8 @@ $(document).ready(function() {
             await $.ajax({
                 url: '/api/resource-usage/background/stop',
                 method: 'POST',
-                data: { task_id: taskIdToStop }
+                contentType: 'application/json',
+                data: JSON.stringify({ task_id: taskIdToStop })
             });
             
             ru.taskId = null;

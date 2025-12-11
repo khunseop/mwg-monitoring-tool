@@ -615,11 +615,15 @@ async def start_background_collection(payload: StartBackgroundCollectRequest):
     )
 
 
+class StopBackgroundCollectRequest(BaseModel):
+    task_id: str
+
+
 @router.post("/resource-usage/background/stop")
-async def stop_background_collection(task_id: str = Query(..., description="수집 작업 ID")):
+async def stop_background_collection(payload: StopBackgroundCollectRequest):
     """백그라운드 수집 작업 중지"""
-    await background_collector.stop_collection(task_id)
-    return {"status": "stopped", "task_id": task_id}
+    await background_collector.stop_collection(payload.task_id)
+    return {"status": "stopped", "task_id": payload.task_id}
 
 
 @router.get("/resource-usage/background/status", response_model=Dict[str, Any])
