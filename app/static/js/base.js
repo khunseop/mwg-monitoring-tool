@@ -110,7 +110,7 @@ window.ResourceUsageCollector = {
     // 웹소켓 연결
     connect: function() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/resource-usage/status`;
+        const wsUrl = `${protocol}//${window.location.host}/api/ws/resource-usage/status`;
         
         try {
             this.ws = new WebSocket(wsUrl);
