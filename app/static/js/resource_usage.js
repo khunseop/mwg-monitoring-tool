@@ -236,19 +236,28 @@ $(document).ready(function() {
             const deltas = { http: null, https: null, ftp: null };
             ['http','https','ftp'].forEach(k => {
                 const v = row[k];
-                if (typeof v === 'number' && typeof last[k] === 'number') {
+                if (typeof v === 'number' && typeof last[k] === 'number' && last[k] !== null) {
                     // 32-bit counter wrap 처리 및 Mbps 변환
+                    // Only calculate delta if we have valid previous value
                     const mbps = calculateTrafficMbps(v, last[k], intervalSec);
                     deltas[k] = (mbps !== null && mbps >= 0) ? mbps : null;
+                } else if (typeof v === 'number') {
+                    // First collection or cache was reset - don't calculate delta yet
+                    deltas[k] = null;
                 }
             });
+            // Update cache with current values
             ru.lastCumulativeByProxy[row.proxy_id] = {
-                http: typeof row.http === 'number' ? row.http : last.http,
-                https: typeof row.https === 'number' ? row.https : last.https,
-                ftp: typeof row.ftp === 'number' ? row.ftp : last.ftp,
+                http: typeof row.http === 'number' ? row.http : (last.http || null),
+                https: typeof row.https === 'number' ? row.https : (last.https || null),
+                ftp: typeof row.ftp === 'number' ? row.ftp : (last.ftp || null),
             };
             
             // Note: interface_mbps is now keyed by interface name, not index
+            
+            // Store proxy info for later use
+            const proxy = (ru.proxies || []).find(p => p.id === row.proxy_id);
+            const fullHost = proxy ? proxy.host : `#${row.proxy_id}`;
             
             rows.push({
                 proxy_id: row.proxy_id,
@@ -260,14 +269,13 @@ $(document).ready(function() {
                 httpsd: deltas.https,
                 ftpd: deltas.ftp,
                 interface_mbps: row.interface_mbps || null, // Keep full interface data
+                _fullHost: fullHost // Store full hostname for tooltip
             });
         });
 
         rows.sort((a, b) => {
-            const pa = (ru.proxies || []).find(p => p.id === a.proxy_id);
-            const pb = (ru.proxies || []).find(p => p.id === b.proxy_id);
-            const na = pa ? pa.host : String(a.proxy_id);
-            const nb = pb ? pb.host : String(b.proxy_id);
+            const na = a._fullHost || String(a.proxy_id);
+            const nb = b._fullHost || String(b.proxy_id);
             return na.localeCompare(nb);
         });
 
@@ -368,10 +376,16 @@ $(document).ready(function() {
             maxByMetric[m.key] = max || 1;
         });
 
+        // Helper function to truncate long hostnames
+        function truncateHostname(hostname, maxLength = 20) {
+            if (!hostname || hostname.length <= maxLength) return hostname;
+            return hostname.substring(0, maxLength - 3) + '...';
+        }
+        
         const xCategories = metrics.map(m => m.title);
         const yCategories = rows.map(r => {
-            const proxy = (ru.proxies || []).find(p => p.id === r.proxy_id);
-            return proxy ? proxy.host : `#${r.proxy_id}`;
+            // Use stored full hostname, truncate for display
+            return truncateHostname(r._fullHost || `#${r.proxy_id}`, 25);
         });
 
         const data = [];
@@ -458,37 +472,49 @@ $(document).ready(function() {
         ru._heatRaw.reverse();
         seriesData.reverse();
 
-        // Calculate dynamic width based on number of columns
+        // Calculate dynamic dimensions based on data size
         const minColWidth = 80;
         const baseWidth = Math.max(800, xCategories.length * minColWidth);
+        
+        // Dynamic height: min 400px, max 1200px, ~25px per row
+        const rowCount = yCategories.length;
+        const minHeight = 400;
+        const maxHeight = 1200;
+        const rowHeight = 25;
+        const calculatedHeight = Math.max(minHeight, Math.min(maxHeight, rowCount * rowHeight + 150)); // +150 for x-axis labels
         
         const options = {
             chart: { 
                 type: 'heatmap', 
-                height: 700,
+                height: calculatedHeight,
                 width: baseWidth,
                 animations: { enabled: false }, 
                 toolbar: { show: false }
             },
-            dataLabels: { enabled: true, style: { colors: ['#111827'], fontSize: '11px' }, formatter: function(val, opts) {
-                const y = opts.seriesIndex; const x = opts.dataPointIndex;
-                const raw = (ru._heatRaw && ru._heatRaw[y]) ? ru._heatRaw[y][x] : null;
-                if (raw == null) return '';
-                const metric = metrics[x];
-                if (!metric) return String(Math.round(raw));
-                const key = metric.key;
-                if (key === 'httpd' || key === 'httpsd' || key === 'ftpd') {
-                    // 이미 Mbps 단위로 변환된 값
-                    return raw.toFixed(2) + ' Mbps';
+            dataLabels: { 
+                enabled: true, 
+                style: { colors: ['#111827'], fontSize: rowCount > 20 ? '9px' : '11px' },
+                formatter: function(val, opts) {
+                    const y = opts.seriesIndex; const x = opts.dataPointIndex;
+                    const raw = (ru._heatRaw && ru._heatRaw[y]) ? ru._heatRaw[y][x] : null;
+                    if (raw == null) return '';
+                    const metric = metrics[x];
+                    if (!metric) return String(Math.round(raw));
+                    const key = metric.key;
+                    // For large datasets, show abbreviated values
+                    const isLargeDataset = rowCount > 20 || xCategories.length > 10;
+                    if (key === 'httpd' || key === 'httpsd' || key === 'ftpd') {
+                        return isLargeDataset ? raw.toFixed(1) + 'M' : raw.toFixed(2) + ' Mbps';
+                    }
+                    if (key === 'cc' || key === 'cs') {
+                        return isLargeDataset ? abbreviateNumber(raw) : formatNumber(raw);
+                    }
+                    if (key.startsWith('if_')) {
+                        return isLargeDataset ? raw.toFixed(1) + 'M' : raw.toFixed(2) + ' Mbps';
+                    }
+                    return String(Math.round(raw));
                 }
-                if (key === 'cc' || key === 'cs') {
-                    return formatNumber(raw);
-                }
-                if (key.startsWith('if_')) {
-                    return raw.toFixed(2) + ' Mbps';
-                }
-                return String(Math.round(raw));
-            } },
+            },
             colors: ["#12824C"],
             plotOptions: {
                 heatmap: {
@@ -518,28 +544,47 @@ $(document).ready(function() {
                     maxHeight: 100
                 }
             },
-            yaxis: { labels: { style: { fontSize: '11px' } } },
-            tooltip: { y: { formatter: function(val, { seriesIndex, dataPointIndex }) {
-                const raw = (ru._heatRaw && ru._heatRaw[seriesIndex]) ? ru._heatRaw[seriesIndex][dataPointIndex] : null;
-                if (raw == null) return 'N/A';
-
-                const metric = metrics[dataPointIndex];
-                let formattedRaw = String(Math.round(raw));
-                if (metric) {
-                    const key = metric.key;
-                if (key === 'httpd' || key === 'httpsd' || key === 'ftpd') {
-                    // 이미 Mbps 단위로 변환된 값
-                    formattedRaw = raw.toFixed(2) + ' Mbps';
-                } else if (key === 'cc' || key === 'cs') {
-                    formattedRaw = formatNumber(raw);
-                } else if (key.startsWith('if_')) {
-                    formattedRaw = raw.toFixed(2) + ' Mbps';
+            yaxis: { 
+                labels: { 
+                    style: { fontSize: rowCount > 20 ? '9px' : '11px' },
+                    maxWidth: 120,
+                    formatter: function(val) {
+                        // Return truncated value (already truncated in yCategories)
+                        return val;
+                    }
                 }
-                }
+            },
+            tooltip: { 
+                y: { 
+                    formatter: function(val, { seriesIndex, dataPointIndex }) {
+                        const raw = (ru._heatRaw && ru._heatRaw[seriesIndex]) ? ru._heatRaw[seriesIndex][dataPointIndex] : null;
+                        if (raw == null) return 'N/A';
 
-                const percent = (val == null || val < 0) ? null : Math.round(val) + '% of threshold';
-                return percent ? `${formattedRaw} (${percent})` : formattedRaw;
-            } } },
+                        const metric = metrics[dataPointIndex];
+                        let formattedRaw = String(Math.round(raw));
+                        if (metric) {
+                            const key = metric.key;
+                            if (key === 'httpd' || key === 'httpsd' || key === 'ftpd') {
+                                formattedRaw = raw.toFixed(2) + ' Mbps';
+                            } else if (key === 'cc' || key === 'cs') {
+                                formattedRaw = formatNumber(raw);
+                            } else if (key.startsWith('if_')) {
+                                formattedRaw = raw.toFixed(2) + ' Mbps';
+                            }
+                        }
+
+                        const percent = (val == null || val < 0) ? null : Math.round(val) + '% of threshold';
+                        return percent ? `${formattedRaw} (${percent})` : formattedRaw;
+                    }
+                },
+                x: {
+                    formatter: function(val, { seriesIndex }) {
+                        // Show full hostname in tooltip
+                        const row = rows[rows.length - 1 - seriesIndex]; // Reversed index
+                        return row && row._fullHost ? row._fullHost : val;
+                    }
+                }
+            },
             series: seriesData
         };
 
@@ -605,11 +650,24 @@ $(document).ready(function() {
                         const currentProxyIds = getSelectedProxyIds();
                         fetchLatestForProxies(currentProxyIds).then(latestRows => {
                             const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
-                            bufferAppendBatch(valid);
-                            saveBufferState();
-                            renderAllCharts();
-                            // 최신 데이터로 테이블 업데이트
                             if (valid.length > 0) {
+                                // Only update cumulative cache if we have previous data
+                                // This prevents wrong delta calculations after page return
+                                const hasPreviousData = Object.keys(ru.lastCumulativeByProxy).length > 0;
+                                if (!hasPreviousData) {
+                                    // First collection or after page return - initialize cache without calculating deltas
+                                    valid.forEach(row => {
+                                        ru.lastCumulativeByProxy[row.proxy_id] = {
+                                            http: typeof row.http === 'number' ? row.http : null,
+                                            https: typeof row.https === 'number' ? row.https : null,
+                                            ftp: typeof row.ftp === 'number' ? row.ftp : null,
+                                        };
+                                    });
+                                }
+                                bufferAppendBatch(valid);
+                                saveBufferState();
+                                renderAllCharts();
+                                // 최신 데이터로 테이블 업데이트
                                 updateTable(valid);
                             }
                         }).catch(() => {});
@@ -671,6 +729,60 @@ $(document).ready(function() {
     });
     $('#ruProxySelect').on('change', function() { saveState(undefined); });
 
+    // Function to reset cumulative cache and resync data
+    async function resyncDataOnPageReturn() {
+        // Reset cumulative cache to prevent wrong delta calculations
+        ru.lastCumulativeByProxy = {};
+        
+        // If collection is running, fetch latest data and resync
+        if (ru.taskId && ru.intervalId === 'background') {
+            const proxyIds = getSelectedProxyIds();
+            if (proxyIds.length > 0) {
+                try {
+                    const latestRows = await fetchLatestForProxies(proxyIds);
+                    const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
+                    if (valid.length > 0) {
+                        // Reset cache before updating to prevent wrong deltas
+                        ru.lastCumulativeByProxy = {};
+                        // Update table and charts with fresh data
+                        bufferAppendBatch(valid);
+                        saveBufferState();
+                        renderAllCharts();
+                        updateTable(valid);
+                    }
+                } catch (e) {
+                    console.warn('[resource_usage] Failed to resync data on page return:', e);
+                }
+            }
+        }
+    }
+    
+    // Handle page visibility changes (tab switch, minimize, etc.)
+    let lastVisibilityChange = Date.now();
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+            // Page became visible - check if enough time has passed
+            const timeSinceLastChange = Date.now() - lastVisibilityChange;
+            // If more than 30 seconds passed, resync data
+            if (timeSinceLastChange > 30000) {
+                resyncDataOnPageReturn();
+            }
+        } else {
+            lastVisibilityChange = Date.now();
+        }
+    });
+    
+    // Handle page focus (when returning from another tab/window)
+    let lastFocusTime = Date.now();
+    window.addEventListener('focus', function() {
+        const timeSinceLastFocus = Date.now() - lastFocusTime;
+        // If more than 30 seconds passed, resync data
+        if (timeSinceLastFocus > 30000 && ru.taskId) {
+            resyncDataOnPageReturn();
+        }
+        lastFocusTime = Date.now();
+    });
+    
     // Show empty state initially
     $('#ruHeatmapWrap').hide();
     $('#ruEmptyState').show();
@@ -693,6 +805,8 @@ $(document).ready(function() {
                 ru.taskId = window.ResourceUsageCollector.taskId;
                 setRunning(true);
                 ru.intervalId = 'background';
+                // Resync data when page loads if collection was running
+                resyncDataOnPageReturn();
             } else if (running) {
                 // ensure we actually have proxies before first collect
                 if (getSelectedProxyIds().length === 0) { 
