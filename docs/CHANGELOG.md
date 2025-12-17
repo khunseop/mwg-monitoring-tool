@@ -29,7 +29,7 @@
   - 수집 완료 후 프록시별 최신 1개 배치만 유지(자동 정리)
   - 상세보기: 안정적인 숫자 ID로 조회 복구(`/api/session-browser/item/{id}`)
   - 프록시 미선택 시 표시는 비워둠(전체 합산으로 행수 증가 방지)
-- SQLite: WAL/SHM 비활성화(운영 기본값)로 `ppat.db-wal/.db-shm` 생성 최소화
+- SQLite: WAL/SHM 비활성화(운영 기본값)로 `pmt.db-wal/.db-shm` 생성 최소화
 - 문서: README/Docs 업데이트(임시파일 경로/환경변수/동작 변경)
 
 ## v1.3.5

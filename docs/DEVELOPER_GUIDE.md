@@ -1,6 +1,6 @@
-# PPAT 개발자 가이드
+# PMT 개발자 가이드
 
-이 문서는 PPAT(Proxy Performance Analysis Tool)의 소스코드 기반 설치, 구성, 빌드, API 사양 등 개발자를 위한 기술 정보를 제공합니다. 최종 사용자용 설명서는 프로젝트 루트의 [README.md](../README.md)를 참고하세요.
+이 문서는 PMT(Proxy Mornitoring Tool)의 소스코드 기반 설치, 구성, 빌드, API 사양 등 개발자를 위한 기술 정보를 제공합니다. 최종 사용자용 설명서는 프로젝트 루트의 [README.md](../README.md)를 참고하세요.
 
 ## 1. 시스템 구성 요소
 
@@ -32,7 +32,7 @@
 3.  **환경변수 설정 (선택 사항)**
     프로젝트 루트에 `.env` 파일을 생성하여 환경변수를 관리할 수 있습니다.
 
-    - `DATABASE_URL`: 데이터베이스 연결 문자열. (기본값: `sqlite:///./ppat.db`)
+    - `DATABASE_URL`: 데이터베이스 연결 문자열. (기본값: `sqlite:///./pmt.db`)
     - `SESSION_TMP_DIR`: 세션 브라우저 임시 파일 저장 경로. (기본값: 시스템 임시 디렉터리 하위 `session_browser/`)
     - `CORS_ALLOW_ORIGINS`: CORS 허용 출처 목록 (쉼표로 구분). (기본값: `*`)
     - `CORS_ALLOW_CREDENTIALS`: CORS 자격증명 허용 여부. (기본값: `false`)
@@ -137,7 +137,7 @@ PyInstaller를 사용하여 모든 의존성이 포함된 단일 `.exe` 파일�
 
 2.  **빌드 명령어 실행 (PowerShell)**
     ```powershell
-    pyinstaller --name PPAT \
+    pyinstaller --name PMT \
       --onefile \
       --noconsole \
       --add-data "app/templates;app/templates" \
@@ -159,5 +159,5 @@ PyInstaller를 사용하여 모든 의존성이 포함된 단일 `.exe` 파일�
     ```
 
 3.  **결과 확인**
-    - 빌드가 성공하면 `dist/` 디렉터리에 `PPAT.exe` 파일이 생성됩니다.
+    - 빌드가 성공하면 `dist/` 디렉터리에 `PMT.exe` 파일이 생성됩니다.
     - `path_resolver.py` 유틸리티가 PyInstaller로 패키징된 환경을 감지하여 템플릿, 정적 파일 등 리소스 경로를 올바르게 설정합니다.

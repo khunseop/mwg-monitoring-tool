@@ -1,5 +1,5 @@
 param(
-    [string]$Name = "PPAT",
+    [string]$Name = "PMT",
     [string]$PyVersion = "3.10",
     [string]$PyInstallerVersion = "6.11.0"
 )

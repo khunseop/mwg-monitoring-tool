@@ -63,7 +63,7 @@ def setup_logging():
             log_path.mkdir(parents=True, exist_ok=True)
             
             # 로그 파일 경로
-            log_file = log_path / "ppat.log"
+            log_file = log_path / "pmt.log"
             
             # 회전 파일 핸들러 생성
             file_handler = RotatingFileHandler(

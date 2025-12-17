@@ -3,7 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
 
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./ppat.db")
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./pmt.db")
 POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "5"))
 MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "10"))
 POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT", "30"))
@@ -32,7 +32,7 @@ engine = create_engine(
     **engine_kwargs,
 )
 
-# For SQLite, disable WAL/Journal if desired to reduce ppat.db-wal/.db-shm creation.
+# For SQLite, disable WAL/Journal if desired to reduce pmt.db-wal/.db-shm creation.
 if is_sqlite:
     try:
         with engine.connect() as conn:
