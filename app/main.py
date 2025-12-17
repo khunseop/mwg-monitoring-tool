@@ -44,8 +44,8 @@ session_browser_config_model.Base.metadata.create_all(bind=engine)
 traffic_log_model.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="PPAT",
-    description="Proxy Performance Analysis Tool",
+    title="PMT",
+    description="Proxy Monitoring Tool",
     version="1.5.0"
 )
 # Security/CORS middleware (configure via env)

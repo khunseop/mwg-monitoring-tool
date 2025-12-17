@@ -44,7 +44,7 @@ def main() -> None:
     if uvicorn is None:
         print(
             (
-                "[PPAT] Uvicorn을 불러올 수 없습니다.\n"
+                "[PMT] Uvicorn을 불러올 수 없습니다.\n"
                 "가상환경을 활성화한 뒤 의존성을 설치하세요.\n\n"
                 "Linux/macOS:\n"
                 "  python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt\n\n"
@@ -61,7 +61,7 @@ def main() -> None:
     try:
         from app.main import app as asgi_app
     except Exception as exc:
-        print(f"[PPAT] ASGI 앱(app.main:app) 가져오기 실패: {exc}", file=sys.stderr)
+        print(f"[PMT] ASGI 앱(app.main:app) 가져오기 실패: {exc}", file=sys.stderr)
         sys.exit(1)
 
     # Force asyncio loop policy on Windows (Proactor may break some libs)
