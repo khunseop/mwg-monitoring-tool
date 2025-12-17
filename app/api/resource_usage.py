@@ -46,8 +46,8 @@ IF_OUT_OCTETS_OID = "1.3.6.1.2.1.2.2.1.16"  # ifOutOctets
 IF_DESCR_OID = "1.3.6.1.2.1.2.2.1.2"  # ifDescr
 COUNTER32_MAX = 4294967295  # 2^32 - 1
 
-# Cache for previous counter values: {(proxy_id, interface_index): (in_octets, out_octets, timestamp)}
-_INTERFACE_COUNTER_CACHE: Dict[Tuple[int, int], Tuple[int, int, float]] = {}
+# Cache for previous counter values: {(proxy_id, interface_name): (counter_value, timestamp)} for OID-based collection
+_INTERFACE_COUNTER_CACHE: Dict[Tuple[int, str], Tuple[int, float]] = {}
 
 
 async def _snmp_get(host: str, port: int, community: str, oid: str, timeout_sec: int = 2) -> float | None:
@@ -396,29 +396,112 @@ async def _ssh_get_mem_percent(proxy: Proxy, spec: str, timeout_sec: int = _SSH_
     return value
 
 
-def _get_selected_interfaces_from_config(db: Session) -> Optional[List[str]]:
-    """Get selected_interfaces from resource config"""
+def _get_interface_config_from_db(db: Session) -> Tuple[Dict[str, str], Dict[str, float]]:
+    """Get interface_oids and interface_thresholds from resource config"""
     try:
         cfg = db.query(ResourceConfigModel).order_by(ResourceConfigModel.id.asc()).first()
         if not cfg:
-            return None
+            return {}, {}
         oids = json.loads(cfg.oids_json or '{}')
-        if isinstance(oids, dict) and isinstance(oids.get('__selected_interfaces__'), list):
-            selected = oids.get('__selected_interfaces__') or []
-            return selected if len(selected) > 0 else None
-        return None
+        interface_oids = {}
+        interface_thresholds = {}
+        if isinstance(oids, dict):
+            if isinstance(oids.get('__interface_oids__'), dict):
+                interface_oids = oids.get('__interface_oids__') or {}
+            if isinstance(oids.get('__interface_thresholds__'), dict):
+                interface_thresholds = oids.get('__interface_thresholds__') or {}
+        return interface_oids, interface_thresholds
     except Exception as e:
-        logger.debug(f"[resource_usage] Failed to get selected_interfaces from config: {e}")
+        logger.debug(f"[resource_usage] Failed to get interface config from db: {e}")
+        return {}, {}
+
+
+async def _collect_interface_mbps_from_oids(proxy: Proxy, community: str, interface_oids: Dict[str, str]) -> Optional[Dict[str, Dict[str, Any]]]:
+    """
+    Collect interface MBPS using configured OIDs.
+    Each interface has a name and OID. The OID should point to a 32-bit counter.
+    Returns {interface_name: {"in_mbps": float, "out_mbps": float, "name": str}} or None if failed.
+    Note: For simplicity, we use a single OID per interface and treat it as total traffic (in+out).
+    """
+    if not interface_oids or len(interface_oids) == 0:
+        return None
+    
+    try:
+        current_time = monotonic()
+        result: Dict[str, Dict[str, Any]] = {}
+        
+        # Collect all interface counters in parallel
+        tasks = {}
+        for if_name, oid in interface_oids.items():
+            tasks[if_name] = _snmp_get(proxy.host, 161, community, oid)
+        
+        counter_values = await asyncio.gather(*tasks.values(), return_exceptions=True)
+        
+        for (if_name, oid), counter_value in zip(tasks.items(), counter_values):
+            if isinstance(counter_value, Exception):
+                logger.debug(f"[resource_usage] Failed to get interface counter host={proxy.host} proxy_id={proxy.id} interface={if_name} oid={oid}: {counter_value}")
+                continue
+            
+            if counter_value is None:
+                continue
+            
+            try:
+                current_counter = int(counter_value)
+            except (ValueError, TypeError):
+                logger.debug(f"[resource_usage] Invalid counter value host={proxy.host} proxy_id={proxy.id} interface={if_name} value={counter_value}")
+                continue
+            
+            cache_key = (proxy.id, if_name)
+            cached = _INTERFACE_COUNTER_CACHE.get(cache_key)
+            
+            if cached:
+                prev_counter, prev_time = cached
+                time_diff = current_time - prev_time
+                
+                # Only calculate if we have valid time difference (at least 1 second)
+                if time_diff >= 1.0:
+                    # Calculate Mbps from counter delta
+                    # For simplicity, treat as total traffic (in+out combined)
+                    total_mbps = _calculate_mbps(current_counter, prev_counter, time_diff)
+                    result[if_name] = {
+                        "in_mbps": round(total_mbps / 2, 3),  # Split equally for display
+                        "out_mbps": round(total_mbps / 2, 3),
+                        "name": if_name
+                    }
+                else:
+                    # Too soon, return 0.0
+                    result[if_name] = {
+                        "in_mbps": 0.0,
+                        "out_mbps": 0.0,
+                        "name": if_name
+                    }
+                # Update cache
+                _INTERFACE_COUNTER_CACHE[cache_key] = (current_counter, current_time)
+            else:
+                # First collection, initialize cache
+                result[if_name] = {
+                    "in_mbps": 0.0,
+                    "out_mbps": 0.0,
+                    "name": if_name
+                }
+                _INTERFACE_COUNTER_CACHE[cache_key] = (current_counter, current_time)
+        
+        if result:
+            logger.info(f"[resource_usage] Interface MBPS collection success host={proxy.host} proxy_id={proxy.id} interfaces={len(result)}")
+        return result if result else None
+        
+    except Exception as exc:
+        logger.warning(f"[resource_usage] Interface MBPS collection failed host={proxy.host} proxy_id={proxy.id}: {exc}")
         return None
 
 
-async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str, db: Optional[Session] = None, selected_interfaces: Optional[List[str]] = None) -> Tuple[int, Dict[str, Any] | None, str | None]:
+async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str, db: Optional[Session] = None, interface_oids: Optional[Dict[str, str]] = None) -> Tuple[int, Dict[str, Any] | None, str | None]:
     result: Dict[str, Any] = {k: None for k in SUPPORTED_KEYS}
     result["interface_mbps"] = None
     
-    # Get selected_interfaces from config if not provided
-    if selected_interfaces is None and db is not None:
-        selected_interfaces = _get_selected_interfaces_from_config(db)
+    # Get interface_oids from config if not provided
+    if interface_oids is None and db is not None:
+        interface_oids, _ = _get_interface_config_from_db(db)
     
     tasks: list = []
     keys: list[str] = []
@@ -434,10 +517,11 @@ async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str,
             keys.append(key)
             tasks.append(_snmp_get(proxy.host, 161, community, oid))
 
-    # Always collect interface MBPS with filtering
-    interface_mbps_task = _collect_interface_mbps(proxy, community, selected_interfaces=selected_interfaces)
-    tasks.append(interface_mbps_task)
-    keys.append("interface_mbps")
+    # Collect interface MBPS using configured OIDs
+    if interface_oids and len(interface_oids) > 0:
+        interface_mbps_task = _collect_interface_mbps_from_oids(proxy, community, interface_oids)
+        tasks.append(interface_mbps_task)
+        keys.append("interface_mbps")
 
     if tasks:
         values = await asyncio.gather(*tasks, return_exceptions=True)
@@ -468,11 +552,11 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
     errors: Dict[int, str] = {}
     collected_models: List[ResourceUsageModel] = []
 
-    # Get selected_interfaces from config
-    selected_interfaces = _get_selected_interfaces_from_config(db)
+    # Get interface_oids from config
+    interface_oids, _ = _get_interface_config_from_db(db)
 
     # Gather all SNMP collection tasks
-    tasks = [_collect_for_proxy(p, payload.oids, payload.community, db=db, selected_interfaces=selected_interfaces) for p in proxies]
+    tasks = [_collect_for_proxy(p, payload.oids, payload.community, db=db, interface_oids=interface_oids) for p in proxies]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     
     for proxy, result in zip(proxies, results):

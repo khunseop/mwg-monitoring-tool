@@ -32,50 +32,84 @@ document.addEventListener('DOMContentLoaded', function() {
     initSettingsTabsFromQuery();
 });
 
-// Interface selector TomSelect instance
-let cfgInterfaceSelect = null;
+// Interface OID management
+let interfaceOidCounter = 0;
 
-// Load active interfaces list
-function loadActiveInterfaces() {
-    $.get('/api/resource-usage/active-interfaces?limit=200')
-        .done(interfaces => {
-            const $select = $('#cfgSelectedInterfaces');
-            
-            // Clear existing options
-            $select.empty();
-            
-            // Add interfaces as options
-            interfaces.forEach(iface => {
-                const displayText = `${iface.name} (인덱스: ${iface.index}) - ${iface.proxy_host}`;
-                const option = $('<option>')
-                    .val(iface.index)
-                    .text(displayText)
-                    .data('name', iface.name)
-                    .data('proxy', iface.proxy_host);
-                $select.append(option);
-            });
-            
-            // Initialize or update TomSelect
-            if (window.TomSelect) {
-                if (cfgInterfaceSelect) {
-                    cfgInterfaceSelect.destroy();
-                }
-                cfgInterfaceSelect = new TomSelect($select[0], {
-                    plugins: ['remove_button'],
-                    maxItems: null,
-                    placeholder: '인터페이스를 선택하세요 (비워두면 모든 인터페이스 표시)',
-                    allowEmptyOption: true
-                });
-            }
-            
-            // Load selected values from config
-            loadResourceConfig();
-        })
-        .fail(() => {
-            console.warn('[settings] Failed to load active interfaces');
-            // Still try to load config even if interface list fails
-            loadResourceConfig();
-        });
+function addInterfaceOidRow(name = '', oid = '') {
+    const counter = interfaceOidCounter++;
+    const row = $(`
+        <div class="field is-horizontal mb-3 interface-oid-row" data-counter="${counter}">
+            <div class="field-body">
+                <div class="field">
+                    <div class="control">
+                        <input class="input interface-name" type="text" placeholder="인터페이스 이름 (예: eth0)" value="${name}">
+                    </div>
+                </div>
+                <div class="field">
+                    <div class="control">
+                        <input class="input interface-oid" type="text" placeholder="OID (예: 1.3.6.1.2.1.2.2.1.10.1)" value="${oid}">
+                    </div>
+                </div>
+                <div class="field">
+                    <div class="control">
+                        <button class="button is-danger is-light remove-interface" type="button">삭제</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `);
+    $('#cfgInterfaceList').append(row);
+    
+    row.find('.remove-interface').on('click', function() {
+        row.remove();
+        updateInterfaceThresholds();
+    });
+}
+
+function addInterfaceThresholdRow(name = '', threshold = '') {
+    const row = $(`
+        <div class="columns mb-3 interface-threshold-row" data-name="${name}">
+            <div class="column is-4">
+                <div class="field">
+                    <label class="label">${name || '인터페이스 이름'}</label>
+                </div>
+            </div>
+            <div class="column is-6">
+                <div class="field">
+                    <div class="control">
+                        <input class="input interface-threshold" type="number" step="0.01" min="0" placeholder="임계치 (Mbps)" value="${threshold}">
+                    </div>
+                </div>
+            </div>
+        </div>
+    `);
+    $('#cfgInterfaceThresholdList').append(row);
+}
+
+function updateInterfaceThresholds() {
+    // Get all interface names from OID list
+    const interfaceNames = [];
+    $('.interface-oid-row').each(function() {
+        const name = $(this).find('.interface-name').val().trim();
+        if (name) {
+            interfaceNames.push(name);
+        }
+    });
+    
+    // Remove threshold rows for interfaces that no longer exist
+    $('.interface-threshold-row').each(function() {
+        const rowName = $(this).data('name');
+        if (!interfaceNames.includes(rowName)) {
+            $(this).remove();
+        }
+    });
+    
+    // Add threshold rows for new interfaces
+    interfaceNames.forEach(name => {
+        if ($(`.interface-threshold-row[data-name="${name}"]`).length === 0) {
+            addInterfaceThresholdRow(name, '');
+        }
+    });
 }
 
 // SNMP 설정 로드/저장
@@ -99,15 +133,21 @@ function loadResourceConfig() {
             $('#cfgThrHttp').val(th.http ?? '');
             $('#cfgThrHttps').val(th.https ?? '');
             $('#cfgThrFtp').val(th.ftp ?? '');
-            // Load selected interfaces
-            const selectedInterfaces = cfg.selected_interfaces || [];
-            if (cfgInterfaceSelect) {
-                // TomSelect instance exists, set values
-                cfgInterfaceSelect.setValue(selectedInterfaces);
-            } else {
-                // Fallback: set as comma-separated string (for backward compatibility)
-                $('#cfgSelectedInterfaces').val(selectedInterfaces.join(','));
-            }
+            
+            // Load interface OIDs
+            $('#cfgInterfaceList').empty();
+            const interfaceOids = cfg.interface_oids || {};
+            Object.keys(interfaceOids).forEach(name => {
+                addInterfaceOidRow(name, interfaceOids[name]);
+            });
+            
+            // Load interface thresholds
+            $('#cfgInterfaceThresholdList').empty();
+            const interfaceThresholds = cfg.interface_thresholds || {};
+            Object.keys(interfaceOids).forEach(name => {
+                addInterfaceThresholdRow(name, interfaceThresholds[name] || '');
+            });
+            
             // Load bandwidth_mbps
             const bandwidthMbps = cfg.bandwidth_mbps !== undefined ? cfg.bandwidth_mbps : 1000.0;
             $('#cfgBandwidthMbps').val(bandwidthMbps);
@@ -136,18 +176,25 @@ function saveResourceConfig() {
         return n < 0 ? 0 : n;
     }
 
-    // Parse selected interfaces (support both TomSelect and text input)
-    let selectedInterfaces = [];
-    if (cfgInterfaceSelect) {
-        // TomSelect instance exists, get values from it
-        selectedInterfaces = cfgInterfaceSelect.getValue() || [];
-    } else {
-        // Fallback: parse from text input (backward compatibility)
-        const selectedInterfacesRaw = ($('#cfgSelectedInterfaces').val() || '').trim();
-        selectedInterfaces = selectedInterfacesRaw
-            ? selectedInterfacesRaw.split(',').map(s => s.trim()).filter(s => s.length > 0)
-            : [];
-    }
+    // Collect interface OIDs
+    const interfaceOids = {};
+    $('.interface-oid-row').each(function() {
+        const name = $(this).find('.interface-name').val().trim();
+        const oid = $(this).find('.interface-oid').val().trim();
+        if (name && oid) {
+            interfaceOids[name] = oid;
+        }
+    });
+    
+    // Collect interface thresholds
+    const interfaceThresholds = {};
+    $('.interface-threshold-row').each(function() {
+        const name = $(this).data('name');
+        const threshold = numOrUndef($(this).find('.interface-threshold'));
+        if (name && threshold !== undefined) {
+            interfaceThresholds[name] = threshold;
+        }
+    });
     
     // Parse bandwidth_mbps
     const bandwidthMbpsRaw = ($('#cfgBandwidthMbps').val() || '').toString().trim();
@@ -173,7 +220,8 @@ function saveResourceConfig() {
             https: numOrUndef('#cfgThrHttps'),
             ftp: numOrUndef('#cfgThrFtp'),
         },
-        selected_interfaces: selectedInterfaces,
+        interface_oids: interfaceOids,
+        interface_thresholds: interfaceThresholds,
         bandwidth_mbps: (Number.isFinite(bandwidthMbps) && bandwidthMbps >= 0) ? bandwidthMbps : 1000.0
     };
     Object.keys(payload.oids).forEach(k => { if (!payload.oids[k]) delete payload.oids[k]; });
@@ -230,16 +278,27 @@ function saveSessionConfig() {
 
 // 초기화
 $(document).ready(() => {
-    // Load active interfaces first, then config (config loading will set selected values)
-    loadActiveInterfaces();
+    loadResourceConfig();
     loadSessionConfig();
     
-    // Refresh button handler
-    $('#cfgRefreshInterfaces').on('click', function() {
-        loadActiveInterfaces();
+    // Add interface button handler
+    $('#cfgAddInterface').on('click', function() {
+        addInterfaceOidRow('', '');
+        updateInterfaceThresholds();
+    });
+    
+    // Update thresholds when interface name changes
+    $(document).on('input', '.interface-name', function() {
+        const row = $(this).closest('.interface-oid-row');
+        const name = $(this).val().trim();
+        const oldName = row.data('old-name') || '';
+        
+        if (name !== oldName) {
+            row.data('old-name', name);
+            updateInterfaceThresholds();
+        }
     });
 });
 
 // Expose functions for inline onclick handlers
 window.saveResourceConfig = saveResourceConfig;
-

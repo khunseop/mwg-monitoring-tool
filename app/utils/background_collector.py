@@ -152,7 +152,7 @@ class BackgroundCollector:
     ) -> dict:
         """단일 수집 실행 (백그라운드에서 실행)"""
         # 순환 import 방지를 위해 여기서 import
-        from app.api.resource_usage import _collect_for_proxy, _enforce_resource_usage_retention, _get_selected_interfaces_from_config
+        from app.api.resource_usage import _collect_for_proxy, _enforce_resource_usage_retention, _get_interface_config_from_db
         
         db = SessionLocal()
         try:
@@ -165,11 +165,11 @@ class BackgroundCollector:
             errors: Dict[int, str] = {}
             collected_models: list[ResourceUsageModel] = []
             
-            # Get selected_interfaces from config
-            selected_interfaces = _get_selected_interfaces_from_config(db)
+            # Get interface_oids from config
+            interface_oids, _ = _get_interface_config_from_db(db)
             
             # 비동기 수집 실행
-            tasks = [_collect_for_proxy(p, oids, community, db=db, selected_interfaces=selected_interfaces) for p in proxies]
+            tasks = [_collect_for_proxy(p, oids, community, db=db, interface_oids=interface_oids) for p in proxies]
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
             for proxy, result in zip(proxies, results):
