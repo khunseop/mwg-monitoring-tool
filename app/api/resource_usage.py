@@ -595,8 +595,8 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
     for model in collected_models:
         db.refresh(model)
 
-    # Enforce 30-day retention after successful commit
-    _enforce_resource_usage_retention(db, days=30)
+    # Enforce 90-day retention after successful commit
+    _enforce_resource_usage_retention(db, days=90)
 
     logger.info(f"[resource_usage] Collect completed requested={len(proxies)} succeeded={len(collected_models)} failed={len(errors)}")
     if errors:
@@ -807,7 +807,7 @@ async def get_resource_usage_history(
 
 # series endpoint removed; UI uses collect + latest buffering
 
-def _enforce_resource_usage_retention(db: Session, days: int = 30) -> None:
+def _enforce_resource_usage_retention(db: Session, days: int = 90) -> None:
     cutoff = now_kst() - timedelta(days=days)
     try:
         db.query(ResourceUsageModel).filter(ResourceUsageModel.collected_at < cutoff).delete(synchronize_session=False)
@@ -818,6 +818,193 @@ def _enforce_resource_usage_retention(db: Session, days: int = 30) -> None:
         except Exception:
             pass
         return
+
+
+# 통계 및 관리 API
+class ResourceUsageStatsResponse(BaseModel):
+    total_count: int
+    oldest_record: Optional[str] = None
+    newest_record: Optional[str] = None
+    retention_days: int = 90
+    records_by_proxy: Dict[int, int] = {}
+
+
+@router.get("/resource-usage/stats", response_model=ResourceUsageStatsResponse)
+async def get_resource_usage_stats(
+    db: Session = Depends(get_db),
+    proxy_id: Optional[int] = Query(None, description="프록시 ID (선택사항)")
+):
+    """자원사용률 로그 통계를 조회합니다."""
+    query = db.query(ResourceUsageModel)
+    
+    if proxy_id:
+        query = query.filter(ResourceUsageModel.proxy_id == proxy_id)
+    
+    total_count = query.count()
+    
+    oldest = query.order_by(ResourceUsageModel.collected_at.asc()).first()
+    newest = query.order_by(ResourceUsageModel.collected_at.desc()).first()
+    
+    # 프록시별 개수
+    from sqlalchemy import func
+    records_by_proxy = {}
+    if not proxy_id:
+        proxy_counts = db.query(
+            ResourceUsageModel.proxy_id,
+            func.count(ResourceUsageModel.id).label('count')
+        ).group_by(ResourceUsageModel.proxy_id).all()
+        records_by_proxy = {pid: count for pid, count in proxy_counts}
+    
+    return ResourceUsageStatsResponse(
+        total_count=total_count,
+        oldest_record=oldest.collected_at.isoformat() if oldest else None,
+        newest_record=newest.collected_at.isoformat() if newest else None,
+        retention_days=90,
+        records_by_proxy=records_by_proxy
+    )
+
+
+class DeleteResourceUsageRequest(BaseModel):
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    proxy_id: Optional[int] = None
+    older_than_days: Optional[int] = None
+
+
+class DeleteResourceUsageResponse(BaseModel):
+    deleted_count: int
+    message: str
+
+
+@router.delete("/resource-usage", response_model=DeleteResourceUsageResponse)
+async def delete_resource_usage(
+    request: DeleteResourceUsageRequest,
+    db: Session = Depends(get_db)
+):
+    """자원사용률 로그를 삭제합니다."""
+    query = db.query(ResourceUsageModel)
+    
+    if request.proxy_id:
+        query = query.filter(ResourceUsageModel.proxy_id == request.proxy_id)
+    
+    if request.older_than_days:
+        cutoff = now_kst() - timedelta(days=request.older_than_days)
+        query = query.filter(ResourceUsageModel.collected_at < cutoff)
+    else:
+        if request.start_time:
+            try:
+                start_dt_utc = datetime.fromisoformat(request.start_time.replace('Z', '+00:00'))
+                if start_dt_utc.tzinfo is None:
+                    start_dt_utc = start_dt_utc.replace(tzinfo=timezone.utc)
+                start_dt_kst = start_dt_utc.astimezone(KST_TZ)
+                query = query.filter(ResourceUsageModel.collected_at >= start_dt_kst)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid start_time format.")
+        
+        if request.end_time:
+            try:
+                end_dt_utc = datetime.fromisoformat(request.end_time.replace('Z', '+00:00'))
+                if end_dt_utc.tzinfo is None:
+                    end_dt_utc = end_dt_utc.replace(tzinfo=timezone.utc)
+                end_dt_kst = end_dt_utc.astimezone(KST_TZ)
+                query = query.filter(ResourceUsageModel.collected_at <= end_dt_kst)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid end_time format.")
+    
+    deleted_count = query.delete(synchronize_session=False)
+    db.commit()
+    
+    logger.info(f"[resource_usage] Deleted {deleted_count} records")
+    
+    return DeleteResourceUsageResponse(
+        deleted_count=deleted_count,
+        message=f"{deleted_count}건의 로그가 삭제되었습니다."
+    )
+
+
+@router.get("/resource-usage/export")
+async def export_resource_usage(
+    db: Session = Depends(get_db),
+    proxy_id: Optional[int] = Query(None),
+    start_time: Optional[str] = Query(None),
+    end_time: Optional[str] = Query(None),
+    limit: int = Query(10000, ge=1, le=100000)
+):
+    """자원사용률 로그를 CSV 형식으로 내보냅니다."""
+    import csv
+    from io import StringIO
+    
+    query = db.query(ResourceUsageModel)
+    
+    if proxy_id:
+        query = query.filter(ResourceUsageModel.proxy_id == proxy_id)
+    
+    if start_time:
+        try:
+            start_dt_utc = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+            if start_dt_utc.tzinfo is None:
+                start_dt_utc = start_dt_utc.replace(tzinfo=timezone.utc)
+            start_dt_kst = start_dt_utc.astimezone(KST_TZ)
+            query = query.filter(ResourceUsageModel.collected_at >= start_dt_kst)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid start_time format.")
+    
+    if end_time:
+        try:
+            end_dt_utc = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+            if end_dt_utc.tzinfo is None:
+                end_dt_utc = end_dt_utc.replace(tzinfo=timezone.utc)
+            end_dt_kst = end_dt_utc.astimezone(KST_TZ)
+            query = query.filter(ResourceUsageModel.collected_at <= end_dt_kst)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid end_time format.")
+    
+    rows = query.order_by(ResourceUsageModel.collected_at.desc()).limit(limit).all()
+    
+    # Get proxy names
+    proxy_map = {}
+    proxy_ids = set(r.proxy_id for r in rows)
+    if proxy_ids:
+        proxies = db.query(Proxy).filter(Proxy.id.in_(proxy_ids)).all()
+        proxy_map = {p.id: p.host for p in proxies}
+    
+    # Create CSV
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    # Header
+    writer.writerow([
+        '수집 시간', '프록시 ID', '프록시 호스트', 'CPU (%)', 'MEM (%)',
+        'CC', 'CS', 'HTTP (Bytes)', 'HTTPS (Bytes)', 'FTP (Bytes)', '인터페이스 MBPS'
+    ])
+    
+    # Data rows
+    for row in rows:
+        proxy_host = proxy_map.get(row.proxy_id, f"#{row.proxy_id}")
+        writer.writerow([
+            row.collected_at.isoformat() if row.collected_at else '',
+            row.proxy_id,
+            proxy_host,
+            row.cpu if row.cpu is not None else '',
+            row.mem if row.mem is not None else '',
+            row.cc if row.cc is not None else '',
+            row.cs if row.cs is not None else '',
+            row.http if row.http is not None else '',
+            row.https if row.https is not None else '',
+            row.ftp if row.ftp is not None else '',
+            row.interface_mbps if row.interface_mbps else ''
+        ])
+    
+    from fastapi.responses import Response
+    from datetime import datetime as dt
+    
+    filename = f"resource_usage_{dt.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 # 백그라운드 수집 관련 스키마

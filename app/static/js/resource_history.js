@@ -28,9 +28,12 @@ $(document).ready(function() {
     }
 
     const history = {
-        chart: null,
         proxies: [],
-        groups: []
+        groups: [],
+        currentPage: 1,
+        pageSize: 500,
+        totalCount: 0,
+        hasMore: false
     };
 
     // Initialize history proxy select
@@ -50,28 +53,6 @@ $(document).ready(function() {
         }
     }
 
-    // Set default time range (last 24 hours in KST)
-    function setDefaultTimeRange() {
-        // 현재 시간을 KST로 가져오기
-        // 브라우저의 로컬 시간대를 KST로 가정하거나, UTC+9로 계산
-        const now = new Date();
-        // 브라우저 로컬 시간대를 KST로 가정 (대부분의 사용자가 한국에 있으므로)
-        // 또는 UTC+9로 명시적으로 계산
-        const nowKST = new Date(now.getTime() + (now.getTimezoneOffset() + 9 * 60) * 60 * 1000);
-        const yesterdayKST = new Date(nowKST.getTime() - 24 * 60 * 60 * 1000);
-        
-        const formatDateTimeLocal = (date) => {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const hours = String(date.getHours()).padStart(2, '0');
-            const minutes = String(date.getMinutes()).padStart(2, '0');
-            return `${year}-${month}-${day}T${hours}:${minutes}`;
-        };
-        
-        $('#ruHistoryEndTime').val(formatDateTimeLocal(nowKST));
-        $('#ruHistoryStartTime').val(formatDateTimeLocal(yesterdayKST));
-    }
 
     // Format datetime for display
     function formatDateTime(datetimeStr) {
@@ -89,64 +70,94 @@ $(document).ready(function() {
 
     // Format interface MBPS for display
     function formatInterfaceMbps(interfaceMbps) {
-        if (!interfaceMbps || typeof interfaceMbps !== 'object') return '';
+        if (!interfaceMbps || typeof interfaceMbps !== 'object') return '-';
         const parts = [];
-        Object.keys(interfaceMbps).forEach(ifIndex => {
-            const ifData = interfaceMbps[ifIndex];
+        Object.keys(interfaceMbps).forEach(ifName => {
+            const ifData = interfaceMbps[ifName];
             if (ifData && typeof ifData === 'object') {
-                const name = ifData.name || `IF${ifIndex}`;
+                const name = ifName.length > 20 ? ifName.substring(0, 17) + '...' : ifName;
                 const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps.toFixed(2) : '0.00';
                 const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps.toFixed(2) : '0.00';
-                parts.push(`${name}: ${inMbps}/${outMbps} Mbps`);
+                parts.push(`${name}: ${inMbps}/${outMbps}`);
             }
         });
-        return parts.join('<br>');
+        return parts.length > 0 ? parts.join(', ') : '-';
+    }
+    
+    // Format traffic value (cumulative bytes to Mbps for display)
+    function formatTrafficMbps(bytes, intervalSec = 60) {
+        if (bytes === null || bytes === undefined || typeof bytes !== 'number') return '-';
+        // This is cumulative, so we can't calculate Mbps without previous value
+        // For display purposes, show as MB
+        const mb = bytes / (1024 * 1024);
+        return mb.toFixed(2) + ' MB';
     }
 
-    // Search history
+    // Convert datetime-local to UTC ISO string
+    function convertKSTToUTC(datetimeLocal) {
+        if (!datetimeLocal) return null;
+        const [datePart, timePart] = datetimeLocal.split('T');
+        const [year, month, day] = datePart.split('-').map(Number);
+        const [hours, minutes] = timePart.split(':').map(Number);
+        const kstDate = new Date(Date.UTC(year, month - 1, day, hours, minutes));
+        const utcDate = new Date(kstDate.getTime() - 9 * 60 * 60 * 1000);
+        return utcDate.toISOString();
+    }
+    
+    // Search history with date range
     function searchHistory() {
         const proxyId = $('#ruHistoryProxySelect').val();
         const startTime = $('#ruHistoryStartTime').val();
         const endTime = $('#ruHistoryEndTime').val();
-        const limit = parseInt($('#ruHistoryLimit').val(), 10) || 1000;
-
-        if (!startTime || !endTime) {
-            $('#ruHistoryError').text('시작 시간과 종료 시간을 모두 입력하세요.').show();
-            return;
-        }
-
-        // datetime-local 입력값을 KST(UTC+9)로 명시적으로 해석하여 UTC로 변환
-        // datetime-local 형식: "YYYY-MM-DDTHH:mm"
-        function convertKSTToUTC(datetimeLocal) {
-            // 입력값을 파싱 (예: "2024-01-01T12:00")
-            const [datePart, timePart] = datetimeLocal.split('T');
-            const [year, month, day] = datePart.split('-').map(Number);
-            const [hours, minutes] = timePart.split(':').map(Number);
-            
-            // KST(UTC+9)로 해석하여 Date 객체 생성
-            // Date 객체는 내부적으로 UTC로 저장되므로, KST 시간에서 9시간을 빼서 UTC로 변환
-            const kstDate = new Date(Date.UTC(year, month - 1, day, hours, minutes));
-            // KST는 UTC+9이므로 9시간을 빼서 UTC로 변환
-            const utcDate = new Date(kstDate.getTime() - 9 * 60 * 60 * 1000);
-            
-            return utcDate.toISOString();
-        }
+        const limit = parseInt($('#ruHistoryLimit').val(), 10) || 500;
         
-        const startDateTime = convertKSTToUTC(startTime);
-        const endDateTime = convertKSTToUTC(endTime);
-
-        $('#ruHistoryLoading').show();
-        $('#ruHistoryError').hide();
-        $('#ruHistoryResults').hide();
+        history.currentPage = 1;
+        history.pageSize = limit;
 
         const params = {
-            start_time: startDateTime,
-            end_time: endDateTime,
-            limit: limit
+            limit: limit,
+            offset: 0
+        };
+
+        if (startTime) {
+            params.start_time = convertKSTToUTC(startTime);
+        }
+        if (endTime) {
+            params.end_time = convertKSTToUTC(endTime);
+        }
+        if (proxyId) {
+            params.proxy_id = parseInt(proxyId, 10);
+        }
+
+        loadHistoryData(params);
+    }
+    
+    // Load all history (no date filter)
+    function loadAllHistory() {
+        const proxyId = $('#ruHistoryProxySelect').val();
+        const limit = parseInt($('#ruHistoryLimit').val(), 10) || 500;
+        
+        history.currentPage = 1;
+        history.pageSize = limit;
+
+        const params = {
+            limit: limit,
+            offset: 0
         };
 
         if (proxyId) {
             params.proxy_id = parseInt(proxyId, 10);
+        }
+
+        loadHistoryData(params);
+    }
+    
+    // Load history data with pagination
+    function loadHistoryData(params, append = false) {
+        $('#ruHistoryLoading').show();
+        $('#ruHistoryError').hide();
+        if (!append) {
+            $('#ruHistoryResults').hide();
         }
 
         $.ajax({
@@ -156,11 +167,16 @@ $(document).ready(function() {
         }).then(data => {
             $('#ruHistoryLoading').hide();
             if (!data || data.length === 0) {
-                $('#ruHistoryError').text('조회된 데이터가 없습니다.').show();
+                if (!append) {
+                    $('#ruHistoryError').text('조회된 데이터가 없습니다.').show();
+                    $('#ruHistoryResults').hide();
+                }
                 return;
             }
 
-            displayHistoryResults(data);
+            history.totalCount = data.length;
+            history.hasMore = data.length === params.limit;
+            displayHistoryResults(data, append);
         }).catch(err => {
             $('#ruHistoryLoading').hide();
             const errorMsg = err.responseJSON && err.responseJSON.detail 
@@ -169,11 +185,69 @@ $(document).ready(function() {
             $('#ruHistoryError').text(errorMsg).show();
         });
     }
+    
+    // Load next page
+    function loadNextPage() {
+        history.currentPage++;
+        const proxyId = $('#ruHistoryProxySelect').val();
+        const startTime = $('#ruHistoryStartTime').val();
+        const endTime = $('#ruHistoryEndTime').val();
+        const limit = history.pageSize;
+        const offset = (history.currentPage - 1) * limit;
+
+        const params = {
+            limit: limit,
+            offset: offset
+        };
+
+        if (startTime) {
+            params.start_time = convertKSTToUTC(startTime);
+        }
+        if (endTime) {
+            params.end_time = convertKSTToUTC(endTime);
+        }
+        if (proxyId) {
+            params.proxy_id = parseInt(proxyId, 10);
+        }
+
+        loadHistoryData(params, false);
+    }
+    
+    // Load previous page
+    function loadPrevPage() {
+        if (history.currentPage <= 1) return;
+        
+        history.currentPage--;
+        const proxyId = $('#ruHistoryProxySelect').val();
+        const startTime = $('#ruHistoryStartTime').val();
+        const endTime = $('#ruHistoryEndTime').val();
+        const limit = history.pageSize;
+        const offset = (history.currentPage - 1) * limit;
+
+        const params = {
+            limit: limit,
+            offset: offset
+        };
+
+        if (startTime) {
+            params.start_time = convertKSTToUTC(startTime);
+        }
+        if (endTime) {
+            params.end_time = convertKSTToUTC(endTime);
+        }
+        if (proxyId) {
+            params.proxy_id = parseInt(proxyId, 10);
+        }
+
+        loadHistoryData(params, false);
+    }
 
     // Display history results
-    function displayHistoryResults(data) {
+    function displayHistoryResults(data, append = false) {
         const $tbody = $('#ruHistoryTableBody');
-        $tbody.empty();
+        if (!append) {
+            $tbody.empty();
+        }
 
         const proxyMap = {};
         (history.proxies || []).forEach(p => { proxyMap[p.id] = p.host; });
@@ -183,157 +257,208 @@ $(document).ready(function() {
             const tr = $('<tr>');
             tr.append(`<td>${formatDateTime(row.collected_at)}</td>`);
             tr.append(`<td>${proxyName}</td>`);
-            tr.append(`<td>${row.cpu != null ? row.cpu.toFixed(2) : '-'}</td>`);
-            tr.append(`<td>${row.mem != null ? row.mem.toFixed(2) : '-'}</td>`);
+            tr.append(`<td>${row.cpu != null ? row.cpu.toFixed(1) : '-'}</td>`);
+            tr.append(`<td>${row.mem != null ? row.mem.toFixed(1) : '-'}</td>`);
             tr.append(`<td>${row.cc != null ? formatNumber(row.cc) : '-'}</td>`);
             tr.append(`<td>${row.cs != null ? formatNumber(row.cs) : '-'}</td>`);
+            // HTTP/HTTPS/FTP는 누적값이므로 표시만 (Mbps 계산은 실시간 그래프에서만)
             tr.append(`<td>${row.http != null ? formatBytes(row.http, 2) : '-'}</td>`);
             tr.append(`<td>${row.https != null ? formatBytes(row.https, 2) : '-'}</td>`);
             tr.append(`<td>${row.ftp != null ? formatBytes(row.ftp, 2) : '-'}</td>`);
-            tr.append(`<td>${formatInterfaceMbps(row.interface_mbps)}</td>`);
+            tr.append(`<td style="font-size: 0.85em;">${formatInterfaceMbps(row.interface_mbps)}</td>`);
             $tbody.append(tr);
         });
 
-        $('#ruHistoryCount').text(`총 ${data.length}건의 데이터가 조회되었습니다.`);
-        $('#ruHistoryResults').show();
-
-        // Draw chart if data exists
-        if (data.length > 0) {
-            drawHistoryChart(data);
+        const totalDisplayed = $tbody.find('tr').length;
+        const pageInfo = `페이지 ${history.currentPage} (${totalDisplayed}건 표시)`;
+        $('#ruHistoryCount').text(`총 ${totalDisplayed}건의 데이터가 표시됩니다.`);
+        $('#ruHistoryPaginationInfo').text(pageInfo);
+        
+        // Show/hide pagination
+        if (history.hasMore || history.currentPage > 1) {
+            $('#ruHistoryPagination').show();
+            $('#ruHistoryPrevBtn').toggleClass('is-disabled', history.currentPage <= 1);
+            $('#ruHistoryNextBtn').toggleClass('is-disabled', !history.hasMore);
+        } else {
+            $('#ruHistoryPagination').hide();
         }
+        
+        $('#ruHistoryResults').show();
     }
 
-    // Draw history chart
-    function drawHistoryChart(data) {
-        if (!window.ApexCharts) return;
 
-        const proxyMap = {};
-        (history.proxies || []).forEach(p => { proxyMap[p.id] = p.host; });
-
-        // Group data by proxy
-        const byProxy = {};
-        data.forEach(row => {
-            if (!byProxy[row.proxy_id]) {
-                byProxy[row.proxy_id] = [];
+    // Load statistics
+    function loadStatistics() {
+        const proxyId = $('#ruHistoryProxySelect').val();
+        const params = proxyId ? { proxy_id: parseInt(proxyId, 10) } : {};
+        
+        $.getJSON('/api/resource-usage/stats', params).then(function(stats) {
+            $('#ruHistoryTotalCount').text(stats.total_count.toLocaleString());
+            
+            let statsText = '';
+            if (stats.oldest_record) {
+                statsText += `가장 오래된 레코드: ${formatDateTime(stats.oldest_record)}`;
             }
-            byProxy[row.proxy_id].push(row);
+            if (stats.newest_record) {
+                if (statsText) statsText += ' | ';
+                statsText += `가장 최근 레코드: ${formatDateTime(stats.newest_record)}`;
+            }
+            if (Object.keys(stats.records_by_proxy).length > 0) {
+                if (statsText) statsText += ' | ';
+                const proxyMap = {};
+                (history.proxies || []).forEach(p => { proxyMap[p.id] = p.host; });
+                const parts = Object.keys(stats.records_by_proxy).map(pid => {
+                    const host = proxyMap[pid] || `#${pid}`;
+                    return `${host}: ${stats.records_by_proxy[pid].toLocaleString()}건`;
+                });
+                statsText += '프록시별: ' + parts.join(', ');
+            }
+            if (statsText) {
+                $('#ruHistoryStatsText').html(statsText);
+                $('#ruHistoryStatsDetails').show();
+            } else {
+                $('#ruHistoryStatsDetails').hide();
+            }
+        }).catch(function(err) {
+            console.error('Failed to load statistics:', err);
         });
-
-        // Prepare series for CPU and MEM
-        const cpuSeries = [];
-        const memSeries = [];
-
-        Object.keys(byProxy).forEach(proxyId => {
-            const rows = byProxy[proxyId].sort((a, b) => 
-                new Date(a.collected_at) - new Date(b.collected_at)
-            );
-            const proxyName = proxyMap[proxyId] || `#${proxyId}`;
-            
-            const cpuData = rows.map(r => ({
-                x: new Date(r.collected_at).getTime(),
-                y: r.cpu != null ? r.cpu : null
-            }));
-            
-            const memData = rows.map(r => ({
-                x: new Date(r.collected_at).getTime(),
-                y: r.mem != null ? r.mem : null
-            }));
-
-            cpuSeries.push({ name: `${proxyName} - CPU`, data: cpuData });
-            memSeries.push({ name: `${proxyName} - MEM`, data: memData });
-        });
-
-        const chartEl = document.getElementById('ruHistoryChart');
-        if (!chartEl) return;
-
-        // Destroy existing chart
-        if (history.chart) {
-            history.chart.destroy();
+    }
+    
+    // Export function
+    function exportHistory() {
+        const proxyId = $('#ruHistoryProxySelect').val();
+        const startTime = $('#ruHistoryStartTime').val();
+        const endTime = $('#ruHistoryEndTime').val();
+        
+        const params = {};
+        if (proxyId) {
+            params.proxy_id = parseInt(proxyId, 10);
         }
-
-        // Create tabs for CPU and MEM
-        const $chartWrap = $('#ruHistoryChartWrap');
-        if (!$chartWrap.find('.tabs').length) {
-            $chartWrap.prepend(`
-                <div class="tabs is-boxed">
-                    <ul>
-                        <li class="is-active" data-tab="cpu"><a>CPU</a></li>
-                        <li data-tab="mem"><a>MEM</a></li>
-                    </ul>
-                </div>
-                <div id="ruHistoryChartContainer" style="margin-top: 10px;"></div>
-            `);
-            
-            $chartWrap.find('.tabs li').on('click', function() {
-                const tab = $(this).data('tab');
-                $chartWrap.find('.tabs li').removeClass('is-active');
-                $(this).addClass('is-active');
-                renderHistoryChartTab(tab === 'cpu' ? cpuSeries : memSeries, tab);
+        if (startTime) {
+            params.start_time = convertKSTToUTC(startTime);
+        }
+        if (endTime) {
+            params.end_time = convertKSTToUTC(endTime);
+        }
+        
+        // Build query string
+        const queryString = Object.keys(params).map(key => 
+            `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`
+        ).join('&');
+        
+        // Open download link
+        window.location.href = `/api/resource-usage/export?${queryString}`;
+    }
+    
+    // Delete function
+    function deleteHistory() {
+        const $modal = $('#ruHistoryDeleteModal');
+        const deleteOption = $modal.find('input[name="deleteOption"]:checked').val();
+        const proxyId = $('#ruDeleteProxySelect').val();
+        
+        const deleteData = {};
+        if (proxyId) {
+            deleteData.proxy_id = parseInt(proxyId, 10);
+        }
+        
+        if (deleteOption === 'older') {
+            const days = parseInt($('#ruDeleteOlderDays').val(), 10);
+            if (!days || days < 1) {
+                alert('삭제할 기간을 입력하세요.');
+                return;
+            }
+            deleteData.older_than_days = days;
+        } else if (deleteOption === 'range') {
+            const startTime = $('#ruDeleteStartTime').val();
+            const endTime = $('#ruDeleteEndTime').val();
+            if (!startTime || !endTime) {
+                alert('시작 시간과 종료 시간을 모두 입력하세요.');
+                return;
+            }
+            deleteData.start_time = convertKSTToUTC(startTime);
+            deleteData.end_time = convertKSTToUTC(endTime);
+        } else if (deleteOption === 'all') {
+            if (!confirm('정말로 전체 로그를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+                return;
+            }
+        }
+        
+        $.ajax({
+            url: '/api/resource-usage',
+            method: 'DELETE',
+            contentType: 'application/json',
+            data: JSON.stringify(deleteData)
+        }).then(function(response) {
+            alert(response.message);
+            $modal.removeClass('is-active');
+            loadStatistics();
+            // Clear current results
+            $('#ruHistoryResults').hide();
+        }).catch(function(err) {
+            const errorMsg = err.responseJSON && err.responseJSON.detail 
+                ? err.responseJSON.detail 
+                : '로그 삭제 중 오류가 발생했습니다.';
+            alert(errorMsg);
+        });
+    }
+    
+    // Initialize delete modal proxy select
+    function initDeleteProxySelect() {
+        const $select = $('#ruDeleteProxySelect');
+        $select.empty();
+        $select.append('<option value="">전체</option>');
+        (history.proxies || []).forEach(p => {
+            $select.append(`<option value="${p.id}">${p.host}</option>`);
+        });
+        if (window.TomSelect && !$select[0]._tomSelect) {
+            new TomSelect($select[0], {
+                placeholder: '프록시 선택',
+                allowEmptyOption: true
             });
         }
-
-        const $container = $('#ruHistoryChartContainer');
-        $container.empty();
-        const newChartEl = document.createElement('div');
-        newChartEl.id = 'ruHistoryChartInner';
-        newChartEl.style.width = '100%';
-        newChartEl.style.height = '400px';
-        $container.append(newChartEl);
-
-        renderHistoryChartTab(cpuSeries, 'cpu');
-        $('#ruHistoryChartWrap').show();
-    }
-
-    function renderHistoryChartTab(series, metric) {
-        const chartEl = document.getElementById('ruHistoryChartInner');
-        if (!chartEl || !window.ApexCharts) return;
-
-        if (history.chart) {
-            history.chart.destroy();
-        }
-
-        history.chart = new ApexCharts(chartEl, {
-            chart: {
-                type: 'line',
-                height: 400,
-                animations: { enabled: false },
-                toolbar: { show: true }
-            },
-            series: series,
-            stroke: { width: 2, curve: 'straight' },
-            markers: { size: 3 },
-            xaxis: {
-                type: 'datetime',
-                labels: { datetimeUTC: false }
-            },
-            yaxis: {
-                title: { text: metric === 'cpu' ? 'CPU (%)' : 'MEM (%)' },
-                decimalsInFloat: 1
-            },
-            tooltip: {
-                shared: true,
-                x: { format: 'yyyy-MM-dd HH:mm:ss' },
-                y: {
-                    formatter: function(val) {
-                        return val != null ? val.toFixed(2) + '%' : 'N/A';
-                    }
-                }
-            },
-            legend: { show: true }
-        });
-
-        history.chart.render();
     }
 
     // Event handlers
     $('#ruHistorySearchBtn').on('click', searchHistory);
+    $('#ruHistoryLoadAllBtn').on('click', loadAllHistory);
+    $('#ruHistoryExportBtn').on('click', exportHistory);
+    $('#ruHistoryDeleteBtn').on('click', function() {
+        initDeleteProxySelect();
+        $('#ruHistoryDeleteModal').addClass('is-active');
+    });
+    
+    $('#ruHistoryDeleteModal').find('input[name="deleteOption"]').on('change', function() {
+        const option = $(this).val();
+        $('#ruDeleteOlderThan').toggle(option === 'older');
+        $('#ruDeleteRange').toggle(option === 'range');
+    });
+    
+    $('#ruHistoryDeleteConfirmBtn').on('click', deleteHistory);
+    $('#ruHistoryDeleteCancelBtn, #ruHistoryDeleteModal .delete, #ruHistoryDeleteModal .modal-background').on('click', function() {
+        $('#ruHistoryDeleteModal').removeClass('is-active');
+    });
+    
+    $('#ruHistoryPrevBtn').on('click', function() {
+        if (!$(this).hasClass('is-disabled')) {
+            loadPrevPage();
+        }
+    });
+    $('#ruHistoryNextBtn').on('click', function() {
+        if (!$(this).hasClass('is-disabled')) {
+            loadNextPage();
+        }
+    });
+    
+    // Load statistics when proxy selection changes
+    $('#ruHistoryProxySelect').on('change', loadStatistics);
 
     // Load proxies on page load
     function loadProxies() {
         return $.getJSON('/api/proxies').then(function(proxies) {
             history.proxies = (proxies || []).filter(function(p) { return p.is_active; });
             initHistoryProxySelect();
-            setDefaultTimeRange();
+            initDeleteProxySelect();
+            loadStatistics(); // Load statistics on page load
         }).catch(function(err) {
             console.error('Failed to load proxies:', err);
             $('#ruHistoryError').text('프록시 목록을 불러오는데 실패했습니다.').show();

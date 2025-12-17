@@ -128,10 +128,20 @@
                 <h3 class="title is-4 mb-0">자원사용률 이력 조회</h3>
             </div>
         </div>
+        <div class="level-right">
+            <div class="level-item">
+                <div class="tags">
+                    <span class="tag is-info">총 레코드</span>
+                    <span class="tag" id="ruHistoryTotalCount">-</span>
+                    <span class="tag is-info">보관 기간</span>
+                    <span class="tag">90일</span>
+                </div>
+            </div>
+        </div>
     </div>
     
-    <div class="columns is-multiline">
-        <div class="column is-3">
+    <div class="columns is-multiline is-vcentered">
+        <div class="column is-2">
             <div class="field">
                 <label class="label">프록시 선택</label>
                 <div class="control">
@@ -141,39 +151,59 @@
                 </div>
             </div>
         </div>
-        <div class="column is-3">
+        <div class="column is-2">
             <div class="field">
                 <label class="label">시작 시간</label>
                 <div class="control">
-                    <input class="input" id="ruHistoryStartTime" type="datetime-local">
+                    <input class="input" id="ruHistoryStartTime" type="datetime-local" placeholder="선택사항">
                 </div>
             </div>
         </div>
-        <div class="column is-3">
+        <div class="column is-2">
             <div class="field">
                 <label class="label">종료 시간</label>
                 <div class="control">
-                    <input class="input" id="ruHistoryEndTime" type="datetime-local">
+                    <input class="input" id="ruHistoryEndTime" type="datetime-local" placeholder="선택사항">
                 </div>
             </div>
         </div>
-        <div class="column is-3">
+        <div class="column is-2">
             <div class="field">
-                <label class="label">최대 조회 개수</label>
+                <label class="label">페이지당 개수</label>
                 <div class="control">
-                    <input class="input" id="ruHistoryLimit" type="number" min="1" max="10000" value="1000">
+                    <select class="input" id="ruHistoryLimit">
+                        <option value="100">100</option>
+                        <option value="500" selected>500</option>
+                        <option value="1000">1,000</option>
+                        <option value="5000">5,000</option>
+                        <option value="10000">10,000</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="column is-4">
+            <div class="field">
+                <label class="label">&nbsp;</label>
+                <div class="control">
+                    <div class="buttons">
+                        <button class="button is-primary" id="ruHistorySearchBtn">기간 조회</button>
+                        <button class="button is-info" id="ruHistoryLoadAllBtn">전체 조회</button>
+                        <button class="button is-success" id="ruHistoryExportBtn">내보내기</button>
+                        <button class="button is-danger" id="ruHistoryDeleteBtn">삭제</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="level">
-        <div class="level-left"></div>
-        <div class="level-right">
-            <div class="level-item">
-                <button class="button is-primary" id="ruHistorySearchBtn">조회</button>
-            </div>
-        </div>
+    
+    <div id="ruHistoryStatsDetails" class="content is-small mt-3" style="display:none;">
+        <p id="ruHistoryStatsText" class="help"></p>
     </div>
+    
+    <div class="help mt-3">
+        ※ 로그는 90일 이상 된 데이터가 자동으로 삭제됩니다.
+    </div>
+</div>
     
     <div id="ruHistoryLoading" class="has-text-centered mt-4" style="display:none;">
         <p class="help">조회 중...</p>
@@ -182,36 +212,113 @@
     <div id="ruHistoryError" class="help is-danger mt-4" style="display:none;"></div>
 </div>
 
+<!-- 삭제 모달 -->
+<div class="modal" id="ruHistoryDeleteModal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">로그 삭제</p>
+            <button class="delete" aria-label="close"></button>
+        </header>
+        <section class="modal-card-body">
+            <div class="field">
+                <label class="label">삭제 옵션 선택</label>
+                <div class="control">
+                    <label class="radio">
+                        <input type="radio" name="deleteOption" value="older" checked>
+                        특정 기간 이상 된 데이터 삭제
+                    </label>
+                    <label class="radio">
+                        <input type="radio" name="deleteOption" value="range">
+                        기간 지정 삭제
+                    </label>
+                    <label class="radio">
+                        <input type="radio" name="deleteOption" value="all">
+                        전체 삭제 (위험)
+                    </label>
+                </div>
+            </div>
+            <div id="ruDeleteOlderThan" class="field">
+                <label class="label">삭제할 기간 (일)</label>
+                <div class="control">
+                    <input class="input" type="number" id="ruDeleteOlderDays" min="1" value="90" placeholder="90">
+                </div>
+                <p class="help">이 기간 이상 된 데이터가 삭제됩니다.</p>
+            </div>
+            <div id="ruDeleteRange" class="field" style="display:none;">
+                <div class="columns">
+                    <div class="column">
+                        <label class="label">시작 시간</label>
+                        <input class="input" type="datetime-local" id="ruDeleteStartTime">
+                    </div>
+                    <div class="column">
+                        <label class="label">종료 시간</label>
+                        <input class="input" type="datetime-local" id="ruDeleteEndTime">
+                    </div>
+                </div>
+            </div>
+            <div class="field">
+                <label class="label">프록시 선택 (선택사항)</label>
+                <div class="control">
+                    <select id="ruDeleteProxySelect" class="ts-fullwidth">
+                        <option value="">전체</option>
+                    </select>
+                </div>
+            </div>
+            <div class="notification is-warning">
+                <strong>경고:</strong> 삭제된 데이터는 복구할 수 없습니다.
+            </div>
+        </section>
+        <footer class="modal-card-foot">
+            <button class="button is-danger" id="ruHistoryDeleteConfirmBtn">삭제</button>
+            <button class="button" id="ruHistoryDeleteCancelBtn">취소</button>
+        </footer>
+    </div>
+</div>
+
 <!-- 결과 섹션 -->
 <div id="ruHistoryResults" style="display:none;">
-    <div class="box mb-4">
-        <h4 class="title is-5 mb-4">조회 결과</h4>
-        <p id="ruHistoryCount" class="help mb-4"></p>
-        <div class="table-container" style="max-height: 600px; overflow-y: auto;">
-            <table class="table is-striped is-fullwidth is-hoverable">
-                <thead>
+    <div class="box">
+        <div class="level mb-4">
+            <div class="level-left">
+                <div class="level-item">
+                    <h4 class="title is-5 mb-0">조회 결과</h4>
+                </div>
+                <div class="level-item">
+                    <p id="ruHistoryCount" class="help mb-0 ml-3"></p>
+                </div>
+            </div>
+            <div class="level-right">
+                <div class="level-item">
+                    <div class="pagination-info" id="ruHistoryPaginationInfo"></div>
+                </div>
+            </div>
+        </div>
+        <div class="table-container" style="max-height: 70vh; overflow-y: auto;">
+            <table class="table is-striped is-fullwidth is-hoverable is-narrow">
+                <thead style="position: sticky; top: 0; background: white; z-index: 10;">
                     <tr>
-                        <th>수집 시간</th>
-                        <th>프록시</th>
-                        <th>CPU (%)</th>
-                        <th>MEM (%)</th>
-                        <th>CC</th>
-                        <th>CS</th>
-                        <th>HTTP</th>
-                        <th>HTTPS</th>
-                        <th>FTP</th>
-                        <th>인터페이스 MBPS</th>
+                        <th style="min-width: 150px;">수집 시간</th>
+                        <th style="min-width: 120px;">프록시</th>
+                        <th style="min-width: 80px;">CPU (%)</th>
+                        <th style="min-width: 80px;">MEM (%)</th>
+                        <th style="min-width: 100px;">CC</th>
+                        <th style="min-width: 100px;">CS</th>
+                        <th style="min-width: 120px;">HTTP (Mbps)</th>
+                        <th style="min-width: 120px;">HTTPS (Mbps)</th>
+                        <th style="min-width: 120px;">FTP (Mbps)</th>
+                        <th style="min-width: 200px;">인터페이스</th>
                     </tr>
                 </thead>
                 <tbody id="ruHistoryTableBody">
                 </tbody>
             </table>
         </div>
-    </div>
-    
-    <div id="ruHistoryChartWrap" class="box" style="display:none;">
-        <h4 class="title is-5 mb-4">이력 그래프</h4>
-        <div id="ruHistoryChart" style="width:100%; height:400px;"></div>
+        <nav class="pagination is-centered mt-4" role="navigation" id="ruHistoryPagination" style="display:none;">
+            <a class="pagination-previous" id="ruHistoryPrevBtn">이전</a>
+            <a class="pagination-next" id="ruHistoryNextBtn">다음</a>
+            <ul class="pagination-list"></ul>
+        </nav>
     </div>
 </div>
 </div>

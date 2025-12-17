@@ -209,8 +209,8 @@ class BackgroundCollector:
             for model in collected_models:
                 db.refresh(model)
             
-            # 30일 보관 정책 적용
-            _enforce_resource_usage_retention(db, days=30)
+            # 90일 보관 정책 적용
+            _enforce_resource_usage_retention(db, days=90)
             
             return {
                 "requested": len(proxies),
