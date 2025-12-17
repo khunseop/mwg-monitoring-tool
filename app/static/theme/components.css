@@ -247,6 +247,10 @@
     margin-bottom: 1.5rem;
 }
 
+.tabs.is-boxed {
+    margin-bottom: 0.5rem;
+}
+
 .tabs ul {
     border-bottom: 0;
 }
