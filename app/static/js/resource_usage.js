@@ -305,12 +305,41 @@ $(document).ready(function() {
             { key: 'ftpd', title: 'FTP Δ' },
         ];
         
-        // Add interface metrics with names
-        const interfaceMetrics = selectedInterfaces.map(ifIndex => ({
-            key: `if_${ifIndex}`,
-            title: interfaceNames[ifIndex] || `IF${ifIndex}`,
-            ifIndex: ifIndex
-        }));
+        // Helper function to abbreviate long interface names
+        function abbreviateInterfaceName(name) {
+            if (!name) return name;
+            // Common abbreviations
+            const abbrevs = {
+                'GigabitEthernet': 'Gi',
+                'FastEthernet': 'Fa',
+                'TenGigabitEthernet': 'Te',
+                'Ethernet': 'Eth'
+            };
+            let abbrev = name;
+            for (const [full, short] of Object.entries(abbrevs)) {
+                if (name.startsWith(full)) {
+                    abbrev = name.replace(full, short);
+                    break;
+                }
+            }
+            // Limit length for display (keep first 15 chars)
+            if (abbrev.length > 15) {
+                abbrev = abbrev.substring(0, 12) + '...';
+            }
+            return abbrev;
+        }
+        
+        // Add interface metrics with names (interface name is primary, index is fallback)
+        const interfaceMetrics = selectedInterfaces.map(ifIndex => {
+            const ifName = interfaceNames[ifIndex];
+            const displayName = ifName ? abbreviateInterfaceName(ifName) : `IF${ifIndex}`;
+            return {
+                key: `if_${ifIndex}`,
+                title: displayName,
+                fullName: ifName || `IF${ifIndex}`, // Keep full name for tooltips
+                ifIndex: ifIndex
+            };
+        });
         
         const metrics = [...basicMetrics, ...interfaceMetrics];
 
@@ -824,10 +853,33 @@ $(document).ready(function() {
                 });
             }
             
+            // Helper function to abbreviate long interface names
+            function abbreviateInterfaceName(name) {
+                if (!name) return name;
+                const abbrevs = {
+                    'GigabitEthernet': 'Gi',
+                    'FastEthernet': 'Fa',
+                    'TenGigabitEthernet': 'Te',
+                    'Ethernet': 'Eth'
+                };
+                let abbrev = name;
+                for (const [full, short] of Object.entries(abbrevs)) {
+                    if (name.startsWith(full)) {
+                        abbrev = name.replace(full, short);
+                        break;
+                    }
+                }
+                if (abbrev.length > 15) {
+                    abbrev = abbrev.substring(0, 12) + '...';
+                }
+                return abbrev;
+            }
+            
             const metrics = [...basicMetrics, ...interfacesToShow.map(ifIndex => `if_${ifIndex}`)];
             const titles = { ...basicTitles };
             interfacesToShow.forEach(ifIndex => {
-                titles[`if_${ifIndex}`] = interfaceNames[ifIndex] || `IF${ifIndex}`;
+                const ifName = interfaceNames[ifIndex];
+                titles[`if_${ifIndex}`] = ifName ? abbreviateInterfaceName(ifName) : `IF${ifIndex}`;
             });
             $wrap.empty();
             metrics.forEach(m => {

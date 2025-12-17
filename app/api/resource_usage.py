@@ -20,6 +20,7 @@ except Exception:
 from app.database.database import get_db
 from app.models.proxy import Proxy
 from app.models.resource_usage import ResourceUsage as ResourceUsageModel
+from app.models.resource_config import ResourceConfig as ResourceConfigModel
 from app.schemas.resource_usage import (
     ResourceUsage as ResourceUsageSchema,
     CollectRequest,
@@ -151,9 +152,34 @@ def _calculate_mbps(current: int, previous: int, time_diff_sec: float) -> float:
     return max(0.0, mbps)
 
 
-async def _collect_interface_mbps(proxy: Proxy, community: str) -> Optional[Dict[str, Dict[str, Any]]]:
+def _is_system_interface(if_name: str) -> bool:
+    """
+    Check if interface is a system interface that should be excluded.
+    Returns True if interface should be excluded.
+    """
+    if not if_name:
+        return False
+    if_name_lower = if_name.lower()
+    # Exclude loopback interfaces
+    if if_name_lower.startswith('lo') or if_name_lower.startswith('loopback'):
+        return True
+    # Exclude virtual interfaces (optional)
+    if any(prefix in if_name_lower for prefix in ['veth', 'docker', 'br-', 'virbr']):
+        return True
+    return False
+
+
+async def _collect_interface_mbps(proxy: Proxy, community: str, selected_interfaces: Optional[List[str]] = None, traffic_threshold_mbps: float = 0.01) -> Optional[Dict[str, Dict[str, Any]]]:
     """
     Collect interface MBPS for all interfaces using SNMP 32-bit counters.
+    Filters out system interfaces and interfaces with no traffic below threshold.
+    
+    Args:
+        proxy: Proxy instance
+        community: SNMP community string
+        selected_interfaces: Optional list of interface indices/names to include. If provided, only these interfaces are collected.
+        traffic_threshold_mbps: Minimum traffic threshold in Mbps. Interfaces below this threshold are excluded. Default: 0.01 Mbps.
+    
     Returns {interface_index: {"in_mbps": float, "out_mbps": float, "name": str}} or None if failed.
     """
     try:
@@ -174,6 +200,37 @@ async def _collect_interface_mbps(proxy: Proxy, community: str) -> Optional[Dict
         if not all_indices:
             return None
         
+        # Filter by selected_interfaces if provided
+        if selected_interfaces and len(selected_interfaces) > 0:
+            # Convert selected_interfaces to set of indices (as strings and ints)
+            selected_set = set()
+            for sel in selected_interfaces:
+                selected_set.add(str(sel))
+                try:
+                    selected_set.add(str(int(sel)))
+                except (ValueError, TypeError):
+                    pass
+            
+            # Also match by interface name
+            name_to_index = {}
+            for idx in all_indices:
+                if_name = if_names_dict.get(idx, f"IF{idx}")
+                name_to_index[if_name.lower()] = idx
+                name_to_index[if_name] = idx
+            
+            filtered_indices = set()
+            for idx in all_indices:
+                idx_str = str(idx)
+                if_name = if_names_dict.get(idx, f"IF{idx}")
+                # Include if index matches or name matches
+                if idx_str in selected_set or if_name in selected_interfaces or if_name.lower() in [s.lower() for s in selected_interfaces]:
+                    filtered_indices.add(idx)
+            
+            all_indices = filtered_indices
+            if not all_indices:
+                logger.debug(f"[resource_usage] No interfaces match selected_interfaces filter host={proxy.host} proxy_id={proxy.id}")
+                return None
+        
         current_time = monotonic()
         result: Dict[str, Dict[str, Any]] = {}
         
@@ -181,6 +238,11 @@ async def _collect_interface_mbps(proxy: Proxy, community: str) -> Optional[Dict
             current_in = in_octets_dict.get(if_index, 0)
             current_out = out_octets_dict.get(if_index, 0)
             if_name = if_names_dict.get(if_index, f"IF{if_index}")  # Fallback to IF{index} if name not found
+            
+            # Filter out system interfaces
+            if _is_system_interface(if_name):
+                logger.debug(f"[resource_usage] Excluding system interface host={proxy.host} proxy_id={proxy.id} interface={if_name} index={if_index}")
+                continue
             
             cache_key = (proxy.id, if_index)
             cached = _INTERFACE_COUNTER_CACHE.get(cache_key)
@@ -193,13 +255,20 @@ async def _collect_interface_mbps(proxy: Proxy, community: str) -> Optional[Dict
                 if time_diff >= 1.0:
                     in_mbps = _calculate_mbps(current_in, prev_in, time_diff)
                     out_mbps = _calculate_mbps(current_out, prev_out, time_diff)
-                    result[str(if_index)] = {
-                        "in_mbps": round(in_mbps, 3),
-                        "out_mbps": round(out_mbps, 3),
-                        "name": if_name
-                    }
+                    total_mbps = in_mbps + out_mbps
+                    
+                    # Filter by traffic threshold
+                    if total_mbps >= traffic_threshold_mbps:
+                        result[str(if_index)] = {
+                            "in_mbps": round(in_mbps, 3),
+                            "out_mbps": round(out_mbps, 3),
+                            "name": if_name
+                        }
+                    else:
+                        logger.debug(f"[resource_usage] Excluding interface below threshold host={proxy.host} proxy_id={proxy.id} interface={if_name} index={if_index} total_mbps={total_mbps:.3f}")
                 else:
-                    # Too soon, return 0.0 to indicate insufficient time has passed
+                    # Too soon, but still include for first-time collection
+                    # We'll filter by threshold on next collection
                     result[str(if_index)] = {
                         "in_mbps": 0.0,
                         "out_mbps": 0.0,
@@ -210,6 +279,7 @@ async def _collect_interface_mbps(proxy: Proxy, community: str) -> Optional[Dict
                 _INTERFACE_COUNTER_CACHE[cache_key] = (current_in, current_out, current_time)
             else:
                 # First collection, no previous data - initialize cache
+                # Include it for now, will be filtered on next collection if no traffic
                 result[str(if_index)] = {
                     "in_mbps": 0.0,
                     "out_mbps": 0.0,
@@ -219,7 +289,7 @@ async def _collect_interface_mbps(proxy: Proxy, community: str) -> Optional[Dict
                 _INTERFACE_COUNTER_CACHE[cache_key] = (current_in, current_out, current_time)
         
         if result:
-            logger.info(f"[resource_usage] Interface MBPS collection success host={proxy.host} proxy_id={proxy.id} interfaces={len(result)}")
+            logger.info(f"[resource_usage] Interface MBPS collection success host={proxy.host} proxy_id={proxy.id} interfaces={len(result)} (filtered)")
         return result if result else None
         
     except Exception as exc:
@@ -326,9 +396,29 @@ async def _ssh_get_mem_percent(proxy: Proxy, spec: str, timeout_sec: int = _SSH_
     return value
 
 
-async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str) -> Tuple[int, Dict[str, Any] | None, str | None]:
+def _get_selected_interfaces_from_config(db: Session) -> Optional[List[str]]:
+    """Get selected_interfaces from resource config"""
+    try:
+        cfg = db.query(ResourceConfigModel).order_by(ResourceConfigModel.id.asc()).first()
+        if not cfg:
+            return None
+        oids = json.loads(cfg.oids_json or '{}')
+        if isinstance(oids, dict) and isinstance(oids.get('__selected_interfaces__'), list):
+            selected = oids.get('__selected_interfaces__') or []
+            return selected if len(selected) > 0 else None
+        return None
+    except Exception as e:
+        logger.debug(f"[resource_usage] Failed to get selected_interfaces from config: {e}")
+        return None
+
+
+async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str, db: Optional[Session] = None, selected_interfaces: Optional[List[str]] = None) -> Tuple[int, Dict[str, Any] | None, str | None]:
     result: Dict[str, Any] = {k: None for k in SUPPORTED_KEYS}
     result["interface_mbps"] = None
+    
+    # Get selected_interfaces from config if not provided
+    if selected_interfaces is None and db is not None:
+        selected_interfaces = _get_selected_interfaces_from_config(db)
     
     tasks: list = []
     keys: list[str] = []
@@ -344,8 +434,8 @@ async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str)
             keys.append(key)
             tasks.append(_snmp_get(proxy.host, 161, community, oid))
 
-    # Always collect interface MBPS
-    interface_mbps_task = _collect_interface_mbps(proxy, community)
+    # Always collect interface MBPS with filtering
+    interface_mbps_task = _collect_interface_mbps(proxy, community, selected_interfaces=selected_interfaces)
     tasks.append(interface_mbps_task)
     keys.append("interface_mbps")
 
@@ -378,8 +468,11 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
     errors: Dict[int, str] = {}
     collected_models: List[ResourceUsageModel] = []
 
+    # Get selected_interfaces from config
+    selected_interfaces = _get_selected_interfaces_from_config(db)
+
     # Gather all SNMP collection tasks
-    tasks = [_collect_for_proxy(p, payload.oids, payload.community) for p in proxies]
+    tasks = [_collect_for_proxy(p, payload.oids, payload.community, db=db, selected_interfaces=selected_interfaces) for p in proxies]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     
     for proxy, result in zip(proxies, results):
@@ -464,6 +557,95 @@ async def latest_resource_usage(proxy_id: int, db: Session = Depends(get_db)):
     if not row:
         raise HTTPException(status_code=404, detail="No resource usage found for proxy")
     return row
+
+
+class ActiveInterfaceItem(BaseModel):
+    index: str
+    name: str
+    proxy_id: int
+    proxy_host: str
+
+
+@router.get("/resource-usage/active-interfaces", response_model=List[ActiveInterfaceItem])
+async def get_active_interfaces(
+    proxy_id: Optional[int] = Query(None, description="Filter by proxy ID"),
+    group_id: Optional[int] = Query(None, description="Filter by group ID"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of interfaces to return"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get list of active interfaces from recent collection data.
+    Returns interfaces that have traffic data in the most recent collections.
+    """
+    from datetime import timedelta
+    
+    # Get recent data (last 24 hours)
+    cutoff_time = now_kst() - timedelta(hours=24)
+    
+    # Build query
+    query = db.query(ResourceUsageModel).filter(ResourceUsageModel.collected_at >= cutoff_time)
+    
+    if proxy_id:
+        query = query.filter(ResourceUsageModel.proxy_id == proxy_id)
+    elif group_id:
+        # Join with Proxy to filter by group_id
+        query = query.join(Proxy).filter(Proxy.group_id == group_id)
+    
+    # Get recent records
+    recent_records = query.order_by(ResourceUsageModel.collected_at.desc()).limit(limit * 10).all()
+    
+    # Extract unique interfaces
+    interface_map: Dict[Tuple[int, str], Dict[str, Any]] = {}
+    
+    for record in recent_records:
+        if not record.interface_mbps:
+            continue
+        
+        try:
+            interface_data = json.loads(record.interface_mbps) if isinstance(record.interface_mbps, str) else record.interface_mbps
+            if not isinstance(interface_data, dict):
+                continue
+            
+            # Get proxy info
+            proxy = db.query(Proxy).filter(Proxy.id == record.proxy_id).first()
+            proxy_host = proxy.host if proxy else f"proxy_{record.proxy_id}"
+            
+            for if_index, if_info in interface_data.items():
+                if not isinstance(if_info, dict):
+                    continue
+                
+                if_name = if_info.get("name", f"IF{if_index}")
+                # Only include interfaces with actual traffic (in_mbps + out_mbps > 0)
+                in_mbps = if_info.get("in_mbps", 0) or 0
+                out_mbps = if_info.get("out_mbps", 0) or 0
+                total_mbps = in_mbps + out_mbps
+                
+                # Skip system interfaces
+                if _is_system_interface(if_name):
+                    continue
+                
+                # Skip interfaces with no traffic
+                if total_mbps <= 0:
+                    continue
+                
+                key = (record.proxy_id, if_index)
+                if key not in interface_map:
+                    interface_map[key] = {
+                        "index": if_index,
+                        "name": if_name,
+                        "proxy_id": record.proxy_id,
+                        "proxy_host": proxy_host
+                    }
+        except Exception as e:
+            logger.debug(f"[resource_usage] Failed to parse interface_mbps for record {record.id}: {e}")
+            continue
+    
+    # Convert to list and sort
+    result = list(interface_map.values())
+    result.sort(key=lambda x: (x["proxy_id"], int(x["index"]) if x["index"].isdigit() else 999999))
+    
+    # Limit results
+    return result[:limit]
 
 
 @router.get("/resource-usage/history", response_model=List[ResourceUsageSchema])

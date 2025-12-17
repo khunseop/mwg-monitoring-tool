@@ -32,6 +32,52 @@ document.addEventListener('DOMContentLoaded', function() {
     initSettingsTabsFromQuery();
 });
 
+// Interface selector TomSelect instance
+let cfgInterfaceSelect = null;
+
+// Load active interfaces list
+function loadActiveInterfaces() {
+    $.get('/api/resource-usage/active-interfaces?limit=200')
+        .done(interfaces => {
+            const $select = $('#cfgSelectedInterfaces');
+            
+            // Clear existing options
+            $select.empty();
+            
+            // Add interfaces as options
+            interfaces.forEach(iface => {
+                const displayText = `${iface.name} (인덱스: ${iface.index}) - ${iface.proxy_host}`;
+                const option = $('<option>')
+                    .val(iface.index)
+                    .text(displayText)
+                    .data('name', iface.name)
+                    .data('proxy', iface.proxy_host);
+                $select.append(option);
+            });
+            
+            // Initialize or update TomSelect
+            if (window.TomSelect) {
+                if (cfgInterfaceSelect) {
+                    cfgInterfaceSelect.destroy();
+                }
+                cfgInterfaceSelect = new TomSelect($select[0], {
+                    plugins: ['remove_button'],
+                    maxItems: null,
+                    placeholder: '인터페이스를 선택하세요 (비워두면 모든 인터페이스 표시)',
+                    allowEmptyOption: true
+                });
+            }
+            
+            // Load selected values from config
+            loadResourceConfig();
+        })
+        .fail(() => {
+            console.warn('[settings] Failed to load active interfaces');
+            // Still try to load config even if interface list fails
+            loadResourceConfig();
+        });
+}
+
 // SNMP 설정 로드/저장
 function loadResourceConfig() {
     $.get('/api/resource-config')
@@ -55,7 +101,13 @@ function loadResourceConfig() {
             $('#cfgThrFtp').val(th.ftp ?? '');
             // Load selected interfaces
             const selectedInterfaces = cfg.selected_interfaces || [];
-            $('#cfgSelectedInterfaces').val(selectedInterfaces.join(','));
+            if (cfgInterfaceSelect) {
+                // TomSelect instance exists, set values
+                cfgInterfaceSelect.setValue(selectedInterfaces);
+            } else {
+                // Fallback: set as comma-separated string (for backward compatibility)
+                $('#cfgSelectedInterfaces').val(selectedInterfaces.join(','));
+            }
             // Load bandwidth_mbps
             const bandwidthMbps = cfg.bandwidth_mbps !== undefined ? cfg.bandwidth_mbps : 1000.0;
             $('#cfgBandwidthMbps').val(bandwidthMbps);
@@ -84,11 +136,18 @@ function saveResourceConfig() {
         return n < 0 ? 0 : n;
     }
 
-    // Parse selected interfaces
-    const selectedInterfacesRaw = ($('#cfgSelectedInterfaces').val() || '').trim();
-    const selectedInterfaces = selectedInterfacesRaw
-        ? selectedInterfacesRaw.split(',').map(s => s.trim()).filter(s => s.length > 0)
-        : [];
+    // Parse selected interfaces (support both TomSelect and text input)
+    let selectedInterfaces = [];
+    if (cfgInterfaceSelect) {
+        // TomSelect instance exists, get values from it
+        selectedInterfaces = cfgInterfaceSelect.getValue() || [];
+    } else {
+        // Fallback: parse from text input (backward compatibility)
+        const selectedInterfacesRaw = ($('#cfgSelectedInterfaces').val() || '').trim();
+        selectedInterfaces = selectedInterfacesRaw
+            ? selectedInterfacesRaw.split(',').map(s => s.trim()).filter(s => s.length > 0)
+            : [];
+    }
     
     // Parse bandwidth_mbps
     const bandwidthMbpsRaw = ($('#cfgBandwidthMbps').val() || '').toString().trim();
@@ -171,8 +230,14 @@ function saveSessionConfig() {
 
 // 초기화
 $(document).ready(() => {
-    loadResourceConfig();
+    // Load active interfaces first, then config (config loading will set selected values)
+    loadActiveInterfaces();
     loadSessionConfig();
+    
+    // Refresh button handler
+    $('#cfgRefreshInterfaces').on('click', function() {
+        loadActiveInterfaces();
+    });
 });
 
 // Expose functions for inline onclick handlers
