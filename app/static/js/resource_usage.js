@@ -455,7 +455,9 @@ $(document).ready(function() {
         });
 
         // Preserve raw values separately for labels/tooltips
+        // Store full hostnames for tooltip access
         ru._heatRaw = yCategories.map(() => new Array(xCategories.length).fill(null));
+        ru._heatRows = rows.map(r => r._fullHost || `#${r.proxy_id}`); // Store full hostnames
 
         const seriesData = yCategories.map((rowLabel, rowIdx) => {
             const dataPoints = xCategories.map((colLabel, colIdx) => {
@@ -470,6 +472,7 @@ $(document).ready(function() {
 
         // ApexCharts heatmap renders series from bottom to top; reverse to anchor top-left
         ru._heatRaw.reverse();
+        ru._heatRows.reverse(); // Also reverse rows array to match
         seriesData.reverse();
 
         // Calculate dynamic dimensions based on data size
@@ -579,9 +582,20 @@ $(document).ready(function() {
                 },
                 x: {
                     formatter: function(val, { seriesIndex }) {
-                        // Show full hostname in tooltip
-                        const row = rows[rows.length - 1 - seriesIndex]; // Reversed index
-                        return row && row._fullHost ? row._fullHost : val;
+                        // Show full hostname in tooltip (using reversed index)
+                        if (ru._heatRows && ru._heatRows[seriesIndex]) {
+                            return ru._heatRows[seriesIndex];
+                        }
+                        return val;
+                    }
+                },
+                title: {
+                    formatter: function(seriesName, { seriesIndex, dataPointIndex }) {
+                        // Show full hostname and metric name
+                        const fullHost = (ru._heatRows && ru._heatRows[seriesIndex]) ? ru._heatRows[seriesIndex] : seriesName;
+                        const metric = metrics[dataPointIndex];
+                        const metricTitle = metric ? metric.title : '';
+                        return `${fullHost} - ${metricTitle}`;
                     }
                 }
             },
