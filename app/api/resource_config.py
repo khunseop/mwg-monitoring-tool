@@ -37,9 +37,9 @@ def get_resource_config(db: Session = Depends(get_db)):
         interface_thresholds = oids.get('__interface_thresholds__') or {}
     if isinstance(oids, dict) and isinstance(oids.get('__bandwidth_mbps__'), (int, float)):
         bandwidth_mbps = float(oids.get('__bandwidth_mbps__'))
-    # filter out embedded keys when returning oids
+    # filter out embedded keys when returning oids (including legacy __selected_interfaces__)
     if isinstance(oids, dict):
-        oids = {k: v for k, v in oids.items() if k not in ['__thresholds__', '__interface_oids__', '__interface_thresholds__', '__bandwidth_mbps__']}
+        oids = {k: v for k, v in oids.items() if k not in ['__thresholds__', '__interface_oids__', '__interface_thresholds__', '__bandwidth_mbps__', '__selected_interfaces__']}
     return ResourceConfigSchema(
         id=cfg.id,
         community=cfg.community,
@@ -60,7 +60,7 @@ def update_resource_config(payload: ResourceConfigBase, db: Session = Depends(ge
         cfg = ResourceConfigModel()
         db.add(cfg)
     cfg.community = payload.community
-    # Store oids; also embed thresholds and selected_interfaces (single source of truth)
+    # Store oids; also embed thresholds, interface_oids, interface_thresholds, and bandwidth_mbps (single source of truth)
     oids = payload.oids or {}
     
     # Check which fields were actually set in the payload (not just default values)
@@ -113,7 +113,7 @@ def update_resource_config(payload: ResourceConfigBase, db: Session = Depends(ge
             interface_thresholds_out = oids_out.get('__interface_thresholds__') or {}
         if '__bandwidth_mbps__' in oids_out:
             bandwidth_mbps_out = float(oids_out.get('__bandwidth_mbps__', 1000.0))
-        oids_out = {k: v for k, v in oids_out.items() if k not in ['__thresholds__', '__interface_oids__', '__interface_thresholds__', '__bandwidth_mbps__']}
+        oids_out = {k: v for k, v in oids_out.items() if k not in ['__thresholds__', '__interface_oids__', '__interface_thresholds__', '__bandwidth_mbps__', '__selected_interfaces__']}
     return ResourceConfigSchema(
         id=cfg.id,
         community=cfg.community,
