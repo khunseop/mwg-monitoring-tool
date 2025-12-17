@@ -986,18 +986,51 @@ $(document).ready(function() {
             configuredInterfaceNames.forEach(ifName => {
                 titles[`if_${ifName}`] = abbreviateInterfaceName(ifName);
             });
-            $wrap.empty();
-            metrics.forEach(m => {
-                const panel = `
-                    <div class="column is-12">
-                        <div class="ru-chart-panel" id="ruChartPanel-${m}" style="border:1px solid var(--border-color,#e5e7eb); border-radius:6px; padding:8px;">
-                            <div class="level" style="margin-bottom:6px;">
-                                <div class="level-left"><h5 class="title is-6" style="margin:0;">${titles[m]}</h5></div>
-                                <div class="level-right">
-                                    <a class="button is-small ru-chart-zoom-btn" data-metric="${m}" title="Zoom in">확대</a>
+            
+            // Add header with controls (only once)
+            if (!$wrap.find('.ru-charts-header').length) {
+                const header = `
+                    <div class="column is-12 ru-charts-header mb-3">
+                        <div class="level mb-0">
+                            <div class="level-left">
+                                <div class="level-item">
+                                    <label class="label mb-0 mr-3">그래프 높이:</label>
+                                    <input type="range" id="ruChartHeightSlider" min="150" max="500" value="${height}" step="50" style="width: 200px; margin: 0 10px;">
+                                    <span id="ruChartHeightValue">${height}px</span>
                                 </div>
                             </div>
-                            <div id="ruApex-${m}" style="width:100%; height:${height}px;"></div>
+                            <div class="level-right">
+                                <div class="level-item">
+                                    <button class="button is-small" id="ruToggleAllCharts">전체 펼치기</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+                $wrap.prepend(header);
+            } else {
+                // Update height value if header exists
+                $('#ruChartHeightSlider').val(height);
+                $('#ruChartHeightValue').text(height + 'px');
+            }
+            
+            // Remove existing chart panels but keep header
+            $wrap.find('.ru-chart-panel').parent().remove();
+            metrics.forEach(m => {
+                const panel = `
+                    <div class="column is-6">
+                        <div class="ru-chart-panel" id="ruChartPanel-${m}" data-collapsed="true" style="border:1px solid var(--border-color,#e5e7eb); border-radius:6px; padding:8px; margin-bottom:1rem;">
+                            <div class="level" style="margin-bottom:6px;">
+                                <div class="level-left">
+                                    <h5 class="title is-6" style="margin:0; cursor:pointer;" data-metric="${m}">${titles[m]}</h5>
+                                </div>
+                                <div class="level-right">
+                                    <a class="button is-small ru-chart-toggle-btn" data-metric="${m}" title="접기/펼치기">▼</a>
+                                    <a class="button is-small ru-chart-zoom-btn" data-metric="${m}" title="확대">확대</a>
+                                </div>
+                            </div>
+                            <div class="ru-chart-content" id="ruChartContent-${m}" style="display:none;">
+                                <div id="ruApex-${m}" style="width:100%; height:${height}px;"></div>
+                            </div>
                         </div>
                     </div>`;
                 $wrap.append(panel);
@@ -1033,7 +1066,8 @@ $(document).ready(function() {
 
     function renderAllCharts() {
         if (!window.ApexCharts) return;
-        ensureApexChartsDom(false, null, 300); // Main charts with default height
+        const currentHeight = parseInt($('#ruChartHeightSlider').val(), 10) || 300;
+        ensureApexChartsDom(false, null, currentHeight); // Main charts with current height
         
         // Get configured interfaces from config
         const interfaceOids = (cachedConfig && cachedConfig.interface_oids) ? cachedConfig.interface_oids : {};
@@ -1047,7 +1081,7 @@ $(document).ready(function() {
     }
 
     function renderMetricChart(metricKey, isModal = false) {
-        const height = isModal ? $(window).height() * 0.7 : 300;
+        const height = isModal ? $(window).height() * 0.7 : (parseInt($('#ruChartHeightSlider').val(), 10) || 300);
         const elId = isModal ? `ruApexModal-${metricKey}` : `ruApex-${metricKey}`;
         const el = document.getElementById(elId);
         if (!el) return;
@@ -1244,9 +1278,84 @@ $(document).ready(function() {
         $('#ruModalChart').empty();
     }
 
-    $('#ruChartsWrap').on('click', '.ru-chart-zoom-btn', function() {
+    // Chart toggle (collapse/expand) functionality
+    function toggleChart(metricKey) {
+        const $panel = $(`#ruChartPanel-${metricKey}`);
+        const $content = $(`#ruChartContent-${metricKey}`);
+        const $btn = $panel.find('.ru-chart-toggle-btn');
+        const isCollapsed = $panel.data('collapsed') === true;
+        
+        if (isCollapsed) {
+            $content.slideDown(200);
+            $btn.text('▲');
+            $panel.data('collapsed', false);
+        } else {
+            $content.slideUp(200);
+            $btn.text('▼');
+            $panel.data('collapsed', true);
+        }
+    }
+    
+    function toggleAllCharts(expand) {
+        const $panels = $('#ruChartsWrap .ru-chart-panel');
+        $panels.each(function() {
+            const metric = $(this).attr('id').replace('ruChartPanel-', '');
+            const isCollapsed = $(this).data('collapsed') === true;
+            if (expand === undefined) {
+                // Toggle based on current state
+                toggleChart(metric);
+            } else if (expand && isCollapsed) {
+                toggleChart(metric);
+            } else if (!expand && !isCollapsed) {
+                toggleChart(metric);
+            }
+        });
+    }
+    
+    // Chart height slider
+    function updateChartHeight(newHeight) {
+        $('#ruChartsWrap .ru-chart-content').each(function() {
+            const $content = $(this);
+            if ($content.is(':visible')) {
+                const metric = $content.attr('id').replace('ruChartContent-', '');
+                const chart = ru.charts[metric];
+                if (chart) {
+                    chart.updateOptions({ chart: { height: newHeight } }, false, true);
+                }
+                $content.find(`#ruApex-${metric}`).css('height', newHeight + 'px');
+            }
+        });
+        $('#ruChartHeightValue').text(newHeight + 'px');
+    }
+    
+    // Event handlers
+    $('#ruChartsWrap').on('click', '.ru-chart-zoom-btn', function(e) {
+        e.stopPropagation();
         const metric = $(this).data('metric');
         if (metric) openModal(metric);
+    });
+    
+    $('#ruChartsWrap').on('click', '.ru-chart-toggle-btn', function(e) {
+        e.stopPropagation();
+        const metric = $(this).data('metric');
+        if (metric) toggleChart(metric);
+    });
+    
+    $('#ruChartsWrap').on('click', '.ru-chart-panel .title', function() {
+        const metric = $(this).data('metric');
+        if (metric) toggleChart(metric);
+    });
+    
+    $('#ruChartHeightSlider').on('input', function() {
+        const newHeight = parseInt($(this).val(), 10);
+        updateChartHeight(newHeight);
+    });
+    
+    let allExpanded = false;
+    $('#ruToggleAllCharts').on('click', function() {
+        allExpanded = !allExpanded;
+        toggleAllCharts(allExpanded);
+        $(this).text(allExpanded ? '전체 접기' : '전체 펼치기');
     });
 
     $modal.find('.modal-background, .delete').on('click', closeModal);
