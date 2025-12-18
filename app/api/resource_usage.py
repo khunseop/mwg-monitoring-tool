@@ -438,7 +438,8 @@ async def _collect_interface_mbps_from_oids(proxy: Proxy, community: str, interf
         result: Dict[str, Dict[str, Any]] = {}
         
         # Collect all interface counters in parallel
-        tasks = {}
+        tasks = []
+        task_metadata = []  # Store (if_name, direction) for each task
         for if_name, oids in interface_oids.items():
             in_oid = oids.get('in_oid', '').strip() if isinstance(oids, dict) else ''
             out_oid = oids.get('out_oid', '').strip() if isinstance(oids, dict) else ''
@@ -449,20 +450,20 @@ async def _collect_interface_mbps_from_oids(proxy: Proxy, community: str, interf
                 out_oid = ''
             
             if in_oid:
-                tasks[f"{if_name}_in"] = (_snmp_get(proxy.host, 161, community, in_oid), if_name, 'in')
+                tasks.append(_snmp_get(proxy.host, 161, community, in_oid))
+                task_metadata.append((if_name, 'in'))
             if out_oid:
-                tasks[f"{if_name}_out"] = (_snmp_get(proxy.host, 161, community, out_oid), if_name, 'out')
+                tasks.append(_snmp_get(proxy.host, 161, community, out_oid))
+                task_metadata.append((if_name, 'out'))
         
         if not tasks:
             return None
         
         # Execute all SNMP queries in parallel
-        task_items = list(tasks.items())
-        snmp_tasks = [task[0] for task in task_items]
-        counter_values = await asyncio.gather(*snmp_tasks, return_exceptions=True)
+        counter_values = await asyncio.gather(*tasks, return_exceptions=True)
         
         # Process results
-        for (task_key, (_, if_name, direction)), counter_value in zip(task_items, counter_values):
+        for (if_name, direction), counter_value in zip(task_metadata, counter_values):
             if isinstance(counter_value, Exception):
                 logger.debug(f"[resource_usage] Failed to get interface counter host={proxy.host} proxy_id={proxy.id} interface={if_name} direction={direction}: {counter_value}")
                 continue
