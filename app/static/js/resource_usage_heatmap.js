@@ -307,7 +307,8 @@
                 if (metricKey === 'httpsd') return 'https';
                 if (metricKey === 'ftpd') return 'ftp';
                 if (metricKey.startsWith('if_')) {
-                    const ifName = metricKey.replace('if_', '');
+                    // if_${ifName}_in 또는 if_${ifName}_out 형태에서 인터페이스 이름 추출
+                    const ifName = metricKey.replace(/^if_/, '').replace(/_in$|_out$/, '');
                     return interfaceThr[ifName] !== undefined ? `__interface_${ifName}__` : 'interface_mbps';
                 }
                 return metricKey;

@@ -55,21 +55,20 @@
                 ru.tsBuffer[proxyId] = ru.tsBuffer[proxyId] || { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [] };
                 
                 // Initialize interface buffers dynamically (now keyed by interface name with in/out)
-                if (row.interface_mbps && typeof row.interface_mbps === 'object') {
-                    const interfaceOids = (ru.cachedConfig && ru.cachedConfig.interface_oids) ? ru.cachedConfig.interface_oids : {};
-                    const configuredInterfaceNames = Object.keys(interfaceOids);
-                    
-                    configuredInterfaceNames.forEach(ifName => {
-                        const inKey = `if_${ifName}_in`;
-                        const outKey = `if_${ifName}_out`;
-                        if (!ru.tsBuffer[proxyId][inKey]) {
-                            ru.tsBuffer[proxyId][inKey] = [];
-                        }
-                        if (!ru.tsBuffer[proxyId][outKey]) {
-                            ru.tsBuffer[proxyId][outKey] = [];
-                        }
-                    });
-                }
+                // 설정에서 인터페이스 목록을 가져와서 버퍼 초기화 (데이터가 없어도 초기화)
+                const interfaceOids = (ru.cachedConfig && ru.cachedConfig.interface_oids) ? ru.cachedConfig.interface_oids : {};
+                const configuredInterfaceNames = Object.keys(interfaceOids);
+                
+                configuredInterfaceNames.forEach(ifName => {
+                    const inKey = `if_${ifName}_in`;
+                    const outKey = `if_${ifName}_out`;
+                    if (!ru.tsBuffer[proxyId][inKey]) {
+                        ru.tsBuffer[proxyId][inKey] = [];
+                    }
+                    if (!ru.tsBuffer[proxyId][outKey]) {
+                        ru.tsBuffer[proxyId][outKey] = [];
+                    }
+                });
                 
                 const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
                 ['cpu','mem','cc','cs'].forEach(k => {
@@ -362,6 +361,14 @@
             selectedProxyIds.forEach(proxyId => {
                 const byMetric = ru.tsBuffer[proxyId] || {};
                 const arr = byMetric[metricKey] || [];
+                
+                // 디버깅: 인터페이스 메트릭의 경우 버퍼 상태 확인
+                if (metricKey.startsWith('if_')) {
+                    if (arr.length === 0) {
+                        console.log(`[resource_usage_charts] No data in buffer for ${metricKey}, proxyId=${proxyId}, available keys:`, Object.keys(byMetric).filter(k => k.startsWith('if_')));
+                    }
+                }
+                
                 const values = new Array(labelsMs.length).fill(null);
                 arr.forEach(p => {
                     if (!p || typeof p.x !== 'number') return;
