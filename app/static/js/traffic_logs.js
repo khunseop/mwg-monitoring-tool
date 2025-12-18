@@ -7,6 +7,7 @@
 	let CURRENT_VIEW = 'remote';
 	let tlGridApi = null;
 	let tlGridColumnApi = null;
+	let tlProxySelectTomSelect = null;
 	const COLS = [
 		"datetime","username","client_ip","url_destination_ip","timeintransaction",
 		"response_statuscode","cache_status","comm_name","url_protocol","url_host",
@@ -103,9 +104,13 @@
 			const raw = localStorage.getItem(STORAGE_KEY);
 			if(raw){ prev = JSON.parse(raw); }
 		}catch(e){ /* ignore */ }
+		const $sel = $('#tlProxySelect');
+		const proxyId = (tlProxySelectTomSelect && typeof tlProxySelectTomSelect.getValue === 'function') 
+			? (tlProxySelectTomSelect.getValue() || '') 
+			: ($sel.val() || '');
 		const state = {
 			view: CURRENT_VIEW,
-			proxyId: $('#tlProxySelect').val() || '',
+			proxyId: proxyId,
 			query: ($('#tlQuery').val() || '').trim(),
 			limit: $('#tlLimit').val() || '200',
 			direction: $('#tlDirection').val() || 'tail',
@@ -123,7 +128,14 @@
 			if(!raw) return;
 			const state = JSON.parse(raw);
 			if(state.view){ CURRENT_VIEW = state.view; }
-			if(state.proxyId !== undefined){ $('#tlProxySelect').val(String(state.proxyId)); }
+			const $sel = $('#tlProxySelect');
+			if(state.proxyId !== undefined){
+				if(tlProxySelectTomSelect && typeof tlProxySelectTomSelect.setValue === 'function'){
+					tlProxySelectTomSelect.setValue(String(state.proxyId));
+				} else {
+					$sel.val(String(state.proxyId));
+				}
+			}
 			if(state.query !== undefined){ $('#tlQuery').val(state.query); }
 			if(state.limit !== undefined){ $('#tlLimit').val(state.limit); }
 			if(state.direction !== undefined){ $('#tlDirection').val(state.direction); }
@@ -162,6 +174,9 @@
 
 	function populateProxySelect(proxies){
 		const $sel = $('#tlProxySelect');
+		const currentValue = (tlProxySelectTomSelect && typeof tlProxySelectTomSelect.getValue === 'function') 
+			? (tlProxySelectTomSelect.getValue() || '') 
+			: ($sel.val() || '');
 		$sel.find('option:not([value=""])').remove();
 		const active = proxies.filter(p => p && p.is_active);
 		if (active.length === 0) {
@@ -176,6 +191,34 @@
 			clearError();
 		}
 		console.log('[TrafficLogs] populateProxySelect - active:', active.length, 'total:', proxies.length);
+		
+		// Initialize or update TomSelect if available
+		if (window.TomSelect) {
+			if (!$sel[0]._tomSelect) {
+				try {
+					tlProxySelectTomSelect = new TomSelect($sel[0], {
+						placeholder: '프록시 선택',
+						allowEmptyOption: true
+					});
+					$sel[0]._tomSelect = tlProxySelectTomSelect;
+					console.log('[TrafficLogs] TomSelect initialized for proxy select');
+				} catch (e) {
+					console.error('[TrafficLogs] TomSelect init failed:', e);
+				}
+			} else {
+				// TomSelect already initialized, refresh options
+				if (tlProxySelectTomSelect && typeof tlProxySelectTomSelect.refreshOptions === 'function') {
+					tlProxySelectTomSelect.refreshOptions(false);
+				}
+			}
+			// Restore previous selection if valid
+			if (currentValue && tlProxySelectTomSelect && typeof tlProxySelectTomSelect.setValue === 'function') {
+				const isValid = active.some(p => String(p.id) === String(currentValue));
+				if (isValid) {
+					tlProxySelectTomSelect.setValue(currentValue);
+				}
+			}
+		}
 	}
 
 	function destroyTableIfExists(){
@@ -280,7 +323,10 @@
 
 	async function loadLogs(){
 		clearError();
-		const proxyId = $('#tlProxySelect').val();
+		const $sel = $('#tlProxySelect');
+		const proxyId = (tlProxySelectTomSelect && typeof tlProxySelectTomSelect.getValue === 'function') 
+			? (tlProxySelectTomSelect.getValue() || '') 
+			: ($sel.val() || '');
 		if(!proxyId || proxyId === ''){ 
 			showError('프록시를 선택하세요'); 
 			return; 
@@ -423,7 +469,14 @@
 								restoreState();
 							} else {
 								// Only sync controls
-								if(state.proxyId !== undefined){ $('#tlProxySelect').val(String(state.proxyId)); }
+								const $sel = $('#tlProxySelect');
+								if(state.proxyId !== undefined){
+									if(tlProxySelectTomSelect && typeof tlProxySelectTomSelect.setValue === 'function'){
+										tlProxySelectTomSelect.setValue(String(state.proxyId));
+									} else {
+										$sel.val(String(state.proxyId));
+									}
+								}
 								if(state.query !== undefined){ $('#tlQuery').val(state.query); }
 								if(state.limit !== undefined){ $('#tlLimit').val(state.limit); }
 								if(state.direction !== undefined){ $('#tlDirection').val(state.direction); }
