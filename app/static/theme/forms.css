@@ -24,16 +24,10 @@
     font-weight: 500; 
 }
 
-/* Tom Select customization */
+/* Tom Select 기본 스타일 */
 .ts-control, 
 .ts-control input, 
 .ts-dropdown { 
-    font-family: var(--font-sans); 
-    font-size: 0.95rem; 
-}
-
-#sbGroupSelect, 
-#ruGroupSelect { 
     font-family: var(--font-sans); 
     font-size: 0.95rem; 
 }
@@ -42,7 +36,6 @@
     border: 1px solid var(--color-border) !important; 
     border-radius: var(--radius-sm) !important; 
     background: var(--color-surface) !important; 
-    min-height: 2.5em; 
 }
 
 .ts-control.focus { 
@@ -68,29 +61,334 @@
     border: 1px solid var(--color-border) !important; 
     border-radius: var(--radius-sm) !important; 
     box-shadow: var(--shadow-sm) !important; 
+    background: var(--color-surface) !important;
+    margin-top: 0.25rem !important;
 }
 
-.ts-dropdown .active { 
-    background: #f8fafc !important; 
+.ts-dropdown .option {
+    padding: 0.5em 0.75em !important;
+    font-size: 0.95rem !important;
+    line-height: 1.5 !important;
 }
 
-.ts-wrapper.multi .ts-control > div.input.has-items { 
-    flex-wrap: nowrap !important; 
+.ts-dropdown .active,
+.ts-dropdown [data-selectable].option:hover {
+    background: color-mix(in srgb, var(--color-primary) 8%, white) !important; 
+    color: var(--color-text) !important;
+}
+
+.ts-dropdown [data-selectable].option {
+    cursor: pointer !important;
 }
 
 .ts-wrapper .ts-control > input { 
     min-width: 6ch !important; 
 }
 
-/* Slightly larger font for group and proxy Tom Select controls */
-#sbProxySelect + .ts-wrapper .ts-control,
-#ruProxySelect + .ts-wrapper .ts-control,
-#sbGroupSelect + .ts-wrapper .ts-control,
-#ruGroupSelect + .ts-wrapper .ts-control { 
-    font-size: 0.96rem; 
-}
-
-/* Tom Select: make wrapper full-width when original has ts-fullwidth */
 .ts-fullwidth + .ts-wrapper { 
     width: 100% !important; 
+}
+
+/* ============================================
+   통합 필터바 스타일
+   ============================================ */
+.filter-bar {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    margin-bottom: 0;
+}
+
+.filter-bar-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.filter-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.filter-item:first-child {
+    min-width: 150px;
+}
+
+.filter-item-expanded {
+    flex: 1;
+    min-width: 300px;
+}
+
+.filter-label {
+    font-weight: 500;
+    color: var(--color-text);
+    white-space: nowrap;
+    font-size: 0.95rem;
+    min-width: fit-content;
+    display: flex;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    height: auto;
+    line-height: 1.5;
+}
+
+.filter-control {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+}
+
+/* 필터바 내부 select와 Tom Select wrapper가 풀너비 사용 */
+.filter-control .select.is-fullwidth,
+.filter-control .select.is-fullwidth select,
+.filter-control .ts-fullwidth + .ts-wrapper {
+    width: 100% !important;
+}
+
+/* Bulma select 래퍼 높이 고정 - 그룹 선택 필드용 */
+.filter-control .select.is-fullwidth {
+    display: block !important;
+    height: 2.5em !important;
+    min-height: 2.5em !important;
+    max-height: 2.5em !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 0 !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+/* Bulma 드롭다운 화살표 숨김 (Tom Select가 자체 화살표 제공) */
+.filter-control .select.is-fullwidth::after {
+    display: none !important;
+}
+
+.filter-control .select.is-fullwidth select {
+    height: 2.5em !important;
+    min-height: 2.5em !important;
+    max-height: 2.5em !important;
+    line-height: 1.5 !important;
+    padding: 0.5em 0.75em !important;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+}
+
+.filter-item-checkbox {
+    display: flex;
+    align-items: center;
+}
+
+.filter-item-checkbox .checkbox {
+    margin: 0;
+    display: flex;
+    align-items: center;
+}
+
+/* 반응형: 작은 화면에서 필터바 세로 배치 */
+@media screen and (max-width: 768px) {
+    .filter-bar-content {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-item {
+        width: 100%;
+    }
+    
+    .filter-item-expanded {
+        min-width: 100%;
+    }
+    
+    .filter-item-checkbox {
+        justify-content: flex-start;
+    }
+}
+
+/* ============================================
+   그룹 선택 필드 (Tom Select single-select)
+   ============================================ */
+/* Tom Select wrapper 높이 통일 */
+.filter-control .select.is-fullwidth .ts-wrapper,
+.filter-control .select.is-fullwidth + .ts-wrapper,
+#ruGroupSelect + .ts-wrapper,
+#sbGroupSelect + .ts-wrapper,
+#ruGroupSelect + .ts-wrapper.single,
+#sbGroupSelect + .ts-wrapper.single {
+    width: 100% !important;
+    height: 2.5em !important;
+    min-height: 2.5em !important;
+    max-height: 2.5em !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: relative !important;
+    box-sizing: border-box !important;
+}
+
+/* 그룹 선택 필드 control - 프록시 선택과 완전히 동일한 스타일 */
+.filter-control .select.is-fullwidth .ts-wrapper .ts-control,
+.filter-control .select.is-fullwidth + .ts-wrapper .ts-control,
+#ruGroupSelect + .ts-wrapper .ts-control,
+#sbGroupSelect + .ts-wrapper .ts-control,
+#ruGroupSelect + .ts-wrapper.single .ts-control,
+#sbGroupSelect + .ts-wrapper.single .ts-control {
+    width: 100% !important;
+    height: 2.5em !important;
+    min-height: 2.5em !important;
+    max-height: 2.5em !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    padding-left: 0.5em !important;
+    padding-right: 0.5em !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    line-height: 1.5 !important;
+    box-sizing: border-box !important;
+    border: 1px solid var(--color-border) !important;
+    overflow: hidden !important;
+    background: var(--color-surface) !important;
+}
+
+/* 그룹 선택 필드 내부 아이템 (텍스트) - 프록시와 동일한 스타일 */
+#ruGroupSelect + .ts-wrapper.single .ts-control .item,
+#sbGroupSelect + .ts-wrapper.single .ts-control .item {
+    display: inline-flex !important;
+    align-items: center !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1.5 !important;
+    background: transparent !important;
+    border: none !important;
+    color: var(--color-text) !important;
+    border-radius: 0 !important;
+    white-space: nowrap !important;
+    font-size: 0.95rem !important;
+}
+
+/* 그룹 선택 필드 내부 input */
+#ruGroupSelect + .ts-wrapper.single .ts-control > input,
+#sbGroupSelect + .ts-wrapper.single .ts-control > input {
+    height: 100% !important;
+    line-height: 1.5 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    font-size: 0.95rem !important;
+}
+
+/* ============================================
+   프록시 선택 필드 (Tom Select multi-select)
+   ============================================ */
+/* 프록시 선택 필드 wrapper 높이 통일 - 그룹 선택과 동일 */
+#ruProxySelect + .ts-wrapper,
+#sbProxySelect + .ts-wrapper,
+#ruProxySelect + .ts-wrapper.multi,
+#sbProxySelect + .ts-wrapper.multi {
+    width: 100% !important;
+    height: 2.5em !important;
+    min-height: 2.5em !important;
+    max-height: 2.5em !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+}
+
+/* 프록시 선택 필드 control - 그룹 선택과 완전히 동일한 스타일 */
+#ruProxySelect + .ts-wrapper .ts-control,
+#sbProxySelect + .ts-wrapper .ts-control,
+#ruProxySelect + .ts-wrapper.multi .ts-control,
+#sbProxySelect + .ts-wrapper.multi .ts-control {
+    height: 2.5em !important;
+    min-height: 2.5em !important;
+    max-height: 2.5em !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    padding-left: 0.5em !important;
+    padding-right: 0.5em !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    line-height: 1.5 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+    box-sizing: border-box !important;
+    border: 1px solid var(--color-border) !important;
+    background: var(--color-surface) !important;
+}
+
+/* 프록시 선택 필드 - 선택된 항목이 있어도 높이 고정 */
+#ruProxySelect + .ts-wrapper.multi.has-items .ts-control,
+#sbProxySelect + .ts-wrapper.multi.has-items .ts-control {
+    height: 2.5em !important;
+    min-height: 2.5em !important;
+    max-height: 2.5em !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    padding-left: 0.5em !important;
+    padding-right: 0.5em !important;
+}
+
+/* 프록시 선택 필드 내부 컨테이너 */
+#ruProxySelect + .ts-wrapper.multi .ts-control > div.input.has-items,
+#sbProxySelect + .ts-wrapper.multi .ts-control > div.input.has-items {
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    max-height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* 프록시 선택 필드 내부 아이템 (태그) - 그룹 선택과 통일된 스타일, 다만 태그 형태 유지 */
+#ruProxySelect + .ts-wrapper.multi .ts-control .item,
+#sbProxySelect + .ts-wrapper.multi .ts-control .item {
+    display: inline-flex !important;
+    align-items: center !important;
+    line-height: 1.5 !important;
+    margin: 0 !important;
+    padding: 0 6px !important;
+    flex-shrink: 0 !important;
+    vertical-align: middle !important;
+    background: color-mix(in srgb, var(--color-primary) 10%, white) !important;
+    border: 1px solid color-mix(in srgb, var(--color-primary) 20%, white) !important;
+    color: var(--color-text) !important;
+    border-radius: 4px !important;
+    white-space: nowrap !important;
+    font-size: 0.95rem !important;
+    height: 1.75em !important;
+}
+
+/* 프록시 선택 필드 내부 input (검색 입력) - 태그와 간격 확보 */
+#ruProxySelect + .ts-wrapper.multi .ts-control > input,
+#sbProxySelect + .ts-wrapper.multi .ts-control > input {
+    display: flex !important;
+    align-items: center !important;
+    height: 100% !important;
+    line-height: 1.5 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    margin-left: 4px !important;
+    vertical-align: middle !important;
+    font-size: 0.95rem !important;
+    min-width: 120px !important;
+}
+
+/* 필드 정렬 개선 */
+.field > .label {
+    margin-bottom: 0.5em;
 }
