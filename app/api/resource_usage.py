@@ -396,7 +396,7 @@ async def _ssh_get_mem_percent(proxy: Proxy, spec: str, timeout_sec: int = _SSH_
     return value
 
 
-def _get_interface_config_from_db(db: Session) -> Tuple[Dict[str, str], Dict[str, float]]:
+def _get_interface_config_from_db(db: Session) -> Tuple[Dict[str, Dict[str, str]], Dict[str, float]]:
     """Get interface_oids and interface_thresholds from resource config"""
     try:
         cfg = db.query(ResourceConfigModel).order_by(ResourceConfigModel.id.asc()).first()
@@ -407,7 +407,15 @@ def _get_interface_config_from_db(db: Session) -> Tuple[Dict[str, str], Dict[str
         interface_thresholds = {}
         if isinstance(oids, dict):
             if isinstance(oids.get('__interface_oids__'), dict):
-                interface_oids = oids.get('__interface_oids__') or {}
+                interface_oids_raw = oids.get('__interface_oids__') or {}
+                # Support both old format (string) and new format (object with in_oid/out_oid)
+                for if_name, oid_value in interface_oids_raw.items():
+                    if isinstance(oid_value, str):
+                        # Old format: convert to new format
+                        interface_oids[if_name] = {'in_oid': oid_value, 'out_oid': ''}
+                    elif isinstance(oid_value, dict):
+                        # New format: use as is
+                        interface_oids[if_name] = oid_value
             if isinstance(oids.get('__interface_thresholds__'), dict):
                 interface_thresholds = oids.get('__interface_thresholds__') or {}
         return interface_oids, interface_thresholds
@@ -416,12 +424,11 @@ def _get_interface_config_from_db(db: Session) -> Tuple[Dict[str, str], Dict[str
         return {}, {}
 
 
-async def _collect_interface_mbps_from_oids(proxy: Proxy, community: str, interface_oids: Dict[str, str]) -> Optional[Dict[str, Dict[str, Any]]]:
+async def _collect_interface_mbps_from_oids(proxy: Proxy, community: str, interface_oids: Dict[str, Dict[str, str]]) -> Optional[Dict[str, Dict[str, Any]]]:
     """
     Collect interface MBPS using configured OIDs.
-    Each interface has a name and OID. The OID should point to a 32-bit counter.
+    Each interface has a name and in_oid/out_oid. Each OID should point to a 32-bit counter.
     Returns {interface_name: {"in_mbps": float, "out_mbps": float, "name": str}} or None if failed.
-    Note: For simplicity, we use a single OID per interface and treat it as total traffic (in+out).
     """
     if not interface_oids or len(interface_oids) == 0:
         return None
@@ -432,14 +439,32 @@ async def _collect_interface_mbps_from_oids(proxy: Proxy, community: str, interf
         
         # Collect all interface counters in parallel
         tasks = {}
-        for if_name, oid in interface_oids.items():
-            tasks[if_name] = _snmp_get(proxy.host, 161, community, oid)
+        for if_name, oids in interface_oids.items():
+            in_oid = oids.get('in_oid', '').strip() if isinstance(oids, dict) else ''
+            out_oid = oids.get('out_oid', '').strip() if isinstance(oids, dict) else ''
+            
+            # Support old format (string) for backward compatibility
+            if isinstance(oids, str):
+                in_oid = oids.strip()
+                out_oid = ''
+            
+            if in_oid:
+                tasks[f"{if_name}_in"] = (_snmp_get(proxy.host, 161, community, in_oid), if_name, 'in')
+            if out_oid:
+                tasks[f"{if_name}_out"] = (_snmp_get(proxy.host, 161, community, out_oid), if_name, 'out')
         
-        counter_values = await asyncio.gather(*tasks.values(), return_exceptions=True)
+        if not tasks:
+            return None
         
-        for (if_name, oid), counter_value in zip(tasks.items(), counter_values):
+        # Execute all SNMP queries in parallel
+        task_items = list(tasks.items())
+        snmp_tasks = [task[0] for task in task_items]
+        counter_values = await asyncio.gather(*snmp_tasks, return_exceptions=True)
+        
+        # Process results
+        for (task_key, (_, if_name, direction)), counter_value in zip(task_items, counter_values):
             if isinstance(counter_value, Exception):
-                logger.debug(f"[resource_usage] Failed to get interface counter host={proxy.host} proxy_id={proxy.id} interface={if_name} oid={oid}: {counter_value}")
+                logger.debug(f"[resource_usage] Failed to get interface counter host={proxy.host} proxy_id={proxy.id} interface={if_name} direction={direction}: {counter_value}")
                 continue
             
             if counter_value is None:
@@ -448,10 +473,10 @@ async def _collect_interface_mbps_from_oids(proxy: Proxy, community: str, interf
             try:
                 current_counter = int(counter_value)
             except (ValueError, TypeError):
-                logger.debug(f"[resource_usage] Invalid counter value host={proxy.host} proxy_id={proxy.id} interface={if_name} value={counter_value}")
+                logger.debug(f"[resource_usage] Invalid counter value host={proxy.host} proxy_id={proxy.id} interface={if_name} direction={direction} value={counter_value}")
                 continue
             
-            cache_key = (proxy.id, if_name)
+            cache_key = (proxy.id, if_name, direction)
             cached = _INTERFACE_COUNTER_CACHE.get(cache_key)
             
             if cached:
@@ -461,29 +486,39 @@ async def _collect_interface_mbps_from_oids(proxy: Proxy, community: str, interf
                 # Only calculate if we have valid time difference (at least 1 second)
                 if time_diff >= 1.0:
                     # Calculate Mbps from counter delta
-                    # For simplicity, treat as total traffic (in+out combined)
-                    total_mbps = _calculate_mbps(current_counter, prev_counter, time_diff)
-                    result[if_name] = {
-                        "in_mbps": round(total_mbps / 2, 3),  # Split equally for display
-                        "out_mbps": round(total_mbps / 2, 3),
-                        "name": if_name
-                    }
+                    mbps = _calculate_mbps(current_counter, prev_counter, time_diff)
+                    
+                    # Initialize result entry if not exists
+                    if if_name not in result:
+                        result[if_name] = {
+                            "in_mbps": 0.0,
+                            "out_mbps": 0.0,
+                            "name": if_name
+                        }
+                    
+                    # Update the appropriate direction
+                    if direction == 'in':
+                        result[if_name]["in_mbps"] = round(mbps, 3)
+                    else:
+                        result[if_name]["out_mbps"] = round(mbps, 3)
                 else:
-                    # Too soon, return 0.0
+                    # Too soon, initialize with 0.0
+                    if if_name not in result:
+                        result[if_name] = {
+                            "in_mbps": 0.0,
+                            "out_mbps": 0.0,
+                            "name": if_name
+                        }
+                # Update cache
+                _INTERFACE_COUNTER_CACHE[cache_key] = (current_counter, current_time)
+            else:
+                # First collection, initialize cache and result
+                if if_name not in result:
                     result[if_name] = {
                         "in_mbps": 0.0,
                         "out_mbps": 0.0,
                         "name": if_name
                     }
-                # Update cache
-                _INTERFACE_COUNTER_CACHE[cache_key] = (current_counter, current_time)
-            else:
-                # First collection, initialize cache
-                result[if_name] = {
-                    "in_mbps": 0.0,
-                    "out_mbps": 0.0,
-                    "name": if_name
-                }
                 _INTERFACE_COUNTER_CACHE[cache_key] = (current_counter, current_time)
         
         if result:
@@ -495,7 +530,7 @@ async def _collect_interface_mbps_from_oids(proxy: Proxy, community: str, interf
         return None
 
 
-async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str, db: Optional[Session] = None, interface_oids: Optional[Dict[str, str]] = None) -> Tuple[int, Dict[str, Any] | None, str | None]:
+async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str, db: Optional[Session] = None, interface_oids: Optional[Dict[str, Dict[str, str]]] = None) -> Tuple[int, Dict[str, Any] | None, str | None]:
     result: Dict[str, Any] = {k: None for k in SUPPORTED_KEYS}
     result["interface_mbps"] = None
     

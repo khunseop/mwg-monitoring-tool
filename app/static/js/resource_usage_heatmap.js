@@ -144,15 +144,24 @@
                 { key: 'ftpd', title: 'FTP Δ' },
             ];
             
-            // Add interface metrics with names
-            const interfaceMetrics = configuredInterfaceNames.map(ifName => {
+            // Add interface metrics with names (in and out separately)
+            const interfaceMetrics = [];
+            configuredInterfaceNames.forEach(ifName => {
                 const displayName = utils.abbreviateInterfaceName(ifName);
-                return {
-                    key: `if_${ifName}`,
-                    title: displayName,
+                interfaceMetrics.push({
+                    key: `if_${ifName}_in`,
+                    title: `${displayName} IN`,
                     fullName: ifName,
-                    ifName: ifName
-                };
+                    ifName: ifName,
+                    direction: 'in'
+                });
+                interfaceMetrics.push({
+                    key: `if_${ifName}_out`,
+                    title: `${displayName} OUT`,
+                    fullName: ifName,
+                    ifName: ifName,
+                    direction: 'out'
+                });
             });
             
             const metrics = [...basicMetrics, ...interfaceMetrics];
@@ -166,6 +175,7 @@
                 let vals;
                 if (m.key.startsWith('if_')) {
                     const ifName = m.ifName;
+                    const direction = m.direction; // 'in' or 'out'
                     vals = rows
                         .map(r => {
                             if (!r.interface_mbps || typeof r.interface_mbps !== 'object') return null;
@@ -184,9 +194,12 @@
                                 });
                             }
                             if (!ifData || typeof ifData !== 'object') return null;
-                            const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
-                            const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
-                            return inMbps + outMbps;
+                            // direction에 따라 in_mbps 또는 out_mbps 반환
+                            if (direction === 'in') {
+                                return typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
+                            } else {
+                                return typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
+                            }
                         })
                         .filter(v => typeof v === 'number' && isFinite(v) && v >= 0)
                         .sort((a, b) => a - b);
@@ -227,6 +240,7 @@
                     let raw = null;
                     if (m.key.startsWith('if_')) {
                         const ifName = m.ifName;
+                        const direction = m.direction; // 'in' or 'out'
                         if (r.interface_mbps && typeof r.interface_mbps === 'object') {
                             // interface_mbps의 키를 인터페이스 이름으로 매핑하여 찾기
                             let ifData = null;
@@ -243,9 +257,12 @@
                                 });
                             }
                             if (ifData && typeof ifData === 'object') {
-                                const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
-                                const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
-                                raw = inMbps + outMbps;
+                                // direction에 따라 in_mbps 또는 out_mbps 반환
+                                if (direction === 'in') {
+                                    raw = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
+                                } else {
+                                    raw = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
+                                }
                             }
                         }
                     } else {

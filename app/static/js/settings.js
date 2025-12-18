@@ -35,8 +35,10 @@ document.addEventListener('DOMContentLoaded', function() {
 // Interface OID management
 let interfaceOidCounter = 0;
 
-function addInterfaceOidRow(name = '', oid = '') {
+function addInterfaceOidRow(name = '', oids = {}) {
     const counter = interfaceOidCounter++;
+    const inOid = oids.in_oid || '';
+    const outOid = oids.out_oid || '';
     const row = $(`
         <div class="field is-horizontal mb-3 interface-oid-row" data-counter="${counter}">
             <div class="field-body">
@@ -47,7 +49,12 @@ function addInterfaceOidRow(name = '', oid = '') {
                 </div>
                 <div class="field">
                     <div class="control">
-                        <input class="input interface-oid" type="text" placeholder="OID (예: 1.3.6.1.2.1.2.2.1.10.1)" value="${oid}">
+                        <input class="input interface-in-oid" type="text" placeholder="IN OID (예: 1.3.6.1.2.1.2.2.1.10.1)" value="${inOid}">
+                    </div>
+                </div>
+                <div class="field">
+                    <div class="control">
+                        <input class="input interface-out-oid" type="text" placeholder="OUT OID (예: 1.3.6.1.2.1.2.2.1.11.1)" value="${outOid}">
                     </div>
                 </div>
                 <div class="field">
@@ -138,7 +145,11 @@ function loadResourceConfig() {
             $('#cfgInterfaceList').empty();
             const interfaceOids = cfg.interface_oids || {};
             Object.keys(interfaceOids).forEach(name => {
-                addInterfaceOidRow(name, interfaceOids[name]);
+                // Support both old format (string) and new format (object with in_oid/out_oid)
+                const oids = typeof interfaceOids[name] === 'string' 
+                    ? { in_oid: interfaceOids[name], out_oid: '' } 
+                    : (interfaceOids[name] || {});
+                addInterfaceOidRow(name, oids);
             });
             
             // Load interface thresholds
@@ -180,9 +191,13 @@ function saveResourceConfig() {
     const interfaceOids = {};
     $('.interface-oid-row').each(function() {
         const name = $(this).find('.interface-name').val().trim();
-        const oid = $(this).find('.interface-oid').val().trim();
-        if (name && oid) {
-            interfaceOids[name] = oid;
+        const inOid = $(this).find('.interface-in-oid').val().trim();
+        const outOid = $(this).find('.interface-out-oid').val().trim();
+        if (name && (inOid || outOid)) {
+            interfaceOids[name] = {
+                in_oid: inOid || '',
+                out_oid: outOid || ''
+            };
         }
     });
     

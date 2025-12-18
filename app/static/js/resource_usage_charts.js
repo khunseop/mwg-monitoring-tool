@@ -54,12 +54,19 @@
                 const ts = Math.floor(rawTs / ru.timeBucketMs) * ru.timeBucketMs;
                 ru.tsBuffer[proxyId] = ru.tsBuffer[proxyId] || { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [] };
                 
-                // Initialize interface buffers dynamically (now keyed by interface name)
+                // Initialize interface buffers dynamically (now keyed by interface name with in/out)
                 if (row.interface_mbps && typeof row.interface_mbps === 'object') {
-                    Object.keys(row.interface_mbps).forEach(ifName => {
-                        const key = `if_${ifName}`;
-                        if (!ru.tsBuffer[proxyId][key]) {
-                            ru.tsBuffer[proxyId][key] = [];
+                    const interfaceOids = (ru.cachedConfig && ru.cachedConfig.interface_oids) ? ru.cachedConfig.interface_oids : {};
+                    const configuredInterfaceNames = Object.keys(interfaceOids);
+                    
+                    configuredInterfaceNames.forEach(ifName => {
+                        const inKey = `if_${ifName}_in`;
+                        const outKey = `if_${ifName}_out`;
+                        if (!ru.tsBuffer[proxyId][inKey]) {
+                            ru.tsBuffer[proxyId][inKey] = [];
+                        }
+                        if (!ru.tsBuffer[proxyId][outKey]) {
+                            ru.tsBuffer[proxyId][outKey] = [];
                         }
                     });
                 }
@@ -132,22 +139,37 @@
                                 ifName = ifKey;
                             }
                             
-                            // configuredInterfaceNames에 있는 인터페이스만 버퍼에 저장
+                            // configuredInterfaceNames에 있는 인터페이스만 버퍼에 저장 (in/out 별도)
                             if (configuredInterfaceNames.includes(ifName)) {
                                 const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
                                 const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
-                                const totalMbps = inMbps + outMbps;
-                                const key = `if_${ifName}`;
-                                const arr = ru.tsBuffer[proxyId][key] || [];
-                                const last = arr[arr.length - 1];
-                                if (last && last.x === ts) {
-                                    arr[arr.length - 1] = { x: ts, y: totalMbps };
+                                
+                                // IN 데이터 저장
+                                const inKey = `if_${ifName}_in`;
+                                let inArr = ru.tsBuffer[proxyId][inKey] || [];
+                                const inLast = inArr[inArr.length - 1];
+                                if (inLast && inLast.x === ts) {
+                                    inArr[inArr.length - 1] = { x: ts, y: inMbps };
                                 } else {
-                                    arr.push({ x: ts, y: totalMbps });
+                                    inArr.push({ x: ts, y: inMbps });
                                 }
-                                ru.tsBuffer[proxyId][key] = arr;
-                                if (arr.length > ru.bufferMaxPoints) {
-                                    arr.shift();
+                                ru.tsBuffer[proxyId][inKey] = inArr;
+                                if (inArr.length > ru.bufferMaxPoints) {
+                                    inArr.shift();
+                                }
+                                
+                                // OUT 데이터 저장
+                                const outKey = `if_${ifName}_out`;
+                                let outArr = ru.tsBuffer[proxyId][outKey] || [];
+                                const outLast = outArr[outArr.length - 1];
+                                if (outLast && outLast.x === ts) {
+                                    outArr[outArr.length - 1] = { x: ts, y: outMbps };
+                                } else {
+                                    outArr.push({ x: ts, y: outMbps });
+                                }
+                                ru.tsBuffer[proxyId][outKey] = outArr;
+                                if (outArr.length > ru.bufferMaxPoints) {
+                                    outArr.shift();
                                 }
                             }
                         }
@@ -187,10 +209,20 @@
                 const interfaceOids = (ru.cachedConfig && ru.cachedConfig.interface_oids) ? ru.cachedConfig.interface_oids : {};
                 const configuredInterfaceNames = Object.keys(interfaceOids);
                 
-                const metrics = [...basicMetrics, ...configuredInterfaceNames.map(ifName => `if_${ifName}`)];
+                // Interface metrics: in and out separately
+                const interfaceMetrics = [];
+                configuredInterfaceNames.forEach(ifName => {
+                    const displayName = utils.abbreviateInterfaceName(ifName);
+                    interfaceMetrics.push(`if_${ifName}_in`);
+                    interfaceMetrics.push(`if_${ifName}_out`);
+                });
+                
+                const metrics = [...basicMetrics, ...interfaceMetrics];
                 const titles = { ...basicTitles };
                 configuredInterfaceNames.forEach(ifName => {
-                    titles[`if_${ifName}`] = utils.abbreviateInterfaceName(ifName);
+                    const displayName = utils.abbreviateInterfaceName(ifName);
+                    titles[`if_${ifName}_in`] = `${displayName} IN`;
+                    titles[`if_${ifName}_out`] = `${displayName} OUT`;
                 });
                 
                 // Add header with controls (only once)
@@ -288,7 +320,12 @@
             const configuredInterfaceNames = Object.keys(interfaceOids);
             
             const basicMetrics = ['cpu','mem','cc','cs','http','https','ftp'];
-            const interfaceMetrics = configuredInterfaceNames.map(ifName => `if_${ifName}`);
+            // Interface metrics: in and out separately
+            const interfaceMetrics = [];
+            configuredInterfaceNames.forEach(ifName => {
+                interfaceMetrics.push(`if_${ifName}_in`);
+                interfaceMetrics.push(`if_${ifName}_out`);
+            });
             const metrics = [...basicMetrics, ...interfaceMetrics];
             
             metrics.forEach(m => this.renderMetricChart(m, false));
@@ -525,8 +562,11 @@
             const ru = window.ru;
             const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
             if (metricKey.startsWith('if_')) {
-                const ifName = metricKey.replace('if_', '');
-                $('#ruModalTitle').text(`${ifName} 회선사용률`);
+                const ifName = metricKey.replace(/^if_/, '').replace(/_in$|_out$/, '');
+                const direction = metricKey.endsWith('_in') ? 'IN' : (metricKey.endsWith('_out') ? 'OUT' : '');
+                const utils = window.ResourceUsageUtils;
+                const displayName = utils.abbreviateInterfaceName(ifName);
+                $('#ruModalTitle').text(`${displayName} ${direction} 회선사용률`);
             } else {
                 $('#ruModalTitle').text(titles[metricKey] || 'Chart');
             }

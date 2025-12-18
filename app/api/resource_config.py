@@ -32,7 +32,16 @@ def get_resource_config(db: Session = Depends(get_db)):
     if isinstance(oids, dict) and isinstance(oids.get('__thresholds__'), dict):
         thresholds = oids.get('__thresholds__') or {}
     if isinstance(oids, dict) and isinstance(oids.get('__interface_oids__'), dict):
-        interface_oids = oids.get('__interface_oids__') or {}
+        interface_oids_raw = oids.get('__interface_oids__') or {}
+        # Support both old format (string) and new format (object with in_oid/out_oid)
+        interface_oids = {}
+        for if_name, oid_value in interface_oids_raw.items():
+            if isinstance(oid_value, str):
+                # Old format: convert to new format
+                interface_oids[if_name] = {'in_oid': oid_value, 'out_oid': ''}
+            elif isinstance(oid_value, dict):
+                # New format: use as is
+                interface_oids[if_name] = oid_value
     if isinstance(oids, dict) and isinstance(oids.get('__interface_thresholds__'), dict):
         interface_thresholds = oids.get('__interface_thresholds__') or {}
     if isinstance(oids, dict) and isinstance(oids.get('__bandwidth_mbps__'), (int, float)):
