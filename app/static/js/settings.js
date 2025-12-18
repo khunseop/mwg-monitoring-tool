@@ -43,21 +43,25 @@ function addInterfaceOidRow(name = '', oids = {}) {
         <div class="field is-horizontal mb-3 interface-oid-row" data-counter="${counter}">
             <div class="field-body">
                 <div class="field">
+                    <label class="label is-small">인터페이스 이름</label>
                     <div class="control">
-                        <input class="input interface-name" type="text" placeholder="인터페이스 이름 (예: eth0)" value="${name}">
+                        <input class="input interface-name" type="text" placeholder="예: eth0" value="${name}">
                     </div>
                 </div>
                 <div class="field">
+                    <label class="label is-small">IN OID</label>
                     <div class="control">
-                        <input class="input interface-in-oid" type="text" placeholder="IN OID (예: 1.3.6.1.2.1.2.2.1.10.1)" value="${inOid}">
+                        <input class="input interface-in-oid" type="text" placeholder="예: 1.3.6.1.2.1.2.2.1.10.1" value="${inOid}">
                     </div>
                 </div>
                 <div class="field">
+                    <label class="label is-small">OUT OID</label>
                     <div class="control">
-                        <input class="input interface-out-oid" type="text" placeholder="OUT OID (예: 1.3.6.1.2.1.2.2.1.11.1)" value="${outOid}">
+                        <input class="input interface-out-oid" type="text" placeholder="예: 1.3.6.1.2.1.2.2.1.11.1" value="${outOid}">
                     </div>
                 </div>
                 <div class="field">
+                    <label class="label is-small">&nbsp;</label>
                     <div class="control">
                         <button class="button is-danger is-light remove-interface" type="button">삭제</button>
                     </div>
@@ -298,7 +302,7 @@ $(document).ready(() => {
     
     // Add interface button handler
     $('#cfgAddInterface').on('click', function() {
-        addInterfaceOidRow('', '');
+        addInterfaceOidRow('', {});
         updateInterfaceThresholds();
     });
     
