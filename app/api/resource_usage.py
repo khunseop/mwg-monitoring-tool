@@ -527,6 +527,33 @@ async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str,
         values = await asyncio.gather(*tasks, return_exceptions=True)
         for key, value in zip(keys, values):
             result[key] = None if isinstance(value, Exception) else value
+    
+    # 모든 수집값을 콘솔 로그로 출력
+    log_parts = [f"host={proxy.host}", f"proxy_id={proxy.id}"]
+    for key in SUPPORTED_KEYS:
+        val = result.get(key)
+        if val is not None:
+            if key in ['cpu', 'mem']:
+                log_parts.append(f"{key}={val:.2f}%")
+            elif key in ['cc', 'cs']:
+                log_parts.append(f"{key}={val}")
+            elif key in ['http', 'https', 'ftp']:
+                log_parts.append(f"{key}={val}")
+    
+    # 인터페이스 데이터 로그 출력
+    if result.get("interface_mbps"):
+        interface_data = result["interface_mbps"]
+        if isinstance(interface_data, dict):
+            interface_logs = []
+            for if_name, if_data in interface_data.items():
+                if isinstance(if_data, dict):
+                    in_mbps = if_data.get("in_mbps", 0)
+                    out_mbps = if_data.get("out_mbps", 0)
+                    interface_logs.append(f"{if_name}(in={in_mbps:.2f}Mbps,out={out_mbps:.2f}Mbps)")
+            if interface_logs:
+                log_parts.append(f"interfaces=[{','.join(interface_logs)}]")
+    
+    logger.info(f"[resource_usage] Collected values: {' '.join(log_parts)}")
 
     return proxy.id, result, None
 

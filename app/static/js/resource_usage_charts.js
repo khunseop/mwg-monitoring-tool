@@ -15,6 +15,38 @@
             const utils = window.ResourceUsageUtils;
             const now = Date.now();
             
+            // 모든 수집값을 콘솔 로그로 출력
+            (rows || []).forEach(row => {
+                const logParts = [`[resource_usage] Collected proxy_id=${row.proxy_id}`];
+                if (row.cpu !== null && row.cpu !== undefined) logParts.push(`cpu=${row.cpu.toFixed(2)}%`);
+                if (row.mem !== null && row.mem !== undefined) logParts.push(`mem=${row.mem.toFixed(2)}%`);
+                if (row.cc !== null && row.cc !== undefined) logParts.push(`cc=${row.cc}`);
+                if (row.cs !== null && row.cs !== undefined) logParts.push(`cs=${row.cs}`);
+                if (row.http !== null && row.http !== undefined) logParts.push(`http=${row.http}`);
+                if (row.https !== null && row.https !== undefined) logParts.push(`https=${row.https}`);
+                if (row.ftp !== null && row.ftp !== undefined) logParts.push(`ftp=${row.ftp}`);
+                
+                // 인터페이스 데이터 로그 출력
+                if (row.interface_mbps && typeof row.interface_mbps === 'object') {
+                    const interfaceLogs = [];
+                    Object.keys(row.interface_mbps).forEach(ifName => {
+                        const ifData = row.interface_mbps[ifName];
+                        if (ifData && typeof ifData === 'object') {
+                            const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
+                            const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
+                            interfaceLogs.push(`${ifName}(in=${inMbps.toFixed(2)}Mbps,out=${outMbps.toFixed(2)}Mbps)`);
+                        }
+                    });
+                    if (interfaceLogs.length > 0) {
+                        logParts.push(`interfaces=[${interfaceLogs.join(',')}]`);
+                    }
+                }
+                
+                if (logParts.length > 1) {
+                    console.log(logParts.join(' '));
+                }
+            });
+            
             (rows || []).forEach(row => {
                 const proxyId = row.proxy_id;
                 const rawTs = row.collected_at ? new Date(row.collected_at).getTime() : now;
