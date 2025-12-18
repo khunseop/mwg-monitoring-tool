@@ -137,19 +137,27 @@ window.ResourceUsageCollector = {
                 console.error('[ResourceUsageCollector] WebSocket error:', error);
             };
             
-            this.ws.onclose = () => {
-                console.log('[ResourceUsageCollector] WebSocket closed');
+            this.ws.onclose = (event) => {
+                console.log('[ResourceUsageCollector] WebSocket closed', event.code, event.reason);
                 this.ws = null;
-                // 자동 재연결 (수집 중일 때만, 또는 항상 재연결 시도)
-                if (this.reconnectAttempts < this.maxReconnectAttempts) {
-                    this.reconnectAttempts++;
-                    setTimeout(() => {
-                        if (this.isCollecting || this.reconnectAttempts <= this.maxReconnectAttempts) {
-                            this.connect();
-                        }
-                    }, this.reconnectDelay);
+                // 페이지 언로드 중이 아닐 때만 재연결 시도
+                // 1000: 정상 종료, 1001: 엔드포인트가 사라짐 (페이지 이동)
+                if (event.code !== 1000 && event.code !== 1001) {
+                    // 자동 재연결 (수집 중일 때만, 또는 항상 재연결 시도)
+                    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                        this.reconnectAttempts++;
+                        setTimeout(() => {
+                            // 페이지가 여전히 활성화되어 있고, 수집 중이거나 재연결 시도 중일 때만 재연결
+                            if (document.visibilityState !== 'hidden' && (this.isCollecting || this.reconnectAttempts <= this.maxReconnectAttempts)) {
+                                this.connect();
+                            }
+                        }, this.reconnectDelay);
+                    } else {
+                        // 최대 재연결 시도 횟수 초과 시 재설정
+                        this.reconnectAttempts = 0;
+                    }
                 } else {
-                    // 최대 재연결 시도 횟수 초과 시 재설정
+                    // 정상 종료인 경우 재연결 시도 횟수 리셋
                     this.reconnectAttempts = 0;
                 }
             };
@@ -286,10 +294,20 @@ window.ResourceUsageCollector = {
         this.updateNavbarIndicator();
         this.connect();
         
-        // 페이지 언로드 시 웹소켓 정리
+        // 페이지 가시성 변경 시 웹소켓 재연결
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && !this.ws && this.isCollecting) {
+                // 페이지가 다시 보일 때 웹소켓이 없으면 재연결
+                console.log('[ResourceUsageCollector] Page visible, reconnecting WebSocket...');
+                this.reconnectAttempts = 0;
+                this.connect();
+            }
+        });
+        
+        // 페이지 언로드 시 웹소켓 정리 (정상 종료 코드로 닫기)
         window.addEventListener('beforeunload', () => {
             if (this.ws) {
-                this.ws.close();
+                this.ws.close(1000, 'Page unloading'); // 1000: 정상 종료
             }
         });
     }
