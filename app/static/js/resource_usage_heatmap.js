@@ -196,7 +196,7 @@
 
             const xCategories = metrics.map(m => m.title);
             const yCategories = rows.map(r => {
-                return utils.truncateHostname(r._fullHost || `#${r.proxy_id}`, 25);
+                return r._fullHost || `#${r.proxy_id}`;
             });
 
             const data = [];
@@ -346,15 +346,15 @@
                     position: 'top',
                     labels: { 
                         rotate: -45,
-                        rotateAlways: false,
+                        rotateAlways: true,
                         style: { fontSize: '10px' },
-                        maxHeight: 100
+                        maxHeight: 150
                     }
                 },
                 yaxis: { 
                     labels: { 
                         style: { fontSize: rowCount > 20 ? '9px' : '11px' },
-                        maxWidth: 120,
+                        maxWidth: 300,
                         formatter: function(val) {
                             return val;
                         }

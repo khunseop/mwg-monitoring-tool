@@ -121,10 +121,7 @@
                     break;
                 }
             }
-            // Limit length for display (keep first 15 chars)
-            if (abbrev.length > 15) {
-                abbrev = abbrev.substring(0, 12) + '...';
-            }
+            // 길이 제한 제거 - 전체 이름 표시
             return abbrev;
         },
 
