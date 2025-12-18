@@ -9,6 +9,7 @@
     const LEGEND_STORAGE_KEY = 'ru_legend_v1';
     const BUFFER_STORAGE_KEY = 'ru_buffer_v1';
     const RUN_STORAGE_KEY = 'ru_running_v1';
+    const HEATMAP_STORAGE_KEY = 'ru_heatmap_v1';
 
     const ResourceUsageState = {
         /**
@@ -31,7 +32,8 @@
             legendState: {}, // { [metricKey]: { [proxyId]: hiddenBoolean } }
             _wsHandlerAdded: false, // 웹소켓 핸들러 추가 여부
             lastData: [], // 최신 데이터 저장
-            cachedConfig: null // 캐시된 설정
+            cachedConfig: null, // 캐시된 설정
+            heatmapMaxByMetric: {} // 히트맵 스케일 일관성을 위한 최대값 저장
         },
 
         /**
@@ -203,6 +205,46 @@
             try {
                 return localStorage.getItem(RUN_STORAGE_KEY) === '1';
             } catch (e) { return false; }
+        },
+
+        /**
+         * 히트맵 상태 저장 (lastData, maxByMetric, lastCumulativeByProxy)
+         */
+        saveHeatmapState() {
+            try {
+                const state = {
+                    lastData: Array.isArray(this.ru.lastData) ? this.ru.lastData : [],
+                    maxByMetric: this.ru.heatmapMaxByMetric || {},
+                    lastCumulativeByProxy: this.ru.lastCumulativeByProxy || {},
+                    savedAt: Date.now()
+                };
+                localStorage.setItem(HEATMAP_STORAGE_KEY, JSON.stringify(state));
+            } catch (e) { /* ignore */ }
+        },
+
+        /**
+         * 히트맵 상태 로드
+         * @returns {Object} 히트맵 상태 객체
+         */
+        loadHeatmapState() {
+            try {
+                const raw = localStorage.getItem(HEATMAP_STORAGE_KEY);
+                if (!raw) return null;
+                const state = JSON.parse(raw);
+                if (!state || typeof state !== 'object') return null;
+                
+                // 1시간 이상 오래된 데이터는 무시
+                const maxAge = 60 * 60 * 1000; // 1 hour
+                if (state.savedAt && (Date.now() - state.savedAt) > maxAge) {
+                    return null;
+                }
+                
+                return {
+                    lastData: Array.isArray(state.lastData) ? state.lastData : [],
+                    maxByMetric: (state.maxByMetric && typeof state.maxByMetric === 'object') ? state.maxByMetric : {},
+                    lastCumulativeByProxy: (state.lastCumulativeByProxy && typeof state.lastCumulativeByProxy === 'object') ? state.lastCumulativeByProxy : {}
+                };
+            } catch (e) { return null; }
         }
     };
 

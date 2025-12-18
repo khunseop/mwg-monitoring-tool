@@ -5,12 +5,51 @@
 (function(window) {
     'use strict';
 
+    // Debounce 및 성능 최적화를 위한 변수
+    let updateTimeout = null;
+    let pendingUpdate = null;
+    let isUpdating = false;
+
     const ResourceUsageHeatmap = {
         /**
-         * 테이블 데이터를 히트맵으로 업데이트
+         * 테이블 데이터를 히트맵으로 업데이트 (debounced)
          * @param {Array} items - 데이터 아이템 배열
          */
         updateTable(items) {
+            // Debounce: 빠른 연속 업데이트 방지
+            pendingUpdate = items;
+            if (updateTimeout) clearTimeout(updateTimeout);
+            updateTimeout = setTimeout(() => {
+                if (pendingUpdate && !isUpdating) {
+                    this._updateTableInternal(pendingUpdate);
+                    pendingUpdate = null;
+                }
+            }, 100); // 100ms debounce
+        },
+
+        /**
+         * 실제 히트맵 업데이트 로직
+         * @param {Array} items - 데이터 아이템 배열
+         */
+        _updateTableInternal(items) {
+            if (isUpdating) return;
+            isUpdating = true;
+            
+            // requestAnimationFrame으로 렌더링 최적화
+            requestAnimationFrame(() => {
+                try {
+                    this._doUpdate(items);
+                } finally {
+                    isUpdating = false;
+                }
+            });
+        },
+
+        /**
+         * 히트맵 업데이트 실행
+         * @param {Array} items - 데이터 아이템 배열
+         */
+        _doUpdate(items) {
             const ru = window.ru;
             const utils = window.ResourceUsageUtils;
             const state = window.ResourceUsageState;
@@ -109,8 +148,12 @@
             
             const metrics = [...basicMetrics, ...interfaceMetrics];
 
+            // 스케일 일관성을 위해 기존 최대값 사용 또는 새로 계산
             const maxByMetric = {};
             metrics.forEach(m => {
+                // 기존에 저장된 최대값이 있으면 사용 (스케일 일관성)
+                const existingMax = ru.heatmapMaxByMetric[m.key];
+                
                 let vals;
                 if (m.key.startsWith('if_')) {
                     const ifName = m.ifName;
@@ -131,14 +174,25 @@
                         .filter(v => typeof v === 'number' && isFinite(v) && v >= 0)
                         .sort((a, b) => a - b);
                 }
+                
                 let max = 0;
                 if (vals.length > 0) {
                     const idx = Math.max(0, Math.floor(vals.length * 0.95) - 1);
                     max = vals[idx];
                 }
                 if ((m.key === 'cpu' || m.key === 'mem') && max < 100) max = 100;
-                maxByMetric[m.key] = max || 1;
+                
+                // 기존 최대값이 있고, 새로 계산한 값이 기존보다 크면 업데이트
+                // 그렇지 않으면 기존 값 유지 (스케일 일관성)
+                if (typeof existingMax === 'number' && existingMax > 0) {
+                    maxByMetric[m.key] = Math.max(existingMax, max || 1);
+                } else {
+                    maxByMetric[m.key] = max || 1;
+                }
             });
+            
+            // 계산된 최대값 저장 (다음 업데이트에서 사용)
+            ru.heatmapMaxByMetric = maxByMetric;
 
             const xCategories = metrics.map(m => m.title);
             const yCategories = rows.map(r => {
@@ -349,11 +403,46 @@
                 series: seriesData
             };
 
-            if (ru.apex) { ru.apex.updateOptions(options, true, true); }
-            else { ru.apex = new ApexCharts(el, options); ru.apex.render(); }
+            // 차트가 이미 있으면 시리즈만 업데이트 (전체 재렌더링 방지)
+            if (ru.apex) {
+                // 시리즈 데이터만 업데이트하여 성능 개선
+                ru.apex.updateSeries(seriesData, false);
+                // 옵션 변경이 필요한 경우에만 업데이트
+                const needsOptionsUpdate = ru._lastHeatmapOptions === undefined || 
+                    JSON.stringify(ru._lastHeatmapOptions) !== JSON.stringify({
+                        height: calculatedHeight,
+                        width: baseWidth,
+                        xCategories: xCategories.length,
+                        yCategories: yCategories.length
+                    });
+                
+                if (needsOptionsUpdate) {
+                    ru.apex.updateOptions(options, false, false);
+                    ru._lastHeatmapOptions = {
+                        height: calculatedHeight,
+                        width: baseWidth,
+                        xCategories: xCategories.length,
+                        yCategories: yCategories.length
+                    };
+                }
+            } else {
+                ru.apex = new ApexCharts(el, options);
+                ru.apex.render();
+                ru._lastHeatmapOptions = {
+                    height: calculatedHeight,
+                    width: baseWidth,
+                    xCategories: xCategories.length,
+                    yCategories: yCategories.length
+                };
+            }
 
             if (!items || items.length === 0) { $('#ruHeatmapWrap').hide(); $('#ruEmptyState').show(); }
             else { $('#ruEmptyState').hide(); $('#ruHeatmapWrap').show(); }
+            
+            // 상태 저장 (히트맵 데이터 및 스케일)
+            if (state && typeof state.saveHeatmapState === 'function') {
+                state.saveHeatmapState();
+            }
         }
     };
 

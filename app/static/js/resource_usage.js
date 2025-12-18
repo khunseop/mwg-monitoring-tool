@@ -13,6 +13,16 @@ $(document).ready(function() {
     ru.legendState = state.loadLegendState();
     ru.tsBuffer = state.loadBufferState();
     
+    // 히트맵 상태 복원 (설정 로드 후에 복원)
+    let restoredHeatmapData = null;
+    const heatmapState = state.loadHeatmapState();
+    if (heatmapState) {
+        ru.lastData = heatmapState.lastData || [];
+        ru.heatmapMaxByMetric = heatmapState.maxByMetric || {};
+        ru.lastCumulativeByProxy = heatmapState.lastCumulativeByProxy || {};
+        restoredHeatmapData = ru.lastData.length > 0 ? ru.lastData : null;
+    }
+    
     // 차트 DOM 초기화
     charts.ensureApexChartsDom();
 
@@ -22,11 +32,15 @@ $(document).ready(function() {
     
     $('#ruGroupSelect').on('change', function() {
         ru.lastCumulativeByProxy = {};
+        ru.heatmapMaxByMetric = {}; // 그룹 변경 시 히트맵 스케일 리셋
         $('#ruTableBody').empty();
         state.saveState(undefined);
     });
     
-    $('#ruProxySelect').on('change', function() { state.saveState(undefined); });
+    $('#ruProxySelect').on('change', function() { 
+        // 프록시 선택 변경 시에는 스케일 유지 (같은 그룹 내에서 프록시만 변경)
+        state.saveState(undefined); 
+    });
 
     // 페이지 가시성 변경 처리 (탭 전환, 최소화 등)
     let lastVisibilityChange = Date.now();
@@ -72,6 +86,13 @@ $(document).ready(function() {
     ]).then(function() {
         return state.restoreState();
     }).then(function() {
+        // 복원된 히트맵 데이터가 있으면 표시 (설정 로드 후)
+        if (restoredHeatmapData && restoredHeatmapData.length > 0) {
+            requestAnimationFrame(() => {
+                heatmap.updateTable(restoredHeatmapData);
+            });
+        }
+        
         // 복원 후 실행 상태 확인 및 처리
         try {
             const running = state.loadRunningState();

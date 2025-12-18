@@ -87,8 +87,11 @@
                                     }
                                     charts.bufferAppendBatch(valid);
                                     state.saveBufferState();
-                                    charts.renderAllCharts();
-                                    heatmap.updateTable(valid);
+                                    // 차트와 히트맵 업데이트를 requestAnimationFrame으로 최적화
+                                    requestAnimationFrame(() => {
+                                        charts.renderAllCharts();
+                                        heatmap.updateTable(valid);
+                                    });
                                 }
                             }).catch(() => {});
                         }
@@ -169,8 +172,11 @@
                             // Update table and charts with fresh data
                             charts.bufferAppendBatch(valid);
                             state.saveBufferState();
-                            charts.renderAllCharts();
-                            heatmap.updateTable(valid);
+                            // 차트와 히트맵 업데이트를 requestAnimationFrame으로 최적화
+                            requestAnimationFrame(() => {
+                                charts.renderAllCharts();
+                                heatmap.updateTable(valid);
+                            });
                         }
                     } catch (e) {
                         console.warn('[resource_usage] Failed to resync data on page return:', e);

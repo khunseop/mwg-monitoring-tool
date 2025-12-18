@@ -395,8 +395,17 @@
                     }
                 });
             } else {
-                chartInstance.updateOptions({ ...options, colors }, false, true);
-                chartInstance.updateSeries(series, true);
+                // 옵션 변경이 필요한 경우에만 업데이트 (성능 최적화)
+                const needsOptionsUpdate = !ru._chartOptionsCache || 
+                    ru._chartOptionsCache[metricKey] !== JSON.stringify({ height, colors: colors.length });
+                
+                if (needsOptionsUpdate) {
+                    chartInstance.updateOptions({ ...options, colors }, false, false);
+                    if (!ru._chartOptionsCache) ru._chartOptionsCache = {};
+                    ru._chartOptionsCache[metricKey] = JSON.stringify({ height, colors: colors.length });
+                }
+                // 시리즈 데이터만 업데이트 (애니메이션 비활성화로 성능 개선)
+                chartInstance.updateSeries(series, false);
             }
         },
 
