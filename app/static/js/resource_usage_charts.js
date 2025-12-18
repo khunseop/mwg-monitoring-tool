@@ -15,37 +15,17 @@
             const utils = window.ResourceUsageUtils;
             const now = Date.now();
             
-            // 모든 수집값을 콘솔 로그로 출력
-            (rows || []).forEach(row => {
-                const logParts = [`[resource_usage] Collected proxy_id=${row.proxy_id}`];
+            // 콘솔 로그 최적화: 디버그 모드일 때만 출력하거나 간소화
+            // 너무 많은 로그로 인한 성능 저하 방지
+            const DEBUG_MODE = false; // 필요시 true로 변경하여 디버깅
+            if (DEBUG_MODE && rows && rows.length > 0) {
+                // 첫 번째 행만 간단히 로그 출력
+                const row = rows[0];
+                const logParts = [`[resource_usage] Collected ${rows.length} rows, proxy_id=${row.proxy_id}`];
                 if (row.cpu !== null && row.cpu !== undefined) logParts.push(`cpu=${row.cpu.toFixed(2)}%`);
                 if (row.mem !== null && row.mem !== undefined) logParts.push(`mem=${row.mem.toFixed(2)}%`);
-                if (row.cc !== null && row.cc !== undefined) logParts.push(`cc=${row.cc}`);
-                if (row.cs !== null && row.cs !== undefined) logParts.push(`cs=${row.cs}`);
-                if (row.http !== null && row.http !== undefined) logParts.push(`http=${row.http}`);
-                if (row.https !== null && row.https !== undefined) logParts.push(`https=${row.https}`);
-                if (row.ftp !== null && row.ftp !== undefined) logParts.push(`ftp=${row.ftp}`);
-                
-                // 인터페이스 데이터 로그 출력
-                if (row.interface_mbps && typeof row.interface_mbps === 'object') {
-                    const interfaceLogs = [];
-                    Object.keys(row.interface_mbps).forEach(ifName => {
-                        const ifData = row.interface_mbps[ifName];
-                        if (ifData && typeof ifData === 'object') {
-                            const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
-                            const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
-                            interfaceLogs.push(`${ifName}(in=${inMbps.toFixed(2)}Mbps,out=${outMbps.toFixed(2)}Mbps)`);
-                        }
-                    });
-                    if (interfaceLogs.length > 0) {
-                        logParts.push(`interfaces=[${interfaceLogs.join(',')}]`);
-                    }
-                }
-                
-                if (logParts.length > 1) {
-                    console.log(logParts.join(' '));
-                }
-            });
+                console.log(logParts.join(' '));
+            }
             
             (rows || []).forEach(row => {
                 const proxyId = row.proxy_id;
@@ -253,19 +233,22 @@
                 // Remove existing chart panels but keep header
                 $wrap.find('.ru-chart-panel').parent().remove();
                 metrics.forEach(m => {
+                    // 인터페이스 차트는 기본적으로 펼쳐진 상태로 표시
+                    const isInterfaceChart = m.startsWith('if_');
+                    const isCollapsed = !isInterfaceChart; // 인터페이스는 펼침, 기본 메트릭은 접힘
                     const panel = `
                         <div class="column is-6">
-                            <div class="ru-chart-panel" id="ruChartPanel-${m}" data-collapsed="true" style="border:1px solid var(--border-color,#e5e7eb); border-radius:6px; padding:8px; margin-bottom:1rem;">
+                            <div class="ru-chart-panel" id="ruChartPanel-${m}" data-collapsed="${isCollapsed}" style="border:1px solid var(--border-color,#e5e7eb); border-radius:6px; padding:8px; margin-bottom:1rem;">
                                 <div class="level" style="margin-bottom:6px;">
                                     <div class="level-left">
                                         <h5 class="title is-6" style="margin:0; cursor:pointer;" data-metric="${m}">${titles[m]}</h5>
                                     </div>
                                     <div class="level-right">
-                                        <a class="button is-small ru-chart-toggle-btn" data-metric="${m}" title="접기/펼치기">▼</a>
+                                        <a class="button is-small ru-chart-toggle-btn" data-metric="${m}" title="접기/펼치기">${isCollapsed ? '▼' : '▲'}</a>
                                         <a class="button is-small ru-chart-zoom-btn" data-metric="${m}" title="확대">확대</a>
                                     </div>
                                 </div>
-                                <div class="ru-chart-content" id="ruChartContent-${m}" style="display:none;">
+                                <div class="ru-chart-content" id="ruChartContent-${m}" style="display:${isCollapsed ? 'none' : 'block'};">
                                     <div id="ruApex-${m}" style="width:100%; height:${height}px;"></div>
                                 </div>
                             </div>

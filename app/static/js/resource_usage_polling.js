@@ -64,39 +64,10 @@
                 if (window.ResourceUsageCollector) {
                     window.ResourceUsageCollector.setCollecting(true);
                     window.ResourceUsageCollector.taskId = response.task_id;
-                    
-                    // 웹소켓을 통해 수집 완료 시 데이터 갱신 핸들러 등록
-                    const self = this;
-                    window.ResourceUsageCollector.onCollectionComplete = function(taskId, data) {
-                        if (taskId === ru.taskId) {
-                            const currentProxyIds = state.getSelectedProxyIds();
-                            self.fetchLatestForProxies(currentProxyIds).then(latestRows => {
-                                const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
-                                if (valid.length > 0) {
-                                    // Only update cumulative cache if we have previous data
-                                    const hasPreviousData = Object.keys(ru.lastCumulativeByProxy).length > 0;
-                                    if (!hasPreviousData) {
-                                        // First collection or after page return - initialize cache without calculating deltas
-                                        valid.forEach(row => {
-                                            ru.lastCumulativeByProxy[row.proxy_id] = {
-                                                http: typeof row.http === 'number' ? row.http : null,
-                                                https: typeof row.https === 'number' ? row.https : null,
-                                                ftp: typeof row.ftp === 'number' ? row.ftp : null,
-                                            };
-                                        });
-                                    }
-                                    charts.bufferAppendBatch(valid);
-                                    state.saveBufferState();
-                                    // 차트와 히트맵 업데이트를 requestAnimationFrame으로 최적화
-                                    requestAnimationFrame(() => {
-                                        charts.renderAllCharts();
-                                        heatmap.updateTable(valid);
-                                    });
-                                }
-                            }).catch(() => {});
-                        }
-                    };
                 }
+                
+                // 자원사용률 페이지에서만 콜백 등록
+                this.registerPageCallback();
             } catch (error) {
                 console.error('[resource_usage] Failed to start background collection:', error);
                 this.showRuError('백그라운드 수집 시작에 실패했습니다.');
@@ -216,6 +187,50 @@
                 $('#ruStatus').removeClass('is-success').removeClass('is-danger').addClass('is-light').text('정지됨');
             }
             state.saveRunningState(running);
+        },
+
+        /**
+         * 페이지별 콜백 등록 (자원사용률 페이지에서만 호출)
+         */
+        registerPageCallback() {
+            const ru = window.ru;
+            const state = window.ResourceUsageState;
+            const charts = window.ResourceUsageCharts;
+            const heatmap = window.ResourceUsageHeatmap;
+            
+            if (!window.ResourceUsageCollector) return;
+            
+            // 웹소켓을 통해 수집 완료 시 데이터 갱신 핸들러 등록
+            const self = this;
+            window.ResourceUsagePolling.onCollectionComplete = function(taskId, data) {
+                if (taskId === ru.taskId) {
+                    const currentProxyIds = state.getSelectedProxyIds();
+                    self.fetchLatestForProxies(currentProxyIds).then(latestRows => {
+                        const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
+                        if (valid.length > 0) {
+                            // Only update cumulative cache if we have previous data
+                            const hasPreviousData = Object.keys(ru.lastCumulativeByProxy).length > 0;
+                            if (!hasPreviousData) {
+                                // First collection or after page return - initialize cache without calculating deltas
+                                valid.forEach(row => {
+                                    ru.lastCumulativeByProxy[row.proxy_id] = {
+                                        http: typeof row.http === 'number' ? row.http : null,
+                                        https: typeof row.https === 'number' ? row.https : null,
+                                        ftp: typeof row.ftp === 'number' ? row.ftp : null,
+                                    };
+                                });
+                            }
+                            charts.bufferAppendBatch(valid);
+                            state.saveBufferState();
+                            // 차트와 히트맵 업데이트를 requestAnimationFrame으로 최적화
+                            requestAnimationFrame(() => {
+                                charts.renderAllCharts();
+                                heatmap.updateTable(valid);
+                            });
+                        }
+                    }).catch(() => {});
+                }
+            };
         }
     };
 

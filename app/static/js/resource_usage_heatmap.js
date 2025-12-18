@@ -158,23 +158,16 @@
                 { key: 'ftpd', title: 'FTP Δ' },
             ];
             
-            // Add interface metrics with names (in and out separately)
+            // Add interface metrics with names (in and out combined)
             const interfaceMetrics = [];
             configuredInterfaceNames.forEach(ifName => {
                 const displayName = utils.abbreviateInterfaceName(ifName);
                 interfaceMetrics.push({
-                    key: `if_${ifName}_in`,
-                    title: `${displayName} IN`,
+                    key: `if_${ifName}`,
+                    title: displayName,
                     fullName: ifName,
                     ifName: ifName,
-                    direction: 'in'
-                });
-                interfaceMetrics.push({
-                    key: `if_${ifName}_out`,
-                    title: `${displayName} OUT`,
-                    fullName: ifName,
-                    ifName: ifName,
-                    direction: 'out'
+                    isInterface: true
                 });
             });
             
@@ -187,19 +180,16 @@
                 const existingMax = ru.heatmapMaxByMetric[m.key];
                 
                 let vals;
-                if (m.key.startsWith('if_')) {
+                if (m.isInterface) {
                     const ifName = m.ifName;
-                    const direction = m.direction; // 'in' or 'out'
+                    // 인터페이스의 경우 in과 out 중 더 큰 값을 사용하여 스케일 계산
                     vals = rows
                         .map(r => {
                             if (!r.interface_mbps || typeof r.interface_mbps !== 'object') return null;
-                            // interface_mbps의 키를 인터페이스 이름으로 매핑하여 찾기
                             let ifData = null;
-                            // 먼저 키가 인터페이스 이름인지 확인
                             if (r.interface_mbps[ifName]) {
                                 ifData = r.interface_mbps[ifName];
                             } else {
-                                // 키가 인터페이스 인덱스인 경우, name 필드로 찾기
                                 Object.keys(r.interface_mbps).forEach(ifKey => {
                                     const data = r.interface_mbps[ifKey];
                                     if (data && typeof data === 'object' && data.name === ifName) {
@@ -208,12 +198,10 @@
                                 });
                             }
                             if (!ifData || typeof ifData !== 'object') return null;
-                            // direction에 따라 in_mbps 또는 out_mbps 반환
-                            if (direction === 'in') {
-                                return typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
-                            } else {
-                                return typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
-                            }
+                            const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
+                            const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
+                            // in과 out 중 더 큰 값을 사용
+                            return Math.max(inMbps, outMbps);
                         })
                         .filter(v => typeof v === 'number' && isFinite(v) && v >= 0)
                         .sort((a, b) => a - b);
@@ -252,17 +240,15 @@
             rows.forEach((r, y) => {
                 metrics.forEach((m, x) => {
                     let raw = null;
-                    if (m.key.startsWith('if_')) {
+                    let rawIn = null;
+                    let rawOut = null;
+                    if (m.isInterface) {
                         const ifName = m.ifName;
-                        const direction = m.direction; // 'in' or 'out'
                         if (r.interface_mbps && typeof r.interface_mbps === 'object') {
-                            // interface_mbps의 키를 인터페이스 이름으로 매핑하여 찾기
                             let ifData = null;
-                            // 먼저 키가 인터페이스 이름인지 확인
                             if (r.interface_mbps[ifName]) {
                                 ifData = r.interface_mbps[ifName];
                             } else {
-                                // 키가 인터페이스 인덱스인 경우, name 필드로 찾기
                                 Object.keys(r.interface_mbps).forEach(ifKey => {
                                     const data = r.interface_mbps[ifKey];
                                     if (data && typeof data === 'object' && data.name === ifName) {
@@ -271,12 +257,10 @@
                                 });
                             }
                             if (ifData && typeof ifData === 'object') {
-                                // direction에 따라 in_mbps 또는 out_mbps 반환
-                                if (direction === 'in') {
-                                    raw = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
-                                } else {
-                                    raw = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
-                                }
+                                rawIn = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
+                                rawOut = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
+                                // 스케일 계산을 위해 더 큰 값 사용
+                                raw = Math.max(rawIn, rawOut);
                             }
                         }
                     } else {
@@ -284,9 +268,14 @@
                     }
                     if (typeof raw === 'number' && isFinite(raw)) {
                         const ratio = raw <= 0 ? 0 : raw / (maxByMetric[m.key] || 1);
-                        data.push({ value: [x, y, ratio], raw: raw });
+                        data.push({ 
+                            value: [x, y, ratio], 
+                            raw: raw,
+                            rawIn: m.isInterface ? rawIn : null,
+                            rawOut: m.isInterface ? rawOut : null
+                        });
                     } else {
-                        data.push({ value: [x, y, null], raw: null });
+                        data.push({ value: [x, y, null], raw: null, rawIn: null, rawOut: null });
                     }
                 });
             });
@@ -307,8 +296,8 @@
                 if (metricKey === 'httpsd') return 'https';
                 if (metricKey === 'ftpd') return 'ftp';
                 if (metricKey.startsWith('if_')) {
-                    // if_${ifName}_in 또는 if_${ifName}_out 형태에서 인터페이스 이름 추출
-                    const ifName = metricKey.replace(/^if_/, '').replace(/_in$|_out$/, '');
+                    // if_${ifName} 형태에서 인터페이스 이름 추출
+                    const ifName = metricKey.replace(/^if_/, '');
                     return interfaceThr[ifName] !== undefined ? `__interface_${ifName}__` : 'interface_mbps';
                 }
                 return metricKey;
@@ -333,15 +322,21 @@
                 };
             });
 
-            // Preserve raw values separately for labels/tooltips
+            // Preserve raw values separately for labels/tooltips (in/out 포함)
             ru._heatRaw = yCategories.map(() => new Array(xCategories.length).fill(null));
+            ru._heatRawIn = yCategories.map(() => new Array(xCategories.length).fill(null));
+            ru._heatRawOut = yCategories.map(() => new Array(xCategories.length).fill(null));
             ru._heatRows = rows.map(r => r._fullHost || `#${r.proxy_id}`);
 
             const seriesData = yCategories.map((rowLabel, rowIdx) => {
                 const dataPoints = xCategories.map((colLabel, colIdx) => {
                     const point = data.find(d => d.value[0] === colIdx && d.value[1] === rowIdx);
                     const raw = point ? point.raw : null;
+                    const rawIn = point ? point.rawIn : null;
+                    const rawOut = point ? point.rawOut : null;
                     ru._heatRaw[rowIdx][colIdx] = (typeof raw === 'number' && isFinite(raw)) ? raw : null;
+                    ru._heatRawIn[rowIdx][colIdx] = (typeof rawIn === 'number' && isFinite(rawIn)) ? rawIn : null;
+                    ru._heatRawOut[rowIdx][colIdx] = (typeof rawOut === 'number' && isFinite(rawOut)) ? rawOut : null;
                     const scaled = (typeof raw === 'number' && isFinite(raw)) ? scaleForCol[colIdx](raw) : null;
                     return { x: colLabel, y: scaled };
                 });
@@ -350,6 +345,8 @@
 
             // ApexCharts heatmap renders series from bottom to top; reverse to anchor top-left
             ru._heatRaw.reverse();
+            ru._heatRawIn.reverse();
+            ru._heatRawOut.reverse();
             ru._heatRows.reverse();
             seriesData.reverse();
 
@@ -372,7 +369,11 @@
                     toolbar: { show: false }
                 },
                 dataLabels: { 
-                    enabled: true, 
+                    enabled: function(opts) {
+                        // 데이터가 많으면 숫자 생략 (색상으로만 구분)
+                        const isLargeDataset = rowCount > 20 || xCategories.length > 10;
+                        return !isLargeDataset;
+                    }, 
                     style: { colors: ['#111827'], fontSize: rowCount > 20 ? '9px' : '11px' },
                     formatter: function(val, opts) {
                         const y = opts.seriesIndex; const x = opts.dataPointIndex;
@@ -382,14 +383,25 @@
                         if (!metric) return String(Math.round(raw));
                         const key = metric.key;
                         const isLargeDataset = rowCount > 20 || xCategories.length > 10;
+                        
+                        // 인터페이스의 경우 in/out 값을 함께 표시
+                        if (metric.isInterface) {
+                            const rawIn = (ru._heatRawIn && ru._heatRawIn[y]) ? ru._heatRawIn[y][x] : null;
+                            const rawOut = (ru._heatRawOut && ru._heatRawOut[y]) ? ru._heatRawOut[y][x] : null;
+                            if (rawIn != null && rawOut != null) {
+                                if (isLargeDataset) {
+                                    return rawIn.toFixed(1) + '/' + rawOut.toFixed(1) + 'M';
+                                }
+                                return rawIn.toFixed(2) + '/' + rawOut.toFixed(2) + 'M';
+                            }
+                            return raw != null ? (isLargeDataset ? raw.toFixed(1) + 'M' : raw.toFixed(2) + ' Mbps') : '';
+                        }
+                        
                         if (key === 'httpd' || key === 'httpsd' || key === 'ftpd') {
                             return isLargeDataset ? raw.toFixed(1) + 'M' : raw.toFixed(2) + ' Mbps';
                         }
                         if (key === 'cc' || key === 'cs') {
                             return isLargeDataset ? utils.abbreviateNumber(raw) : utils.formatNumber(raw);
-                        }
-                        if (key.startsWith('if_')) {
-                            return isLargeDataset ? raw.toFixed(1) + 'M' : raw.toFixed(2) + ' Mbps';
                         }
                         return String(Math.round(raw));
                     }
@@ -448,14 +460,22 @@
 
                             const metric = metrics[dataPointIndex];
                             let formattedRaw = String(Math.round(raw));
-                            if (metric) {
+                            
+                            // 인터페이스의 경우 in/out 값을 함께 표시
+                            if (metric && metric.isInterface) {
+                                const rawIn = (ru._heatRawIn && ru._heatRawIn[seriesIndex]) ? ru._heatRawIn[seriesIndex][dataPointIndex] : null;
+                                const rawOut = (ru._heatRawOut && ru._heatRawOut[seriesIndex]) ? ru._heatRawOut[seriesIndex][dataPointIndex] : null;
+                                if (rawIn != null && rawOut != null) {
+                                    formattedRaw = `IN: ${rawIn.toFixed(2)} Mbps / OUT: ${rawOut.toFixed(2)} Mbps`;
+                                } else {
+                                    formattedRaw = raw.toFixed(2) + ' Mbps';
+                                }
+                            } else if (metric) {
                                 const key = metric.key;
                                 if (key === 'httpd' || key === 'httpsd' || key === 'ftpd') {
                                     formattedRaw = raw.toFixed(2) + ' Mbps';
                                 } else if (key === 'cc' || key === 'cs') {
                                     formattedRaw = utils.formatNumber(raw);
-                                } else if (key.startsWith('if_')) {
-                                    formattedRaw = raw.toFixed(2) + ' Mbps';
                                 }
                             }
 
@@ -464,9 +484,12 @@
                         }
                     },
                     x: {
-                        formatter: function(val, { seriesIndex }) {
+                        formatter: function(val, { seriesIndex, dataPointIndex }) {
+                            // y축 레이블 (호스트명) 표시
                             if (ru._heatRows && ru._heatRows[seriesIndex]) {
-                                return ru._heatRows[seriesIndex];
+                                const metric = metrics[dataPointIndex];
+                                const metricTitle = metric ? metric.title : '';
+                                return `${ru._heatRows[seriesIndex]} - ${metricTitle}`;
                             }
                             return val;
                         }

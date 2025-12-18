@@ -140,15 +140,25 @@ $(document).ready(function() {
         } catch (e) { /* ignore */ }
     }
 
+    function showLoading() {
+        $('#sbLoadingIndicator').show();
+    }
+
+    function hideLoading() {
+        $('#sbLoadingIndicator').hide();
+    }
+
     function loadGridData() {
         var proxyIds = getSelectedProxyIds();
         if (proxyIds.length === 0) {
             if (sb.gridApi) {
                 sb.gridApi.setGridOption('rowData', []);
             }
+            hideLoading();
             return;
         }
 
+        showLoading();
         // 모든 데이터를 한 번에 불러와서 클라이언트사이드에서 처리
         $.ajax({
             url: '/api/session-browser/datatables',
@@ -194,10 +204,12 @@ $(document).ready(function() {
                     }
                 }, 200);
             }
+            hideLoading();
         }).fail(function() {
             if (sb.gridApi) {
                 sb.gridApi.setGridOption('rowData', []);
             }
+            hideLoading();
         });
     }
 
@@ -255,6 +267,13 @@ $(document).ready(function() {
                     $.getJSON('/api/session-browser/item/' + itemId)
                         .done(function(item){ fillDetailModal(item || {}); openSbModal(); })
                         .fail(function(){ showErr('상세를 불러오지 못했습니다.'); });
+                },
+                onFilterChanged: function() {
+                    // 필터 변경 시 로딩 인디케이터 표시 (필터링은 클라이언트사이드에서 즉시 처리되므로 짧게 표시)
+                    showLoading();
+                    setTimeout(function() {
+                        hideLoading();
+                    }, 100);
                 }
             };
 
@@ -292,11 +311,31 @@ $(document).ready(function() {
             setStatus('완료');
             // Clear any cached items to avoid mixing old data on next restore; persist only selection
             saveState([]);
-            try { if (window.SbAnalyze && typeof window.SbAnalyze.run === 'function') { window.SbAnalyze.run({ proxyIds: proxyIds }); $('#sbAnalyzeSection').show(); } } catch (e) { /* ignore */ }
+            // 자동 분석 제거 - 통계 분석 버튼으로 대체
         }).catch(() => { setStatus('오류', true); showErr('수집 요청 중 오류가 발생했습니다.'); });
     }
 
     $('#sbLoadBtn').on('click', function() { loadLatest(); });
+    
+    // 통계 분석 버튼 클릭 이벤트
+    $('#sbAnalyzeBtn').on('click', function() {
+        const proxyIds = getSelectedProxyIds();
+        if (proxyIds.length === 0) {
+            showErr('프록시를 하나 이상 선택하세요.');
+            return;
+        }
+        try {
+            if (window.SbAnalyze && typeof window.SbAnalyze.run === 'function') {
+                window.SbAnalyze.run({ proxyIds: proxyIds });
+                $('#sbAnalyzeSection').show();
+            } else {
+                showErr('분석 기능을 사용할 수 없습니다.');
+            }
+        } catch (e) {
+            console.error('Analysis error:', e);
+            showErr('분석 중 오류가 발생했습니다.');
+        }
+    });
     // Removed analyze button and tabs; analysis auto-runs after collect
     $('#sbExportBtn').on('click', function() {
         const params = {};

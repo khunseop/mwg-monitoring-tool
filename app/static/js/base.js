@@ -175,10 +175,33 @@ window.ResourceUsageCollector = {
                     this.taskId = message.task_id;
                 }
             } else if (message.status === 'completed') {
-                // 수집 완료 콜백 호출
-                if (typeof this.onCollectionComplete === 'function') {
-                    this.onCollectionComplete(message.task_id, message.data);
+                // 마지막 수집 시간 저장 및 표시
+                const now = new Date();
+                try {
+                    localStorage.setItem('ru_last_collected_at', now.toISOString());
+                } catch (e) {
+                    // ignore
                 }
+                this.updateNavbarIndicator();
+                
+                // 수집 완료 콜백 호출 (자원사용률 페이지가 로드되어 있으면 해당 콜백 호출)
+                if (typeof this.onCollectionComplete === 'function') {
+                    try {
+                        this.onCollectionComplete(message.task_id, message.data);
+                    } catch (e) {
+                        console.error('[ResourceUsageCollector] Error in onCollectionComplete:', e);
+                    }
+                }
+                
+                // 자원사용률 페이지가 로드되어 있으면 해당 페이지의 콜백도 호출
+                if (window.ResourceUsagePolling && typeof window.ResourceUsagePolling.onCollectionComplete === 'function') {
+                    try {
+                        window.ResourceUsagePolling.onCollectionComplete(message.task_id, message.data);
+                    } catch (e) {
+                        console.error('[ResourceUsageCollector] Error in ResourceUsagePolling.onCollectionComplete:', e);
+                    }
+                }
+                
                 // 완료 후에도 계속 실행 중이면 collecting 상태 유지
                 if (this.isCollecting) {
                     // 다음 주기까지 대기 중이므로 collecting 상태 유지
@@ -256,6 +279,39 @@ window.ResourceUsageCollector = {
     updateNavbarIndicator: function() {
         const $indicator = $('#ruNavIndicator');
         if (this.isCollecting) {
+            // 마지막 수집 시간 표시
+            let lastCollectedText = '';
+            try {
+                const lastCollectedAt = localStorage.getItem('ru_last_collected_at');
+                if (lastCollectedAt) {
+                    const lastDate = new Date(lastCollectedAt);
+                    const now = new Date();
+                    const diffMs = now - lastDate;
+                    const diffSec = Math.floor(diffMs / 1000);
+                    const diffMin = Math.floor(diffSec / 60);
+                    
+                    if (diffSec < 60) {
+                        lastCollectedText = ` (${diffSec}초 전)`;
+                    } else if (diffMin < 60) {
+                        lastCollectedText = ` (${diffMin}분 전)`;
+                    } else {
+                        const diffHour = Math.floor(diffMin / 60);
+                        lastCollectedText = ` (${diffHour}시간 전)`;
+                    }
+                }
+            } catch (e) {
+                // ignore
+            }
+            
+            const $text = $indicator.find('.ru-nav-text');
+            if ($text.length > 0) {
+                $text.text('수집 중...' + lastCollectedText);
+            } else {
+                $indicator.html(
+                    '<span class="ru-nav-spinner"></span>' +
+                    '<span class="ru-nav-text">수집 중...' + lastCollectedText + '</span>'
+                );
+            }
             $indicator.show();
         } else {
             $indicator.hide();
