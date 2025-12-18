@@ -43,6 +43,102 @@
 			];
 		},
 
+		// 자원사용률 이력용 컬럼 정의
+		getResourceHistoryColumns: function() {
+			return [
+				{ field: 'collected_at', headerName: '수집 시간', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 150, width: 180,
+					valueFormatter: function(params) {
+						if (!params.value) return '';
+						const date = new Date(params.value);
+						return date.toLocaleString('ko-KR', {
+							year: 'numeric',
+							month: '2-digit',
+							day: '2-digit',
+							hour: '2-digit',
+							minute: '2-digit',
+							second: '2-digit'
+						});
+					}
+				},
+				{ field: 'proxy_name', headerName: '프록시', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 120, width: 150 },
+				{ field: 'cpu', headerName: 'CPU (%)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 80, width: 100, cellClass: 'num',
+					valueFormatter: function(params) {
+						return params.value != null ? params.value.toFixed(1) : '-';
+					}
+				},
+				{ field: 'mem', headerName: 'MEM (%)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 80, width: 100, cellClass: 'num',
+					valueFormatter: function(params) {
+						return params.value != null ? params.value.toFixed(1) : '-';
+					}
+				},
+				{ field: 'cc', headerName: 'CC', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 100, width: 120, cellClass: 'num',
+					valueFormatter: function(params) {
+						if (params.value == null) return '-';
+						return params.value.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,');
+					}
+				},
+				{ field: 'cs', headerName: 'CS', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 100, width: 120, cellClass: 'num',
+					valueFormatter: function(params) {
+						if (params.value == null) return '-';
+						return params.value.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,');
+					}
+				},
+				{ field: 'http', headerName: 'HTTP (누적)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 120, width: 150, cellClass: 'num',
+					valueFormatter: function(params) {
+						if (params.value == null || params.value === undefined) return '-';
+						const bytes = params.value;
+						if (bytes === 0) return '0 Bytes';
+						const k = 1024;
+						const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+						const i = Math.floor(Math.log(bytes) / Math.log(k));
+						const size = i >= sizes.length ? sizes[sizes.length - 1] : sizes[i];
+						return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + size;
+					}
+				},
+				{ field: 'https', headerName: 'HTTPS (누적)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 120, width: 150, cellClass: 'num',
+					valueFormatter: function(params) {
+						if (params.value == null || params.value === undefined) return '-';
+						const bytes = params.value;
+						if (bytes === 0) return '0 Bytes';
+						const k = 1024;
+						const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+						const i = Math.floor(Math.log(bytes) / Math.log(k));
+						const size = i >= sizes.length ? sizes[sizes.length - 1] : sizes[i];
+						return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + size;
+					}
+				},
+				{ field: 'ftp', headerName: 'FTP (누적)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 120, width: 150, cellClass: 'num',
+					valueFormatter: function(params) {
+						if (params.value == null || params.value === undefined) return '-';
+						const bytes = params.value;
+						if (bytes === 0) return '0 Bytes';
+						const k = 1024;
+						const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+						const i = Math.floor(Math.log(bytes) / Math.log(k));
+						const size = i >= sizes.length ? sizes[sizes.length - 1] : sizes[i];
+						return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + size;
+					}
+				},
+				{ field: 'interface_mbps', headerName: '인터페이스', sortable: false, filter: false, minWidth: 200, flex: 1,
+					cellRenderer: function(params) {
+						if (!params.value || typeof params.value !== 'object') return '-';
+						const parts = [];
+						Object.keys(params.value).forEach(ifName => {
+							const ifData = params.value[ifName];
+							if (ifData && typeof ifData === 'object') {
+								const name = ifName.length > 20 ? ifName.substring(0, 17) + '...' : ifName;
+								const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps.toFixed(2) : '0.00';
+								const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps.toFixed(2) : '0.00';
+								parts.push(`${name}: ${inMbps}/${outMbps} Mbps`);
+							}
+						});
+						return parts.length > 0 ? parts.join(', ') : '-';
+					},
+					cellStyle: { fontSize: '0.85em' }
+				}
+			];
+		},
+
 		// 트래픽로그용 컬럼 정의
 		getTrafficLogColumns: function() {
 			var COLS = [

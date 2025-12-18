@@ -33,7 +33,8 @@ $(document).ready(function() {
         currentPage: 1,
         pageSize: 500,
         totalCount: 0,
-        hasMore: false
+        hasMore: false,
+        gridApi: null
     };
 
     // Initialize history proxy select
@@ -244,32 +245,84 @@ $(document).ready(function() {
 
     // Display history results
     function displayHistoryResults(data, append = false) {
-        const $tbody = $('#ruHistoryTableBody');
-        if (!append) {
-            $tbody.empty();
-        }
-
         const proxyMap = {};
         (history.proxies || []).forEach(p => { proxyMap[p.id] = p.host; });
 
-        data.forEach(row => {
-            const proxyName = proxyMap[row.proxy_id] || `#${row.proxy_id}`;
-            const tr = $('<tr>');
-            tr.append(`<td>${formatDateTime(row.collected_at)}</td>`);
-            tr.append(`<td>${proxyName}</td>`);
-            tr.append(`<td>${row.cpu != null ? row.cpu.toFixed(1) : '-'}</td>`);
-            tr.append(`<td>${row.mem != null ? row.mem.toFixed(1) : '-'}</td>`);
-            tr.append(`<td>${row.cc != null ? formatNumber(row.cc) : '-'}</td>`);
-            tr.append(`<td>${row.cs != null ? formatNumber(row.cs) : '-'}</td>`);
-            // HTTP/HTTPS/FTP는 누적값이므로 표시만 (Mbps 계산은 실시간 그래프에서만)
-            tr.append(`<td>${row.http != null ? formatBytes(row.http, 2) : '-'}</td>`);
-            tr.append(`<td>${row.https != null ? formatBytes(row.https, 2) : '-'}</td>`);
-            tr.append(`<td>${row.ftp != null ? formatBytes(row.ftp, 2) : '-'}</td>`);
-            tr.append(`<td style="font-size: 0.85em;">${formatInterfaceMbps(row.interface_mbps)}</td>`);
-            $tbody.append(tr);
-        });
+        // 데이터 변환 (ag-grid 형식으로)
+        const rowData = data.map(row => ({
+            collected_at: row.collected_at,
+            proxy_name: proxyMap[row.proxy_id] || `#${row.proxy_id}`,
+            cpu: row.cpu,
+            mem: row.mem,
+            cc: row.cc,
+            cs: row.cs,
+            http: row.http,
+            https: row.https,
+            ftp: row.ftp,
+            interface_mbps: row.interface_mbps
+        }));
 
-        const totalDisplayed = $tbody.find('tr').length;
+        // ag-grid 초기화 또는 업데이트
+        const gridDiv = document.querySelector('#ruHistoryTableGrid');
+        if (gridDiv && window.agGrid) {
+            if (!history.gridApi) {
+                // 초기화
+                const gridOptions = {
+                    columnDefs: window.AgGridConfig ? window.AgGridConfig.getResourceHistoryColumns() : [],
+                    rowData: rowData,
+                    defaultColDef: {
+                        sortable: true,
+                        filter: 'agTextColumnFilter',
+                        filterParams: { applyButton: true, clearButton: true },
+                        resizable: true,
+                        minWidth: 100
+                    },
+                    rowModelType: 'clientSide',
+                    pagination: true,
+                    paginationPageSize: history.pageSize,
+                    enableFilter: true,
+                    enableSorting: true,
+                    animateRows: false,
+                    suppressRowClickSelection: false,
+                    headerHeight: 50,
+                    overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">조회된 데이터가 없습니다.</div>',
+                    onGridReady: function(params) {
+                        history.gridApi = params.api;
+                        // 컬럼 너비 자동 조절
+                        setTimeout(function() {
+                            if (history.gridApi) {
+                                const allColumnIds = [];
+                                history.gridApi.getColumns().forEach(function(column) {
+                                    allColumnIds.push(column.getColId());
+                                });
+                                if (history.gridApi.autoSizeColumns) {
+                                    history.gridApi.autoSizeColumns(allColumnIds, { skipHeader: false });
+                                } else if (history.gridApi.sizeColumnsToFit) {
+                                    history.gridApi.sizeColumnsToFit();
+                                }
+                            }
+                        }, 200);
+                    }
+                };
+
+                try {
+                    if (typeof window.agGrid.createGrid === 'function') {
+                        history.gridApi = window.agGrid.createGrid(gridDiv, gridOptions);
+                    } else if (window.agGrid.Grid) {
+                        history.gridApi = new window.agGrid.Grid(gridDiv, gridOptions);
+                    }
+                } catch (e) {
+                    console.error('[ResourceHistory] ag-grid init failed:', e);
+                }
+            } else {
+                // 데이터 업데이트
+                history.gridApi.setGridOption('rowData', rowData);
+            }
+        } else {
+            console.warn('[ResourceHistory] ag-grid not available or grid div not found');
+        }
+
+        const totalDisplayed = rowData.length;
         const pageInfo = `페이지 ${history.currentPage} (${totalDisplayed}건 표시)`;
         $('#ruHistoryCount').text(`총 ${totalDisplayed}건의 데이터가 표시됩니다.`);
         $('#ruHistoryPaginationInfo').text(pageInfo);

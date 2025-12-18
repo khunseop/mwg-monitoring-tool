@@ -291,26 +291,7 @@
                 </div>
             </div>
         </div>
-        <div class="table-container" style="max-height: 70vh; overflow-y: auto;">
-            <table class="table is-striped is-fullwidth is-hoverable is-narrow">
-                <thead style="position: sticky; top: 0; background: white; z-index: 10;">
-                    <tr>
-                        <th style="min-width: 150px;">수집 시간</th>
-                        <th style="min-width: 120px;">프록시</th>
-                        <th style="min-width: 80px;">CPU (%)</th>
-                        <th style="min-width: 80px;">MEM (%)</th>
-                        <th style="min-width: 100px;">CC</th>
-                        <th style="min-width: 100px;">CS</th>
-                        <th style="min-width: 120px;">HTTP (Mbps)</th>
-                        <th style="min-width: 120px;">HTTPS (Mbps)</th>
-                        <th style="min-width: 120px;">FTP (Mbps)</th>
-                        <th style="min-width: 200px;">인터페이스</th>
-                    </tr>
-                </thead>
-                <tbody id="ruHistoryTableBody">
-                </tbody>
-            </table>
-        </div>
+        <div id="ruHistoryTableGrid" style="height: 70vh; width: 100%;"></div>
         <nav class="pagination is-centered mt-4" role="navigation" id="ruHistoryPagination" style="display:none;">
             <a class="pagination-previous" id="ruHistoryPrevBtn">이전</a>
             <a class="pagination-next" id="ruHistoryNextBtn">다음</a>
@@ -354,6 +335,11 @@ $(document).ready(function() {
     }
 });
 </script>
+<!-- ag-grid (local) -->
+<link rel="stylesheet" href="/static/vendor/ag-grid/ag-grid.css?v={{ request.app.version }}">
+<link rel="stylesheet" href="/static/vendor/ag-grid/ag-theme-quartz.css?v={{ request.app.version }}">
+<script src="/static/vendor/ag-grid/ag-grid-community.js?v={{ request.app.version }}"></script>
+<script src="/static/js/ag_grid_config.js"></script>
 <script src="/static/js/resource_history.js"></script>
 {% endblock %}
 
