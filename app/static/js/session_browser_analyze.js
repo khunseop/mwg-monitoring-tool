@@ -106,6 +106,7 @@
 			if(pids.length === 0){ showError('프록시를 선택하세요.'); return; }
 			const topN = Math.max(1, Math.min(100, parseInt((opts && opts.topN) ? String(opts.topN) : '20', 10)));
 			setStatus('분석 중...', 'is-info');
+			$('#sbAnalyzeSection').show(); // 분석 시작 시 섹션 표시
 			const qs = $.param({ proxy_ids: pids.join(','), topN: topN });
 			const res = await fetch(`${API_BASE}/session-browser/analyze?${qs}`);
 			if(!res.ok){ const err = await res.json().catch(()=>({detail:'분석 실패'})); throw new Error(err.detail || '분석 실패'); }
@@ -114,9 +115,23 @@
 			renderCharts(data);
 			clearResult(); // Clear previous results only on success
 			saveResult(data);
-			$('#sbAnalyzeSection').show();
-			setStatus('완료', 'is-success');
-		}catch(e){ showError(e.message || String(e)); setStatus('실패', 'is-danger'); }
+			setStatus('분석 완료', 'is-success');
+			// 완료 알림 (3초 후 자동 숨김)
+			setTimeout(() => {
+				if ($('#sbAnalyzeStatus').text() === '분석 완료') {
+					setStatus('', 'is-light');
+				}
+			}, 3000);
+		}catch(e){ 
+			showError(e.message || String(e)); 
+			setStatus('분석 실패', 'is-danger');
+			// 실패 알림 (5초 후 자동 숨김)
+			setTimeout(() => {
+				if ($('#sbAnalyzeStatus').text() === '분석 실패') {
+					setStatus('', 'is-light');
+				}
+			}, 5000);
+		}
 	}
 
 	// Expose to other scripts

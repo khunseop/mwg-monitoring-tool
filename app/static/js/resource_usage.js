@@ -23,8 +23,7 @@ $(document).ready(function() {
         restoredHeatmapData = ru.lastData.length > 0 ? ru.lastData : null;
     }
     
-    // 차트 DOM 초기화
-    charts.ensureApexChartsDom();
+    // 차트 DOM 초기화는 설정 로드 후에 수행 (설정에 등록된 인터페이스 정보 필요)
 
     // 이벤트 핸들러
     $('#ruStartBtn').on('click', function() { polling.startPolling(); });
@@ -141,6 +140,10 @@ $(document).ready(function() {
     ]).then(function() {
         return state.restoreState();
     }).then(function() {
+        // 설정 로드 후 차트 DOM 초기화 (설정에 등록된 인터페이스 모두 표시)
+        charts.ensureApexChartsDom();
+        charts.renderAllCharts();
+        
         // 복원된 히트맵 데이터가 있으면 표시 (설정 로드 후)
         if (restoredHeatmapData && restoredHeatmapData.length > 0) {
             requestAnimationFrame(() => {

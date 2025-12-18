@@ -180,7 +180,18 @@
             if ($wrap.length === 0) return false;
 
             if (!isModal) {
-                if ($wrap.data('initialized')) return true;
+                // 설정이 로드되지 않았으면 초기화하지 않음 (설정에 등록된 인터페이스 정보 필요)
+                if (!ru.cachedConfig) {
+                    return false;
+                }
+                
+                // 이미 초기화되었고 설정이 변경되지 않았으면 스킵
+                const currentConfigHash = JSON.stringify(ru.cachedConfig.interface_oids || {});
+                const lastConfigHash = $wrap.data('configHash');
+                if ($wrap.data('initialized') && lastConfigHash === currentConfigHash) {
+                    return true;
+                }
+                
                 const basicMetrics = ['cpu','mem','cc','cs','http','https','ftp'];
                 const basicTitles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
                 
@@ -256,6 +267,7 @@
                     $wrap.append(panel);
                 });
                 $wrap.data('initialized', true);
+                $wrap.data('configHash', currentConfigHash); // 설정 해시 저장
             } else {
                 // For modal, just create one chart placeholder
                 $wrap.empty();

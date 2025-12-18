@@ -115,15 +115,42 @@ class BackgroundCollector:
         oids: dict,
         interval_sec: int
     ):
-        """주기적 수집 실행"""
+        """주기적 수집 실행 (정확한 주기 유지)"""
+        import time
         try:
+            # 첫 수집은 즉시 실행
+            next_collect_time = time.time()
+            
             while True:
+                # 정확한 주기 유지를 위해 다음 수집 시간 계산
+                current_time = time.time()
+                sleep_time = next_collect_time - current_time
+                
+                # 수집 시간이 주기보다 길어지면 즉시 다음 수집 시작
+                if sleep_time < 0:
+                    logger.warning(f"[BackgroundCollector] Collection took longer than interval ({interval_sec}s), starting next immediately")
+                    sleep_time = 0
+                
+                # 대기 (첫 수집이 아닌 경우에만)
+                if sleep_time > 0:
+                    await asyncio.sleep(sleep_time)
+                
+                # 다음 수집 시간 설정 (현재 시간 기준으로 정확히 interval_sec 후)
+                next_collect_time = time.time() + interval_sec
+                
                 # 수집 시작 알림
+                collect_start_time = time.time()
                 await self._broadcast_status(task_id, "collecting")
                 
                 # 수집 실행
                 try:
                     result = await self._collect_once(proxy_ids, community, oids)
+                    collect_duration = time.time() - collect_start_time
+                    
+                    logger.info(f"[BackgroundCollector] Collection completed for task {task_id}: "
+                              f"succeeded={result['succeeded']}, failed={result['failed']}, "
+                              f"duration={collect_duration:.2f}s, next_in={interval_sec}s")
+                    
                     await self._broadcast_status(
                         task_id,
                         "completed",
@@ -131,15 +158,18 @@ class BackgroundCollector:
                             "requested": result["requested"],
                             "succeeded": result["succeeded"],
                             "failed": result["failed"],
-                            "errors": result.get("errors", {})
+                            "errors": result.get("errors", {}),
+                            "duration_sec": round(collect_duration, 2),
+                            "next_collect_at": datetime.fromtimestamp(next_collect_time).isoformat()
                         }
                     )
                 except Exception as e:
-                    logger.error(f"[BackgroundCollector] Collection error: {e}", exc_info=True)
-                    await self._broadcast_status(task_id, "error", {"error": str(e)})
-                
-                # 다음 주기까지 대기
-                await asyncio.sleep(interval_sec)
+                    collect_duration = time.time() - collect_start_time
+                    logger.error(f"[BackgroundCollector] Collection error for task {task_id} (duration={collect_duration:.2f}s): {e}", exc_info=True)
+                    await self._broadcast_status(task_id, "error", {
+                        "error": str(e),
+                        "duration_sec": round(collect_duration, 2)
+                    })
         except asyncio.CancelledError:
             logger.info(f"[BackgroundCollector] Collection task {task_id} cancelled")
             raise
@@ -186,6 +216,13 @@ class BackgroundCollector:
                     interface_mbps_data = metrics.get("interface_mbps")
                     interface_mbps_json = json_lib.dumps(interface_mbps_data) if interface_mbps_data else None
                     
+                    # 인터페이스 데이터 수집 확인 로그
+                    if interface_mbps_data:
+                        if_count = len(interface_mbps_data) if isinstance(interface_mbps_data, dict) else 0
+                        logger.debug(f"[BackgroundCollector] Interface data collected for proxy_id={proxy_id}: {if_count} interfaces")
+                    else:
+                        logger.debug(f"[BackgroundCollector] No interface data for proxy_id={proxy_id}")
+                    
                     model = ResourceUsageModel(
                         proxy_id=proxy_id,
                         cpu=metrics.get("cpu"),
@@ -202,12 +239,22 @@ class BackgroundCollector:
                     )
                     db.add(model)
                     collected_models.append(model)
+                    
+                    # 저장 전 데이터 확인 로그
+                    logger.debug(f"[BackgroundCollector] Saving data for proxy_id={proxy_id}: "
+                               f"cpu={metrics.get('cpu')}, mem={metrics.get('mem')}, "
+                               f"http={metrics.get('http')}, https={metrics.get('https')}, ftp={metrics.get('ftp')}, "
+                               f"interface_mbps={'present' if interface_mbps_json else 'none'}")
                 except Exception as e:
                     errors[proxy.id] = str(e)
             
             db.commit()
             for model in collected_models:
                 db.refresh(model)
+            
+            # 저장 완료 로그
+            logger.info(f"[BackgroundCollector] Saved {len(collected_models)} records to database "
+                       f"(requested={len(proxies)}, failed={len(errors)})")
             
             # 90일 보관 정책 적용
             _enforce_resource_usage_retention(db, days=90)

@@ -179,10 +179,23 @@ window.ResourceUsageCollector = {
                 const now = new Date();
                 try {
                     localStorage.setItem('ru_last_collected_at', now.toISOString());
+                    // 다음 수집 예정 시간도 저장 (서버에서 전송된 경우)
+                    if (message.data && message.data.next_collect_at) {
+                        localStorage.setItem('ru_next_collect_at', message.data.next_collect_at);
+                    }
                 } catch (e) {
                     // ignore
                 }
                 this.updateNavbarIndicator();
+                
+                // 수집 완료 로그 (디버깅용)
+                if (message.data) {
+                    const duration = message.data.duration_sec;
+                    const nextAt = message.data.next_collect_at;
+                    if (duration !== undefined) {
+                        console.log(`[ResourceUsageCollector] Collection completed: duration=${duration}s, next=${nextAt || 'N/A'}`);
+                    }
+                }
                 
                 // 수집 완료 콜백 호출 (자원사용률 페이지가 로드되어 있으면 해당 콜백 호출)
                 if (typeof this.onCollectionComplete === 'function') {
@@ -279,41 +292,48 @@ window.ResourceUsageCollector = {
     updateNavbarIndicator: function() {
         const $indicator = $('#ruNavIndicator');
         if (this.isCollecting) {
-            // 마지막 수집 시간 표시
-            let lastCollectedText = '';
-            try {
-                const lastCollectedAt = localStorage.getItem('ru_last_collected_at');
-                if (lastCollectedAt) {
-                    const lastDate = new Date(lastCollectedAt);
-                    const now = new Date();
-                    const diffMs = now - lastDate;
-                    const diffSec = Math.floor(diffMs / 1000);
-                    const diffMin = Math.floor(diffSec / 60);
-                    
-                    if (diffSec < 60) {
-                        lastCollectedText = ` (${diffSec}초 전)`;
-                    } else if (diffMin < 60) {
-                        lastCollectedText = ` (${diffMin}분 전)`;
-                    } else {
-                        const diffHour = Math.floor(diffMin / 60);
-                        lastCollectedText = ` (${diffHour}시간 전)`;
+            // 마지막 수집 시간 표시 (실시간 갱신)
+            const updateTime = () => {
+                let lastCollectedText = '';
+                try {
+                    const lastCollectedAt = localStorage.getItem('ru_last_collected_at');
+                    if (lastCollectedAt) {
+                        const lastDate = new Date(lastCollectedAt);
+                        const now = new Date();
+                        // 마지막 수집시각을 직접 표시 (HH:MM:SS 형식)
+                        const hours = String(lastDate.getHours()).padStart(2, '0');
+                        const minutes = String(lastDate.getMinutes()).padStart(2, '0');
+                        const seconds = String(lastDate.getSeconds()).padStart(2, '0');
+                        lastCollectedText = ` (${hours}:${minutes}:${seconds})`;
                     }
+                } catch (e) {
+                    // ignore
                 }
-            } catch (e) {
-                // ignore
-            }
+                
+                const $text = $indicator.find('.ru-nav-text');
+                if ($text.length > 0) {
+                    $text.text('수집 중' + lastCollectedText);
+                } else {
+                    $indicator.html(
+                        '<span class="ru-nav-spinner"></span>' +
+                        '<span class="ru-nav-text">수집 중' + lastCollectedText + '</span>'
+                    );
+                }
+            };
             
-            const $text = $indicator.find('.ru-nav-text');
-            if ($text.length > 0) {
-                $text.text('수집 중...' + lastCollectedText);
-            } else {
-                $indicator.html(
-                    '<span class="ru-nav-spinner"></span>' +
-                    '<span class="ru-nav-text">수집 중...' + lastCollectedText + '</span>'
-                );
+            updateTime();
+            // 1초마다 시간 업데이트
+            if (this._indicatorUpdateInterval) {
+                clearInterval(this._indicatorUpdateInterval);
             }
+            this._indicatorUpdateInterval = setInterval(updateTime, 1000);
+            
             $indicator.show();
         } else {
+            if (this._indicatorUpdateInterval) {
+                clearInterval(this._indicatorUpdateInterval);
+                this._indicatorUpdateInterval = null;
+            }
             $indicator.hide();
         }
     },
