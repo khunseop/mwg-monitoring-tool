@@ -111,14 +111,23 @@
             const interfaceOids = (ru.cachedConfig && ru.cachedConfig.interface_oids) ? ru.cachedConfig.interface_oids : {};
             const configuredInterfaceNames = Object.keys(interfaceOids);
             
-            // Build interface data from collected data
-            const interfaceDataMap = {};
+            // Build interface name mapping from collected data
+            // interface_mbps의 키는 인터페이스 이름 또는 인덱스일 수 있으므로,
+            // 각 항목의 name 필드를 사용하여 인터페이스 이름으로 매핑
+            const interfaceNameMap = {}; // {interface_key_in_data: interface_name_from_config}
             (items || []).forEach(row => {
                 if (row.interface_mbps && typeof row.interface_mbps === 'object') {
-                    Object.keys(row.interface_mbps).forEach(ifName => {
-                        const ifData = row.interface_mbps[ifName];
+                    Object.keys(row.interface_mbps).forEach(ifKey => {
+                        const ifData = row.interface_mbps[ifKey];
                         if (ifData && typeof ifData === 'object') {
-                            interfaceDataMap[ifName] = ifData;
+                            const ifName = ifData.name || ifKey;
+                            // configuredInterfaceNames에 있는 인터페이스 이름과 매칭
+                            if (configuredInterfaceNames.includes(ifName)) {
+                                interfaceNameMap[ifKey] = ifName;
+                            } else if (configuredInterfaceNames.includes(ifKey)) {
+                                // 키 자체가 인터페이스 이름인 경우
+                                interfaceNameMap[ifKey] = ifKey;
+                            }
                         }
                     });
                 }
@@ -160,7 +169,20 @@
                     vals = rows
                         .map(r => {
                             if (!r.interface_mbps || typeof r.interface_mbps !== 'object') return null;
-                            const ifData = r.interface_mbps[ifName];
+                            // interface_mbps의 키를 인터페이스 이름으로 매핑하여 찾기
+                            let ifData = null;
+                            // 먼저 키가 인터페이스 이름인지 확인
+                            if (r.interface_mbps[ifName]) {
+                                ifData = r.interface_mbps[ifName];
+                            } else {
+                                // 키가 인터페이스 인덱스인 경우, name 필드로 찾기
+                                Object.keys(r.interface_mbps).forEach(ifKey => {
+                                    const data = r.interface_mbps[ifKey];
+                                    if (data && typeof data === 'object' && data.name === ifName) {
+                                        ifData = data;
+                                    }
+                                });
+                            }
                             if (!ifData || typeof ifData !== 'object') return null;
                             const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
                             const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
@@ -206,7 +228,20 @@
                     if (m.key.startsWith('if_')) {
                         const ifName = m.ifName;
                         if (r.interface_mbps && typeof r.interface_mbps === 'object') {
-                            const ifData = r.interface_mbps[ifName];
+                            // interface_mbps의 키를 인터페이스 이름으로 매핑하여 찾기
+                            let ifData = null;
+                            // 먼저 키가 인터페이스 이름인지 확인
+                            if (r.interface_mbps[ifName]) {
+                                ifData = r.interface_mbps[ifName];
+                            } else {
+                                // 키가 인터페이스 인덱스인 경우, name 필드로 찾기
+                                Object.keys(r.interface_mbps).forEach(ifKey => {
+                                    const data = r.interface_mbps[ifKey];
+                                    if (data && typeof data === 'object' && data.name === ifName) {
+                                        ifData = data;
+                                    }
+                                });
+                            }
                             if (ifData && typeof ifData === 'object') {
                                 const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
                                 const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;

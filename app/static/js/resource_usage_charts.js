@@ -115,25 +115,40 @@
                     }
                 });
                 
-                // Add interface data to buffer (per interface, now keyed by name)
+                // Add interface data to buffer (per interface, keyed by name from config)
                 if (row.interface_mbps && typeof row.interface_mbps === 'object') {
-                    Object.keys(row.interface_mbps).forEach(ifName => {
-                        const ifData = row.interface_mbps[ifName];
+                    // Get configured interfaces from config to map interface names
+                    const interfaceOids = (ru.cachedConfig && ru.cachedConfig.interface_oids) ? ru.cachedConfig.interface_oids : {};
+                    const configuredInterfaceNames = Object.keys(interfaceOids);
+                    
+                    Object.keys(row.interface_mbps).forEach(ifKey => {
+                        const ifData = row.interface_mbps[ifKey];
                         if (ifData && typeof ifData === 'object') {
-                            const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
-                            const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
-                            const totalMbps = inMbps + outMbps;
-                            const key = `if_${ifName}`;
-                            const arr = ru.tsBuffer[proxyId][key] || [];
-                            const last = arr[arr.length - 1];
-                            if (last && last.x === ts) {
-                                arr[arr.length - 1] = { x: ts, y: totalMbps };
-                            } else {
-                                arr.push({ x: ts, y: totalMbps });
+                            // 인터페이스 이름 결정: name 필드가 있으면 사용, 없으면 키 사용
+                            // configuredInterfaceNames에 있는 이름과 매칭
+                            let ifName = ifData.name || ifKey;
+                            // configuredInterfaceNames에 없으면 키가 이름일 수 있음
+                            if (!configuredInterfaceNames.includes(ifName) && configuredInterfaceNames.includes(ifKey)) {
+                                ifName = ifKey;
                             }
-                            ru.tsBuffer[proxyId][key] = arr;
-                            if (arr.length > ru.bufferMaxPoints) {
-                                arr.shift();
+                            
+                            // configuredInterfaceNames에 있는 인터페이스만 버퍼에 저장
+                            if (configuredInterfaceNames.includes(ifName)) {
+                                const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
+                                const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
+                                const totalMbps = inMbps + outMbps;
+                                const key = `if_${ifName}`;
+                                const arr = ru.tsBuffer[proxyId][key] || [];
+                                const last = arr[arr.length - 1];
+                                if (last && last.x === ts) {
+                                    arr[arr.length - 1] = { x: ts, y: totalMbps };
+                                } else {
+                                    arr.push({ x: ts, y: totalMbps });
+                                }
+                                ru.tsBuffer[proxyId][key] = arr;
+                                if (arr.length > ru.bufferMaxPoints) {
+                                    arr.shift();
+                                }
                             }
                         }
                     });
