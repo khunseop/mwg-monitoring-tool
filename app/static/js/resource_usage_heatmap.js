@@ -63,32 +63,46 @@
             // First pass: collect all interface indices and process rows
             const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
             (items || []).forEach(row => {
-                const last = ru.lastCumulativeByProxy[row.proxy_id] || {};
+                const proxyId = row.proxy_id;
+                const last = ru.lastCumulativeByProxy[proxyId] || {};
                 const deltas = { http: null, https: null, ftp: null };
+                
+                // 차트 버퍼에서 최신 값을 가져와서 사용 (차트와 동일한 데이터 소스)
                 ['http','https','ftp'].forEach(k => {
-                    const v = row[k];
-                    if (typeof v === 'number' && typeof last[k] === 'number' && last[k] !== null) {
-                        // 32-bit counter wrap 처리 및 Mbps 변환
-                        const mbps = utils.calculateTrafficMbps(v, last[k], intervalSec);
-                        deltas[k] = (mbps !== null && mbps >= 0) ? mbps : null;
-                    } else if (typeof v === 'number') {
-                        // First collection or cache was reset - don't calculate delta yet
-                        deltas[k] = null;
+                    const buffer = ru.tsBuffer[proxyId] || {};
+                    const series = buffer[k] || [];
+                    // 버퍼에서 가장 최신 값 가져오기
+                    if (series.length > 0) {
+                        const latestPoint = series[series.length - 1];
+                        if (latestPoint && typeof latestPoint.y === 'number' && latestPoint.y >= 0) {
+                            deltas[k] = latestPoint.y; // 이미 Mbps로 변환된 값
+                        }
+                    }
+                    
+                    // 버퍼에 값이 없으면 델타 계산 시도
+                    if (deltas[k] === null) {
+                        const v = row[k];
+                        if (typeof v === 'number' && typeof last[k] === 'number' && last[k] !== null) {
+                            // 32-bit counter wrap 처리 및 Mbps 변환
+                            const mbps = utils.calculateTrafficMbps(v, last[k], intervalSec);
+                            deltas[k] = (mbps !== null && mbps >= 0) ? mbps : null;
+                        }
                     }
                 });
+                
                 // Update cache with current values
-                ru.lastCumulativeByProxy[row.proxy_id] = {
+                ru.lastCumulativeByProxy[proxyId] = {
                     http: typeof row.http === 'number' ? row.http : (last.http || null),
                     https: typeof row.https === 'number' ? row.https : (last.https || null),
                     ftp: typeof row.ftp === 'number' ? row.ftp : (last.ftp || null),
                 };
                 
                 // Store proxy info for later use
-                const proxy = (ru.proxies || []).find(p => p.id === row.proxy_id);
-                const fullHost = proxy ? proxy.host : `#${row.proxy_id}`;
+                const proxy = (ru.proxies || []).find(p => p.id === proxyId);
+                const fullHost = proxy ? proxy.host : `#${proxyId}`;
                 
                 rows.push({
-                    proxy_id: row.proxy_id,
+                    proxy_id: proxyId,
                     cpu: typeof row.cpu === 'number' ? row.cpu : null,
                     mem: typeof row.mem === 'number' ? row.mem : null,
                     cc: typeof row.cc === 'number' ? row.cc : null,

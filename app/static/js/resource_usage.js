@@ -30,6 +30,61 @@ $(document).ready(function() {
     $('#ruStartBtn').on('click', function() { polling.startPolling(); });
     $('#ruStopBtn').on('click', function() { polling.stopPolling(); });
     
+    // 그래프 초기화 버튼
+    $('#ruResetBtn').on('click', function() {
+        if (!confirm('모든 그래프 데이터를 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+            return;
+        }
+        
+        // 타임시리즈 버퍼 초기화
+        ru.tsBuffer = {};
+        
+        // 히트맵 관련 상태 초기화
+        ru.lastCumulativeByProxy = {};
+        ru.heatmapMaxByMetric = {};
+        ru.lastData = [];
+        
+        // 범례 상태 초기화
+        ru.legendState = {};
+        
+        // 차트 인스턴스 초기화
+        if (ru.charts) {
+            Object.values(ru.charts).forEach(chart => {
+                if (chart && typeof chart.destroy === 'function') {
+                    chart.destroy();
+                }
+            });
+            ru.charts = {};
+        }
+        
+        // 히트맵 차트 초기화
+        if (ru.apex) {
+            ru.apex.destroy();
+            ru.apex = null;
+        }
+        
+        // 모달 차트 초기화
+        if (ru.modalChart) {
+            ru.modalChart.destroy();
+            ru.modalChart = null;
+        }
+        
+        // 상태 저장
+        state.saveBufferState();
+        state.saveLegendState();
+        state.saveHeatmapState();
+        
+        // 차트 DOM 재초기화 및 렌더링
+        charts.ensureApexChartsDom();
+        charts.renderAllCharts();
+        
+        // 히트맵 빈 상태 표시
+        $('#ruHeatmapWrap').hide();
+        $('#ruEmptyState').show();
+        
+        alert('그래프가 초기화되었습니다.');
+    });
+    
     $('#ruGroupSelect').on('change', function() {
         ru.lastCumulativeByProxy = {};
         ru.heatmapMaxByMetric = {}; // 그룹 변경 시 히트맵 스케일 리셋
