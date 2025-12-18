@@ -311,6 +311,11 @@ $(document).ready(function() {
         // 모든 탭 콘텐츠 숨기기
         $('.tab-content').hide();
         
+        // 실시간 모니터링 탭으로 전환 시 이력조회 결과 숨기기
+        if (tabName === 'realtime') {
+            $('#ruHistoryResults').hide();
+        }
+        
         // 선택된 탭 활성화
         $('.tabs li[data-tab="' + tabName + '"]').addClass('is-active');
         // 선택된 탭 콘텐츠 표시

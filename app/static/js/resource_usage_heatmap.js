@@ -228,6 +228,10 @@
             const el = document.getElementById('ruHeatmapEl');
             if (!el) return;
             if (!window.ApexCharts) return;
+            
+            // 컨테이너가 보이는지 확인
+            const container = el.closest('#ruHeatmapWrap');
+            const isVisible = container && container.offsetParent !== null;
 
             // Build per-column scaling using thresholds when provided
             const thr = (ru.cachedConfig && ru.cachedConfig.thresholds) ? ru.cachedConfig.thresholds : {};
@@ -348,7 +352,16 @@
                         rotate: -45,
                         rotateAlways: true,
                         style: { fontSize: '10px' },
-                        maxHeight: 150
+                        maxHeight: 150,
+                        offsetY: 0,
+                        show: true,
+                        hideOverlappingLabels: false
+                    },
+                    axisBorder: {
+                        show: true
+                    },
+                    axisTicks: {
+                        show: true
                     }
                 },
                 yaxis: { 
@@ -424,10 +437,36 @@
                         xCategories: xCategories.length,
                         yCategories: yCategories.length
                     };
+                    // 옵션 업데이트 후 resize 호출하여 레이블 표시 보장
+                    setTimeout(() => {
+                        if (ru.apex && typeof ru.apex.resize === 'function') {
+                            ru.apex.resize();
+                        }
+                    }, 100);
                 }
             } else {
                 ru.apex = new ApexCharts(el, options);
-                ru.apex.render();
+                // 컨테이너가 보이는 상태에서 렌더링
+                const renderChart = () => {
+                    ru.apex.render().then(() => {
+                        // 렌더링 완료 후 resize 호출하여 x축 레이블 표시 보장
+                        setTimeout(() => {
+                            if (ru.apex && typeof ru.apex.resize === 'function') {
+                                ru.apex.resize();
+                            }
+                        }, 100);
+                    });
+                };
+                
+                if (isVisible) {
+                    renderChart();
+                } else {
+                    // 컨테이너가 보이지 않으면 다음 프레임에서 시도
+                    requestAnimationFrame(() => {
+                        renderChart();
+                    });
+                }
+                
                 ru._lastHeatmapOptions = {
                     height: calculatedHeight,
                     width: baseWidth,
@@ -436,8 +475,19 @@
                 };
             }
 
-            if (!items || items.length === 0) { $('#ruHeatmapWrap').hide(); $('#ruEmptyState').show(); }
-            else { $('#ruEmptyState').hide(); $('#ruHeatmapWrap').show(); }
+            if (!items || items.length === 0) { 
+                $('#ruHeatmapWrap').hide(); 
+                $('#ruEmptyState').show(); 
+            } else { 
+                $('#ruEmptyState').hide(); 
+                $('#ruHeatmapWrap').show();
+                // 히트맵이 표시될 때 resize 호출하여 레이블 표시 보장
+                if (ru.apex && typeof ru.apex.resize === 'function') {
+                    setTimeout(() => {
+                        ru.apex.resize();
+                    }, 150);
+                }
+            }
             
             // 상태 저장 (히트맵 데이터 및 스케일)
             if (state && typeof state.saveHeatmapState === 'function') {

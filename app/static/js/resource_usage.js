@@ -153,4 +153,15 @@ $(document).ready(function() {
     $('#ruChartModal').find('.modal-background, .delete').on('click', function() {
         charts.closeModal();
     });
+    
+    // window resize 이벤트 - 히트맵 차트 resize
+    let resizeTimeout = null;
+    window.addEventListener('resize', function() {
+        if (resizeTimeout) clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(function() {
+            if (ru.apex && typeof ru.apex.resize === 'function') {
+                ru.apex.resize();
+            }
+        }, 250);
+    });
 });

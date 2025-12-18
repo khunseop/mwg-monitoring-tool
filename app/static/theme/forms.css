@@ -287,36 +287,36 @@
 /* ============================================
    프록시 선택 필드 (Tom Select multi-select)
    ============================================ */
-/* 프록시 선택 필드 wrapper 높이 통일 - 그룹 선택과 동일 */
+/* 프록시 선택 필드 wrapper 높이 - 최대 3줄까지 확장 가능 */
 #ruProxySelect + .ts-wrapper,
 #sbProxySelect + .ts-wrapper,
 #ruProxySelect + .ts-wrapper.multi,
 #sbProxySelect + .ts-wrapper.multi {
     width: 100% !important;
-    height: 2.5em !important;
+    height: auto !important;
     min-height: 2.5em !important;
-    max-height: 2.5em !important;
+    max-height: 7.5em !important;
     margin: 0 !important;
     padding: 0 !important;
     box-sizing: border-box !important;
     position: relative !important;
 }
 
-/* 프록시 선택 필드 control - 그룹 선택과 완전히 동일한 스타일 */
+/* 프록시 선택 필드 control - 최대 3줄까지 확장 가능 */
 #ruProxySelect + .ts-wrapper .ts-control,
 #sbProxySelect + .ts-wrapper .ts-control,
 #ruProxySelect + .ts-wrapper.multi .ts-control,
 #sbProxySelect + .ts-wrapper.multi .ts-control {
-    height: 2.5em !important;
+    height: auto !important;
     min-height: 2.5em !important;
-    max-height: 2.5em !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
+    max-height: 7.5em !important;
+    padding-top: 0.375em !important;
+    padding-bottom: 0.375em !important;
     padding-left: 0.5em !important;
     padding-right: 0.5em !important;
     margin: 0 !important;
     display: flex !important;
-    align-items: center !important;
+    align-items: flex-start !important;
     justify-content: flex-start !important;
     line-height: 1.5 !important;
     overflow-y: auto !important;
@@ -328,14 +328,14 @@
     background: var(--color-surface) !important;
 }
 
-/* 프록시 선택 필드 - 선택된 항목이 있어도 높이 고정 */
+/* 프록시 선택 필드 - 선택된 항목이 있을 때 높이 자동 조절 */
 #ruProxySelect + .ts-wrapper.multi.has-items .ts-control,
 #sbProxySelect + .ts-wrapper.multi.has-items .ts-control {
-    height: 2.5em !important;
+    height: auto !important;
     min-height: 2.5em !important;
-    max-height: 2.5em !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
+    max-height: 7.5em !important;
+    padding-top: 0.375em !important;
+    padding-bottom: 0.375em !important;
     padding-left: 0.5em !important;
     padding-right: 0.5em !important;
 }
@@ -344,7 +344,7 @@
 #ruProxySelect + .ts-wrapper.multi .ts-control > div.input.has-items,
 #sbProxySelect + .ts-wrapper.multi .ts-control > div.input.has-items {
     display: flex !important;
-    align-items: center !important;
+    align-items: flex-start !important;
     flex-wrap: wrap !important;
     gap: 8px !important;
     max-height: 100% !important;
