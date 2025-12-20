@@ -2,220 +2,151 @@
 
 {% block content %}
 
-<!-- 리소스 설정 탭 -->
-<div id="resource-config" class="tab-panel">
-    <!-- 헤더 -->
-    <div class="box mb-4">
-        <div class="level mb-4">
-            <div class="level-left">
-                <div class="level-item">
-                    <h3 class="title is-4 mb-0">리소스 설정</h3>
-                </div>
-            </div>
-            <div class="level-right">
-                <div class="level-item">
-                    <div class="buttons">
-                        <button class="button is-primary" onclick="saveResourceConfig()">저장</button>
-                        <span id="cfgStatus" class="tag is-light ml-2">로딩 중...</span>
-                    </div>
-                </div>
+<!-- 통합 설정 폼 -->
+<div class="box mb-4">
+    <div class="level mb-4">
+        <div class="level-left">
+            <div class="level-item">
+                <h3 class="title is-4 mb-0">설정</h3>
             </div>
         </div>
-
-        <div class="field is-horizontal">
-            <div class="field-label is-normal" style="min-width: 9rem;">
-                <label class="label">Community String</label>
-            </div>
-            <div class="field-body">
-                <div class="field">
-                    <div class="control">
-                        <input class="input" id="cfgCommunity" type="text" placeholder="public" value="public">
-                    </div>
+        <div class="level-right">
+            <div class="level-item">
+                <div class="buttons">
+                    <button class="button is-primary" onclick="saveAllConfig()">저장</button>
+                    <span id="cfgStatus" class="tag is-light ml-2">로딩 중...</span>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- OID 설정 섹션 -->
-    <div class="box mb-4">
-        <h4 class="title is-5 mb-4">OID 설정</h4>
-        <div class="columns is-multiline">
-            <div class="column is-4">
-                <div class="field">
-                    <label class="label">cpu OID</label>
-                    <input class="input" id="cfgOidCpu" placeholder="1.3.6.1.x">
-                </div>
-            </div>
-            <div class="column is-4">
-                <div class="field">
-                    <label class="label">mem OID</label>
-                    <input class="input" id="cfgOidMem" placeholder="1.3.6.1.x">
-                </div>
-            </div>
-            <div class="column is-4">
-                <div class="field">
-                    <label class="label">cc OID</label>
-                    <input class="input" id="cfgOidCc" placeholder="1.3.6.1.x">
-                </div>
-            </div>
-            <div class="column is-4">
-                <div class="field">
-                    <label class="label">cs OID</label>
-                    <input class="input" id="cfgOidCs" placeholder="1.3.6.1.x">
-                </div>
-            </div>
-            <div class="column is-4">
-                <div class="field">
-                    <label class="label">http OID (누적)</label>
-                    <input class="input" id="cfgOidHttp" placeholder="1.3.6.1.x">
-                </div>
-            </div>
-            <div class="column is-4">
-                <div class="field">
-                    <label class="label">https OID (누적)</label>
-                    <input class="input" id="cfgOidHttps" placeholder="1.3.6.1.x">
-                </div>
-            </div>
-            <div class="column is-4">
-                <div class="field">
-                    <label class="label">ftp OID (누적)</label>
-                    <input class="input" id="cfgOidFtp" placeholder="1.3.6.1.x">
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 임계치 설정 섹션 -->
-    <div class="box mb-4">
-        <h4 class="title is-5 mb-4">임계치 설정</h4>
-        <p class="mb-4" style="color: var(--color-text-muted);">각 항목의 경고 임계치를 설정합니다. 비워두면 자동 스케일링만 사용합니다.</p>
-        <div class="columns is-multiline">
-            <div class="column is-3">
-                <div class="field">
-                    <label class="label">CPU 임계치</label>
-                    <input class="input" id="cfgThrCpu" type="number" step="1" min="0" placeholder="예: 80">
-                </div>
-            </div>
-            <div class="column is-3">
-                <div class="field">
-                    <label class="label">MEM 임계치</label>
-                    <input class="input" id="cfgThrMem" type="number" step="1" min="0" placeholder="예: 80">
-                </div>
-            </div>
-            <div class="column is-3">
-                <div class="field">
-                    <label class="label">CC 임계치</label>
-                    <input class="input" id="cfgThrCc" type="number" step="1" min="0" placeholder="숫자">
-                </div>
-            </div>
-            <div class="column is-3">
-                <div class="field">
-                    <label class="label">CS 임계치</label>
-                    <input class="input" id="cfgThrCs" type="number" step="1" min="0" placeholder="숫자">
-                </div>
-            </div>
-            <div class="column is-3">
-                <div class="field">
-                    <label class="label">HTTP Δ 임계치</label>
-                    <input class="input" id="cfgThrHttp" type="number" step="0.01" min="0" placeholder="Mbps (예: 100)">
-                </div>
-            </div>
-            <div class="column is-3">
-                <div class="field">
-                    <label class="label">HTTPS Δ 임계치</label>
-                    <input class="input" id="cfgThrHttps" type="number" step="0.01" min="0" placeholder="Mbps (예: 100)">
-                </div>
-            </div>
-            <div class="column is-3">
-                <div class="field">
-                    <label class="label">FTP Δ 임계치</label>
-                    <input class="input" id="cfgThrFtp" type="number" step="0.01" min="0" placeholder="Mbps (예: 100)">
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 인터페이스 설정 섹션 (통합: OID, 임계치, 대역폭) -->
-    <div class="box mb-4">
-        <h4 class="title is-5 mb-4">인터페이스 설정</h4>
-        <p class="mb-4" style="color: var(--color-text-muted);">
-            모니터링할 인터페이스를 추가하세요. 각 인터페이스의 이름, IN/OUT OID, 임계치, 대역폭을 한 번에 설정할 수 있습니다.
-        </p>
-        <div id="cfgInterfaceList">
-            <!-- 동적으로 추가됨 -->
-        </div>
-        <div class="field">
-            <button class="button is-primary" id="cfgAddInterface" type="button">인터페이스 추가</button>
-        </div>
-    </div>
-
-    <!-- 회선 대역폭 설정 섹션 (전체 기본값) -->
-    <div class="box">
-        <h4 class="title is-5 mb-4">회선 대역폭 설정 (기본값)</h4>
-        <p class="mb-4" style="color: var(--color-text-muted);">
-            프록시 트래픽 계산에 사용할 기본 회선 대역폭을 설정합니다. 인터페이스별로 대역폭을 설정하지 않은 경우 이 값이 사용됩니다.
-        </p>
-        <div class="field">
-            <label class="label">회선 대역폭 (Mbps)</label>
-            <div class="control">
-                <input class="input" id="cfgBandwidthMbps" type="number" step="0.1" min="0" placeholder="1000" value="1000">
-            </div>
-            <p class="help">회선 대역폭을 Mbps 단위로 입력하세요. 기본값은 1000 Mbps (1Gbps)입니다.</p>
         </div>
     </div>
 </div>
 
-<!-- 세션브라우저 설정 탭 -->
-<div id="session-config" class="tab-panel">
-    <div class="box">
-        <div class="level">
-            <div class="level-left">
-                <div class="level-item">
-                    <h3 class="title is-4">세션브라우저 설정</h3>
+<!-- SNMP 설정 섹션 -->
+<div class="box mb-4">
+    <h4 class="title is-5 mb-4">SNMP 설정</h4>
+    <div class="columns is-multiline">
+        <div class="column is-3">
+            <div class="field">
+                <label class="label">Community String</label>
+                <div class="control">
+                    <input class="input" id="cfgCommunity" type="text" placeholder="public" value="public">
+                </div>
+                <p class="help">SNMP v2c community string (기본값: public)</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 자원 수집 설정 섹션 -->
+<div class="box mb-4">
+    <h4 class="title is-5 mb-4">자원 수집 설정</h4>
+    <p class="mb-3" style="color: var(--color-text-muted); font-size: 0.875rem;">각 항목의 OID와 경고 임계치를 설정합니다. 임계치는 비워두면 자동 스케일링만 사용합니다.</p>
+    <div class="table-container">
+        <table class="table is-fullwidth is-narrow">
+            <thead>
+                <tr>
+                    <th style="width: 15%;">항목</th>
+                    <th style="width: 45%;">OID</th>
+                    <th style="width: 30%;">임계치</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>CPU</strong></td>
+                    <td><input class="input is-small" id="cfgOidCpu" placeholder="1.3.6.1.x"></td>
+                    <td><input class="input is-small" id="cfgThrCpu" type="number" step="1" min="0" placeholder="예: 80"></td>
+                </tr>
+                <tr>
+                    <td><strong>MEM</strong></td>
+                    <td><input class="input is-small" id="cfgOidMem" placeholder="1.3.6.1.x"></td>
+                    <td><input class="input is-small" id="cfgThrMem" type="number" step="1" min="0" placeholder="예: 80"></td>
+                </tr>
+                <tr>
+                    <td><strong>CC</strong></td>
+                    <td><input class="input is-small" id="cfgOidCc" placeholder="1.3.6.1.x"></td>
+                    <td><input class="input is-small" id="cfgThrCc" type="number" step="1" min="0" placeholder="숫자"></td>
+                </tr>
+                <tr>
+                    <td><strong>CS</strong></td>
+                    <td><input class="input is-small" id="cfgOidCs" placeholder="1.3.6.1.x"></td>
+                    <td><input class="input is-small" id="cfgThrCs" type="number" step="1" min="0" placeholder="숫자"></td>
+                </tr>
+                <tr>
+                    <td><strong>HTTP (누적)</strong></td>
+                    <td><input class="input is-small" id="cfgOidHttp" placeholder="1.3.6.1.x"></td>
+                    <td><input class="input is-small" id="cfgThrHttp" type="number" step="0.01" min="0" placeholder="Mbps (예: 100)"></td>
+                </tr>
+                <tr>
+                    <td><strong>HTTPS (누적)</strong></td>
+                    <td><input class="input is-small" id="cfgOidHttps" placeholder="1.3.6.1.x"></td>
+                    <td><input class="input is-small" id="cfgThrHttps" type="number" step="0.01" min="0" placeholder="Mbps (예: 100)"></td>
+                </tr>
+                <tr>
+                    <td><strong>FTP (누적)</strong></td>
+                    <td><input class="input is-small" id="cfgOidFtp" placeholder="1.3.6.1.x"></td>
+                    <td><input class="input is-small" id="cfgThrFtp" type="number" step="0.01" min="0" placeholder="Mbps (예: 100)"></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+    <!-- 인터페이스 설정 섹션 -->
+    <div class="box mb-4">
+        <h4 class="title is-5 mb-4">인터페이스 설정</h4>
+        <p class="mb-3" style="color: var(--color-text-muted); font-size: 0.875rem;">모니터링할 인터페이스를 추가하세요.</p>
+        <div class="table-container">
+            <table class="table is-fullwidth is-narrow">
+                <thead>
+                    <tr>
+                        <th style="width: 12%;">인터페이스</th>
+                        <th style="width: 25%;">IN OID</th>
+                        <th style="width: 25%;">OUT OID</th>
+                        <th style="width: 15%;">임계치 (Mbps)</th>
+                        <th style="width: 15%;">대역폭 (Mbps)</th>
+                        <th style="width: 8%;"></th>
+                    </tr>
+                </thead>
+                <tbody id="cfgInterfaceList">
+                    <!-- 동적으로 추가됨 -->
+                </tbody>
+            </table>
+        </div>
+        <div class="field mt-3">
+            <button class="button is-primary is-small" id="cfgAddInterface" type="button">인터페이스 추가</button>
+        </div>
+    </div>
+
+<!-- 세션브라우저 설정 섹션 -->
+<div class="box mb-4">
+    <h4 class="title is-5 mb-4">세션브라우저 설정</h4>
+    <div class="columns is-multiline">
+        <div class="column is-3">
+            <div class="field">
+                <label class="label">SSH 포트</label>
+                <div class="control">
+                    <input class="input" id="sbCfgPort" type="number" min="1" max="65535" value="22">
                 </div>
             </div>
         </div>
-
-        <div class="columns is-multiline">
-            <div class="column is-3">
-                <div class="field">
-                    <label class="label">SSH 포트</label>
-                    <div class="control">
-                        <input class="input" id="sbCfgPort" type="number" min="1" max="65535" value="22">
-                    </div>
-                </div>
-            </div>
-            
-            <div class="column is-3">
-                <div class="field">
-                    <label class="label">타임아웃(초)</label>
-                    <div class="control">
-                        <input class="input" id="sbCfgTimeout" type="number" min="1" max="120" value="10">
-                    </div>
-                </div>
-            </div>
-            <div class="column is-4">
-                <div class="field">
-                    <label class="label">호스트키 정책</label>
-                    <div class="control">
-                        <div class="select is-fullwidth">
-                            <select id="sbCfgHostKeyPolicy">
-                                <option value="auto_add">auto_add</option>
-                                <option value="reject">reject</option>
-                            </select>
-                        </div>
-                    </div>
+        
+        <div class="column is-3">
+            <div class="field">
+                <label class="label">타임아웃(초)</label>
+                <div class="control">
+                    <input class="input" id="sbCfgTimeout" type="number" min="1" max="120" value="10">
                 </div>
             </div>
         </div>
-
-        <div class="level">
-            <div class="level-left"></div>
-            <div class="level-right">
-                <div class="level-item">
-                    <div class="buttons">
-                        <button class="button is-primary" onclick="saveSessionConfig()">저장</button>
-                        <span id="sbCfgStatus" class="tag is-light ml-2">로딩 중...</span>
+        <div class="column is-3">
+            <div class="field">
+                <label class="label">호스트키 정책</label>
+                <div class="control">
+                    <div class="select is-fullwidth">
+                        <select id="sbCfgHostKeyPolicy">
+                            <option value="auto_add">auto_add</option>
+                            <option value="reject">reject</option>
+                        </select>
                     </div>
                 </div>
             </div>
