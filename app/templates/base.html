@@ -30,18 +30,57 @@
 
                 <div id="mainNavbar" class="navbar-menu">
                     <div class="navbar-start">
-                        <a class="navbar-item {% if request.url.path == '/' or request.url.path == '/resource' or request.url.path == '/resource-history' %}is-active{% endif %}" href="/resource">
-                            자원사용률
-                        </a>
+                        <!-- 자원사용률 하위메뉴 -->
+                        <div class="navbar-item has-dropdown is-hoverable is-hidden-touch">
+                            <a class="navbar-link {% if request.url.path == '/' or request.url.path == '/resource' or request.url.path.startswith('/resource') %}is-active{% endif %}">자원사용률</a>
+                            <div class="navbar-dropdown is-boxed">
+                                <a class="navbar-item {% if request.url.path == '/' or request.url.path == '/resource' %}is-active{% endif %}" href="/resource">실시간 모니터링</a>
+                                <a class="navbar-item {% if request.url.path == '/resource/history' %}is-active{% endif %}" href="/resource/history">이력 조회</a>
+                            </div>
+                        </div>
+                        <!-- 자원사용률 모바일 -->
+                        <div class="navbar-item has-dropdown is-hidden-desktop">
+                            <a class="navbar-link">자원사용률</a>
+                            <div class="navbar-dropdown is-boxed">
+                                <a class="navbar-item {% if request.url.path == '/' or request.url.path == '/resource' %}is-active{% endif %}" href="/resource">실시간 모니터링</a>
+                                <a class="navbar-item {% if request.url.path == '/resource/history' %}is-active{% endif %}" href="/resource/history">이력 조회</a>
+                            </div>
+                        </div>
                         <a class="navbar-item {% if request.url.path.startswith('/session') %}is-active{% endif %}" href="/session">
                             세션브라우저
                         </a>
-                        <a class="navbar-item {% if request.url.path.startswith('/traffic-logs') %}is-active{% endif %}" href="/traffic-logs">
-                            트래픽 로그
-                        </a>
-                        <a class="navbar-item {% if request.url.path.startswith('/proxy') %}is-active{% endif %}" href="/proxy">
-                            프록시 관리
-                        </a>
+                        <!-- 트래픽 로그 하위메뉴 -->
+                        <div class="navbar-item has-dropdown is-hoverable is-hidden-touch">
+                            <a class="navbar-link {% if request.url.path.startswith('/traffic-logs') %}is-active{% endif %}">트래픽 로그</a>
+                            <div class="navbar-dropdown is-boxed">
+                                <a class="navbar-item {% if request.url.path == '/traffic-logs' %}is-active{% endif %}" href="/traffic-logs">원격 조회(SSH)</a>
+                                <a class="navbar-item {% if request.url.path == '/traffic-logs/upload' %}is-active{% endif %}" href="/traffic-logs/upload">파일 업로드 분석</a>
+                            </div>
+                        </div>
+                        <!-- 트래픽 로그 모바일 -->
+                        <div class="navbar-item has-dropdown is-hidden-desktop">
+                            <a class="navbar-link">트래픽 로그</a>
+                            <div class="navbar-dropdown is-boxed">
+                                <a class="navbar-item {% if request.url.path == '/traffic-logs' %}is-active{% endif %}" href="/traffic-logs">원격 조회(SSH)</a>
+                                <a class="navbar-item {% if request.url.path == '/traffic-logs/upload' %}is-active{% endif %}" href="/traffic-logs/upload">파일 업로드 분석</a>
+                            </div>
+                        </div>
+                        <!-- 프록시 관리 하위메뉴 -->
+                        <div class="navbar-item has-dropdown is-hoverable is-hidden-touch">
+                            <a class="navbar-link {% if request.url.path.startswith('/proxy') %}is-active{% endif %}">프록시 관리</a>
+                            <div class="navbar-dropdown is-boxed">
+                                <a class="navbar-item {% if request.url.path == '/proxy' %}is-active{% endif %}" href="/proxy">프록시 목록</a>
+                                <a class="navbar-item {% if request.url.path == '/proxy/groups' %}is-active{% endif %}" href="/proxy/groups">프록시 그룹</a>
+                            </div>
+                        </div>
+                        <!-- 프록시 관리 모바일 -->
+                        <div class="navbar-item has-dropdown is-hidden-desktop">
+                            <a class="navbar-link">프록시 관리</a>
+                            <div class="navbar-dropdown is-boxed">
+                                <a class="navbar-item {% if request.url.path == '/proxy' %}is-active{% endif %}" href="/proxy">프록시 목록</a>
+                                <a class="navbar-item {% if request.url.path == '/proxy/groups' %}is-active{% endif %}" href="/proxy/groups">프록시 그룹</a>
+                            </div>
+                        </div>
                         <div class="navbar-item has-dropdown is-hoverable is-hidden-touch">
                             <a id="navSettings" class="navbar-link {% if request.url.path.startswith('/settings') %}is-active{% endif %}" href="/settings">설정</a>
                             <div class="navbar-dropdown is-boxed">

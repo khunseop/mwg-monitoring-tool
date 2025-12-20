@@ -1,34 +1,22 @@
-// 섹션 탭 관리
-function activateSectionTab(targetId) {
-    document.querySelectorAll('.tabs li').forEach(t => {
-        if (t.dataset && t.dataset.target) {
-            t.classList.toggle('is-active', t.dataset.target === targetId);
-        }
-    });
-    document.querySelectorAll('.tab-content').forEach(section => {
-        section.classList.toggle('is-active', section.id === targetId);
-    });
-}
-
+// URL 기반 섹션 표시
 document.addEventListener('DOMContentLoaded', function() {
-    // 섹션 탭 클릭 이벤트
-    document.querySelectorAll('.tabs li').forEach(tab => {
-        tab.addEventListener('click', function(e) {
-            e.preventDefault();
-            const target = this.dataset.target;
-            if (target) {
-                activateSectionTab(target);
-            }
-        });
-    });
-
-    // URL 쿼리 파라미터로 섹션 탭 활성화
+    // 레거시 URL 파라미터 지원 (?section=groups)
     const params = new URLSearchParams(window.location.search);
-    const section = params.get('section');
-    if (section === 'groups') {
-        activateSectionTab('proxy-groups-section');
+    const sectionParam = params.get('section');
+    if (sectionParam === 'groups' && window.location.pathname === '/proxy') {
+        // 레거시 URL 리다이렉트
+        window.location.href = '/proxy/groups';
+        return;
+    }
+    
+    // URL 경로에 따라 섹션 표시/숨김
+    const path = window.location.pathname;
+    if (path === '/proxy/groups') {
+        $('#proxy-list-section').hide();
+        $('#proxy-groups-section').show();
     } else {
-        activateSectionTab('proxy-list-section');
+        $('#proxy-list-section').show();
+        $('#proxy-groups-section').hide();
     }
 });
 

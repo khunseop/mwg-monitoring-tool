@@ -414,29 +414,36 @@
 		}
 		// Restore previous state and results after proxies are loaded
 		restoreState();
-		// Tabs behavior
+		// URL 기반 섹션 표시
 		function setView(view, write){
 			CURRENT_VIEW = view;
 			if(view === 'upload'){
 				$('#tlRemoteSection').hide();
 				$('#tlaSection').show();
-				$('#tlTabs li').removeClass('is-active');
-				$('#tlTabs [data-view="upload"]').parent().addClass('is-active');
 			}else{
 				$('#tlaSection').hide();
 				$('#tlRemoteSection').show();
-				$('#tlTabs li').removeClass('is-active');
-				$('#tlTabs [data-view="remote"]').parent().addClass('is-active');
 			}
 			if(write){ saveState(undefined); }
 		}
-		function applyViewFromQuery(){
+		function applyViewFromUrl(){
+			const path = window.location.pathname;
+			// 레거시 URL 파라미터 지원 (?view=upload)
 			const params = new URLSearchParams(window.location.search);
-			const view = (params.get('view') || CURRENT_VIEW || 'remote').toLowerCase();
-			setView(view === 'upload' ? 'upload' : 'remote', false);
+			const viewParam = params.get('view');
+			if (viewParam === 'upload' && path === '/traffic-logs') {
+				// 레거시 URL 리다이렉트
+				window.location.href = '/traffic-logs/upload';
+				return;
+			}
+			// URL 경로에 따라 섹션 표시
+			if(path === '/traffic-logs/upload'){
+				setView('upload', false);
+			}else{
+				setView('remote', false);
+			}
 		}
-		applyViewFromQuery();
-		$('#tlTabs').on('click', 'a[data-view]', function(e){ e.preventDefault(); var v = $(this).data('view'); setView(String(v || 'remote'), true); });
+		applyViewFromUrl();
 		
 		// Quick filter (전체 검색)
 		$('#tlQuickFilter').on('input', function() {

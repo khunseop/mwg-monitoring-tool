@@ -1,16 +1,9 @@
 {% extends "base.html" %}
 
 {% block content %}
-<!-- 탭: 원격 조회 / 파일 업로드 분석 (딥링크: ?view=remote|upload) -->
-<div class="tabs is-boxed mb-0" id="tlTabs">
-	<ul>
-		<li class="is-active"><a href="#" data-view="remote">원격 조회(SSH)</a></li>
-		<li><a href="#" data-view="upload">파일 업로드 분석</a></li>
-	</ul>
-</div>
-
+{% set is_upload = request.url.path == '/traffic-logs/upload' %}
 <!-- 원격 조회 섹션 -->
-<div id="tlRemoteSection">
+<div id="tlRemoteSection" {% if is_upload %}style="display:none;"{% endif %}>
 	<!-- 제어 헤더 -->
 	<div class="box mb-4">
 		<div class="level mb-4">
@@ -108,7 +101,7 @@
 </div> <!-- /#tlRemoteSection -->
 
 <!-- 업로드 분석 섹션 -->
-<div id="tlaSection" style="display:none;">
+<div id="tlaSection" {% if not is_upload %}style="display:none;"{% endif %}>
 	<!-- 제어 헤더 -->
 	<div class="box mb-4">
 		<div class="level mb-4">

@@ -1,21 +1,9 @@
 {% extends "base.html" %}
 
 {% block content %}
-
-<!-- 섹션 탭 -->
-<div class="tabs is-boxed mb-0">
-    <ul>
-        <li class="is-active" data-target="proxy-list-section">
-            <a>프록시 목록</a>
-        </li>
-        <li data-target="proxy-groups-section">
-            <a>프록시 그룹</a>
-        </li>
-    </ul>
-</div>
-
+{% set is_groups = request.url.path == '/proxy/groups' %}
 <!-- 프록시 목록 섹션 -->
-<div id="proxy-list-section" class="tab-content is-active">
+<div id="proxy-list-section" class="tab-content" {% if is_groups %}style="display:none;"{% endif %}>
     <div class="box">
         <div class="level">
             <div class="level-left">
@@ -51,7 +39,7 @@
 </div>
 
 <!-- 프록시 그룹 섹션 -->
-<div id="proxy-groups-section" class="tab-content">
+<div id="proxy-groups-section" class="tab-content" {% if not is_groups %}style="display:none;"{% endif %}>
     <div class="box">
         <div class="level">
             <div class="level-left">

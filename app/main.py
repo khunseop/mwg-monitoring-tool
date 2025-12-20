@@ -91,14 +91,22 @@ async def read_root(request: Request):
 async def read_resource(request: Request):
     return templates.TemplateResponse("components/resource_usage.html", {"request": request})
 
-@app.get("/resource-history")
+@app.get("/resource/history")
 async def read_resource_history(request: Request):
-    # 자원사용률 이력은 이제 자원사용률 페이지의 하위 탭으로 통합됨
+    return templates.TemplateResponse("components/resource_usage.html", {"request": request})
+
+@app.get("/resource-history")
+async def read_resource_history_legacy(request: Request):
+    # 레거시 URL 리다이렉트
     from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/resource?tab=history", status_code=301)
+    return RedirectResponse(url="/resource/history", status_code=301)
 
 @app.get("/proxy")
 async def read_proxy_management(request: Request):
+    return templates.TemplateResponse("components/proxy_management.html", {"request": request})
+
+@app.get("/proxy/groups")
+async def read_proxy_groups(request: Request):
     return templates.TemplateResponse("components/proxy_management.html", {"request": request})
 
 @app.get("/settings")
@@ -117,6 +125,10 @@ def healthz():
 
 @app.get("/traffic-logs")
 async def read_traffic_logs_page(request: Request):
+    return templates.TemplateResponse("components/traffic_logs.html", {"request": request})
+
+@app.get("/traffic-logs/upload")
+async def read_traffic_logs_upload(request: Request):
     return templates.TemplateResponse("components/traffic_logs.html", {"request": request})
 
 

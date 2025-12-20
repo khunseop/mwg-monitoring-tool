@@ -1,18 +1,8 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="tabs is-boxed mb-0">
-    <ul>
-        <li class="is-active" data-tab="realtime">
-            <a>실시간 모니터링</a>
-        </li>
-        <li data-tab="history">
-            <a>이력 조회</a>
-        </li>
-    </ul>
-</div>
-
-<div id="realtime-tab" class="tab-content">
+{% set is_history = request.url.path == '/resource/history' %}
+<div id="realtime-tab" class="tab-content" {% if is_history %}style="display:none;"{% endif %}>
 <!-- 필터/설정 섹션 -->
 <div class="box mb-4">
     <div class="level mb-4">
@@ -117,7 +107,7 @@
 </div>
 </div>
 
-<div id="history-tab" class="tab-content" style="display:none;">
+<div id="history-tab" class="tab-content" {% if not is_history %}style="display:none;"{% endif %}>
 <!-- 조회 조건 섹션 -->
 <div class="box mb-4">
     <div class="level mb-4">
@@ -303,41 +293,25 @@
 </div>
 
 <script>
-// 탭 전환 기능
+// URL 기반 섹션 표시
 $(document).ready(function() {
-    // 탭 클릭 이벤트 핸들러
-    function switchTab(tabName) {
-        // 모든 탭 비활성화
-        $('.tabs li').removeClass('is-active');
-        // 모든 탭 콘텐츠 숨기기
-        $('.tab-content').hide();
-        
-        // 실시간 모니터링 탭으로 전환 시 이력조회 결과 숨기기
-        if (tabName === 'realtime') {
-            $('#ruHistoryResults').hide();
-        }
-        
-        // 선택된 탭 활성화
-        $('.tabs li[data-tab="' + tabName + '"]').addClass('is-active');
-        // 선택된 탭 콘텐츠 표시
-        $('#' + tabName + '-tab').show();
-    }
-    
-    // 탭 클릭 이벤트 바인딩
-    $('.tabs li').on('click', function(e) {
-        e.preventDefault();
-        const tab = $(this).data('tab');
-        switchTab(tab);
-    });
-    
-    // URL 파라미터로 탭 전환 (예: /resource?tab=history)
+    // 레거시 URL 파라미터 지원 (?tab=history)
     const urlParams = new URLSearchParams(window.location.search);
     const tabParam = urlParams.get('tab');
-    if (tabParam === 'history') {
-        switchTab('history');
+    if (tabParam === 'history' && window.location.pathname === '/resource') {
+        // 레거시 URL 리다이렉트
+        window.location.href = '/resource/history';
+        return;
+    }
+    
+    // URL 경로에 따라 섹션 표시/숨김
+    const path = window.location.pathname;
+    if (path === '/resource/history') {
+        $('#realtime-tab').hide();
+        $('#history-tab').show();
     } else {
-        // 기본값: 실시간 모니터링 탭 표시
-        switchTab('realtime');
+        $('#realtime-tab').show();
+        $('#history-tab').hide();
     }
 });
 </script>

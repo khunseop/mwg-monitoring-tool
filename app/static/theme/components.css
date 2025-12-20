@@ -77,14 +77,16 @@
 }
 
 .navbar-item.is-active::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    left: 0.75rem;
-    right: 0.75rem;
-    height: 2px;
-    background: var(--color-primary);
-    border-radius: 1px;
+    display: none;
+}
+
+/* 드롭다운 화살표 제거 */
+.navbar-link:not(.is-arrowless)::after {
+    display: none !important;
+}
+
+.navbar-link:not(.is-arrowless) {
+    padding-inline-end: 0.75rem !important;
 }
 
 /* Burger menu */
@@ -144,6 +146,15 @@
     
     .navbar-menu .navbar-item.is-active::after {
         display: none;
+    }
+    
+    /* 모바일에서도 드롭다운 화살표 제거 */
+    .navbar-menu .navbar-link:not(.is-arrowless)::after {
+        display: none !important;
+    }
+    
+    .navbar-menu .navbar-link:not(.is-arrowless) {
+        padding-inline-end: 0.75rem !important;
     }
     
     .navbar-menu .navbar-item.is-active {
