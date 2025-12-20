@@ -202,11 +202,26 @@ $(document).ready(function() {
         charts.updateChartHeight(newHeight);
     });
     
-    let allExpanded = false;
-    $('#ruToggleAllCharts').on('click', function() {
-        allExpanded = !allExpanded;
-        charts.toggleAllCharts(allExpanded);
-        $(this).text(allExpanded ? '전체 접기' : '전체 펼치기');
+    // 동적으로 생성되는 버튼이므로 이벤트 위임 사용
+    $(document).on('click', '#ruToggleAllCharts', function() {
+        const $panels = $('#ruChartsWrap .ru-chart-panel');
+        if ($panels.length === 0) return;
+        
+        let allCollapsed = true;
+        
+        // 현재 상태 확인 (HTML 속성에서 직접 읽기)
+        $panels.each(function() {
+            const isCollapsed = $(this).attr('data-collapsed') === 'true';
+            if (!isCollapsed) {
+                allCollapsed = false;
+                return false; // break
+            }
+        });
+        
+        // 모두 접혀있으면 펼치기, 그렇지 않으면 접기
+        const shouldExpand = allCollapsed;
+        charts.toggleAllCharts(shouldExpand);
+        $(this).text(shouldExpand ? '전체 접기' : '전체 펼치기');
     });
 
     // 모달 닫기 이벤트

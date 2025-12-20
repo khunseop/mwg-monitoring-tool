@@ -243,10 +243,48 @@
                 
                 // Remove existing chart panels but keep header
                 $wrap.find('.ru-chart-panel').parent().remove();
-                metrics.forEach(m => {
-                    // 인터페이스 차트는 기본적으로 펼쳐진 상태로 표시
-                    const isInterfaceChart = m.startsWith('if_');
-                    const isCollapsed = !isInterfaceChart; // 인터페이스는 펼침, 기본 메트릭은 접힘
+                $wrap.find('.ru-interface-separator').remove();
+                
+                // 기본 메트릭과 인터페이스 메트릭 분리
+                const basicMetricsList = metrics.filter(m => basicMetrics.includes(m));
+                const interfaceMetricsList = metrics.filter(m => m.startsWith('if_'));
+                
+                // 기본 메트릭 차트 생성 (모두 접힌 상태)
+                basicMetricsList.forEach(m => {
+                    const isCollapsed = true; // 모든 기본 메트릭은 접힌 상태
+                    const panel = `
+                        <div class="column is-6">
+                            <div class="ru-chart-panel" id="ruChartPanel-${m}" data-collapsed="${isCollapsed}" style="border:1px solid var(--border-color,#e5e7eb); border-radius:6px; padding:8px; margin-bottom:1rem;">
+                                <div class="level" style="margin-bottom:6px;">
+                                    <div class="level-left">
+                                        <h5 class="title is-6" style="margin:0; cursor:pointer;" data-metric="${m}">${titles[m]}</h5>
+                                    </div>
+                                    <div class="level-right">
+                                        <a class="button is-small ru-chart-toggle-btn" data-metric="${m}" title="접기/펼치기">${isCollapsed ? '▼' : '▲'}</a>
+                                        <a class="button is-small ru-chart-zoom-btn" data-metric="${m}" title="확대">확대</a>
+                                    </div>
+                                </div>
+                                <div class="ru-chart-content" id="ruChartContent-${m}" style="display:${isCollapsed ? 'none' : 'block'};">
+                                    <div id="ruApex-${m}" style="width:100%; height:${height}px;"></div>
+                                </div>
+                            </div>
+                        </div>`;
+                    $wrap.append(panel);
+                });
+                
+                // 인터페이스 메트릭 구분선 추가
+                if (interfaceMetricsList.length > 0) {
+                    const separator = `
+                        <div class="column is-12 ru-interface-separator" style="margin: 2rem 0 1rem 0;">
+                            <hr style="background-color: var(--border-color,#e5e7eb); height: 2px; border: none;">
+                            <h4 class="title is-5" style="margin-top: 1rem;">회선사용량 인터페이스</h4>
+                        </div>`;
+                    $wrap.append(separator);
+                }
+                
+                // 인터페이스 메트릭 차트 생성 (모두 접힌 상태)
+                interfaceMetricsList.forEach(m => {
+                    const isCollapsed = true; // 모든 인터페이스 메트릭도 접힌 상태
                     const panel = `
                         <div class="column is-6">
                             <div class="ru-chart-panel" id="ruChartPanel-${m}" data-collapsed="${isCollapsed}" style="border:1px solid var(--border-color,#e5e7eb); border-radius:6px; padding:8px; margin-bottom:1rem;">
@@ -397,6 +435,9 @@
                             }
                         },
                         mouseMove: function(event, chartContext, config) {
+                            if (!chartContext || !chartContext.w || !chartContext.w.globals || !chartContext.w.globals.dom || !chartContext.w.globals.dom.el) {
+                                return;
+                            }
                             if (config.seriesIndex < 0) {
                                 (chartContext.w.globals.series || []).forEach((s, i) => {
                                     chartContext.updateSeries([{ data: s }], false);
@@ -406,14 +447,25 @@
                             }
                             const seriesIndex = config.seriesIndex;
                             (chartContext.w.globals.series || []).forEach((s, i) => {
-                                const newOpacity = (i === seriesIndex) ? 1 : 0.3;
-                                chartContext.w.globals.dom.el.querySelector(`.apexcharts-series[seriesName="${s.name.replace(/"/g, '\\"')}"]`).style.opacity = newOpacity;
+                                const seriesEl = chartContext.w.globals.dom.el.querySelector(`.apexcharts-series[seriesName="${s.name.replace(/"/g, '\\"')}"]`);
+                                if (seriesEl) {
+                                    const newOpacity = (i === seriesIndex) ? 1 : 0.3;
+                                    seriesEl.style.opacity = newOpacity;
+                                }
                             });
                             chartContext.w.globals.dom.el.style.cursor = 'pointer';
                         },
                         mouseLeave: function(event, chartContext, config) {
-                            (chartContext.w.globals.series || []).forEach((s, i) => {
-                               chartContext.w.globals.dom.el.querySelector(`.apexcharts-series[seriesName="${s.name.replace(/"/g, '\\"')}"]`).style.opacity = 1;
+                            if (!chartContext || !chartContext.w || !chartContext.w.globals || !chartContext.w.globals.dom || !chartContext.w.globals.dom.el) {
+                                return;
+                            }
+                            const series = chartContext.w.globals.series || [];
+                            if (series.length === 0) return;
+                            series.forEach((s, i) => {
+                                const seriesEl = chartContext.w.globals.dom.el.querySelector(`.apexcharts-series[seriesName="${s.name.replace(/"/g, '\\"')}"]`);
+                                if (seriesEl) {
+                                    seriesEl.style.opacity = 1;
+                                }
                             });
                             chartContext.w.globals.dom.el.style.cursor = 'default';
                         }
@@ -498,21 +550,38 @@
         /**
          * 차트 접기/펼치기 토글
          * @param {string} metricKey - 메트릭 키
+         * @param {boolean} forceExpand - 강제로 펼치기 (undefined면 토글)
          */
-        toggleChart(metricKey) {
+        toggleChart(metricKey, forceExpand) {
             const $panel = $(`#ruChartPanel-${metricKey}`);
             const $content = $(`#ruChartContent-${metricKey}`);
             const $btn = $panel.find('.ru-chart-toggle-btn');
-            const isCollapsed = $panel.data('collapsed') === true;
             
-            if (isCollapsed) {
-                $content.slideDown(200);
-                $btn.text('▲');
-                $panel.data('collapsed', false);
+            if (!$panel.length || !$content.length) return;
+            
+            // forceExpand가 지정되면 그대로 사용, 없으면 현재 상태 확인 후 토글
+            let shouldCollapse;
+            if (forceExpand !== undefined) {
+                shouldCollapse = !forceExpand;
             } else {
+                // 현재 상태 확인 (HTML 속성에서 읽기)
+                const collapsedAttr = $panel.attr('data-collapsed');
+                const currentCollapsed = collapsedAttr === 'true';
+                shouldCollapse = !currentCollapsed;
+            }
+            
+            if (shouldCollapse) {
+                // 접기
                 $content.slideUp(200);
                 $btn.text('▼');
+                $panel.attr('data-collapsed', 'true');
                 $panel.data('collapsed', true);
+            } else {
+                // 펼치기
+                $content.slideDown(200);
+                $btn.text('▲');
+                $panel.attr('data-collapsed', 'false');
+                $panel.data('collapsed', false);
             }
         },
 
@@ -522,16 +591,31 @@
          */
         toggleAllCharts(expand) {
             const $panels = $('#ruChartsWrap .ru-chart-panel');
-            const self = this;
-            $panels.each(function() {
-                const metric = $(this).attr('id').replace('ruChartPanel-', '');
-                const isCollapsed = $(this).data('collapsed') === true;
-                if (expand === undefined) {
-                    self.toggleChart(metric);
-                } else if (expand && isCollapsed) {
-                    self.toggleChart(metric);
-                } else if (!expand && !isCollapsed) {
-                    self.toggleChart(metric);
+            if ($panels.length === 0) return;
+            
+            let shouldExpand;
+            
+            if (expand !== undefined) {
+                // expand 값이 지정되면 그대로 사용
+                shouldExpand = expand;
+            } else {
+                // expand가 undefined면 현재 상태 확인 후 토글
+                let allCollapsed = true;
+                $panels.each(function() {
+                    const isCollapsed = $(this).attr('data-collapsed') === 'true';
+                    if (!isCollapsed) {
+                        allCollapsed = false;
+                        return false; // break
+                    }
+                });
+                shouldExpand = allCollapsed;
+            }
+            
+            // 모든 차트를 한 번에 처리 (화살표 함수로 this 바인딩)
+            $panels.each((index, element) => {
+                const metric = $(element).attr('id').replace('ruChartPanel-', '');
+                if (metric) {
+                    this.toggleChart(metric, shouldExpand);
                 }
             });
         },
