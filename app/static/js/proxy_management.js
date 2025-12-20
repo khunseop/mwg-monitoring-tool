@@ -84,8 +84,8 @@ function loadProxies() {
                         <td>${proxy.description || ''}</td>
                         <td>
                             <div class="buttons">
-                                <button class="button is-secondary is-light" onclick="openModal('proxy', ${proxy.id})">수정</button>
-                                <button class="button is-danger is-light" onclick="deleteProxy(${proxy.id})">삭제</button>
+                                <button class="button is-light" onclick="openModal('proxy', ${proxy.id})">수정</button>
+                                <button class="button is-danger" onclick="deleteProxy(${proxy.id})">삭제</button>
                             </div>
                         </td>
                     </tr>
@@ -170,8 +170,8 @@ function loadGroups() {
                         <td>${group.proxies_count}</td>
                         <td>
                             <div class="buttons">
-                                <button class="button is-secondary is-light" onclick="openModal('group', ${group.id})">수정</button>
-                                <button class="button is-danger is-light" onclick="deleteGroup(${group.id})">삭제</button>
+                                <button class="button is-light" onclick="openModal('group', ${group.id})">수정</button>
+                                <button class="button is-danger" onclick="deleteGroup(${group.id})">삭제</button>
                             </div>
                         </td>
                     </tr>

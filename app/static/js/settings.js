@@ -85,7 +85,7 @@ function addInterfaceRow(name = '', oids = {}, threshold = '', bandwidth = '') {
             </div>
             <div class="field is-grouped is-grouped-right">
                 <div class="control">
-                    <button class="button is-danger is-light is-small remove-interface" type="button">삭제</button>
+                    <button class="button is-danger is-small remove-interface" type="button">삭제</button>
                 </div>
             </div>
         </div>
