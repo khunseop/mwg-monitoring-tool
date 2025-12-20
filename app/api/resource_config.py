@@ -116,6 +116,12 @@ def update_resource_config(payload: ResourceConfigBase, db: Session = Depends(ge
     cfg.oids_json = json.dumps(merged)
     db.commit()
     db.refresh(cfg)
+    # Invalidate interface config cache when config is updated
+    try:
+        from app.api.resource_usage import _invalidate_interface_config_cache
+        _invalidate_interface_config_cache()
+    except Exception:
+        pass  # Non-fatal if cache invalidation fails
     # Build response splitting embedded thresholds, interface_oids, interface_thresholds, interface_bandwidths, and bandwidth_mbps back out
     oids_out = json.loads(cfg.oids_json or '{}')
     thresholds_out = {}

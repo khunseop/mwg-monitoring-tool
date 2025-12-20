@@ -166,3 +166,16 @@ def migrate_legacy_proxy_passwords():
 
 
 # (removed) one-time startup cleanup for legacy accumulated rows
+
+# Start retention policy background task on startup
+@app.on_event("startup")
+async def start_background_tasks():
+    from app.utils.background_collector import background_collector
+    # Start retention policy task (runs every hour)
+    await background_collector.start_retention_policy(interval_sec=3600)
+
+@app.on_event("shutdown")
+async def stop_background_tasks():
+    from app.utils.background_collector import background_collector
+    # Stop retention policy task
+    await background_collector.stop_retention_policy()

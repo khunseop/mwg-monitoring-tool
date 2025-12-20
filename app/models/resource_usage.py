@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, Text, Index
 from sqlalchemy.orm import relationship
 from app.database.database import Base
 from app.utils.time import now_kst
@@ -6,6 +6,9 @@ from app.utils.time import now_kst
 
 class ResourceUsage(Base):
     __tablename__ = "resource_usage"
+    __table_args__ = (
+        Index('idx_resource_usage_proxy_collected', 'proxy_id', 'collected_at'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     proxy_id = Column(Integer, ForeignKey("proxies.id", ondelete="CASCADE"), nullable=False, index=True)

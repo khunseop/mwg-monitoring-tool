@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Tuple, Optional
+import time
 from datetime import timedelta, datetime, timezone
 import asyncio
 from asyncio import Semaphore
@@ -48,6 +49,10 @@ COUNTER32_MAX = 4294967295  # 2^32 - 1
 
 # Cache for previous counter values: {(proxy_id, interface_name): (counter_value, timestamp)} for OID-based collection
 _INTERFACE_COUNTER_CACHE: Dict[Tuple[int, str], Tuple[int, float]] = {}
+
+# Cache for interface config: (interface_oids, interface_thresholds, config_updated_at)
+_INTERFACE_CONFIG_CACHE: Optional[Tuple[Dict[str, Dict[str, str]], Dict[str, float], float]] = None
+_INTERFACE_CONFIG_CACHE_LOCK = asyncio.Lock()
 
 
 async def _snmp_get(host: str, port: int, community: str, oid: str, timeout_sec: int = 2) -> float | None:
@@ -396,12 +401,39 @@ async def _ssh_get_mem_percent(proxy: Proxy, spec: str, timeout_sec: int = _SSH_
     return value
 
 
+def _invalidate_interface_config_cache():
+    """Invalidate the interface config cache (call when config is updated)"""
+    global _INTERFACE_CONFIG_CACHE
+    _INTERFACE_CONFIG_CACHE = None
+    logger.debug("[resource_usage] Interface config cache invalidated")
+
+
 def _get_interface_config_from_db(db: Session) -> Tuple[Dict[str, Dict[str, str]], Dict[str, float]]:
-    """Get interface_oids and interface_thresholds from resource config"""
+    """Get interface_oids and interface_thresholds from resource config (with caching)"""
+    global _INTERFACE_CONFIG_CACHE
+    
     try:
+        # Check cache first
+        if _INTERFACE_CONFIG_CACHE is not None:
+            interface_oids, interface_thresholds, cached_at = _INTERFACE_CONFIG_CACHE
+            # Verify cache is still valid by checking config updated_at
+            cfg = db.query(ResourceConfigModel).order_by(ResourceConfigModel.id.asc()).first()
+            if cfg and cfg.updated_at:
+                # Convert datetime to timestamp for comparison
+                cfg_updated_ts = cfg.updated_at.timestamp() if hasattr(cfg.updated_at, 'timestamp') else time.mktime(cfg.updated_at.timetuple())
+                if cfg_updated_ts <= cached_at:
+                    logger.debug("[resource_usage] Using cached interface config")
+                    return interface_oids, interface_thresholds
+                else:
+                    logger.debug("[resource_usage] Cache expired, refreshing interface config")
+                    _INTERFACE_CONFIG_CACHE = None
+        
+        # Cache miss or expired - fetch from DB
         cfg = db.query(ResourceConfigModel).order_by(ResourceConfigModel.id.asc()).first()
         if not cfg:
+            _INTERFACE_CONFIG_CACHE = ({}, {}, time.time())
             return {}, {}
+        
         oids = json.loads(cfg.oids_json or '{}')
         interface_oids = {}
         interface_thresholds = {}
@@ -418,6 +450,13 @@ def _get_interface_config_from_db(db: Session) -> Tuple[Dict[str, Dict[str, str]
                         interface_oids[if_name] = oid_value
             if isinstance(oids.get('__interface_thresholds__'), dict):
                 interface_thresholds = oids.get('__interface_thresholds__') or {}
+        
+        # Update cache
+        import time
+        cache_timestamp = cfg.updated_at.timestamp() if cfg.updated_at and hasattr(cfg.updated_at, 'timestamp') else time.time()
+        _INTERFACE_CONFIG_CACHE = (interface_oids, interface_thresholds, cache_timestamp)
+        logger.debug(f"[resource_usage] Cached interface config: {len(interface_oids)} interfaces")
+        
         return interface_oids, interface_thresholds
     except Exception as e:
         logger.debug(f"[resource_usage] Failed to get interface config from db: {e}")
@@ -613,7 +652,7 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
         return CollectResponse(requested=0, succeeded=0, failed=0, errors={}, items=[])
 
     errors: Dict[int, str] = {}
-    collected_models: List[ResourceUsageModel] = []
+    collected_data: List[dict] = []
 
     # Get interface_oids from config
     interface_oids, _ = _get_interface_config_from_db(db)
@@ -621,6 +660,8 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
     # Gather all SNMP collection tasks
     tasks = [_collect_for_proxy(p, payload.oids, payload.community, db=db, interface_oids=interface_oids) for p in proxies]
     results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    collected_at_ts = now_kst()
     
     for proxy, result in zip(proxies, results):
         try:
@@ -635,28 +676,55 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
             interface_mbps_data = metrics.get("interface_mbps")
             interface_mbps_json = json.dumps(interface_mbps_data) if interface_mbps_data else None
             
-            model = ResourceUsageModel(
-                proxy_id=proxy_id,
-                cpu=metrics.get("cpu"),
-                mem=metrics.get("mem"),
-                cc=metrics.get("cc"),
-                cs=metrics.get("cs"),
-                http=metrics.get("http"),
-                https=metrics.get("https"),
-                ftp=metrics.get("ftp"),
-                interface_mbps=interface_mbps_json,
-                community=payload.community,
-                oids_raw=json.dumps(payload.oids),
-                collected_at=now_kst(),
-            )
-            db.add(model)
-            collected_models.append(model)
+            # Prepare data for bulk insert
+            collected_data.append({
+                "proxy_id": proxy_id,
+                "cpu": metrics.get("cpu"),
+                "mem": metrics.get("mem"),
+                "cc": metrics.get("cc"),
+                "cs": metrics.get("cs"),
+                "http": metrics.get("http"),
+                "https": metrics.get("https"),
+                "ftp": metrics.get("ftp"),
+                "interface_mbps": interface_mbps_json,
+                "community": payload.community,
+                "oids_raw": json.dumps(payload.oids),
+                "collected_at": collected_at_ts,
+                "created_at": collected_at_ts,
+                "updated_at": collected_at_ts,
+            })
         except Exception as e:
             errors[proxy.id] = str(e)
 
-    db.commit()
-    for model in collected_models:
-        db.refresh(model)
+    # Bulk insert for better performance
+    collected_models: List[ResourceUsageModel] = []
+    if collected_data:
+        try:
+            db.bulk_insert_mappings(ResourceUsageModel, collected_data)
+            db.commit()
+            # Refresh models to get IDs (for response)
+            # Note: bulk_insert_mappings doesn't return IDs, so we query them back
+            for data in collected_data:
+                model = db.query(ResourceUsageModel).filter(
+                    ResourceUsageModel.proxy_id == data["proxy_id"],
+                    ResourceUsageModel.collected_at == data["collected_at"]
+                ).order_by(ResourceUsageModel.id.desc()).first()
+                if model:
+                    collected_models.append(model)
+        except Exception as e:
+            logger.error(f"[resource_usage] Bulk insert failed, falling back to individual inserts: {e}")
+            db.rollback()
+            # Fallback to individual inserts
+            for data in collected_data:
+                try:
+                    model = ResourceUsageModel(**data)
+                    db.add(model)
+                    collected_models.append(model)
+                except Exception as e2:
+                    logger.error(f"[resource_usage] Failed to insert record: {e2}")
+            db.commit()
+            for model in collected_models:
+                db.refresh(model)
 
     # Enforce 90-day retention after successful commit
     _enforce_resource_usage_retention(db, days=90)

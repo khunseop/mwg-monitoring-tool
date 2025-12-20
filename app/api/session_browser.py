@@ -378,9 +378,11 @@ def _load_latest_rows_for_proxies(db: Session, target_ids: List[int]) -> List[Di
     if target_ids:
         for p in db.query(Proxy).filter(Proxy.id.in_(target_ids)).all():
             host_map[p.id] = p.host
-    rows: List[Dict[str, Any]] = []
-    for pid in target_ids:
+    
+    def _read_and_process_proxy(pid: int) -> List[Dict[str, Any]]:
+        """Read and process records for a single proxy"""
         batch = temp_store.read_latest(pid)
+        proxy_rows: List[Dict[str, Any]] = []
         for idx, rec in enumerate(batch):
             r = dict(rec)
             r.setdefault("proxy_id", pid)
@@ -393,7 +395,31 @@ def _load_latest_rows_for_proxies(db: Session, target_ids: List[int]) -> List[Di
                     r["client_ip"] = cip.strip().rsplit(":", 1)[0]
             except Exception:
                 pass
-            rows.append(r)
+            proxy_rows.append(r)
+        return proxy_rows
+    
+    # Read from multiple proxies in parallel using ThreadPoolExecutor
+    rows: List[Dict[str, Any]] = []
+    if len(target_ids) > 1:
+        # Use parallel reading for multiple proxies
+        with ThreadPoolExecutor(max_workers=min(len(target_ids), 8)) as executor:
+            futures = {executor.submit(_read_and_process_proxy, pid): pid for pid in target_ids}
+            for future in as_completed(futures):
+                try:
+                    proxy_rows = future.result()
+                    rows.extend(proxy_rows)
+                except Exception as e:
+                    pid = futures[future]
+                    logger.warning(f"[session_browser] Failed to load data for proxy {pid}: {e}")
+    else:
+        # Single proxy: no need for parallel processing
+        for pid in target_ids:
+            try:
+                proxy_rows = _read_and_process_proxy(pid)
+                rows.extend(proxy_rows)
+            except Exception as e:
+                logger.warning(f"[session_browser] Failed to load data for proxy {pid}: {e}")
+    
     return rows
 
 

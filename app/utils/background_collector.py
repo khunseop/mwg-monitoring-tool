@@ -24,6 +24,8 @@ class BackgroundCollector:
         self._websocket_clients: Set[Any] = set()
         self._collection_status: Dict[str, dict] = {}  # {task_id: {status, started_at, ...}}
         self._lock = asyncio.Lock()
+        self._retention_task: Optional[asyncio.Task] = None
+        self._retention_interval_sec = 3600  # 1시간마다 실행
     
     async def register_websocket(self, websocket):
         """웹소켓 클라이언트 등록"""
@@ -193,7 +195,7 @@ class BackgroundCollector:
                 return {"requested": 0, "succeeded": 0, "failed": 0, "errors": {}}
             
             errors: Dict[int, str] = {}
-            collected_models: list[ResourceUsageModel] = []
+            collected_data: list[dict] = []
             
             # Get interface_oids from config
             interface_oids, _ = _get_interface_config_from_db(db)
@@ -201,6 +203,9 @@ class BackgroundCollector:
             # 비동기 수집 실행
             tasks = [_collect_for_proxy(p, oids, community, db=db, interface_oids=interface_oids) for p in proxies]
             results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            import json as json_lib
+            collected_at_ts = now_kst()
             
             for proxy, result in zip(proxies, results):
                 try:
@@ -212,7 +217,6 @@ class BackgroundCollector:
                         errors[proxy_id] = err
                         continue
                     
-                    import json as json_lib
                     interface_mbps_data = metrics.get("interface_mbps")
                     interface_mbps_json = json_lib.dumps(interface_mbps_data) if interface_mbps_data else None
                     
@@ -223,41 +227,56 @@ class BackgroundCollector:
                     else:
                         logger.debug(f"[BackgroundCollector] No interface data for proxy_id={proxy_id}")
                     
-                    model = ResourceUsageModel(
-                        proxy_id=proxy_id,
-                        cpu=metrics.get("cpu"),
-                        mem=metrics.get("mem"),
-                        cc=metrics.get("cc"),
-                        cs=metrics.get("cs"),
-                        http=metrics.get("http"),
-                        https=metrics.get("https"),
-                        ftp=metrics.get("ftp"),
-                        interface_mbps=interface_mbps_json,
-                        community=community,
-                        oids_raw=json_lib.dumps(oids),
-                        collected_at=now_kst(),
-                    )
-                    db.add(model)
-                    collected_models.append(model)
+                    # Prepare data for bulk insert
+                    collected_data.append({
+                        "proxy_id": proxy_id,
+                        "cpu": metrics.get("cpu"),
+                        "mem": metrics.get("mem"),
+                        "cc": metrics.get("cc"),
+                        "cs": metrics.get("cs"),
+                        "http": metrics.get("http"),
+                        "https": metrics.get("https"),
+                        "ftp": metrics.get("ftp"),
+                        "interface_mbps": interface_mbps_json,
+                        "community": community,
+                        "oids_raw": json_lib.dumps(oids),
+                        "collected_at": collected_at_ts,
+                        "created_at": collected_at_ts,
+                        "updated_at": collected_at_ts,
+                    })
                     
                     # 저장 전 데이터 확인 로그
-                    logger.debug(f"[BackgroundCollector] Saving data for proxy_id={proxy_id}: "
+                    logger.debug(f"[BackgroundCollector] Preparing data for proxy_id={proxy_id}: "
                                f"cpu={metrics.get('cpu')}, mem={metrics.get('mem')}, "
                                f"http={metrics.get('http')}, https={metrics.get('https')}, ftp={metrics.get('ftp')}, "
                                f"interface_mbps={'present' if interface_mbps_json else 'none'}")
                 except Exception as e:
                     errors[proxy.id] = str(e)
             
-            db.commit()
-            for model in collected_models:
-                db.refresh(model)
+            # Bulk insert for better performance
+            if collected_data:
+                try:
+                    db.bulk_insert_mappings(ResourceUsageModel, collected_data)
+                    db.commit()
+                    logger.info(f"[BackgroundCollector] Bulk inserted {len(collected_data)} records to database "
+                             f"(requested={len(proxies)}, failed={len(errors)})")
+                except Exception as e:
+                    logger.error(f"[BackgroundCollector] Bulk insert failed, falling back to individual inserts: {e}")
+                    db.rollback()
+                    # Fallback to individual inserts
+                    for data in collected_data:
+                        try:
+                            model = ResourceUsageModel(**data)
+                            db.add(model)
+                        except Exception as e2:
+                            logger.error(f"[BackgroundCollector] Failed to insert record: {e2}")
+                    db.commit()
             
             # 저장 완료 로그
             logger.info(f"[BackgroundCollector] Saved {len(collected_models)} records to database "
                        f"(requested={len(proxies)}, failed={len(errors)})")
             
-            # 90일 보관 정책 적용
-            _enforce_resource_usage_retention(db, days=90)
+            # 보존 정책은 별도 백그라운드 작업에서 처리 (매 수집마다 실행하지 않음)
             
             return {
                 "requested": len(proxies),
@@ -280,6 +299,49 @@ class BackgroundCollector:
     def is_running(self, task_id: str) -> bool:
         """작업 실행 중 여부 확인"""
         return task_id in self._running_tasks
+    
+    async def start_retention_policy(self, interval_sec: int = 3600):
+        """보존 정책 백그라운드 작업 시작 (기본 1시간마다 실행)"""
+        if self._retention_task is not None and not self._retention_task.done():
+            logger.info("[BackgroundCollector] Retention policy task already running")
+            return
+        
+        self._retention_interval_sec = interval_sec
+        self._retention_task = asyncio.create_task(self._periodic_retention())
+        logger.info(f"[BackgroundCollector] Started retention policy task (interval={interval_sec}s)")
+    
+    async def stop_retention_policy(self):
+        """보존 정책 백그라운드 작업 중지"""
+        if self._retention_task is not None:
+            self._retention_task.cancel()
+            try:
+                await self._retention_task
+            except asyncio.CancelledError:
+                pass
+            self._retention_task = None
+            logger.info("[BackgroundCollector] Stopped retention policy task")
+    
+    async def _periodic_retention(self):
+        """주기적으로 보존 정책 실행"""
+        import time
+        from app.api.resource_usage import _enforce_resource_usage_retention
+        
+        try:
+            while True:
+                await asyncio.sleep(self._retention_interval_sec)
+                
+                db = SessionLocal()
+                try:
+                    logger.info("[BackgroundCollector] Running retention policy (90 days)")
+                    _enforce_resource_usage_retention(db, days=90)
+                    logger.info("[BackgroundCollector] Retention policy completed")
+                except Exception as e:
+                    logger.error(f"[BackgroundCollector] Retention policy error: {e}", exc_info=True)
+                finally:
+                    db.close()
+        except asyncio.CancelledError:
+            logger.info("[BackgroundCollector] Retention policy task cancelled")
+            raise
 
 
 # 전역 인스턴스

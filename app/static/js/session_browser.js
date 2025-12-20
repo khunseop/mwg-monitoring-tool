@@ -194,65 +194,21 @@ $(document).ready(function() {
         var proxyIds = getSelectedProxyIds();
         if (proxyIds.length === 0) {
             if (sb.gridApi) {
-                sb.gridApi.setGridOption('rowData', []);
+                // Server-side model: refresh to clear data
+                if (sb.gridApi.refreshServerSide) {
+                    sb.gridApi.refreshServerSide({ purge: true });
+                } else {
+                    sb.gridApi.setGridOption('rowData', []);
+                }
             }
             hideLoading();
             return;
         }
 
-        showLoading();
-        // 모든 데이터를 한 번에 불러와서 클라이언트사이드에서 처리
-        $.ajax({
-            url: '/api/session-browser/datatables',
-            method: 'GET',
-            data: {
-                startRow: 0,
-                endRow: 10000, // 충분히 큰 값으로 모든 데이터 가져오기
-                proxy_ids: proxyIds.join(',')
-            }
-        }).done(function(response) {
-            if (sb.gridApi) {
-                // 데이터 변환 (ag-grid 형식으로)
-                var rowData = (response.rowData || []).map(function(rec) {
-                    return {
-                        host: rec.host || '',
-                        creation_time: rec.creation_time || '',
-                        protocol: rec.protocol || '',
-                        user_name: rec.user_name || '',
-                        client_ip: rec.client_ip || '',
-                        server_ip: rec.server_ip || '',
-                        cl_bytes_received: rec.cl_bytes_received,
-                        cl_bytes_sent: rec.cl_bytes_sent,
-                        age_seconds: rec.age_seconds,
-                        url: rec.url || '',
-                        id: rec.id
-                    };
-                });
-                sb.gridApi.setGridOption('rowData', rowData);
-                // 컬럼 너비 자동 조절 (헤더 텍스트가 잘리지 않도록)
-                setTimeout(function() {
-                    if (sb.gridApi) {
-                        var allColumnIds = [];
-                        sb.gridApi.getColumns().forEach(function(column) {
-                            if (column.getColDef().field !== 'id') {
-                                allColumnIds.push(column.getColId());
-                            }
-                        });
-                        if (sb.gridApi.autoSizeColumns) {
-                            sb.gridApi.autoSizeColumns(allColumnIds, { skipHeader: false });
-                        } else if (sb.gridApi.sizeColumnsToFit) {
-                            sb.gridApi.sizeColumnsToFit();
-                        }
-                    }
-                }, 200);
-            }
-            hideLoading();
-        }).fail(function() {
-            if (sb.gridApi) {
-                sb.gridApi.setGridOption('rowData', []);
-            }
-            hideLoading();
-        });
+        // Server-side model: refresh to reload data
+        if (sb.gridApi && sb.gridApi.refreshServerSide) {
+            sb.gridApi.refreshServerSide({ purge: true });
+        }
     }
 
     function initTable() {
@@ -260,7 +216,6 @@ $(document).ready(function() {
         try {
             var gridOptions = {
                 columnDefs: AgGridConfig.getSessionBrowserColumns(),
-                rowData: [],
                 defaultColDef: {
                     sortable: true,
                     filter: 'agTextColumnFilter',
@@ -268,15 +223,65 @@ $(document).ready(function() {
                     resizable: true,
                     minWidth: 100
                 },
-                rowModelType: 'clientSide',
+                rowModelType: 'serverSide',
+                serverSideInfiniteScroll: false,
+                cacheBlockSize: 100,
                 pagination: true,
-                paginationPageSize: 25,
+                paginationPageSize: 100,
                 enableFilter: true,
                 enableSorting: true,
                 animateRows: false,
                 suppressRowClickSelection: false,
                 headerHeight: 50,
                 overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">표시할 세션이 없습니다.<br><small style="margin-top: 8px; display: block;">프록시를 선택하고 "세션 불러오기" 버튼을 클릭하세요.</small></div>',
+                getRows: function(params) {
+                    // Server-side data loading
+                    var proxyIds = getSelectedProxyIds();
+                    if (proxyIds.length === 0) {
+                        params.success({ rowData: [], rowCount: 0 });
+                        return;
+                    }
+
+                    showLoading();
+                    
+                    // Build request parameters
+                    var requestParams = {
+                        startRow: params.request.startRow || 0,
+                        endRow: (params.request.startRow || 0) + (params.request.endRow || 100),
+                        proxy_ids: proxyIds.join(',')
+                    };
+                    
+                    // Add sorting
+                    if (params.request.sortModel && params.request.sortModel.length > 0) {
+                        requestParams.sortModel = JSON.stringify(params.request.sortModel);
+                    }
+                    
+                    // Add filtering
+                    if (params.request.filterModel && Object.keys(params.request.filterModel).length > 0) {
+                        requestParams.filterModel = JSON.stringify(params.request.filterModel);
+                    }
+                    
+                    // Add quick filter
+                    if (params.request.quickFilterText) {
+                        requestParams.quickFilterText = params.request.quickFilterText;
+                    }
+                    
+                    $.ajax({
+                        url: '/api/session-browser/datatables',
+                        method: 'GET',
+                        data: requestParams
+                    }).done(function(response) {
+                        hideLoading();
+                        params.success({
+                            rowData: response.rowData || [],
+                            rowCount: response.rowCount || 0
+                        });
+                        updateFilterCount();
+                    }).fail(function() {
+                        hideLoading();
+                        params.fail();
+                    });
+                },
                 onGridReady: function(params) {
                     sb.gridApi = params.api;
                     if (params.columnApi) {
@@ -311,12 +316,9 @@ $(document).ready(function() {
                         .fail(function(){ showErr('상세를 불러오지 못했습니다.'); });
                 },
                 onFilterChanged: function() {
-                    // 필터 변경 시 로딩 인디케이터 표시 (필터링은 클라이언트사이드에서 즉시 처리되므로 짧게 표시)
+                    // 필터 변경 시 서버 사이드에서 처리되므로 로딩만 표시
                     showLoading();
                     updateFilterCount();
-                    setTimeout(function() {
-                        hideLoading();
-                    }, 100);
                 }
             };
 
