@@ -238,6 +238,48 @@
 		}
 	}
 
+	function updateFilterCount() {
+		if (!tlGridApi) return;
+		try {
+			var filterModel = tlGridApi.getFilterModel();
+			var filterCount = 0;
+			if (filterModel) {
+				// 필터 모델에서 실제로 값이 있는 필터의 수를 계산
+				for (var colId in filterModel) {
+					if (filterModel.hasOwnProperty(colId)) {
+						var filter = filterModel[colId];
+						// 필터가 있고 값이 있는지 확인
+						if (filter && typeof filter === 'object') {
+							// agTextColumnFilter의 경우 filter 속성 확인
+							if (filter.filter && String(filter.filter).trim() !== '') {
+								filterCount++;
+							}
+							// agNumberColumnFilter의 경우 filter, filterTo, filterTo 등 확인
+							else if (filter.filter !== undefined && filter.filter !== null && filter.filter !== '') {
+								filterCount++;
+							}
+							else if (filter.filterTo !== undefined && filter.filterTo !== null && filter.filterTo !== '') {
+								filterCount++;
+							}
+							else if (filter.type && filter.type !== 'equals') {
+								// 다른 필터 타입들
+								filterCount++;
+							}
+						}
+					}
+				}
+			}
+			var $filterCount = $('#tlFilterCount');
+			if (filterCount > 0) {
+				$filterCount.text('필터: ' + filterCount).show();
+			} else {
+				$filterCount.hide();
+			}
+		} catch (e) {
+			console.error('Failed to update filter count:', e);
+		}
+	}
+
 	function renderParsed(records){
 		destroyTableIfExists();
 		
@@ -290,9 +332,13 @@
 						}
 					}
 				}, 200);
+				updateFilterCount();
 			},
 			onRowClicked: function(params) {
 				showDetail(params.data || {});
+			},
+			onFilterChanged: function() {
+				updateFilterCount();
 			}
 		};
 
@@ -459,6 +505,7 @@
 				tlGridApi.setFilterModel(null);
 				tlGridApi.setGridOption('quickFilterText', '');
 				$('#tlQuickFilter').val('');
+				updateFilterCount();
 			}
 		});
 		

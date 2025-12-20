@@ -81,6 +81,48 @@ $(document).ready(function() {
         try { if (sb.gridApi && sb.gridApi.sizeColumnsToFit) { sb.gridApi.sizeColumnsToFit(); } } catch (e) { /* ignore */ }
     }
 
+    function updateFilterCount() {
+        if (!sb.gridApi) return;
+        try {
+            var filterModel = sb.gridApi.getFilterModel();
+            var filterCount = 0;
+            if (filterModel) {
+                // 필터 모델에서 실제로 값이 있는 필터의 수를 계산
+                for (var colId in filterModel) {
+                    if (filterModel.hasOwnProperty(colId)) {
+                        var filter = filterModel[colId];
+                        // 필터가 있고 값이 있는지 확인
+                        if (filter && typeof filter === 'object') {
+                            // agTextColumnFilter의 경우 filter 속성 확인
+                            if (filter.filter && String(filter.filter).trim() !== '') {
+                                filterCount++;
+                            }
+                            // agNumberColumnFilter의 경우 filter, filterTo, filterTo 등 확인
+                            else if (filter.filter !== undefined && filter.filter !== null && filter.filter !== '') {
+                                filterCount++;
+                            }
+                            else if (filter.filterTo !== undefined && filter.filterTo !== null && filter.filterTo !== '') {
+                                filterCount++;
+                            }
+                            else if (filter.type && filter.type !== 'equals') {
+                                // 다른 필터 타입들
+                                filterCount++;
+                            }
+                        }
+                    }
+                }
+            }
+            var $filterCount = $('#sbFilterCount');
+            if (filterCount > 0) {
+                $filterCount.text('필터: ' + filterCount).show();
+            } else {
+                $filterCount.hide();
+            }
+        } catch (e) {
+            console.error('Failed to update filter count:', e);
+        }
+    }
+
     function saveState(itemsForSave) {
         var prevItems;
         try {
@@ -261,7 +303,7 @@ $(document).ready(function() {
                     // 초기 데이터 로드
                     loadGridData();
                 },
-                onRowClicked: function(params) {
+                onRowDoubleClicked: function(params) {
                     var itemId = params.data.id;
                     if (!itemId) return;
                     $.getJSON('/api/session-browser/item/' + itemId)
@@ -271,6 +313,7 @@ $(document).ready(function() {
                 onFilterChanged: function() {
                     // 필터 변경 시 로딩 인디케이터 표시 (필터링은 클라이언트사이드에서 즉시 처리되므로 짧게 표시)
                     showLoading();
+                    updateFilterCount();
                     setTimeout(function() {
                         hideLoading();
                     }, 100);
@@ -379,6 +422,7 @@ $(document).ready(function() {
             sb.gridApi.setFilterModel(null);
             sb.gridApi.setGridOption('quickFilterText', '');
             $('#sbQuickFilter').val('');
+            updateFilterCount();
         }
     });
     
