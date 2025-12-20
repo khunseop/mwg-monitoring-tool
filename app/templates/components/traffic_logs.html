@@ -120,7 +120,7 @@
 			<div class="level-right">
 				<div class="level-item">
 					<div class="buttons">
-						<button class="button is-primary" id="tlaAnalyzeBtn">업로드 분석</button>
+						<button class="button is-primary" id="tlaAnalyzeBtn">통계 분석</button>
 						<span id="tlaStatus" class="tag is-light ml-2">대기</span>
 					</div>
 				</div>
@@ -170,6 +170,38 @@
 				<div class="column is-3"><div class="box has-text-centered"><p class="heading">로그 종료 시간</p><p class="title is-6" id="tlaTimeEnd">-</p></div></div>
 			</div>
 		</div>
+	</div>
+
+	<!-- 파싱된 로그 그리드 섹션 -->
+	<div id="tlaGridWrap" class="box mb-4" style="display:none;">
+		<div class="level mb-4">
+			<div class="level-left">
+				<div class="level-item">
+					<h4 class="title is-5 mb-0">파싱된 로그</h4>
+				</div>
+			</div>
+			<div class="level-right">
+				<div class="level-item">
+					<div class="field has-addons">
+						<div class="control">
+							<input class="input is-small" type="text" id="tlaQuickFilter" placeholder="전체 검색..." style="width: 200px;">
+						</div>
+						<div class="control">
+							<button class="button is-small" id="tlaClearFilters" title="모든 필터 삭제">
+								<span>필터 초기화</span>
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="sb-table-wrap" style="height: 1200px;">
+			<div id="tlaTableGrid" style="height: 100%; width: 100%;"></div>
+		</div>
+	</div>
+	
+	<div id="tlaEmptyState" class="box empty-state mb-4" style="display:none;">
+		표시할 로그가 없습니다. 파일을 선택하고 "통계 분석" 버튼을 클릭하세요.
 	</div>
 
 	<!-- 차트 섹션 -->

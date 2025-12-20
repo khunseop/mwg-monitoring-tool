@@ -135,10 +135,12 @@
         </div>
     </div>
 
-    <!-- 인터페이스 OID 설정 섹션 -->
+    <!-- 인터페이스 설정 섹션 (통합: OID, 임계치, 대역폭) -->
     <div class="box mb-4">
-        <h4 class="title is-5 mb-4">인터페이스 OID 설정</h4>
-        <p class="mb-4" style="color: var(--color-text-muted);">모니터링할 인터페이스를 추가하세요. 각 인터페이스는 이름과 IN/OUT OID를 입력합니다.</p>
+        <h4 class="title is-5 mb-4">인터페이스 설정</h4>
+        <p class="mb-4" style="color: var(--color-text-muted);">
+            모니터링할 인터페이스를 추가하세요. 각 인터페이스의 이름, IN/OUT OID, 임계치, 대역폭을 한 번에 설정할 수 있습니다.
+        </p>
         <div id="cfgInterfaceList">
             <!-- 동적으로 추가됨 -->
         </div>
@@ -147,19 +149,12 @@
         </div>
     </div>
 
-    <!-- 인터페이스 임계치 설정 섹션 -->
-    <div class="box mb-4">
-        <h4 class="title is-5 mb-4">인터페이스 임계치 설정</h4>
-        <p class="mb-4" style="color: var(--color-text-muted);">각 인터페이스의 경고 임계치를 설정합니다. 비워두면 자동 스케일링만 사용합니다.</p>
-        <div id="cfgInterfaceThresholdList">
-            <!-- 동적으로 추가됨 -->
-        </div>
-    </div>
-
-    <!-- 회선 대역폭 설정 섹션 -->
+    <!-- 회선 대역폭 설정 섹션 (전체 기본값) -->
     <div class="box">
-        <h4 class="title is-5 mb-4">회선 대역폭 설정</h4>
-        <p class="mb-4" style="color: var(--color-text-muted);">프록시 트래픽 계산에 사용할 회선 대역폭을 설정합니다.</p>
+        <h4 class="title is-5 mb-4">회선 대역폭 설정 (기본값)</h4>
+        <p class="mb-4" style="color: var(--color-text-muted);">
+            프록시 트래픽 계산에 사용할 기본 회선 대역폭을 설정합니다. 인터페이스별로 대역폭을 설정하지 않은 경우 이 값이 사용됩니다.
+        </p>
         <div class="field">
             <label class="label">회선 대역폭 (Mbps)</label>
             <div class="control">

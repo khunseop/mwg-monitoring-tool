@@ -167,6 +167,7 @@ async def analyze_traffic_log_upload(
 	unique_hosts: set[str] = set()
 	earliest_dt = None
 	latest_dt = None
+	parsed_records: List[Dict[str, Any]] = []  # 파싱된 레코드 저장
 
 	# Stream decode lines from the uploaded file without additional wrappers
 	try:
@@ -179,6 +180,8 @@ async def analyze_traffic_log_upload(
 			try:
 				rec = parse_log_line(line)
 				parsed_lines += 1
+				# 파싱된 레코드 저장 (그리드 표시용)
+				parsed_records.append(rec)
 			except Exception:
 				unparsed_lines += 1
 				continue
@@ -279,6 +282,7 @@ async def analyze_traffic_log_upload(
 			"hosts_by_download_bytes": top_n(host_recv_bytes, topN),
 			"hosts_by_upload_bytes": top_n(host_sent_bytes, topN),
 		},
+		"records": parsed_records,  # 파싱된 레코드 배열 추가
 	}
 
 	return result

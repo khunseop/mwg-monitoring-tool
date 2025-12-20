@@ -56,6 +56,9 @@
 		});
 		$('#tlDetailModal').addClass('is-active');
 	}
+	
+	// 전역 함수로 노출 (traffic_logs_analyze.js에서 사용)
+	window.showTrafficLogDetail = showDetail;
 
 	// localStorage helpers for persistence
 	function tryWriteState(state){

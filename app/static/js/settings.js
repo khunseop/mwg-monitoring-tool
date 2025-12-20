@@ -35,36 +35,57 @@ document.addEventListener('DOMContentLoaded', function() {
 // Interface OID management
 let interfaceOidCounter = 0;
 
-function addInterfaceOidRow(name = '', oids = {}) {
+function addInterfaceRow(name = '', oids = {}, threshold = '', bandwidth = '') {
     const counter = interfaceOidCounter++;
     const inOid = oids.in_oid || '';
     const outOid = oids.out_oid || '';
     const row = $(`
-        <div class="field is-horizontal mb-3 interface-oid-row" data-counter="${counter}">
-            <div class="field-body">
-                <div class="field">
-                    <label class="label is-small">인터페이스 이름</label>
-                    <div class="control">
-                        <input class="input interface-name" type="text" placeholder="예: eth0" value="${name}">
+        <div class="box mb-3 interface-row" data-counter="${counter}" style="border: 1px solid var(--border-color, #e5e7eb);">
+            <div class="columns is-multiline is-vcentered">
+                <div class="column is-2">
+                    <div class="field">
+                        <label class="label is-small">인터페이스 이름</label>
+                        <div class="control">
+                            <input class="input interface-name" type="text" placeholder="예: eth0" value="${name}">
+                        </div>
                     </div>
                 </div>
-                <div class="field">
-                    <label class="label is-small">IN OID</label>
-                    <div class="control">
-                        <input class="input interface-in-oid" type="text" placeholder="예: 1.3.6.1.2.1.2.2.1.10.1" value="${inOid}">
+                <div class="column is-3">
+                    <div class="field">
+                        <label class="label is-small">IN OID</label>
+                        <div class="control">
+                            <input class="input interface-in-oid" type="text" placeholder="예: 1.3.6.1.2.1.2.2.1.10.1" value="${inOid}">
+                        </div>
                     </div>
                 </div>
-                <div class="field">
-                    <label class="label is-small">OUT OID</label>
-                    <div class="control">
-                        <input class="input interface-out-oid" type="text" placeholder="예: 1.3.6.1.2.1.2.2.1.11.1" value="${outOid}">
+                <div class="column is-3">
+                    <div class="field">
+                        <label class="label is-small">OUT OID</label>
+                        <div class="control">
+                            <input class="input interface-out-oid" type="text" placeholder="예: 1.3.6.1.2.1.2.2.1.16.1" value="${outOid}">
+                        </div>
                     </div>
                 </div>
-                <div class="field">
-                    <label class="label is-small">&nbsp;</label>
-                    <div class="control">
-                        <button class="button is-danger is-light remove-interface" type="button">삭제</button>
+                <div class="column is-2">
+                    <div class="field">
+                        <label class="label is-small">임계치 (Mbps)</label>
+                        <div class="control">
+                            <input class="input interface-threshold" type="number" step="0.01" min="0" placeholder="예: 100" value="${threshold}">
+                        </div>
                     </div>
+                </div>
+                <div class="column is-2">
+                    <div class="field">
+                        <label class="label is-small">대역폭 (Mbps)</label>
+                        <div class="control">
+                            <input class="input interface-bandwidth" type="number" step="0.1" min="0" placeholder="예: 1000" value="${bandwidth}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="field is-grouped is-grouped-right">
+                <div class="control">
+                    <button class="button is-danger is-light is-small remove-interface" type="button">삭제</button>
                 </div>
             </div>
         </div>
@@ -73,55 +94,10 @@ function addInterfaceOidRow(name = '', oids = {}) {
     
     row.find('.remove-interface').on('click', function() {
         row.remove();
-        updateInterfaceThresholds();
     });
 }
 
-function addInterfaceThresholdRow(name = '', threshold = '') {
-    const row = $(`
-        <div class="columns mb-3 interface-threshold-row" data-name="${name}">
-            <div class="column is-4">
-                <div class="field">
-                    <label class="label">${name || '인터페이스 이름'}</label>
-                </div>
-            </div>
-            <div class="column is-6">
-                <div class="field">
-                    <div class="control">
-                        <input class="input interface-threshold" type="number" step="0.01" min="0" placeholder="임계치 (Mbps)" value="${threshold}">
-                    </div>
-                </div>
-            </div>
-        </div>
-    `);
-    $('#cfgInterfaceThresholdList').append(row);
-}
-
-function updateInterfaceThresholds() {
-    // Get all interface names from OID list
-    const interfaceNames = [];
-    $('.interface-oid-row').each(function() {
-        const name = $(this).find('.interface-name').val().trim();
-        if (name) {
-            interfaceNames.push(name);
-        }
-    });
-    
-    // Remove threshold rows for interfaces that no longer exist
-    $('.interface-threshold-row').each(function() {
-        const rowName = $(this).data('name');
-        if (!interfaceNames.includes(rowName)) {
-            $(this).remove();
-        }
-    });
-    
-    // Add threshold rows for new interfaces
-    interfaceNames.forEach(name => {
-        if ($(`.interface-threshold-row[data-name="${name}"]`).length === 0) {
-            addInterfaceThresholdRow(name, '');
-        }
-    });
-}
+// 인터페이스 임계치/대역폭 행 추가 함수는 더 이상 사용하지 않음 (통합된 인터페이스 행 사용)
 
 // SNMP 설정 로드/저장
 function loadResourceConfig() {
@@ -145,25 +121,23 @@ function loadResourceConfig() {
             $('#cfgThrHttps').val(th.https ?? '');
             $('#cfgThrFtp').val(th.ftp ?? '');
             
-            // Load interface OIDs
+            // Load interface settings (통합된 형태로 로드)
             $('#cfgInterfaceList').empty();
             const interfaceOids = cfg.interface_oids || {};
+            const interfaceThresholds = cfg.interface_thresholds || {};
+            const interfaceBandwidths = cfg.interface_bandwidths || {}; // 인터페이스별 대역폭
+            
             Object.keys(interfaceOids).forEach(name => {
                 // Support both old format (string) and new format (object with in_oid/out_oid)
                 const oids = typeof interfaceOids[name] === 'string' 
                     ? { in_oid: interfaceOids[name], out_oid: '' } 
                     : (interfaceOids[name] || {});
-                addInterfaceOidRow(name, oids);
+                const threshold = interfaceThresholds[name] || '';
+                const bandwidth = interfaceBandwidths[name] || ''; // 인터페이스별 대역폭
+                addInterfaceRow(name, oids, threshold, bandwidth);
             });
             
-            // Load interface thresholds
-            $('#cfgInterfaceThresholdList').empty();
-            const interfaceThresholds = cfg.interface_thresholds || {};
-            Object.keys(interfaceOids).forEach(name => {
-                addInterfaceThresholdRow(name, interfaceThresholds[name] || '');
-            });
-            
-            // Load bandwidth_mbps
+            // Load global bandwidth_mbps (전체 회선 대역폭, 기본값으로 사용)
             const bandwidthMbps = cfg.bandwidth_mbps !== undefined ? cfg.bandwidth_mbps : 1000.0;
             $('#cfgBandwidthMbps').val(bandwidthMbps);
             $('#cfgStatus').removeClass('is-danger').addClass('is-success').text('불러오기 완료');
@@ -191,27 +165,32 @@ function saveResourceConfig() {
         return n < 0 ? 0 : n;
     }
 
-    // Collect interface OIDs
+    // Collect interface settings (통합된 형태로 수집)
     const interfaceOids = {};
-    $('.interface-oid-row').each(function() {
+    const interfaceThresholds = {};
+    const interfaceBandwidths = {}; // 향후 인터페이스별 대역폭 지원
+    
+    $('.interface-row').each(function() {
         const name = $(this).find('.interface-name').val().trim();
         const inOid = $(this).find('.interface-in-oid').val().trim();
         const outOid = $(this).find('.interface-out-oid').val().trim();
+        const threshold = numOrUndef($(this).find('.interface-threshold'));
+        const bandwidth = numOrUndef($(this).find('.interface-bandwidth'));
+        
         if (name && (inOid || outOid)) {
             interfaceOids[name] = {
                 in_oid: inOid || '',
                 out_oid: outOid || ''
             };
-        }
-    });
-    
-    // Collect interface thresholds
-    const interfaceThresholds = {};
-    $('.interface-threshold-row').each(function() {
-        const name = $(this).data('name');
-        const threshold = numOrUndef($(this).find('.interface-threshold'));
-        if (name && threshold !== undefined) {
-            interfaceThresholds[name] = threshold;
+            
+            if (threshold !== undefined) {
+                interfaceThresholds[name] = threshold;
+            }
+            
+            // 향후 인터페이스별 대역폭 지원
+            if (bandwidth !== undefined && bandwidth > 0) {
+                interfaceBandwidths[name] = bandwidth;
+            }
         }
     });
     
@@ -241,6 +220,7 @@ function saveResourceConfig() {
         },
         interface_oids: interfaceOids,
         interface_thresholds: interfaceThresholds,
+        interface_bandwidths: interfaceBandwidths, // 향후 인터페이스별 대역폭 지원
         bandwidth_mbps: (Number.isFinite(bandwidthMbps) && bandwidthMbps >= 0) ? bandwidthMbps : 1000.0
     };
     Object.keys(payload.oids).forEach(k => { if (!payload.oids[k]) delete payload.oids[k]; });
@@ -302,20 +282,7 @@ $(document).ready(() => {
     
     // Add interface button handler
     $('#cfgAddInterface').on('click', function() {
-        addInterfaceOidRow('', {});
-        updateInterfaceThresholds();
-    });
-    
-    // Update thresholds when interface name changes
-    $(document).on('input', '.interface-name', function() {
-        const row = $(this).closest('.interface-oid-row');
-        const name = $(this).val().trim();
-        const oldName = row.data('old-name') || '';
-        
-        if (name !== oldName) {
-            row.data('old-name', name);
-            updateInterfaceThresholds();
-        }
+        addInterfaceRow('', {}, '', '');
     });
 });
 
