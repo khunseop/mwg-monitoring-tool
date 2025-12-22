@@ -254,10 +254,20 @@ class BackgroundCollector:
                     errors[proxy.id] = str(e)
             
             # Bulk insert for better performance
+            collected_models: list[ResourceUsageModel] = []
             if collected_data:
                 try:
                     db.bulk_insert_mappings(ResourceUsageModel, collected_data)
                     db.commit()
+                    # Refresh models to get IDs (for response)
+                    # Note: bulk_insert_mappings doesn't return IDs, so we query them back
+                    for data in collected_data:
+                        model = db.query(ResourceUsageModel).filter(
+                            ResourceUsageModel.proxy_id == data["proxy_id"],
+                            ResourceUsageModel.collected_at == data["collected_at"]
+                        ).order_by(ResourceUsageModel.id.desc()).first()
+                        if model:
+                            collected_models.append(model)
                     logger.info(f"[BackgroundCollector] Bulk inserted {len(collected_data)} records to database "
                              f"(requested={len(proxies)}, failed={len(errors)})")
                 except Exception as e:
@@ -268,9 +278,12 @@ class BackgroundCollector:
                         try:
                             model = ResourceUsageModel(**data)
                             db.add(model)
+                            collected_models.append(model)
                         except Exception as e2:
                             logger.error(f"[BackgroundCollector] Failed to insert record: {e2}")
                     db.commit()
+                    for model in collected_models:
+                        db.refresh(model)
             
             # 저장 완료 로그
             logger.info(f"[BackgroundCollector] Saved {len(collected_models)} records to database "
