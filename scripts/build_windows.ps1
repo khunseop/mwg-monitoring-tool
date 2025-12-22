@@ -66,6 +66,15 @@ pip install --upgrade pip
 pip install -r requirements.txt
 pip install pyinstaller==$PyInstallerVersion
 
+# Clean PyInstaller cache before build
+Write-Step "Clean PyInstaller cache"
+if (Test-Path "build") {
+    Remove-Item -Recurse -Force "build" -ErrorAction SilentlyContinue
+}
+if (Test-Path "__pycache__") {
+    Get-ChildItem -Path "." -Filter "__pycache__" -Recurse | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # Build with PyInstaller
 Write-Step "Run PyInstaller"
 $argsList = @(
@@ -88,7 +97,10 @@ $argsList = @(
     "--hidden-import", "dotenv",
     "--hidden-import", "Jinja2",
     "--hidden-import", "cryptography.hazmat.bindings._rust",
+    "--hidden-import", "sqlite3",
+    "--hidden-import", "_sqlite3",
     "--additional-hooks-dir", "hooks",
+    "--clean",  # Clean PyInstaller cache and remove temporary files
     "run_app.py"
 )
 
