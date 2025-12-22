@@ -14,26 +14,51 @@ function Write-Step($msg) {
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $repoRoot
 
-# Choose Python launcher
-$python = $null
-try {
-    $python = (Get-Command "py" -ErrorAction Stop).Path
-} catch {}
-if ($python) {
-    $pythonCmd = "py -$PyVersion"
-} else {
+# Detect environment type (conda or venv)
+$isConda = $env:CONDA_DEFAULT_ENV -ne $null -or $env:CONDA_PREFIX -ne $null
+$isVenv = $env:VIRTUAL_ENV -ne $null
+
+if ($isConda) {
+    $envName = if ($env:CONDA_DEFAULT_ENV) { $env:CONDA_DEFAULT_ENV } else { "conda" }
+    Write-Step "Using conda environment: $envName"
+    if ($env:CONDA_PREFIX) {
+        Write-Step "Conda prefix: $env:CONDA_PREFIX"
+    }
     $pythonCmd = "python"
+    # Verify Python is accessible
+    try {
+        $pythonVersion = & python --version 2>&1
+        Write-Step "Python version: $pythonVersion"
+    } catch {
+        Write-Host "[ERROR] Python not found in conda environment. Make sure conda is activated." -ForegroundColor Red
+        exit 1
+    }
+} elseif ($isVenv) {
+    Write-Step "Using venv environment: $env:VIRTUAL_ENV"
+    $pythonCmd = "python"
+} else {
+    # No virtual environment detected, use system Python or py launcher
+    Write-Step "No virtual environment detected, checking for Python..."
+    $python = $null
+    try {
+        $python = (Get-Command "py" -ErrorAction Stop).Path
+    } catch {}
+    if ($python) {
+        $pythonCmd = "py -$PyVersion"
+    } else {
+        $pythonCmd = "python"
+    }
+    
+    # Create venv if missing (only if not using conda/venv)
+    if (-not (Test-Path ".venv")) {
+        Write-Step "Create venv (.venv)"
+        & $pythonCmd -m venv .venv
+    }
+    
+    # Activate venv
+    Write-Step "Activate venv"
+    . .\.venv\Scripts\Activate.ps1
 }
-
-# Create venv if missing
-if (-not (Test-Path ".venv")) {
-    Write-Step "Create venv (.venv)"
-    & $pythonCmd -m venv .venv
-}
-
-# Activate venv
-Write-Step "Activate venv"
-. .\.venv\Scripts\Activate.ps1
 
 # Upgrade pip and install deps
 Write-Step "Install Python deps"
@@ -59,6 +84,7 @@ $argsList = @(
     "--collect-all", "paramiko",
     "--collect-all", "pynacl",
     "--collect-all", "bcrypt",
+    "--collect-all", "cryptography",
     "--hidden-import", "dotenv",
     "--hidden-import", "Jinja2",
     "--hidden-import", "cryptography.hazmat.bindings._rust",
