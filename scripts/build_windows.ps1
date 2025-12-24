@@ -1,7 +1,8 @@
 param(
     [string]$Name = "PMT",
     [string]$PyVersion = "3.10",
-    [string]$PyInstallerVersion = "6.11.0"
+    [string]$PyInstallerVersion = "6.11.0",
+    [switch]$NoConsole  # 콘솔 없이 빌드하려면 -NoConsole 플래그 사용
 )
 
 $ErrorActionPreference = "Stop"
@@ -77,14 +78,28 @@ if (Test-Path "__pycache__") {
 
 # Build with PyInstaller
 Write-Step "Run PyInstaller"
+if ($NoConsole) {
+    Write-Step "Building WITHOUT console window"
+} else {
+    Write-Step "Building WITH console window (Ctrl+C to stop)"
+}
+
 $argsList = @(
     "--name", $Name,
     "--onefile",
     "--noconfirm",
-    "--noconsole",
     "--add-data", "app/templates;app/templates",
     "--add-data", "app/static;app/static",
-    "--add-data", "docs;docs",
+    "--add-data", "docs;docs"
+)
+
+# 콘솔 옵션 추가
+if ($NoConsole) {
+    $argsList += "--noconsole"
+}
+
+# 나머지 옵션 추가
+$argsList += @(
     "--collect-all", "uvicorn",
     "--collect-all", "fastapi_standalone_docs",
     "--collect-all", "aiosnmp",

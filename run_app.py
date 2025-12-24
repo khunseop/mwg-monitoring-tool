@@ -5,6 +5,19 @@ import time
 import webbrowser
 from typing import Optional
 
+# Fix stdin/stdout/stderr for PyInstaller builds (especially --noconsole)
+if getattr(sys, "frozen", False):
+    # PyInstaller 빌드 환경에서 표준 스트림이 None일 수 있음
+    if sys.stdin is None:
+        import io
+        sys.stdin = io.StringIO()
+    if sys.stdout is None:
+        import io
+        sys.stdout = io.StringIO()
+    if sys.stderr is None:
+        import io
+        sys.stderr = io.StringIO()
+
 # Ensure PyInstaller can see this import during analysis
 try:
     import uvicorn  # type: ignore
@@ -18,6 +31,26 @@ def ensure_default_env() -> None:
     # In frozen (PyInstaller) builds, disable docs by default to avoid missing asset errors
     if getattr(sys, "frozen", False):
         os.environ.setdefault("ENABLE_DOCS", "false")
+        # PyInstaller 빌드에서 콘솔이 있는지 확인
+        has_console = True
+        try:
+            if sys.stdout is None or not hasattr(sys.stdout, 'isatty'):
+                has_console = False
+            else:
+                # isatty() 호출 시 에러가 발생하면 콘솔 없음
+                try:
+                    sys.stdout.isatty()
+                except (AttributeError, OSError, ValueError):
+                    has_console = False
+        except Exception:
+            has_console = False
+        
+        # 콘솔이 있으면 콘솔 로깅 활성화, 없으면 파일만 사용
+        if has_console:
+            os.environ.setdefault("LOG_TO_CONSOLE", "true")
+        else:
+            os.environ.setdefault("LOG_TO_CONSOLE", "false")
+        os.environ.setdefault("LOG_TO_FILE", "true")
     else:
         os.environ.setdefault("ENABLE_DOCS", "true")
 
@@ -72,6 +105,79 @@ def main() -> None:
     except Exception:
         pass
 
+    # PyInstaller 빌드 환경에서 uvicorn 로깅 설정 조정
+    log_config = None
+    if getattr(sys, "frozen", False):
+        # PyInstaller 빌드에서는 uvicorn의 기본 로깅 설정을 사용하지 않음
+        # (로깅은 app.utils.logging_config에서 이미 설정됨)
+        import logging
+        from pathlib import Path
+        
+        # 로그 디렉토리 확인 및 생성
+        log_dir = Path("logs")
+        log_dir.mkdir(exist_ok=True)
+        
+        # 안전한 핸들러 선택 (stdout이 사용 가능한지 확인)
+        handler_class = "logging.FileHandler"
+        handler_config = {
+            "filename": str(log_dir / "pmt_uvicorn.log"),
+            "mode": "a",
+            "encoding": "utf-8",
+        }
+        
+        try:
+            # stdout이 사용 가능하고 isatty()가 작동하는지 확인
+            if (sys.stdout is not None and 
+                hasattr(sys.stdout, 'isatty') and 
+                callable(getattr(sys.stdout, 'isatty', None))):
+                try:
+                    sys.stdout.isatty()
+                    # isatty()가 성공하면 StreamHandler 사용 가능
+                    handler_class = "logging.StreamHandler"
+                    handler_config = {
+                        "stream": "ext://sys.stdout",
+                    }
+                except (AttributeError, OSError, ValueError):
+                    # isatty() 실패 시 FileHandler 사용
+                    pass
+        except Exception:
+            # 모든 예외 시 FileHandler 사용
+            pass
+        
+        log_config = {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "default": {
+                    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                    "datefmt": "%Y-%m-%d %H:%M:%S",
+                },
+            },
+            "handlers": {
+                "default": {
+                    "class": handler_class,
+                    "formatter": "default",
+                    **handler_config,
+                },
+            },
+            "root": {
+                "level": "INFO",
+                "handlers": ["default"],
+            },
+            "loggers": {
+                "uvicorn": {
+                    "level": "WARNING",
+                    "handlers": ["default"],
+                    "propagate": False,
+                },
+                "uvicorn.access": {
+                    "level": "WARNING",
+                    "handlers": ["default"],
+                    "propagate": False,
+                },
+            },
+        }
+
     uvicorn.run(
         asgi_app,
         host=host,
@@ -79,6 +185,7 @@ def main() -> None:
         reload=False,
         access_log=False,
         log_level="info",
+        log_config=log_config,
     )
 
 

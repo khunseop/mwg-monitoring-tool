@@ -50,10 +50,27 @@ def setup_logging():
     
     # 콘솔 핸들러 추가
     if log_to_console:
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(log_level)
-        console_handler.setFormatter(log_format)
-        root_logger.addHandler(console_handler)
+        try:
+            # PyInstaller 빌드 환경에서 sys.stdout이 None이거나 isatty()를 지원하지 않을 수 있음
+            if sys.stdout is not None and hasattr(sys.stdout, 'isatty'):
+                try:
+                    # isatty() 호출 시 에러가 발생할 수 있으므로 try-except로 감쌈
+                    sys.stdout.isatty()
+                except (AttributeError, OSError):
+                    # isatty() 실패 시 파일 핸들러로 대체
+                    log_to_console = False
+                    if not log_to_file:
+                        # 파일 핸들러가 없으면 강제로 생성
+                        log_to_file = True
+            
+            if log_to_console and sys.stdout is not None:
+                console_handler = logging.StreamHandler(sys.stdout)
+                console_handler.setLevel(log_level)
+                console_handler.setFormatter(log_format)
+                root_logger.addHandler(console_handler)
+        except Exception as e:
+            # 콘솔 핸들러 생성 실패 시 무시 (파일 핸들러만 사용)
+            root_logger.warning(f"콘솔 핸들러 생성 실패: {e}. 파일 핸들러만 사용합니다.")
     
     # 파일 핸들러 추가
     if log_to_file:
