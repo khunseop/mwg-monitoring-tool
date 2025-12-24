@@ -31,27 +31,47 @@ if (Test-Path ".venv") {
     . .\.venv\Scripts\Activate.ps1
 }
 
+# 아이콘 파일 경로 확인
+$iconPath = Join-Path $repoRoot "favicon.ico"
+$iconArg = ""
+if (Test-Path $iconPath) {
+    $iconArg = "--icon `"$iconPath`""
+    Write-Step "Using icon: $iconPath"
+}
+
+# 버전 파일 경로 확인
+$versionPath = Join-Path $repoRoot "version.txt"
+$versionArg = ""
+if (Test-Path $versionPath) {
+    $versionArg = "--version-file `"$versionPath`""
+    Write-Step "Using version file: $versionPath"
+}
+
 Write-Step "Generate spec file"
-pyinstaller --name $Name `
-    --onefile `
-    --noconsole `
-    --add-data "app/templates;app/templates" `
-    --add-data "app/static;app/static" `
-    --add-data "docs;docs" `
-    --collect-all uvicorn `
-    --collect-all fastapi_standalone_docs `
-    --collect-all aiosnmp `
-    --collect-all asyncio_dgram `
-    --collect-all pyasn1 `
-    --collect-all paramiko `
-    --collect-all pynacl `
-    --collect-all bcrypt `
-    --collect-all cryptography `
-    --hidden-import dotenv `
-    --hidden-import Jinja2 `
-    --hidden-import "cryptography.hazmat.bindings._rust" `
-    --additional-hooks-dir hooks `
-    run_app.py
+$specCmd = "pyinstaller --name $Name " +
+    "--onefile " +
+    "--noconsole " +
+    "--add-data `"app/templates;app/templates`" " +
+    "--add-data `"app/static;app/static`" " +
+    "--add-data `"docs;docs`" " +
+    "$iconArg " +
+    "$versionArg " +
+    "--collect-all uvicorn " +
+    "--collect-all fastapi_standalone_docs " +
+    "--collect-all aiosnmp " +
+    "--collect-all asyncio_dgram " +
+    "--collect-all pyasn1 " +
+    "--collect-all paramiko " +
+    "--collect-all pynacl " +
+    "--collect-all bcrypt " +
+    "--collect-all cryptography " +
+    "--hidden-import dotenv " +
+    "--hidden-import Jinja2 " +
+    "--hidden-import `"cryptography.hazmat.bindings._rust`" " +
+    "--additional-hooks-dir hooks " +
+    "run_app.py"
+
+Invoke-Expression $specCmd
 
 Write-Host ""
 Write-Host "Spec file generated: `"$((Resolve-Path "$Name.spec").Path)`"" -ForegroundColor Green

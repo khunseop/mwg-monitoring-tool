@@ -84,6 +84,18 @@ if ($NoConsole) {
     Write-Step "Building WITH console window (Ctrl+C to stop)"
 }
 
+# 아이콘 파일 경로 확인
+$iconPath = Join-Path $repoRoot "favicon.ico"
+if (-not (Test-Path $iconPath)) {
+    Write-Host "[WARNING] Icon file not found: $iconPath" -ForegroundColor Yellow
+}
+
+# 버전 파일 경로 확인
+$versionPath = Join-Path $repoRoot "version.txt"
+if (-not (Test-Path $versionPath)) {
+    Write-Host "[WARNING] Version file not found: $versionPath" -ForegroundColor Yellow
+}
+
 $argsList = @(
     "--name", $Name,
     "--onefile",
@@ -92,6 +104,18 @@ $argsList = @(
     "--add-data", "app/static;app/static",
     "--add-data", "docs;docs"
 )
+
+# 아이콘 옵션 추가
+if (Test-Path $iconPath) {
+    $argsList += "--icon", $iconPath
+    Write-Step "Using icon: $iconPath"
+}
+
+# 버전 파일 옵션 추가
+if (Test-Path $versionPath) {
+    $argsList += "--version-file", $versionPath
+    Write-Step "Using version file: $versionPath"
+}
 
 # 콘솔 옵션 추가
 if ($NoConsole) {

@@ -46,7 +46,7 @@ traffic_log_model.Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="PMT",
     description="Proxy Monitoring Tool",
-    version="1.5.0"
+    version="2025.12.24"
 )
 # Security/CORS middleware (configure via env)
 cors_origins = os.getenv("CORS_ALLOW_ORIGINS", "*")
