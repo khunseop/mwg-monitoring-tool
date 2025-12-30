@@ -198,7 +198,7 @@ class BackgroundCollector:
             collected_data: list[dict] = []
             
             # Get interface_oids from config
-            interface_oids, _ = _get_interface_config_from_db(db)
+            interface_oids, _, _ = _get_interface_config_from_db(db)
             
             # 비동기 수집 실행
             tasks = [_collect_for_proxy(p, oids, community, db=db, interface_oids=interface_oids) for p in proxies]
