@@ -506,7 +506,7 @@ async def sessions_datatables(
     request: Request,
     db: Session = Depends(get_db),
     startRow: int = Query(0, ge=0, alias="startRow"),
-    endRow: int = Query(100, ge=1, alias="endRow"),
+    endRow: int = Query(10000, ge=1, alias="endRow"),  # Increased default for client-side model
     sortModel: str | None = Query(None, alias="sortModel"),
     filterModel: str | None = Query(None, alias="filterModel"),
     group_id: int | None = Query(None),

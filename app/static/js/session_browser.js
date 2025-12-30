@@ -191,31 +191,113 @@ $(document).ready(function() {
     }
 
     function loadGridData() {
+        if (!sb.gridApi) {
+            console.warn('[SessionBrowser] Grid API not available, skipping data load');
+            return;
+        }
+        
         var proxyIds = getSelectedProxyIds();
         if (proxyIds.length === 0) {
-            if (sb.gridApi) {
-                // Server-side model: refresh to clear data
-                if (sb.gridApi.refreshServerSide) {
-                    sb.gridApi.refreshServerSide({ purge: true });
-                } else {
+            // Client-side model: clear data
+            try {
+                if (sb.gridApi.setRowData) {
+                    sb.gridApi.setRowData([]);
+                } else if (sb.gridApi.setGridOption) {
                     sb.gridApi.setGridOption('rowData', []);
                 }
+            } catch (e) {
+                console.error('[SessionBrowser] Error clearing grid data:', e);
             }
             hideLoading();
             return;
         }
 
-        // Server-side model: refresh to reload data
-        if (sb.gridApi && sb.gridApi.refreshServerSide) {
-            sb.gridApi.refreshServerSide({ purge: true });
-        }
+        // Client-side model: load all data from API (no pagination on server)
+        showLoading();
+        var requestParams = {
+            proxy_ids: proxyIds.join(','),
+            startRow: 0,
+            endRow: 10000  // Request large range to get all data
+        };
+        
+        $.ajax({
+            url: '/api/session-browser/datatables',
+            method: 'GET',
+            data: requestParams
+        }).done(function(response) {
+            hideLoading();
+            try {
+                if (!sb.gridApi) {
+                    console.warn('[SessionBrowser] Grid API not available, cannot update data');
+                    return;
+                }
+                
+                if (!response) {
+                    console.error('[SessionBrowser] Empty response from server');
+                    showErr('서버에서 빈 응답을 받았습니다.');
+                    if (sb.gridApi.setRowData) {
+                        sb.gridApi.setRowData([]);
+                    } else if (sb.gridApi.setGridOption) {
+                        sb.gridApi.setGridOption('rowData', []);
+                    }
+                    return;
+                }
+                
+                var rowData = response.rowData;
+                if (!Array.isArray(rowData)) {
+                    console.error('[SessionBrowser] Invalid response format - rowData is not an array:', response);
+                    showErr('서버 응답 형식이 올바르지 않습니다. (rowData가 배열이 아님)');
+                    if (sb.gridApi.setRowData) {
+                        sb.gridApi.setRowData([]);
+                    } else if (sb.gridApi.setGridOption) {
+                        sb.gridApi.setGridOption('rowData', []);
+                    }
+                    return;
+                }
+                
+                // Update grid with all data (client-side handles pagination/filtering)
+                // Use setRowData for better compatibility with AG Grid Community
+                if (sb.gridApi.setRowData) {
+                    sb.gridApi.setRowData(rowData);
+                } else if (sb.gridApi.setGridOption) {
+                    sb.gridApi.setGridOption('rowData', rowData);
+                } else {
+                    console.error('[SessionBrowser] Cannot set row data - API methods not available');
+                    showErr('그리드 데이터를 업데이트할 수 없습니다.');
+                    return;
+                }
+                
+                updateFilterCount();
+                clearErr(); // Clear any previous errors on success
+                console.log('[SessionBrowser] Loaded', rowData.length, 'rows');
+            } catch (e) {
+                console.error('[SessionBrowser] Error updating grid data:', e);
+                showErr('데이터 업데이트 실패: ' + (e.message || String(e)));
+            }
+        }).fail(function(xhr, status, error) {
+            hideLoading();
+            console.error('[SessionBrowser] AJAX error:', status, error, xhr);
+            var errorMsg = '데이터 로드 실패';
+            if (xhr && xhr.responseJSON && xhr.responseJSON.detail) {
+                errorMsg += ': ' + xhr.responseJSON.detail;
+            } else if (error) {
+                errorMsg += ': ' + error;
+            } else if (status) {
+                errorMsg += ': ' + status;
+            }
+            showErr(errorMsg);
+        });
     }
 
     function initTable() {
-        if (sb.gridApi) return;
+        if (sb.gridApi) {
+            console.log('[SessionBrowser] Grid already initialized');
+            return;
+        }
         try {
             var gridOptions = {
                 columnDefs: AgGridConfig.getSessionBrowserColumns(),
+                rowData: [],
                 defaultColDef: {
                     sortable: true,
                     filter: 'agTextColumnFilter',
@@ -223,90 +305,55 @@ $(document).ready(function() {
                     resizable: true,
                     minWidth: 100
                 },
-                rowModelType: 'serverSide',
-                serverSideInfiniteScroll: false,
-                cacheBlockSize: 100,
+                rowModelType: 'clientSide',
                 pagination: true,
                 paginationPageSize: 100,
-                enableFilter: true,
-                enableSorting: true,
+                // Removed enableFilter and enableSorting - these are deprecated in AG Grid v32+
+                // Filtering and sorting are enabled by default via columnDefs
                 animateRows: false,
-                suppressRowClickSelection: false,
+                // Removed rowSelection - not needed for this grid (no row selection required)
                 headerHeight: 50,
                 overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">표시할 세션이 없습니다.<br><small style="margin-top: 8px; display: block;">프록시를 선택하고 "세션 불러오기" 버튼을 클릭하세요.</small></div>',
-                getRows: function(params) {
-                    // Server-side data loading
-                    var proxyIds = getSelectedProxyIds();
-                    if (proxyIds.length === 0) {
-                        params.success({ rowData: [], rowCount: 0 });
-                        return;
-                    }
-
-                    showLoading();
-                    
-                    // Build request parameters
-                    var requestParams = {
-                        startRow: params.request.startRow || 0,
-                        endRow: (params.request.startRow || 0) + (params.request.endRow || 100),
-                        proxy_ids: proxyIds.join(',')
-                    };
-                    
-                    // Add sorting
-                    if (params.request.sortModel && params.request.sortModel.length > 0) {
-                        requestParams.sortModel = JSON.stringify(params.request.sortModel);
-                    }
-                    
-                    // Add filtering
-                    if (params.request.filterModel && Object.keys(params.request.filterModel).length > 0) {
-                        requestParams.filterModel = JSON.stringify(params.request.filterModel);
-                    }
-                    
-                    // Add quick filter
-                    if (params.request.quickFilterText) {
-                        requestParams.quickFilterText = params.request.quickFilterText;
-                    }
-                    
-                    $.ajax({
-                        url: '/api/session-browser/datatables',
-                        method: 'GET',
-                        data: requestParams
-                    }).done(function(response) {
-                        hideLoading();
-                        params.success({
-                            rowData: response.rowData || [],
-                            rowCount: response.rowCount || 0
-                        });
-                        updateFilterCount();
-                    }).fail(function() {
-                        hideLoading();
-                        params.fail();
-                    });
-                },
                 onGridReady: function(params) {
-                    sb.gridApi = params.api;
-                    if (params.columnApi) {
-                        sb.gridColumnApi = params.columnApi;
-                    }
-                    // 컬럼 너비 자동 조절 (헤더 텍스트가 잘리지 않도록)
-                    setTimeout(function() {
-                        if (sb.gridApi) {
-                            var allColumnIds = [];
-                            sb.gridApi.getColumns().forEach(function(column) {
-                                if (column.getColDef().field !== 'id') {
-                                    allColumnIds.push(column.getColId());
-                                }
-                            });
-                            if (sb.gridApi.autoSizeColumns) {
-                                // 헤더 텍스트를 기준으로 자동 크기 조절
-                                sb.gridApi.autoSizeColumns(allColumnIds, { skipHeader: false });
-                            } else if (sb.gridApi.sizeColumnsToFit) {
-                                sb.gridApi.sizeColumnsToFit();
-                            }
+                    try {
+                        sb.gridApi = params.api;
+                        if (params.columnApi) {
+                            sb.gridColumnApi = params.columnApi;
                         }
-                    }, 200);
-                    updateTableVisibility();
-                    // 초기 데이터 로드
-                    loadGridData();
+                        console.log('[SessionBrowser] Grid ready, API:', sb.gridApi ? 'available' : 'missing');
+                        
+                        // 컬럼 너비 자동 조절 (헤더 텍스트가 잘리지 않도록)
+                        setTimeout(function() {
+                            if (sb.gridApi) {
+                                try {
+                                    var allColumnIds = [];
+                                    var columns = sb.gridApi.getColumns();
+                                    if (columns && columns.length > 0) {
+                                        columns.forEach(function(column) {
+                                            if (column && column.getColDef && column.getColDef().field !== 'id') {
+                                                allColumnIds.push(column.getColId());
+                                            }
+                                        });
+                                        if (allColumnIds.length > 0) {
+                                            if (sb.gridApi.autoSizeColumns) {
+                                                // 헤더 텍스트를 기준으로 자동 크기 조절
+                                                sb.gridApi.autoSizeColumns(allColumnIds, { skipHeader: false });
+                                            } else if (sb.gridApi.sizeColumnsToFit) {
+                                                sb.gridApi.sizeColumnsToFit();
+                                            }
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.warn('[SessionBrowser] Failed to auto-size columns:', e);
+                                }
+                            }
+                        }, 200);
+                        updateTableVisibility();
+                        // 초기 데이터는 로드하지 않음 (프록시 선택 후 수동으로 로드)
+                    } catch (e) {
+                        console.error('[SessionBrowser] onGridReady error:', e);
+                        showErr('그리드 준비 중 오류: ' + (e.message || String(e)));
+                    }
                 },
                 onRowDoubleClicked: function(params) {
                     var itemId = params.data.id;
@@ -316,22 +363,51 @@ $(document).ready(function() {
                         .fail(function(){ showErr('상세를 불러오지 못했습니다.'); });
                 },
                 onFilterChanged: function() {
-                    // 필터 변경 시 서버 사이드에서 처리되므로 로딩만 표시
-                    showLoading();
+                    // Client-side model: filtering is handled automatically by AG Grid
                     updateFilterCount();
                 }
             };
 
             var gridDiv = document.querySelector('#sbTableGrid');
-            if (gridDiv && window.agGrid) {
+            if (!gridDiv) {
+                console.error('[SessionBrowser] Grid div #sbTableGrid not found');
+                showErr('그리드 컨테이너를 찾을 수 없습니다. 페이지를 새로고침해주세요.');
+                return;
+            }
+            
+            if (!window.agGrid) {
+                console.error('[SessionBrowser] ag-grid library not loaded');
+                showErr('AG Grid 라이브러리가 로드되지 않았습니다. 페이지를 새로고침해주세요.');
+                return;
+            }
+            
+            try {
                 if (typeof window.agGrid.createGrid === 'function') {
-                    sb.gridApi = window.agGrid.createGrid(gridDiv, gridOptions);
+                    // AG Grid v31+: createGrid returns Grid instance
+                    var gridInstance = window.agGrid.createGrid(gridDiv, gridOptions);
+                    // For v31+, API might be available immediately from gridInstance
+                    if (gridInstance && gridInstance.api && !sb.gridApi) {
+                        sb.gridApi = gridInstance.api;
+                        console.log('[SessionBrowser] Grid API set from gridInstance');
+                    }
+                    // API will also be set in onGridReady callback
+                    console.log('[SessionBrowser] Grid created using createGrid API');
                 } else if (window.agGrid.Grid) {
+                    // AG Grid v30 and below
                     new window.agGrid.Grid(gridDiv, gridOptions);
+                    console.log('[SessionBrowser] Grid created using Grid constructor');
+                } else {
+                    console.error('[SessionBrowser] ag-grid API not available');
+                    showErr('AG Grid API를 사용할 수 없습니다. 라이브러리 버전을 확인해주세요.');
+                    return;
                 }
+            } catch (e) {
+                console.error('[SessionBrowser] ag-grid init failed:', e);
+                showErr('그리드 초기화 실패: ' + (e.message || String(e)));
             }
         } catch (e) {
-            console.error('ag-grid init failed:', e);
+            console.error('[SessionBrowser] ag-grid init failed:', e);
+            showErr('그리드 초기화 실패: ' + (e.message || String(e)));
         }
     }
 
@@ -414,17 +490,36 @@ $(document).ready(function() {
     $('#sbQuickFilter').on('input', function() {
         var filterText = $(this).val();
         if (sb.gridApi) {
-            sb.gridApi.setGridOption('quickFilterText', filterText);
+            try {
+                // Use setQuickFilter for better compatibility
+                if (sb.gridApi.setQuickFilter) {
+                    sb.gridApi.setQuickFilter(filterText);
+                } else if (sb.gridApi.setGridOption) {
+                    sb.gridApi.setGridOption('quickFilterText', filterText);
+                }
+            } catch (e) {
+                console.error('[SessionBrowser] Error setting quick filter:', e);
+            }
         }
     });
     
     // 필터 초기화 버튼
     $('#sbClearFilters').on('click', function() {
         if (sb.gridApi) {
-            sb.gridApi.setFilterModel(null);
-            sb.gridApi.setGridOption('quickFilterText', '');
-            $('#sbQuickFilter').val('');
-            updateFilterCount();
+            try {
+                if (sb.gridApi.setFilterModel) {
+                    sb.gridApi.setFilterModel(null);
+                }
+                if (sb.gridApi.setQuickFilter) {
+                    sb.gridApi.setQuickFilter('');
+                } else if (sb.gridApi.setGridOption) {
+                    sb.gridApi.setGridOption('quickFilterText', '');
+                }
+                $('#sbQuickFilter').val('');
+                updateFilterCount();
+            } catch (e) {
+                console.error('[SessionBrowser] Error clearing filters:', e);
+            }
         }
     });
     
