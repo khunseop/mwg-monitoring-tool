@@ -389,12 +389,22 @@
                             const rawIn = (ru._heatRawIn && ru._heatRawIn[y]) ? ru._heatRawIn[y][x] : null;
                             const rawOut = (ru._heatRawOut && ru._heatRawOut[y]) ? ru._heatRawOut[y][x] : null;
                             if (rawIn != null && rawOut != null) {
+                                // 회선사용률은 bps로 표시
+                                const utils = window.ResourceUsageUtils;
+                                const bpsIn = utils.mbpsToBps(rawIn);
+                                const bpsOut = utils.mbpsToBps(rawOut);
                                 if (isLargeDataset) {
-                                    return rawIn.toFixed(1) + '/' + rawOut.toFixed(1) + 'M';
+                                    return utils.formatBps(bpsIn, 1) + '/' + utils.formatBps(bpsOut, 1);
                                 }
-                                return rawIn.toFixed(2) + '/' + rawOut.toFixed(2) + 'M';
+                                return utils.formatBps(bpsIn, 2) + '/' + utils.formatBps(bpsOut, 2);
                             }
-                            return raw != null ? (isLargeDataset ? raw.toFixed(1) + 'M' : raw.toFixed(2) + ' Mbps') : '';
+                            if (raw != null) {
+                                // 회선사용률은 bps로 표시
+                                const utils = window.ResourceUsageUtils;
+                                const bps = utils.mbpsToBps(raw);
+                                return utils.formatBps(bps, isLargeDataset ? 1 : 2);
+                            }
+                            return '';
                         }
                         
                         if (key === 'httpd' || key === 'httpsd' || key === 'ftpd') {
@@ -461,14 +471,18 @@
                             const metric = metrics[dataPointIndex];
                             let formattedRaw = String(Math.round(raw));
                             
-                            // 인터페이스의 경우 in/out 값을 함께 표시
+                            // 인터페이스의 경우 in/out 값을 함께 표시 (bps로 변환)
                             if (metric && metric.isInterface) {
+                                const utils = window.ResourceUsageUtils;
                                 const rawIn = (ru._heatRawIn && ru._heatRawIn[seriesIndex]) ? ru._heatRawIn[seriesIndex][dataPointIndex] : null;
                                 const rawOut = (ru._heatRawOut && ru._heatRawOut[seriesIndex]) ? ru._heatRawOut[seriesIndex][dataPointIndex] : null;
                                 if (rawIn != null && rawOut != null) {
-                                    formattedRaw = `IN: ${rawIn.toFixed(2)} Mbps / OUT: ${rawOut.toFixed(2)} Mbps`;
+                                    const bpsIn = utils.mbpsToBps(rawIn);
+                                    const bpsOut = utils.mbpsToBps(rawOut);
+                                    formattedRaw = `IN: ${utils.formatBps(bpsIn, 2)} / OUT: ${utils.formatBps(bpsOut, 2)}`;
                                 } else {
-                                    formattedRaw = raw.toFixed(2) + ' Mbps';
+                                    const bps = utils.mbpsToBps(raw);
+                                    formattedRaw = utils.formatBps(bps, 2);
                                 }
                             } else if (metric) {
                                 const key = metric.key;

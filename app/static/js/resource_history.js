@@ -69,17 +69,20 @@ $(document).ready(function() {
         });
     }
 
-    // Format interface MBPS for display
+    // Format interface MBPS for display (bps로 변환)
     function formatInterfaceMbps(interfaceMbps) {
         if (!interfaceMbps || typeof interfaceMbps !== 'object') return '-';
+        const utils = window.ResourceUsageUtils;
         const parts = [];
         Object.keys(interfaceMbps).forEach(ifName => {
             const ifData = interfaceMbps[ifName];
             if (ifData && typeof ifData === 'object') {
                 const name = ifName.length > 20 ? ifName.substring(0, 17) + '...' : ifName;
-                const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps.toFixed(2) : '0.00';
-                const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps.toFixed(2) : '0.00';
-                parts.push(`${name}: ${inMbps}/${outMbps}`);
+                const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
+                const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
+                const bpsIn = utils.mbpsToBps(inMbps);
+                const bpsOut = utils.mbpsToBps(outMbps);
+                parts.push(`${name}: ${utils.formatBps(bpsIn, 2)}/${utils.formatBps(bpsOut, 2)}`);
             }
         });
         return parts.length > 0 ? parts.join(', ') : '-';

@@ -122,14 +122,17 @@
 				{ field: 'interface_mbps', headerName: '인터페이스', sortable: false, filter: false, minWidth: 200, flex: 1,
 					cellRenderer: function(params) {
 						if (!params.value || typeof params.value !== 'object') return '-';
+						const utils = window.ResourceUsageUtils;
 						const parts = [];
 						Object.keys(params.value).forEach(ifName => {
 							const ifData = params.value[ifName];
 							if (ifData && typeof ifData === 'object') {
 								const name = ifName.length > 20 ? ifName.substring(0, 17) + '...' : ifName;
-								const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps.toFixed(2) : '0.00';
-								const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps.toFixed(2) : '0.00';
-								parts.push(`${name}: ${inMbps}/${outMbps} Mbps`);
+								const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
+								const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
+								const bpsIn = utils.mbpsToBps(inMbps);
+								const bpsOut = utils.mbpsToBps(outMbps);
+								parts.push(`${name}: ${utils.formatBps(bpsIn, 2)}/${utils.formatBps(bpsOut, 2)}`);
 							}
 						});
 						return parts.length > 0 ? parts.join(', ') : '-';

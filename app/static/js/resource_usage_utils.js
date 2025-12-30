@@ -101,6 +101,43 @@
         },
 
         /**
+         * Mbps를 bps로 변환
+         * @param {number} mbps - Mbps 값
+         * @returns {number} bps 값
+         */
+        mbpsToBps(mbps) {
+            if (mbps === null || mbps === undefined || isNaN(mbps)) return 0;
+            // 1 Mbps = 1,000,000 bps
+            return mbps * 1_000_000;
+        },
+
+        /**
+         * bps를 읽기 쉬운 형식으로 포맷
+         * @param {number} bps - bps 값
+         * @param {number} decimals - 소수점 자릿수 (기본값: 2)
+         * @returns {string} 포맷된 문자열 (예: "100.50 Mbps" 또는 "1.25 Gbps")
+         */
+        formatBps(bps, decimals = 2) {
+            if (bps === null || bps === undefined || isNaN(bps) || bps < 0) return '0 bps';
+            if (bps === 0) return '0 bps';
+            
+            // Gbps 단위로 표시 (1 Gbps = 1,000,000,000 bps)
+            if (bps >= 1_000_000_000) {
+                return (bps / 1_000_000_000).toFixed(decimals) + ' Gbps';
+            }
+            // Mbps 단위로 표시 (1 Mbps = 1,000,000 bps)
+            if (bps >= 1_000_000) {
+                return (bps / 1_000_000).toFixed(decimals) + ' Mbps';
+            }
+            // Kbps 단위로 표시 (1 Kbps = 1,000 bps)
+            if (bps >= 1_000) {
+                return (bps / 1_000).toFixed(decimals) + ' Kbps';
+            }
+            // bps 단위로 표시
+            return bps.toFixed(0) + ' bps';
+        },
+
+        /**
          * 긴 인터페이스 이름을 축약
          * @param {string} name - 인터페이스 이름
          * @returns {string} 축약된 이름

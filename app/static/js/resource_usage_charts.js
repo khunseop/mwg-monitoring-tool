@@ -488,7 +488,11 @@
                                 return val.toFixed(1) + ' Mbps';
                             }
                             if (metricKey === 'cc' || metricKey === 'cs') { return utils.abbreviateNumber(val); }
-                            if (metricKey.startsWith('if_')) { return val.toFixed(1) + ' Mbps'; }
+                            if (metricKey.startsWith('if_')) { 
+                                // 회선사용률은 bps로 표시
+                                const bps = utils.mbpsToBps(val);
+                                return utils.formatBps(bps, 1);
+                            }
                             return val;
                         }
                     }
@@ -505,7 +509,11 @@
                             }
                             if (metricKey === 'cc' || metricKey === 'cs') { return utils.formatNumber(Math.round(val)); }
                             if (metricKey === 'cpu' || metricKey === 'mem') { return String(Math.round(val)); }
-                            if (metricKey.startsWith('if_')) { return val.toFixed(2) + ' Mbps'; }
+                            if (metricKey.startsWith('if_')) { 
+                                // 회선사용률은 bps로 표시
+                                const bps = utils.mbpsToBps(val);
+                                return utils.formatBps(bps, 2);
+                            }
                             return val;
                         }
                     }

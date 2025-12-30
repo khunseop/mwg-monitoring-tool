@@ -50,8 +50,8 @@ COUNTER32_MAX = 4294967295  # 2^32 - 1
 # Cache for previous counter values: {(proxy_id, interface_name): (counter_value, timestamp)} for OID-based collection
 _INTERFACE_COUNTER_CACHE: Dict[Tuple[int, str], Tuple[int, float]] = {}
 
-# Cache for interface config: (interface_oids, interface_thresholds, config_updated_at)
-_INTERFACE_CONFIG_CACHE: Optional[Tuple[Dict[str, Dict[str, str]], Dict[str, float], float]] = None
+# Cache for interface config: (interface_oids, interface_thresholds, interface_bandwidths, config_updated_at)
+_INTERFACE_CONFIG_CACHE: Optional[Tuple[Dict[str, Dict[str, str]], Dict[str, float], Dict[str, float], float]] = None
 _INTERFACE_CONFIG_CACHE_LOCK = asyncio.Lock()
 
 
@@ -408,14 +408,14 @@ def _invalidate_interface_config_cache():
     logger.debug("[resource_usage] Interface config cache invalidated")
 
 
-def _get_interface_config_from_db(db: Session) -> Tuple[Dict[str, Dict[str, str]], Dict[str, float]]:
-    """Get interface_oids and interface_thresholds from resource config (with caching)"""
+def _get_interface_config_from_db(db: Session) -> Tuple[Dict[str, Dict[str, str]], Dict[str, float], Dict[str, float]]:
+    """Get interface_oids, interface_thresholds, and interface_bandwidths from resource config (with caching)"""
     global _INTERFACE_CONFIG_CACHE
     
     try:
         # Check cache first
         if _INTERFACE_CONFIG_CACHE is not None:
-            interface_oids, interface_thresholds, cached_at = _INTERFACE_CONFIG_CACHE
+            interface_oids, interface_thresholds, interface_bandwidths, cached_at = _INTERFACE_CONFIG_CACHE
             # Verify cache is still valid by checking config updated_at
             cfg = db.query(ResourceConfigModel).order_by(ResourceConfigModel.id.asc()).first()
             if cfg and cfg.updated_at:
@@ -423,7 +423,7 @@ def _get_interface_config_from_db(db: Session) -> Tuple[Dict[str, Dict[str, str]
                 cfg_updated_ts = cfg.updated_at.timestamp() if hasattr(cfg.updated_at, 'timestamp') else time.mktime(cfg.updated_at.timetuple())
                 if cfg_updated_ts <= cached_at:
                     logger.debug("[resource_usage] Using cached interface config")
-                    return interface_oids, interface_thresholds
+                    return interface_oids, interface_thresholds, interface_bandwidths
                 else:
                     logger.debug("[resource_usage] Cache expired, refreshing interface config")
                     _INTERFACE_CONFIG_CACHE = None
@@ -431,12 +431,13 @@ def _get_interface_config_from_db(db: Session) -> Tuple[Dict[str, Dict[str, str]
         # Cache miss or expired - fetch from DB
         cfg = db.query(ResourceConfigModel).order_by(ResourceConfigModel.id.asc()).first()
         if not cfg:
-            _INTERFACE_CONFIG_CACHE = ({}, {}, time.time())
-            return {}, {}
+            _INTERFACE_CONFIG_CACHE = ({}, {}, {}, time.time())
+            return {}, {}, {}
         
         oids = json.loads(cfg.oids_json or '{}')
         interface_oids = {}
         interface_thresholds = {}
+        interface_bandwidths = {}
         if isinstance(oids, dict):
             if isinstance(oids.get('__interface_oids__'), dict):
                 interface_oids_raw = oids.get('__interface_oids__') or {}
@@ -450,17 +451,19 @@ def _get_interface_config_from_db(db: Session) -> Tuple[Dict[str, Dict[str, str]
                         interface_oids[if_name] = oid_value
             if isinstance(oids.get('__interface_thresholds__'), dict):
                 interface_thresholds = oids.get('__interface_thresholds__') or {}
+            if isinstance(oids.get('__interface_bandwidths__'), dict):
+                interface_bandwidths = oids.get('__interface_bandwidths__') or {}
         
         # Update cache
         import time
         cache_timestamp = cfg.updated_at.timestamp() if cfg.updated_at and hasattr(cfg.updated_at, 'timestamp') else time.time()
-        _INTERFACE_CONFIG_CACHE = (interface_oids, interface_thresholds, cache_timestamp)
-        logger.debug(f"[resource_usage] Cached interface config: {len(interface_oids)} interfaces")
+        _INTERFACE_CONFIG_CACHE = (interface_oids, interface_thresholds, interface_bandwidths, cache_timestamp)
+        logger.debug(f"[resource_usage] Cached interface config: {len(interface_oids)} interfaces, {len(interface_bandwidths)} bandwidths")
         
-        return interface_oids, interface_thresholds
+        return interface_oids, interface_thresholds, interface_bandwidths
     except Exception as e:
         logger.debug(f"[resource_usage] Failed to get interface config from db: {e}")
-        return {}, {}
+        return {}, {}, {}
 
 
 async def _collect_interface_mbps_from_oids(proxy: Proxy, community: str, interface_oids: Dict[str, Dict[str, str]]) -> Optional[Dict[str, Dict[str, Any]]]:
@@ -576,7 +579,7 @@ async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str,
     
     # Get interface_oids from config if not provided
     if interface_oids is None and db is not None:
-        interface_oids, _ = _get_interface_config_from_db(db)
+        interface_oids, _, _ = _get_interface_config_from_db(db)
     
     tasks: list = []
     keys: list[str] = []
@@ -655,7 +658,7 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
     collected_data: List[dict] = []
 
     # Get interface_oids from config
-    interface_oids, _ = _get_interface_config_from_db(db)
+    interface_oids, _, _ = _get_interface_config_from_db(db)
 
     # Gather all SNMP collection tasks
     tasks = [_collect_for_proxy(p, payload.oids, payload.community, db=db, interface_oids=interface_oids) for p in proxies]
