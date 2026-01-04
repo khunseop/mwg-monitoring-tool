@@ -553,33 +553,47 @@
 
             // 차트가 이미 있으면 시리즈만 업데이트 (전체 재렌더링 방지)
             if (ru.apex) {
-                // 시리즈 데이터만 업데이트하여 성능 개선
-                ru.apex.updateSeries(seriesData, false);
-                // 옵션 변경이 필요한 경우에만 업데이트
-                const needsOptionsUpdate = ru._lastHeatmapOptions === undefined || 
-                    JSON.stringify(ru._lastHeatmapOptions) !== JSON.stringify({
-                        height: calculatedHeight,
-                        width: baseWidth,
-                        xCategories: xCategories.length,
-                        yCategories: yCategories.length
-                    });
-                
-                if (needsOptionsUpdate) {
-                    ru.apex.updateOptions(options, false, false);
-                    ru._lastHeatmapOptions = {
-                        height: calculatedHeight,
-                        width: baseWidth,
-                        xCategories: xCategories.length,
-                        yCategories: yCategories.length
-                    };
-                    // 옵션 업데이트 후 resize 호출하여 레이블 표시 보장
-                    setTimeout(() => {
-                        if (ru.apex && typeof ru.apex.resize === 'function') {
-                            ru.apex.resize();
-                        }
-                    }, 100);
+                try {
+                    // 시리즈 데이터만 업데이트하여 성능 개선
+                    ru.apex.updateSeries(seriesData, false);
+                    // 옵션 변경이 필요한 경우에만 업데이트
+                    const needsOptionsUpdate = ru._lastHeatmapOptions === undefined || 
+                        JSON.stringify(ru._lastHeatmapOptions) !== JSON.stringify({
+                            height: calculatedHeight,
+                            width: baseWidth,
+                            xCategories: xCategories.length,
+                            yCategories: yCategories.length
+                        });
+                    
+                    if (needsOptionsUpdate) {
+                        ru.apex.updateOptions(options, false, false);
+                        ru._lastHeatmapOptions = {
+                            height: calculatedHeight,
+                            width: baseWidth,
+                            xCategories: xCategories.length,
+                            yCategories: yCategories.length
+                        };
+                        // 옵션 업데이트 후 resize 호출하여 레이블 표시 보장
+                        setTimeout(() => {
+                            if (ru.apex && typeof ru.apex.resize === 'function') {
+                                ru.apex.resize();
+                            }
+                        }, 100);
+                    }
+                } catch (e) {
+                    console.warn('[resource_usage_heatmap] Failed to update heatmap chart:', e);
+                    // 업데이트 실패 시 차트 재생성
+                    try {
+                        ru.apex.destroy();
+                    } catch (destroyErr) {
+                        // ignore
+                    }
+                    ru.apex = null;
+                    // 아래 else 블록으로 재생성
                 }
-            } else {
+            }
+            
+            if (!ru.apex) {
                 ru.apex = new ApexCharts(el, options);
                 // 컨테이너가 보이는 상태에서 렌더링
                 const renderChart = () => {

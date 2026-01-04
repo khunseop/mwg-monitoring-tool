@@ -27,6 +27,9 @@
                 console.log(logParts.join(' '));
             }
             
+            // 사용 중인 프록시 ID 수집 (메모리 정리를 위해)
+            const activeProxyIds = new Set((rows || []).map(row => row.proxy_id));
+            
             (rows || []).forEach(row => {
                 const proxyId = row.proxy_id;
                 const rawTs = row.collected_at ? new Date(row.collected_at).getTime() : now;
@@ -157,11 +160,32 @@
             });
             // prune old points (defensively skip null/invalid)
             const cutoff = now - ru.bufferWindowMs;
-            Object.values(ru.tsBuffer).forEach(byMetric => {
-                Object.keys(byMetric).forEach(k => {
-                    const arr = Array.isArray(byMetric[k]) ? byMetric[k] : [];
-                    byMetric[k] = arr.filter(p => p && typeof p.x === 'number' && p.x >= cutoff);
-                });
+            // 사용하지 않는 프록시 버퍼 제거 (메모리 누수 방지)
+            Object.keys(ru.tsBuffer).forEach(proxyId => {
+                if (!activeProxyIds.has(parseInt(proxyId, 10))) {
+                    // 오래된 프록시 버퍼 제거 (30분 이상 사용하지 않음)
+                    const byMetric = ru.tsBuffer[proxyId] || {};
+                    let hasRecentData = false;
+                    Object.keys(byMetric).forEach(k => {
+                        const arr = Array.isArray(byMetric[k]) ? byMetric[k] : [];
+                        if (arr.length > 0) {
+                            const lastPoint = arr[arr.length - 1];
+                            if (lastPoint && typeof lastPoint.x === 'number' && lastPoint.x >= cutoff) {
+                                hasRecentData = true;
+                            }
+                        }
+                    });
+                    if (!hasRecentData) {
+                        delete ru.tsBuffer[proxyId];
+                    }
+                } else {
+                    // 활성 프록시의 경우 오래된 포인트만 제거
+                    const byMetric = ru.tsBuffer[proxyId] || {};
+                    Object.keys(byMetric).forEach(k => {
+                        const arr = Array.isArray(byMetric[k]) ? byMetric[k] : [];
+                        byMetric[k] = arr.filter(p => p && typeof p.x === 'number' && p.x >= cutoff);
+                    });
+                }
             });
         },
 
@@ -242,6 +266,18 @@
                 }
                 
                 // Remove existing chart panels but keep header
+                // 이전 차트 인스턴스 정리 (메모리 누수 방지)
+                $wrap.find('.ru-chart-panel').each(function() {
+                    const metric = $(this).attr('id')?.replace('ruChartPanel-', '');
+                    if (metric && ru.charts && ru.charts[metric]) {
+                        try {
+                            ru.charts[metric].destroy();
+                        } catch (e) {
+                            console.warn('[resource_usage_charts] Failed to destroy chart:', e);
+                        }
+                        delete ru.charts[metric];
+                    }
+                });
                 $wrap.find('.ru-chart-panel').parent().remove();
                 $wrap.find('.ru-interface-separator').remove();
                 
@@ -551,7 +587,25 @@
                     ru._chartOptionsCache[metricKey] = JSON.stringify({ height, colors: colors.length });
                 }
                 // 시리즈 데이터만 업데이트 (애니메이션 비활성화로 성능 개선)
-                chartInstance.updateSeries(series, false);
+                // 이전 시리즈 데이터 참조를 정리하여 메모리 누수 방지
+                try {
+                    chartInstance.updateSeries(series, false);
+                } catch (e) {
+                    console.warn(`[resource_usage_charts] Failed to update series for ${metricKey}:`, e);
+                    // 업데이트 실패 시 차트 재생성
+                    try {
+                        chartInstance.destroy();
+                    } catch (destroyErr) {
+                        // ignore
+                    }
+                    const newChart = new ApexCharts(el, { ...options, series });
+                    if (isModal) {
+                        ru.modalChart = newChart;
+                    } else {
+                        ru.charts[metricKey] = newChart;
+                    }
+                    newChart.render();
+                }
             }
         },
 
@@ -677,10 +731,55 @@
             const ru = window.ru;
             $('#ruChartModal').removeClass('is-active');
             if (ru.modalChart) {
-                ru.modalChart.destroy();
+                try {
+                    ru.modalChart.destroy();
+                } catch (e) {
+                    console.warn('[resource_usage_charts] Failed to destroy modal chart:', e);
+                }
                 ru.modalChart = null;
             }
             $('#ruModalChart').empty();
+        },
+        
+        /**
+         * 모든 차트 인스턴스 정리 (메모리 누수 방지)
+         */
+        cleanupAllCharts() {
+            const ru = window.ru;
+            // 일반 차트 정리
+            if (ru.charts) {
+                Object.keys(ru.charts).forEach(metricKey => {
+                    const chart = ru.charts[metricKey];
+                    if (chart && typeof chart.destroy === 'function') {
+                        try {
+                            chart.destroy();
+                        } catch (e) {
+                            console.warn(`[resource_usage_charts] Failed to destroy chart ${metricKey}:`, e);
+                        }
+                    }
+                });
+                ru.charts = {};
+            }
+            
+            // 히트맵 차트 정리
+            if (ru.apex) {
+                try {
+                    ru.apex.destroy();
+                } catch (e) {
+                    console.warn('[resource_usage_charts] Failed to destroy heatmap chart:', e);
+                }
+                ru.apex = null;
+            }
+            
+            // 모달 차트 정리
+            if (ru.modalChart) {
+                try {
+                    ru.modalChart.destroy();
+                } catch (e) {
+                    console.warn('[resource_usage_charts] Failed to destroy modal chart:', e);
+                }
+                ru.modalChart = null;
+            }
         }
     };
 

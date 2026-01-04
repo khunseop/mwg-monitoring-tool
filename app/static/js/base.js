@@ -383,7 +383,17 @@ window.ResourceUsageCollector = {
         // 페이지 언로드 시 웹소켓 정리 (정상 종료 코드로 닫기)
         window.addEventListener('beforeunload', () => {
             if (this.ws) {
-                this.ws.close(1000, 'Page unloading'); // 1000: 정상 종료
+                try {
+                    this.ws.close(1000, 'Page unloading'); // 1000: 정상 종료
+                } catch (e) {
+                    // ignore
+                }
+                this.ws = null;
+            }
+            // 인디케이터 업데이트 타이머 정리
+            if (this._indicatorUpdateInterval) {
+                clearInterval(this._indicatorUpdateInterval);
+                this._indicatorUpdateInterval = null;
             }
         });
     }

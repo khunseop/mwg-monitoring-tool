@@ -125,6 +125,55 @@ $(document).ready(function() {
     $('#ruHeatmapWrap').hide();
     $('#ruEmptyState').show();
     
+    // 주기적 메모리 정리 (5분마다)
+    let memoryCleanupInterval = null;
+    function performMemoryCleanup() {
+        const now = Date.now();
+        const cutoff = now - ru.bufferWindowMs;
+        const selectedProxyIds = new Set(state.getSelectedProxyIds());
+        
+        // 사용하지 않는 프록시 버퍼 제거
+        Object.keys(ru.tsBuffer).forEach(proxyId => {
+            const proxyIdNum = parseInt(proxyId, 10);
+            if (!selectedProxyIds.has(proxyIdNum)) {
+                const byMetric = ru.tsBuffer[proxyId] || {};
+                let hasRecentData = false;
+                Object.keys(byMetric).forEach(k => {
+                    const arr = Array.isArray(byMetric[k]) ? byMetric[k] : [];
+                    const filtered = arr.filter(p => p && typeof p.x === 'number' && p.x >= cutoff);
+                    byMetric[k] = filtered;
+                    if (filtered.length > 0) {
+                        hasRecentData = true;
+                    }
+                });
+                // 최근 데이터가 없으면 버퍼 제거
+                if (!hasRecentData) {
+                    delete ru.tsBuffer[proxyId];
+                }
+            } else {
+                // 활성 프록시의 경우 오래된 포인트만 제거
+                const byMetric = ru.tsBuffer[proxyId] || {};
+                Object.keys(byMetric).forEach(k => {
+                    const arr = Array.isArray(byMetric[k]) ? byMetric[k] : [];
+                    byMetric[k] = arr.filter(p => p && typeof p.x === 'number' && p.x >= cutoff);
+                });
+            }
+        });
+        
+        // 차트 옵션 캐시 정리 (메모리 절약)
+        if (ru._chartOptionsCache) {
+            const activeMetrics = Object.keys(ru.charts || {});
+            Object.keys(ru._chartOptionsCache).forEach(key => {
+                if (!activeMetrics.includes(key)) {
+                    delete ru._chartOptionsCache[key];
+                }
+            });
+        }
+    }
+    
+    // 메모리 정리 시작 (5분마다)
+    memoryCleanupInterval = setInterval(performMemoryCleanup, 5 * 60 * 1000);
+    
     // 초기화: DeviceSelector 및 설정 로드
     Promise.all([
         DeviceSelector.init({
@@ -238,5 +287,54 @@ $(document).ready(function() {
                 ru.apex.resize();
             }
         }, 250);
+    });
+    
+    // 페이지 언로드 시 리소스 정리 (메모리 누수 방지)
+    window.addEventListener('beforeunload', function() {
+        // 메모리 정리 인터벌 정리
+        if (memoryCleanupInterval) {
+            clearInterval(memoryCleanupInterval);
+            memoryCleanupInterval = null;
+        }
+        
+        // 모든 차트 인스턴스 정리
+        if (ru.charts) {
+            Object.values(ru.charts).forEach(chart => {
+                if (chart && typeof chart.destroy === 'function') {
+                    try {
+                        chart.destroy();
+                    } catch (e) {
+                        // ignore
+                    }
+                }
+            });
+            ru.charts = {};
+        }
+        
+        // 히트맵 차트 정리
+        if (ru.apex) {
+            try {
+                ru.apex.destroy();
+            } catch (e) {
+                // ignore
+            }
+            ru.apex = null;
+        }
+        
+        // 모달 차트 정리
+        if (ru.modalChart) {
+            try {
+                ru.modalChart.destroy();
+            } catch (e) {
+                // ignore
+            }
+            ru.modalChart = null;
+        }
+        
+        // resize 타이머 정리
+        if (resizeTimeout) {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = null;
+        }
     });
 });
