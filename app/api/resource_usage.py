@@ -577,13 +577,42 @@ async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str,
     result: Dict[str, Any] = {k: None for k in SUPPORTED_KEYS}
     result["interface_mbps"] = None
     
-    # Get interface_oids from config if not provided
-    if interface_oids is None and db is not None:
-        interface_oids, _, _ = _get_interface_config_from_db(db)
+    # Check for per-proxy OID overrides in proxy.oids_json
+    proxy_oids_config = {}
+    if proxy.oids_json:
+        try:
+            proxy_oids_config = json.loads(proxy.oids_json)
+            if not isinstance(proxy_oids_config, dict):
+                proxy_oids_config = {}
+        except Exception as e:
+            logger.warning(f"[resource_usage] Failed to parse oids_json for proxy {proxy.id}: {e}")
+
+    # Merge OIDs: prioritizing payload, then proxy overrides, then global defaults
+    final_oids = dict(oids)
+    for key, val in proxy_oids_config.items():
+        if key in SUPPORTED_KEYS and val:
+            final_oids[key] = val
+
+    # Get interface_oids: prioritizing proxy overrides, then global config
+    final_interface_oids = {}
+    if "__interface_oids__" in proxy_oids_config and isinstance(proxy_oids_config["__interface_oids__"], dict):
+        # Support both old format (string) and new format (object with in_oid/out_oid)
+        for if_name, oid_value in proxy_oids_config["__interface_oids__"].items():
+            if isinstance(oid_value, str):
+                final_interface_oids[if_name] = {'in_oid': oid_value, 'out_oid': ''}
+            elif isinstance(oid_value, dict):
+                final_interface_oids[if_name] = oid_value
+    
+    # If no proxy-specific interface OIDs, use provided or fetch from DB
+    if not final_interface_oids:
+        if interface_oids is not None:
+            final_interface_oids = interface_oids
+        elif db is not None:
+            final_interface_oids, _, _ = _get_interface_config_from_db(db)
     
     tasks: list = []
     keys: list[str] = []
-    for key, oid in oids.items():
+    for key, oid in final_oids.items():
         if key not in SUPPORTED_KEYS:
             continue
         # Special handling for memory via SSH
@@ -596,8 +625,8 @@ async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str,
             tasks.append(_snmp_get(proxy.host, 161, community, oid))
 
     # Collect interface MBPS using configured OIDs
-    if interface_oids and len(interface_oids) > 0:
-        interface_mbps_task = _collect_interface_mbps_from_oids(proxy, community, interface_oids)
+    if final_interface_oids and len(final_interface_oids) > 0:
+        interface_mbps_task = _collect_interface_mbps_from_oids(proxy, community, final_interface_oids)
         tasks.append(interface_mbps_task)
         keys.append("interface_mbps")
 

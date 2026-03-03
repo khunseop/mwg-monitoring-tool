@@ -14,6 +14,7 @@ class Proxy(Base):
     traffic_log_path = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     group_id = Column(Integer, ForeignKey("proxy_groups.id", ondelete="SET NULL"), nullable=True)
+    oids_json = Column(Text, nullable=True)  # JSON string for per-proxy OID overrides
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=now_kst)
     updated_at = Column(DateTime(timezone=True), onupdate=now_kst, default=now_kst)

@@ -49,11 +49,62 @@ function fillForm(type, data) {
         $('#group_id').val(data.group_id || '');
         $('#description').val(data.description || '');
         $('#is_active').prop('checked', data.is_active);
+
+        // OID 개별 설정 초기화
+        $('#proxyInterfaceList').empty();
+        $('#use_custom_oids').prop('checked', false);
+        $('#customOidSection').hide();
+
+        if (data.oids_json) {
+            try {
+                const oids = JSON.parse(data.oids_json);
+                if (oids && oids.__interface_oids__ && Object.keys(oids.__interface_oids__).length > 0) {
+                    $('#use_custom_oids').prop('checked', true);
+                    $('#customOidSection').show();
+                    
+                    for (const [name, config] of Object.entries(oids.__interface_oids__)) {
+                        const in_oid = typeof config === 'string' ? config : (config.in_oid || '');
+                        const out_oid = typeof config === 'object' ? (config.out_oid || '') : '';
+                        addProxyInterfaceRow(name, in_oid, out_oid);
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to parse oids_json:', e);
+            }
+        }
     } else {
         $('#groupId').val(data.id);
         $('#groupName').val(data.name);
         $('#groupDescription').val(data.description || '');
     }
+}
+
+function toggleCustomOids() {
+    const isChecked = $('#use_custom_oids').is(':checked');
+    if (isChecked) {
+        $('#customOidSection').show();
+        if ($('#proxyInterfaceList tr').length === 0) {
+            addProxyInterfaceRow();
+        }
+    } else {
+        $('#customOidSection').hide();
+    }
+}
+
+function addProxyInterfaceRow(name = '', in_oid = '', out_oid = '') {
+    const row = `
+        <tr style="border-bottom: 1px solid var(--color-border-light);">
+            <td style="padding: 0.5rem 0.25rem;"><input class="input is-small if-name" type="text" value="${name}" placeholder="eth0" style="background: white;"></td>
+            <td style="padding: 0.5rem 0.25rem;"><input class="input is-small if-in-oid" type="text" value="${in_oid}" placeholder="1.3.6.1..." style="background: white;"></td>
+            <td style="padding: 0.5rem 0.25rem;"><input class="input is-small if-out-oid" type="text" value="${out_oid}" placeholder="1.3.6.1..." style="background: white;"></td>
+            <td class="has-text-centered" style="padding: 0.5rem 0.25rem;">
+                <button class="button is-small is-ghost px-0 py-0" onclick="$(this).closest('tr').remove()" title="삭제" style="color: var(--color-text-muted); height: auto;">
+                    <span class="icon is-small"><i class="fas fa-times"></i></span>
+                </button>
+            </td>
+        </tr>
+    `;
+    $('#proxyInterfaceList').append(row);
 }
 
 // 프록시 관리
@@ -97,12 +148,33 @@ function saveProxy() {
     const proxyId = $('#proxyId').val();
     const password = $('#password').val();
     
+    // OID 개별 설정 수집
+    let oids_json = null;
+    if ($('#use_custom_oids').is(':checked')) {
+        const interfaceOids = {};
+        $('#proxyInterfaceList tr').each(function() {
+            const name = $(this).find('.if-name').val().trim();
+            const in_oid = $(this).find('.if-in-oid').val().trim();
+            const out_oid = $(this).find('.if-out-oid').val().trim();
+            if (name && (in_oid || out_oid)) {
+                interfaceOids[name] = { in_oid, out_oid };
+            }
+        });
+        
+        if (Object.keys(interfaceOids).length > 0) {
+            oids_json = JSON.stringify({
+                __interface_oids__: interfaceOids
+            });
+        }
+    }
+
     const data = {
         host: $('#host').val(),
         username: $('#username').val(),
         traffic_log_path: ($('#traffic_log_path').val() || '').trim(),
         is_active: $('#is_active').is(':checked'),
         group_id: $('#group_id').val() ? parseInt($('#group_id').val()) : null,
+        oids_json: oids_json,
         description: $('#description').val() || null
     };
 
@@ -225,39 +297,42 @@ function parseCsvLinesToProxies(text) {
     for (let i = 0; i < lines.length; i++) {
         const raw = lines[i].trim();
         if (raw.length === 0) continue;
-        // Split by comma, keeping empty entries
-        const parts = raw.split(',').map(s => (s == null ? '' : s.trim()));
+        
+        // Simple CSV parser that handles quoted strings (for JSON)
+        const parts = [];
+        let current = '';
+        let inQuotes = false;
+        for (let char of raw) {
+            if (char === '"') inQuotes = !inQuotes;
+            else if (char === ',' && !inQuotes) {
+                parts.push(current.trim());
+                current = '';
+            } else current += char;
+        }
+        parts.push(current.trim());
+
         const host = parts[0] || '';
         const username = parts[1] || '';
         const password = parts[2] || '';
-        if (!host || !username || !password) {
-            // Skip malformed line
-            continue;
-        }
+        if (!host || !username || !password) continue;
+        
         const groupNameRaw = parts[3] || '';
         const trafficLogPathRaw = parts[4] || '';
         const isActiveRaw = parts[5] || '';
-        const descriptionRaw = parts.slice(6).join(','); // allow commas in description by joining remainder
+        const descriptionRaw = parts[6] || '';
+        const oidsJsonRaw = parts[7] || '';
 
-        const payload = {
-            host,
-            username,
-            password,
-        };
-        if (groupNameRaw && groupNameRaw.trim().length > 0) {
-            payload.group_name = groupNameRaw.trim();
-        }
-        if (trafficLogPathRaw && trafficLogPathRaw.trim().length > 0) {
-            payload.traffic_log_path = trafficLogPathRaw.trim();
-        }
+        const payload = { host, username, password };
+        if (groupNameRaw) payload.group_name = groupNameRaw;
+        if (trafficLogPathRaw) payload.traffic_log_path = trafficLogPathRaw;
         if (isActiveRaw) {
             const lowered = isActiveRaw.toLowerCase();
             if (['true','1','yes','y','on'].includes(lowered)) payload.is_active = true;
             else if (['false','0','no','n','off'].includes(lowered)) payload.is_active = false;
         }
-        if (descriptionRaw && descriptionRaw.trim().length > 0) {
-            payload.description = descriptionRaw.trim();
-        }
+        if (oidsJsonRaw) payload.oids_json = oidsJsonRaw;
+        if (descriptionRaw) payload.description = descriptionRaw;
+        
         proxies.push(payload);
     }
     return proxies;
@@ -339,3 +414,5 @@ window.saveProxy = saveProxy;
 window.deleteProxy = deleteProxy;
 window.saveGroup = saveGroup;
 window.deleteGroup = deleteGroup;
+window.toggleCustomOids = toggleCustomOids;
+window.addProxyInterfaceRow = addProxyInterfaceRow;

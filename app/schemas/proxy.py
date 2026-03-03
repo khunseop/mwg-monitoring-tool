@@ -15,6 +15,7 @@ class ProxyBase(BaseModel):
     traffic_log_path: str | None = None
     is_active: bool = True
     group_id: int | None = None
+    oids_json: str | None = None
     description: str | None = None
 
 class ProxyCreate(ProxyBase):
@@ -27,6 +28,7 @@ class ProxyUpdate(BaseModel):
     traffic_log_path: Optional[str] = None
     is_active: Optional[bool] = None
     group_id: Optional[int] = None
+    oids_json: Optional[str] = None
     description: Optional[str] = None
 
 class ProxyOut(TimestampModel):
@@ -36,6 +38,7 @@ class ProxyOut(TimestampModel):
     traffic_log_path: Optional[str] = None
     is_active: bool = True
     group_id: Optional[int] = None
+    oids_json: Optional[str] = None
     description: Optional[str] = None
     group_name: Optional[str] = None
 
@@ -58,4 +61,5 @@ class ProxyBulkCreateIn(BaseModel):
     group_name: Optional[constr(min_length=1)] = None
     traffic_log_path: Optional[str] = None
     is_active: bool = True
+    oids_json: Optional[str] = None
     description: Optional[str] = None

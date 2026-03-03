@@ -110,6 +110,7 @@ def bulk_create_proxies(
                 "traffic_log_path": item.traffic_log_path,
                 "is_active": item.is_active,
                 "group_id": resolved_group_id,
+                "oids_json": item.oids_json,
                 "description": item.description,
             }
             valid = ProxyCreate(**create_input)
