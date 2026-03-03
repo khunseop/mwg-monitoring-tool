@@ -26,7 +26,6 @@
                 <div class="buttons">
                     <button class="button is-primary" id="ruStartBtn">시작</button>
                     <button class="button is-danger" id="ruStopBtn" disabled>중지</button>
-                    <button class="button is-light" id="ruResetBtn" title="그래프 초기화">그래프 초기화</button>
                     <span id="ruStatus" class="tag is-light ml-2">정지됨</span>
                 </div>
             </div>
@@ -73,38 +72,14 @@
     </div>
 </div>
 
-<!-- 실시간 그래프 섹션 -->
-<div class="box">
-    <h4 class="title is-5 mb-4">실시간 그래프</h4>
-    <div id="ruChartsWrap" class="columns is-multiline" data-initialized="false">
-        <!-- Charts will be injected per metric by resource_usage.js -->
-    </div>
-</div>
-
-<!-- Optional local Chart.js (place chart.umd.js under static/vendor/chartjs/) -->
-<!-- Chart.js removed; using ApexCharts only -->
 <!-- Local ApexCharts (MIT) for heatmap -->
 <script src="/static/vendor/apexcharts/apexcharts.min.js"></script>
 <!-- Resource Usage 모듈들 (의존성 순서대로 로드) -->
 <script src="/static/js/resource_usage_utils.js"></script>
 <script src="/static/js/resource_usage_state.js"></script>
 <script src="/static/js/resource_usage_heatmap.js"></script>
-<script src="/static/js/resource_usage_charts.js"></script>
 <script src="/static/js/resource_usage_polling.js"></script>
 <script src="/static/js/resource_usage.js"></script>
-
-<div class="modal" id="ruChartModal">
-    <div class="modal-background"></div>
-    <div class="modal-card" style="width: 90%; max-width: 1200px;">
-        <header class="modal-card-head">
-            <p class="modal-card-title" id="ruModalTitle"></p>
-            <button class="delete" aria-label="close"></button>
-        </header>
-        <section class="modal-card-body">
-            <div id="ruModalChart"></div>
-        </section>
-    </div>
-</div>
 </div>
 
 <div id="history-tab" class="tab-content" {% if not is_history %}style="display:none;"{% endif %}>

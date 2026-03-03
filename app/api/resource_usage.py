@@ -39,7 +39,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-SUPPORTED_KEYS = {"cpu", "mem", "cc", "cs", "http", "https", "ftp"}
+SUPPORTED_KEYS = {"cpu", "mem", "cc", "cs", "http", "https", "ftp", "disk"}
 
 # Interface MBPS calculation constants
 IF_IN_OCTETS_OID = "1.3.6.1.2.1.2.2.1.10"  # ifInOctets
@@ -359,6 +359,75 @@ def _ssh_exec_and_parse_mem(host: str, port: int, username: str, password: str |
             pass
 
 
+def _ssh_exec_and_parse_disk(host: str, port: int, user: str, password: str | None, path: str, timeout_sec: int) -> float | None:
+    try:
+        import paramiko
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.connect(host, port=port, username=user, password=password, timeout=timeout_sec)
+        
+        # -Ph to be more portable and parse the percentage column
+        command = f"df -Ph {path} | awk 'NR==2 {{print $5}}' | sed 's/%//'"
+        _, stdout, stderr = client.exec_command(command, timeout=timeout_sec)
+        stdout_str = stdout.read().decode().strip()
+        stderr_str = stderr.read().decode().strip()
+        
+        if stdout_str:
+            try:
+                value = float(stdout_str)
+                logger.debug(f"[resource_usage] SSH disk success host={host} path={path} value={value:.2f}%")
+                return value
+            except (ValueError, TypeError):
+                logger.warning(f"[resource_usage] SSH disk parse failed host={host} output={stdout_str[:100]}")
+                return None
+        else:
+            logger.warning(f"[resource_usage] SSH disk failed host={host} stderr={stderr_str[:100]}")
+            return None
+    except Exception as exc:
+        logger.warning(f"[resource_usage] SSH disk error host={host} path={path}: {exc}")
+        return None
+    finally:
+        try:
+            client.close()
+        except Exception:
+            pass
+
+
+async def _ssh_get_disk_usage(proxy: Proxy, spec: str, timeout_sec: int = _SSH_TIMEOUT_SEC) -> float | None:
+    # spec formats: 'ssh' or 'ssh:<path>'
+    if not proxy or not proxy.host or not proxy.username:
+        return None
+    path = "/"
+    s = (spec or "").strip()
+    if ":" in s:
+        _, after = s.split(":", 1)
+        after = after.strip()
+        if after:
+            path = after
+    
+    loop = asyncio.get_running_loop()
+    async with _SSH_SEMAPHORE:
+        t0 = monotonic()
+        value = await loop.run_in_executor(
+            None,
+            lambda: _ssh_exec_and_parse_disk(
+                proxy.host,
+                getattr(proxy, "port", 22) or 22,
+                proxy.username,
+                decrypt_string_if_encrypted(getattr(proxy, "password", None)),
+                path,
+                timeout_sec,
+            ),
+        )
+        t1 = monotonic()
+        elapsed_ms = (t1 - t0) * 1000
+        if value is not None:
+            logger.info(f"[resource_usage] SSH disk success host={proxy.host} proxy_id={proxy.id} ms={elapsed_ms:.1f} value={value:.2f}%")
+        else:
+            logger.warning(f"[resource_usage] SSH disk failed host={proxy.host} proxy_id={proxy.id} ms={elapsed_ms:.1f}")
+    return value
+
+
 async def _ssh_get_mem_percent(proxy: Proxy, spec: str, timeout_sec: int = _SSH_TIMEOUT_SEC) -> float | None:
     # spec formats: 'ssh' or 'ssh:<command>'
     if not proxy or not proxy.host or not proxy.username:
@@ -615,11 +684,15 @@ async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str,
     for key, oid in final_oids.items():
         if key not in SUPPORTED_KEYS:
             continue
-        # Special handling for memory via SSH
+        # Special handling for memory/disk via SSH
         if key == "mem" and isinstance(oid, str) and oid.lower().strip().startswith("ssh"):
             logger.debug(f"[resource_usage] Using SSH mem for host={proxy.host} proxy_id={proxy.id} oidSpec={oid}")
             keys.append(key)
             tasks.append(_ssh_get_mem_percent(proxy, oid))
+        elif key == "disk" and isinstance(oid, str) and oid.lower().strip().startswith("ssh"):
+            logger.debug(f"[resource_usage] Using SSH disk for host={proxy.host} proxy_id={proxy.id} oidSpec={oid}")
+            keys.append(key)
+            tasks.append(_ssh_get_disk_usage(proxy, oid))
         else:
             keys.append(key)
             tasks.append(_snmp_get(proxy.host, 161, community, oid))
@@ -640,7 +713,7 @@ async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str,
     for key in SUPPORTED_KEYS:
         val = result.get(key)
         if val is not None:
-            if key in ['cpu', 'mem']:
+            if key in ['cpu', 'mem', 'disk']:
                 log_parts.append(f"{key}={val:.2f}%")
             elif key in ['cc', 'cs']:
                 log_parts.append(f"{key}={val}")

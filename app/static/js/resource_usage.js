@@ -29,61 +29,6 @@ $(document).ready(function() {
     $('#ruStartBtn').on('click', function() { polling.startPolling(); });
     $('#ruStopBtn').on('click', function() { polling.stopPolling(); });
     
-    // 그래프 초기화 버튼
-    $('#ruResetBtn').on('click', function() {
-        if (!confirm('모든 그래프 데이터를 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
-            return;
-        }
-        
-        // 타임시리즈 버퍼 초기화
-        ru.tsBuffer = {};
-        
-        // 히트맵 관련 상태 초기화
-        ru.lastCumulativeByProxy = {};
-        ru.heatmapMaxByMetric = {};
-        ru.lastData = [];
-        
-        // 범례 상태 초기화
-        ru.legendState = {};
-        
-        // 차트 인스턴스 초기화
-        if (ru.charts) {
-            Object.values(ru.charts).forEach(chart => {
-                if (chart && typeof chart.destroy === 'function') {
-                    chart.destroy();
-                }
-            });
-            ru.charts = {};
-        }
-        
-        // 히트맵 차트 초기화
-        if (ru.apex) {
-            ru.apex.destroy();
-            ru.apex = null;
-        }
-        
-        // 모달 차트 초기화
-        if (ru.modalChart) {
-            ru.modalChart.destroy();
-            ru.modalChart = null;
-        }
-        
-        // 상태 저장
-        state.saveBufferState();
-        state.saveLegendState();
-        state.saveHeatmapState();
-        
-        // 차트 DOM 재초기화 및 렌더링
-        charts.ensureApexChartsDom();
-        charts.renderAllCharts();
-        
-        // 히트맵 빈 상태 표시
-        $('#ruHeatmapWrap').hide();
-        $('#ruEmptyState').show();
-        
-        alert('그래프가 초기화되었습니다.');
-    });
-    
     $('#ruGroupSelect').on('change', function() {
         ru.lastCumulativeByProxy = {};
         ru.heatmapMaxByMetric = {}; // 그룹 변경 시 히트맵 스케일 리셋
@@ -128,47 +73,8 @@ $(document).ready(function() {
     // 주기적 메모리 정리 (5분마다)
     let memoryCleanupInterval = null;
     function performMemoryCleanup() {
-        const now = Date.now();
-        const cutoff = now - ru.bufferWindowMs;
-        const selectedProxyIds = new Set(state.getSelectedProxyIds());
-        
-        // 사용하지 않는 프록시 버퍼 제거
-        Object.keys(ru.tsBuffer).forEach(proxyId => {
-            const proxyIdNum = parseInt(proxyId, 10);
-            if (!selectedProxyIds.has(proxyIdNum)) {
-                const byMetric = ru.tsBuffer[proxyId] || {};
-                let hasRecentData = false;
-                Object.keys(byMetric).forEach(k => {
-                    const arr = Array.isArray(byMetric[k]) ? byMetric[k] : [];
-                    const filtered = arr.filter(p => p && typeof p.x === 'number' && p.x >= cutoff);
-                    byMetric[k] = filtered;
-                    if (filtered.length > 0) {
-                        hasRecentData = true;
-                    }
-                });
-                // 최근 데이터가 없으면 버퍼 제거
-                if (!hasRecentData) {
-                    delete ru.tsBuffer[proxyId];
-                }
-            } else {
-                // 활성 프록시의 경우 오래된 포인트만 제거
-                const byMetric = ru.tsBuffer[proxyId] || {};
-                Object.keys(byMetric).forEach(k => {
-                    const arr = Array.isArray(byMetric[k]) ? byMetric[k] : [];
-                    byMetric[k] = arr.filter(p => p && typeof p.x === 'number' && p.x >= cutoff);
-                });
-            }
-        });
-        
-        // 차트 옵션 캐시 정리 (메모리 절약)
-        if (ru._chartOptionsCache) {
-            const activeMetrics = Object.keys(ru.charts || {});
-            Object.keys(ru._chartOptionsCache).forEach(key => {
-                if (!activeMetrics.includes(key)) {
-                    delete ru._chartOptionsCache[key];
-                }
-            });
-        }
+        // 타임시리즈 버퍼 미사용으로 로직 대폭 축소
+        ru.tsBuffer = {};
     }
     
     // 메모리 정리 시작 (5분마다)
@@ -189,10 +95,6 @@ $(document).ready(function() {
     ]).then(function() {
         return state.restoreState();
     }).then(function() {
-        // 설정 로드 후 차트 DOM 초기화 (설정에 등록된 인터페이스 모두 표시)
-        charts.ensureApexChartsDom();
-        charts.renderAllCharts();
-        
         // 복원된 히트맵 데이터가 있으면 표시 (설정 로드 후)
         if (restoredHeatmapData && restoredHeatmapData.length > 0) {
             requestAnimationFrame(() => {
@@ -215,69 +117,16 @@ $(document).ready(function() {
             } else if (running) {
                 // 프록시가 선택되어 있는지 확인
                 if (state.getSelectedProxyIds().length === 0) { 
-                    charts.renderAllCharts(); 
                     polling.setRunning(false); 
                 } else { 
                     polling.startPolling(); 
                 }
-            } else { 
-                charts.renderAllCharts(); 
             }
         } catch (e) { 
-            charts.renderAllCharts(); 
+            console.error('State restoration failed:', e);
         }
     });
 
-    // 차트 관련 이벤트 핸들러
-    $('#ruChartsWrap').on('click', '.ru-chart-zoom-btn', function(e) {
-        e.stopPropagation();
-        const metric = $(this).data('metric');
-        if (metric) charts.openModal(metric);
-    });
-    
-    $('#ruChartsWrap').on('click', '.ru-chart-toggle-btn', function(e) {
-        e.stopPropagation();
-        const metric = $(this).data('metric');
-        if (metric) charts.toggleChart(metric);
-    });
-    
-    $('#ruChartsWrap').on('click', '.ru-chart-panel .title', function() {
-        const metric = $(this).data('metric');
-        if (metric) charts.toggleChart(metric);
-    });
-    
-    $('#ruChartHeightSlider').on('input', function() {
-        const newHeight = parseInt($(this).val(), 10);
-        charts.updateChartHeight(newHeight);
-    });
-    
-    // 동적으로 생성되는 버튼이므로 이벤트 위임 사용
-    $(document).on('click', '#ruToggleAllCharts', function() {
-        const $panels = $('#ruChartsWrap .ru-chart-panel');
-        if ($panels.length === 0) return;
-        
-        let allCollapsed = true;
-        
-        // 현재 상태 확인 (HTML 속성에서 직접 읽기)
-        $panels.each(function() {
-            const isCollapsed = $(this).attr('data-collapsed') === 'true';
-            if (!isCollapsed) {
-                allCollapsed = false;
-                return false; // break
-            }
-        });
-        
-        // 모두 접혀있으면 펼치기, 그렇지 않으면 접기
-        const shouldExpand = allCollapsed;
-        charts.toggleAllCharts(shouldExpand);
-        $(this).text(shouldExpand ? '전체 접기' : '전체 펼치기');
-    });
-
-    // 모달 닫기 이벤트
-    $('#ruChartModal').find('.modal-background, .delete').on('click', function() {
-        charts.closeModal();
-    });
-    
     // window resize 이벤트 - 히트맵 차트 resize
     let resizeTimeout = null;
     window.addEventListener('resize', function() {
@@ -297,20 +146,6 @@ $(document).ready(function() {
             memoryCleanupInterval = null;
         }
         
-        // 모든 차트 인스턴스 정리
-        if (ru.charts) {
-            Object.values(ru.charts).forEach(chart => {
-                if (chart && typeof chart.destroy === 'function') {
-                    try {
-                        chart.destroy();
-                    } catch (e) {
-                        // ignore
-                    }
-                }
-            });
-            ru.charts = {};
-        }
-        
         // 히트맵 차트 정리
         if (ru.apex) {
             try {
@@ -319,16 +154,6 @@ $(document).ready(function() {
                 // ignore
             }
             ru.apex = null;
-        }
-        
-        // 모달 차트 정리
-        if (ru.modalChart) {
-            try {
-                ru.modalChart.destroy();
-            } catch (e) {
-                // ignore
-            }
-            ru.modalChart = null;
         }
         
         // resize 타이머 정리

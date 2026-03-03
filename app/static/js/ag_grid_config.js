@@ -71,6 +71,11 @@
 						return params.value != null ? params.value.toFixed(1) : '-';
 					}
 				},
+				{ field: 'disk', headerName: 'DISK (%)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 80, width: 100, cellClass: 'num',
+					valueFormatter: function(params) {
+						return params.value != null ? params.value.toFixed(1) : '-';
+					}
+				},
 				{ field: 'cc', headerName: 'CC', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 100, width: 120, cellClass: 'num',
 					valueFormatter: function(params) {
 						if (params.value == null) return '-';

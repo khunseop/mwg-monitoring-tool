@@ -134,10 +134,12 @@ function getResourceConfigData() {
             http: $('#cfgOidHttp').val() || undefined,
             https: $('#cfgOidHttps').val() || undefined,
             ftp: $('#cfgOidFtp').val() || undefined,
+            disk: $('#cfgOidDisk').val() || undefined,
         },
         thresholds: {
             cpu: numOrUndef('#cfgThrCpu'),
             mem: numOrUndef('#cfgThrMem'),
+            disk: numOrUndef('#cfgThrDisk'),
             cc: numOrUndef('#cfgThrCc'),
             cs: numOrUndef('#cfgThrCs'),
             http: numOrUndef('#cfgThrHttp'),
@@ -168,9 +170,11 @@ function loadResourceConfig() {
             $('#cfgOidHttp').val(oids.http || '');
             $('#cfgOidHttps').val(oids.https || '');
             $('#cfgOidFtp').val(oids.ftp || '');
+            $('#cfgOidDisk').val(oids.disk || '');
             const th = cfg.thresholds || {};
             $('#cfgThrCpu').val(th.cpu ?? '');
             $('#cfgThrMem').val(th.mem ?? '');
+            $('#cfgThrDisk').val(th.disk ?? '');
             $('#cfgThrCc').val(th.cc ?? '');
             $('#cfgThrCs').val(th.cs ?? '');
             $('#cfgThrHttp').val(th.http ?? '');
@@ -358,9 +362,9 @@ $(document).ready(() => {
     
     // 모든 입력 필드 변경 감지
     const configInputs = [
-        '#cfgCommunity', '#cfgOidCpu', '#cfgOidMem', '#cfgOidCc', '#cfgOidCs', 
+        '#cfgCommunity', '#cfgOidCpu', '#cfgOidMem', '#cfgOidDisk', '#cfgOidCc', '#cfgOidCs', 
         '#cfgOidHttp', '#cfgOidHttps', '#cfgOidFtp',
-        '#cfgThrCpu', '#cfgThrMem', '#cfgThrCc', '#cfgThrCs',
+        '#cfgThrCpu', '#cfgThrMem', '#cfgThrDisk', '#cfgThrCc', '#cfgThrCs',
         '#cfgThrHttp', '#cfgThrHttps', '#cfgThrFtp',
         '#sbCfgPort', '#sbCfgTimeout', '#sbCfgHostKeyPolicy'
     ];

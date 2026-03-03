@@ -105,6 +105,7 @@
                     proxy_id: proxyId,
                     cpu: typeof row.cpu === 'number' ? row.cpu : null,
                     mem: typeof row.mem === 'number' ? row.mem : null,
+                    disk: typeof row.disk === 'number' ? row.disk : null,
                     cc: typeof row.cc === 'number' ? row.cc : null,
                     cs: typeof row.cs === 'number' ? row.cs : null,
                     httpd: deltas.http,
@@ -151,6 +152,7 @@
             const basicMetrics = [
                 { key: 'cpu', title: 'CPU' },
                 { key: 'mem', title: 'MEM' },
+                { key: 'disk', title: 'DISK' },
                 { key: 'cc', title: 'CC' },
                 { key: 'cs', title: 'CS' },
                 { key: 'httpd', title: 'HTTP Δ' },
@@ -217,7 +219,7 @@
                     const idx = Math.max(0, Math.floor(vals.length * 0.95) - 1);
                     max = vals[idx];
                 }
-                if ((m.key === 'cpu' || m.key === 'mem') && max < 100) max = 100;
+                if ((m.key === 'cpu' || m.key === 'mem' || m.key === 'disk') && max < 100) max = 100;
                 
                 // 기존 최대값이 있고, 새로 계산한 값이 기존보다 크면 업데이트
                 // 그렇지 않으면 기존 값 유지 (스케일 일관성)
@@ -426,6 +428,9 @@
                         }
                         if (key === 'cc' || key === 'cs') {
                             return isLargeDataset ? utils.abbreviateNumber(raw) : utils.formatNumber(raw);
+                        }
+                        if (key === 'cpu' || key === 'mem' || key === 'disk') {
+                            return Math.round(raw) + '%';
                         }
                         return String(Math.round(raw));
                     }

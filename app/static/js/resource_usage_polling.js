@@ -140,12 +140,8 @@
                         if (valid.length > 0) {
                             // Reset cache before updating to prevent wrong deltas
                             ru.lastCumulativeByProxy = {};
-                            // Update table and charts with fresh data
-                            charts.bufferAppendBatch(valid);
-                            state.saveBufferState();
-                            // 차트와 히트맵 업데이트를 requestAnimationFrame으로 최적화
+                            // Update heatmap with fresh data
                             requestAnimationFrame(() => {
-                                charts.renderAllCharts();
                                 heatmap.updateTable(valid);
                             });
                         }
@@ -220,11 +216,8 @@
                                     };
                                 });
                             }
-                            charts.bufferAppendBatch(valid);
-                            state.saveBufferState();
-                            // 차트와 히트맵 업데이트를 requestAnimationFrame으로 최적화
+                            // Update heatmap with fresh data
                             requestAnimationFrame(() => {
-                                charts.renderAllCharts();
                                 heatmap.updateTable(valid);
                             });
                         }
