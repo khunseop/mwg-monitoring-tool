@@ -35,7 +35,7 @@
                 const rawTs = row.collected_at ? new Date(row.collected_at).getTime() : now;
                 // quantize to bucket to align across proxies in same cycle
                 const ts = Math.floor(rawTs / ru.timeBucketMs) * ru.timeBucketMs;
-                ru.tsBuffer[proxyId] = ru.tsBuffer[proxyId] || { cpu: [], mem: [], cc: [], cs: [], http: [], https: [], ftp: [] };
+                ru.tsBuffer[proxyId] = ru.tsBuffer[proxyId] || { cpu: [], mem: [], cc: [], cs: [], disk: [], http: [], https: [], ftp: [] };
                 
                 // Initialize interface buffers dynamically (now keyed by interface name with in/out)
                 // 설정에서 인터페이스 목록을 가져와서 버퍼 초기화 (데이터가 없어도 초기화)
@@ -54,7 +54,7 @@
                 });
                 
                 const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
-                ['cpu','mem','cc','cs'].forEach(k => {
+                ['cpu','mem','cc','cs','disk'].forEach(k => {
                     const v = row[k];
                     if (typeof v === 'number') {
                         const arr = ru.tsBuffer[proxyId][k];
@@ -216,8 +216,8 @@
                     return true;
                 }
                 
-                const basicMetrics = ['cpu','mem','cc','cs','http','https','ftp'];
-                const basicTitles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
+                const basicMetrics = ['cpu','mem','cc','cs','disk','http','https','ftp'];
+                const basicTitles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', disk: 'DISK', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
                 
                 // Get configured interfaces from config
                 const interfaceOids = (ru.cachedConfig && ru.cachedConfig.interface_oids) ? ru.cachedConfig.interface_oids : {};
@@ -387,7 +387,7 @@
             const interfaceOids = (ru.cachedConfig && ru.cachedConfig.interface_oids) ? ru.cachedConfig.interface_oids : {};
             const configuredInterfaceNames = Object.keys(interfaceOids);
             
-            const basicMetrics = ['cpu','mem','cc','cs','http','https','ftp'];
+            const basicMetrics = ['cpu','mem','cc','cs','disk','http','https','ftp'];
             // Interface metrics: in and out separately
             const interfaceMetrics = [];
             configuredInterfaceNames.forEach(ifName => {
@@ -544,7 +544,7 @@
                                 return val.toFixed(2) + ' Mbps';
                             }
                             if (metricKey === 'cc' || metricKey === 'cs') { return utils.formatNumber(Math.round(val)); }
-                            if (metricKey === 'cpu' || metricKey === 'mem') { return String(Math.round(val)); }
+                            if (metricKey === 'cpu' || metricKey === 'mem' || metricKey === 'disk') { return String(Math.round(val)); }
                             if (metricKey.startsWith('if_')) { 
                                 // 회선사용률은 bps로 표시
                                 const bps = utils.mbpsToBps(val);
@@ -708,7 +708,7 @@
          */
         openModal(metricKey) {
             const ru = window.ru;
-            const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
+            const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', disk: 'DISK', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
             if (metricKey.startsWith('if_')) {
                 const ifName = metricKey.replace(/^if_/, '').replace(/_in$|_out$/, '');
                 const direction = metricKey.endsWith('_in') ? 'IN' : (metricKey.endsWith('_out') ? 'OUT' : '');

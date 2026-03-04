@@ -237,6 +237,7 @@ class BackgroundCollector:
                         "http": metrics.get("http"),
                         "https": metrics.get("https"),
                         "ftp": metrics.get("ftp"),
+                        "disk": metrics.get("disk"),
                         "interface_mbps": interface_mbps_json,
                         "community": community,
                         "oids_raw": json_lib.dumps(oids),

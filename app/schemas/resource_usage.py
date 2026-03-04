@@ -44,7 +44,7 @@ class ResourceUsage(ResourceUsageBase, TimestampModel):
 class ResourceUsageCreate(BaseModel):
     proxy_id: int
     community: Optional[str] = Field(default="public")
-    # Map of metric key to OID string. Supported keys: cpu, mem, cc, cs, http, https, ftp
+    # Map of metric key to OID string. Supported keys: cpu, mem, cc, cs, http, https, ftp, disk
     oids: Dict[str, str]
 
 
@@ -53,7 +53,7 @@ class CollectRequest(BaseModel):
     proxy_ids: List[int]
     # Community string (required)
     community: str = Field(min_length=1)
-    # OIDs mapping (keys: cpu, mem, cc, cs, http, https, ftp) (required)
+    # OIDs mapping (keys: cpu, mem, cc, cs, http, https, ftp, disk) (required)
     oids: Dict[str, str]
 
 
