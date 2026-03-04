@@ -2,11 +2,19 @@
 
 /* Titles */
 .title { 
-    color: var(--color-text); 
+    color: var(--color-text);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    margin-bottom: 1.5rem;
+}
+
+.subtitle {
+    color: var(--color-text-muted);
+    font-weight: 500;
 }
 
 .title strong { 
-    font-weight: 600; 
+    font-weight: 800; 
 }
 
 /* Formatting helpers */
