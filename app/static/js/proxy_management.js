@@ -291,6 +291,56 @@ function closeBulkProxyModal() {
     $('#bulkProxyModal').removeClass('is-active');
 }
 
+function downloadProxySampleCsv() {
+    const header = "host,user,pass,group,log_path,active,desc,oids_json\n";
+    const sample = '10.10.10.1,admin,mypassword123,서울센터,/var/log/mwg/traffic.log,true,Primary MWG,"{\"__interface_oids__\":{\"eth0\":{\"in_oid\":\"1.3.6.1.2.1.2.2.1.10.1\",\"out_oid\":\"1.3.6.1.2.1.2.2.1.16.1\"}}}"\n';
+    const blob = new Blob([header + sample], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", "pmt_proxy_sample.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function exportProxiesToCsv() {
+    $.get('/api/proxies')
+        .done(proxies => {
+            const header = "host,user,pass,group,log_path,active,desc,oids_json\n";
+            let csv = header;
+            proxies.forEach(p => {
+                const fields = [
+                    p.host,
+                    p.username || '',
+                    '', // password is not exported for security
+                    p.group_name || '',
+                    p.traffic_log_path || '',
+                    p.is_active ? 'true' : 'false',
+                    p.description || '',
+                    p.oids_json ? JSON.stringify(p.oids_json) : ''
+                ];
+                
+                const row = fields.map(f => {
+                    const str = String(f);
+                    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                        return '"' + str.replace(/"/g, '""') + '"';
+                    }
+                    return str;
+                }).join(',');
+                csv += row + '\n';
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", `pmt_proxies_export_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        })
+        .fail(() => (window.AppUtils && AppUtils.showError('내보내기 실패')));
+}
+
 function parseCsvLinesToProxies(text) {
     const lines = (text || '').split(/\r?\n/);
     const proxies = [];
@@ -298,29 +348,45 @@ function parseCsvLinesToProxies(text) {
         const raw = lines[i].trim();
         if (raw.length === 0) continue;
         
-        // Simple CSV parser that handles quoted strings (for JSON)
+        // Robust CSV parser (handles quoted strings and escaped quotes)
         const parts = [];
         let current = '';
         let inQuotes = false;
-        for (let char of raw) {
-            if (char === '"') inQuotes = !inQuotes;
-            else if (char === ',' && !inQuotes) {
+        for (let j = 0; j < raw.length; j++) {
+            const char = raw[j];
+            const nextChar = raw[j+1];
+
+            if (char === '"') {
+                if (inQuotes && nextChar === '"') {
+                    // Escaped quote
+                    current += '"';
+                    j++;
+                } else {
+                    // Toggle quote mode
+                    inQuotes = !inQuotes;
+                }
+            } else if (char === ',' && !inQuotes) {
                 parts.push(current.trim());
                 current = '';
-            } else current += char;
+            } else {
+                current += char;
+            }
         }
         parts.push(current.trim());
+
+        // Skip header if it matches "host,user,pass"
+        if (i === 0 && parts[0].toLowerCase() === 'host' && parts[1].toLowerCase() === 'user') continue;
 
         const host = parts[0] || '';
         const username = parts[1] || '';
         const password = parts[2] || '';
-        if (!host || !username || !password) continue;
+        if (!host || !username) continue; // password might be empty for existing records if we supported updates via CSV, but for create it's usually needed.
         
         const groupNameRaw = parts[3] || '';
         const trafficLogPathRaw = parts[4] || '';
         const isActiveRaw = parts[5] || '';
         const descriptionRaw = parts[6] || '';
-        const oidsJsonRaw = parts[7] || '';
+        let oidsJsonRaw = parts[7] || '';
 
         const payload = { host, username, password };
         if (groupNameRaw) payload.group_name = groupNameRaw;
@@ -330,7 +396,14 @@ function parseCsvLinesToProxies(text) {
             if (['true','1','yes','y','on'].includes(lowered)) payload.is_active = true;
             else if (['false','0','no','n','off'].includes(lowered)) payload.is_active = false;
         }
-        if (oidsJsonRaw) payload.oids_json = oidsJsonRaw;
+        
+        // If oids_json is provided
+        if (oidsJsonRaw) {
+            // If it's already a valid JSON string, use it. 
+            // The parser handles escaped quotes if they were provided correctly.
+            payload.oids_json = oidsJsonRaw;
+        }
+        
         if (descriptionRaw) payload.description = descriptionRaw;
         
         proxies.push(payload);
@@ -416,3 +489,5 @@ window.saveGroup = saveGroup;
 window.deleteGroup = deleteGroup;
 window.toggleCustomOids = toggleCustomOids;
 window.addProxyInterfaceRow = addProxyInterfaceRow;
+window.downloadProxySampleCsv = downloadProxySampleCsv;
+window.exportProxiesToCsv = exportProxiesToCsv;
