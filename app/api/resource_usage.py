@@ -1237,7 +1237,7 @@ async def export_resource_usage(
     filename = f"resource_usage_{dt.now().strftime('%Y%m%d_%H%M%S')}.csv"
     
     return Response(
-        content=output.getvalue(),
+        content="\ufeff" + output.getvalue(),
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )

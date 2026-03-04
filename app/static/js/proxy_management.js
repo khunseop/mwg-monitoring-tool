@@ -294,7 +294,7 @@ function closeBulkProxyModal() {
 function downloadProxySampleCsv() {
     const header = "host,user,pass,group,log_path,active,desc,oids_json\n";
     const sample = '10.10.10.1,admin,mypassword123,서울센터,/var/log/mwg/traffic.log,true,Primary MWG,"{\"__interface_oids__\":{\"eth0\":{\"in_oid\":\"1.3.6.1.2.1.2.2.1.10.1\",\"out_oid\":\"1.3.6.1.2.1.2.2.1.16.1\"}}}"\n';
-    const blob = new Blob([header + sample], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(["\ufeff" + header + sample], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.setAttribute("download", "pmt_proxy_sample.csv");
@@ -330,7 +330,7 @@ function exportProxiesToCsv() {
                 csv += row + '\n';
             });
             
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
             link.setAttribute("download", `pmt_proxies_export_${new Date().toISOString().split('T')[0]}.csv`);
