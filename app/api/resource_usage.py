@@ -366,8 +366,8 @@ def _ssh_exec_and_parse_disk(host: str, port: int, user: str, password: str | No
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         client.connect(host, port=port, username=user, password=password, timeout=timeout_sec)
         
-        # -Ph to be more portable and parse the percentage column
-        command = f"df -Ph {path} | awk 'NR==2 {{print $5}}' | sed 's/%//'"
+        # Use a more robust command to get the usage percentage of the specific path
+        command = f"df -k {path} | awk 'END{{print $(NF-1)}}' | sed 's/%//'"
         _, stdout, stderr = client.exec_command(command, timeout=timeout_sec)
         stdout_str = stdout.read().decode().strip()
         stderr_str = stderr.read().decode().strip()
@@ -394,16 +394,11 @@ def _ssh_exec_and_parse_disk(host: str, port: int, user: str, password: str | No
 
 
 async def _ssh_get_disk_usage(proxy: Proxy, spec: str, timeout_sec: int = _SSH_TIMEOUT_SEC) -> float | None:
-    # spec formats: 'ssh' or 'ssh:<path>'
+    # Always check /opt filesystem as requested
     if not proxy or not proxy.host or not proxy.username:
         return None
-    path = "/"
-    s = (spec or "").strip()
-    if ":" in s:
-        _, after = s.split(":", 1)
-        after = after.strip()
-        if after:
-            path = after
+    
+    path = "/opt"
     
     loop = asyncio.get_running_loop()
     async with _SSH_SEMAPHORE:
