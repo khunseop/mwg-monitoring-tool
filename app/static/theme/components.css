@@ -47,25 +47,43 @@
     margin-top: 0;
 }
 
-/* Box - Modern Card */
+/* Box - Modern Flat (Minimalist) */
 .box {
-    background: var(--color-surface);
-    border-radius: var(--radius-md);
-    border: 1px solid var(--color-border);
-    box-shadow: var(--shadow-sm);
-    padding: 1.5rem;
+    background: transparent; /* 배경 투명화 또는 매우 연하게 */
+    border-radius: 0;
+    border: none;
+    border-bottom: 1px solid var(--color-border); /* 구분선 역할만 수행 */
+    box-shadow: none;
+    padding: 1.5rem 0; /* 좌우 패딩 제거 */
+    margin-bottom: 1.5rem;
 }
 
 .box.is-compact {
-    padding: 1rem 1.25rem;
+    padding: 0.75rem 0;
 }
 
-/* Settings Bar (Integrated) */
+/* 설정 바 - 배경 추가 및 보정 */
 .settings-bar {
     display: flex;
     align-items: center;
     gap: 1rem;
     flex-wrap: wrap;
+    background: var(--color-surface);
+    padding: 0.75rem 1.25rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+}
+
+/* Settings Bar (Integrated) */
+.settings-bar .select:not(.is-multiple):not(.is-loading)::after {
+    display: none !important;
+}
+
+.settings-bar .select select {
+    padding-right: 0.75rem !important;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
 }
 
 .settings-bar .button,
@@ -76,6 +94,7 @@
     height: 32px !important;
     min-height: 32px !important;
     font-size: 0.875rem !important;
+    background-color: white !important;
 }
 
 /* Buttons */

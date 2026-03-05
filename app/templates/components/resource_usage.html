@@ -2,61 +2,157 @@
 
 {% block content %}
 {% set is_history = request.url.path == '/resource/history' %}
+
 <div id="realtime-tab" class="tab-content" {% if is_history %}style="display:none;"{% endif %}>
-<!-- 모니터링 설정 섹션 (컴팩트 버전) -->
-<div class="box is-compact mb-4">
-    <div class="is-flex is-align-items-center is-flex-wrap-wrap ru-settings-bar settings-bar" style="gap: 1rem; min-height: 2.5rem;">
-        <h3 class="title is-6 mb-0 has-text-grey-darker">모니터링 설정</h3>
-        
-        <div class="is-flex is-align-items-center" style="gap: 0.5rem; flex: 1; min-width: 250px;">
-            <div class="select is-small" style="width: 140px; display: flex !important; align-items: center;">
-                <select id="ruGroupSelect" style="width: 100%; border-radius: 4px;"></select>
+    <!-- 페이지 헤더 -->
+    <div class="is-flex is-align-items-center mb-5">
+        <h3 class="title is-4 mb-0">실시간 자원 모니터링</h3>
+        <div id="ruNavIndicator" class="ru-nav-indicator ml-3" style="display: none;">
+            <span class="ru-nav-spinner"></span>
+            <span class="is-size-7">수집 중</span>
+        </div>
+    </div>
+
+    <!-- 모니터링 설정 바 (슬림 & 미니멀) -->
+    <div class="settings-bar mb-5">
+        <div class="is-flex is-align-items-center" style="gap: 0.4rem; flex: 1;">
+            <div class="select is-small" style="width: 160px;">
+                <select id="ruGroupSelect"></select>
             </div>
-            <div style="position: relative; display: flex !important; align-items: center;">
-                <!-- 선택 현황을 보여주는 버튼 트리거 -->
-                <button id="ruProxyTrigger" class="button is-small is-info is-light px-3" type="button" style="min-width: 100px;">
+            <div style="position: relative;">
+                <button id="ruProxyTrigger" class="button is-small is-white px-3" type="button" style="border: 1px solid var(--color-border); min-width: 120px; justify-content: space-between;">
                     <span class="icon is-small mr-1"><i class="fas fa-server"></i></span>
                     <span id="ruSelectionCounter">0 / 0</span>
                     <span class="icon is-small ml-1"><i class="fas fa-angle-down"></i></span>
                 </button>
-                <div style="position: absolute; top: 100%; left: 0; width: 100%; height: 0; visibility: hidden; pointer-events: none;">
+                <div style="position: absolute; visibility: hidden; height: 0;">
                     <select id="ruProxySelect" multiple></select>
                 </div>
             </div>
         </div>
 
-        <div class="is-flex is-align-items-center" style="gap: 0.75rem; margin-left: auto;">
+        <div class="is-flex is-align-items-center" style="gap: 1rem;">
             <div class="field has-addons mb-0">
                 <p class="control">
-                    <span class="button is-static is-small">주기</span>
+                    <span class="button is-static is-small" style="background: transparent; border: none; font-weight: 600;">주기</span>
                 </p>
                 <p class="control">
-                    <input class="input is-small has-text-centered" id="ruIntervalSec" type="number" min="5" value="60" style="width: 50px;">
+                    <input class="input is-small has-text-centered" id="ruIntervalSec" type="number" min="5" value="60" style="width: 50px; border-radius: var(--radius-sm);">
                 </p>
                 <p class="control">
-                    <span class="button is-static is-small">초</span>
+                    <span class="button is-static is-small" style="background: transparent; border: none;">초</span>
                 </p>
             </div>
             
-            <button class="button is-primary is-small px-5" id="ruToggleBtn">시작</button>
-            
-            <span id="ruNavIndicator" class="ru-nav-indicator" style="display: none; padding: 0 0.5rem; height: 32px; align-items: center;">
-                <span class="ru-nav-spinner" style="width: 10px; height: 10px;"></span>
-                <span class="is-size-7 ml-1">수집 중</span>
-            </span>
+            <button class="button is-primary is-small px-5" id="ruToggleBtn" style="font-weight: 600;">시작</button>
         </div>
     </div>
-    <p id="ruError" class="help is-danger mt-1" style="display:none;"></p>
+
+    <!-- 히트맵 섹션 (전체 너비 활용) -->
+    <div class="heatmap-container" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1.5rem; overflow: hidden;">
+        <div class="is-flex is-align-items-center is-justify-content-between mb-4">
+            <h4 class="title is-6 mb-0 has-text-grey">자원 사용률 히트맵</h4>
+            <div id="ruHeatmapLegend" class="is-size-7"></div>
+        </div>
+        <div id="ruHeatmapWrap" style="overflow-x: auto; overflow-y: auto; max-height: 75vh;">
+            <div id="ruHeatmapEl" style="min-width: 1000px;"></div>
+        </div>
+        <div id="ruEmptyState" class="empty-state">
+            <div class="has-text-centered">
+                <span class="icon is-large has-text-grey-lighter mb-3"><i class="fas fa-chart-line fa-3x"></i></span>
+                <p>표시할 데이터가 없습니다. 상단에서 대상을 선택하고 "시작"을 클릭하세요.</p>
+            </div>
+        </div>
+    </div>
 </div>
 
-<!-- 히트맵 섹션 -->
-<div class="box mb-4">
-    <h4 class="title is-5 mb-4">자원 사용률 히트맵</h4>
-    <div id="ruHeatmapWrap" style="overflow-x: auto; overflow-y: auto; max-height: 80vh;">
-        <div id="ruHeatmapEl" style="min-width: 800px;"></div>
+<div id="history-tab" class="tab-content" {% if not is_history %}style="display:none;"{% endif %}>
+    <!-- 이력 조회 헤더 -->
+    <div class="level mb-5">
+        <div class="level-left">
+            <div class="level-item">
+                <h3 class="title is-4 mb-0">자원사용률 이력 조회</h3>
+            </div>
+        </div>
+        <div class="level-right">
+            <div class="level-item">
+                <div class="tags has-addons">
+                    <span class="tag is-dark">총 레코드</span>
+                    <span class="tag is-info" id="ruHistoryTotalCount">-</span>
+                </div>
+            </div>
+        </div>
     </div>
-    <div id="ruEmptyState" class="empty-state" style="display:none; padding: 2rem;">
-        현재 표시할 데이터가 없습니다. 상단에서 대상을 선택하고 "시작"을 클릭하세요.
+    
+    <!-- 이력 조회 필터 바 -->
+    <div class="settings-bar mb-5" style="padding: 1.25rem;">
+        <div class="columns is-multiline is-variable is-2 w-100">
+            <div class="column is-2">
+                <div class="field">
+                    <label class="label is-size-7">프록시</label>
+                    <div class="control">
+                        <select id="ruHistoryProxySelect" class="ts-fullwidth">
+                            <option value="">전체</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="column is-2">
+                <div class="field">
+                    <label class="label is-size-7">시작 시간</label>
+                    <div class="control">
+                        <input class="input is-small" id="ruHistoryStartTime" type="datetime-local">
+                    </div>
+                </div>
+            </div>
+            <div class="column is-2">
+                <div class="field">
+                    <label class="label is-size-7">종료 시간</label>
+                    <div class="control">
+                        <input class="input is-small" id="ruHistoryEndTime" type="datetime-local">
+                    </div>
+                </div>
+            </div>
+            <div class="column is-1">
+                <div class="field">
+                    <label class="label is-size-7">개수</label>
+                    <div class="control">
+                        <div class="select is-small is-fullwidth">
+                            <select id="ruHistoryLimit">
+                                <option value="100">100</option>
+                                <option value="500" selected>500</option>
+                                <option value="1000">1,000</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="column is-5">
+                <div class="field">
+                    <label class="label is-size-7">&nbsp;</label>
+                    <div class="buttons">
+                        <button class="button is-primary is-small" id="ruHistorySearchBtn">기간 조회</button>
+                        <button class="button is-light is-small" id="ruHistoryLoadAllBtn">전체 조회</button>
+                        <button class="button is-light is-small" id="ruHistoryExportBtn">내보내기</button>
+                        <button class="button is-danger is-light is-small" id="ruHistoryDeleteBtn">삭제</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="ruHistoryLoading" class="has-text-centered p-6" style="display:none;">
+        <span class="loader" style="display: inline-block; width: 2rem; height: 2rem;"></span>
+        <p class="mt-3 has-text-grey">조회 중...</p>
+    </div>
+    
+    <div id="ruHistoryResults" style="display:none;">
+        <div id="ruHistoryTableGrid" class="ag-theme-quartz" style="height: 70vh; width: 100%; border-radius: var(--radius-md); overflow: hidden;"></div>
+        <nav class="pagination is-centered mt-4" role="navigation" id="ruHistoryPagination" style="display:none;">
+            <a class="pagination-previous" id="ruHistoryPrevBtn">이전</a>
+            <a class="pagination-next" id="ruHistoryNextBtn">다음</a>
+            <ul class="pagination-list"></ul>
+        </nav>
     </div>
 </div>
 

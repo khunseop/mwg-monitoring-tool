@@ -24,12 +24,14 @@ body {
 }
 
 .main-content {
-    padding: 2rem 1.5rem; /* 실제 컨텐츠 영역 패딩 */
+    padding: 1.5rem 0; /* 상하 여백만 유지 */
 }
 
 .container { 
-    max-width: 1600px; /* 더 와이드하게 확장 */
-    margin: 0 auto;
+    max-width: 100% !important; /* 너비 제한 해제 */
+    width: 100%;
+    padding: 0 2rem; /* 네비바와 일치하는 최소 여백 */
+    margin: 0;
 }
 
 /* Utility classes */
