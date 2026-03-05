@@ -4,47 +4,8 @@
 {% set is_history = request.url.path == '/resource/history' %}
 <div id="realtime-tab" class="tab-content" {% if is_history %}style="display:none;"{% endif %}>
 <!-- 모니터링 설정 섹션 (컴팩트 버전) -->
-<style>
-    /* 설정 바 내부의 모든 입력/버튼/셀렉트 높이 강제 통일 */
-    .ru-settings-bar .button,
-    .ru-settings-bar .input,
-    .ru-settings-bar .select,
-    .ru-settings-bar .select select,
-    .ru-settings-bar .ts-wrapper .ts-control {
-        height: 32px !important;
-        min-height: 32px !important;
-        max-height: 32px !important;
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-        margin: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-        line-height: 1 !important;
-        vertical-align: middle !important;
-    }
-    /* 셀렉트 내부 텍스트 패딩 조정 */
-    .ru-settings-bar .select select {
-        padding-left: 0.75rem !important;
-        padding-right: 2rem !important;
-    }
-    /* 일반 셀렉트 화살표 위치 보정 */
-    .ru-settings-bar .select:not(.is-multiple):not(.is-loading)::after {
-        border-color: #4a4a4a !important;
-        top: 50% !important;
-        margin-top: -3px !important;
-    }
-    /* TomSelect 내부 텍스트 정렬 보정 */
-    .ru-settings-bar .ts-wrapper .ts-control > .item,
-    .ru-settings-bar .ts-wrapper .ts-control > input {
-        display: flex !important;
-        align-items: center !important;
-        height: 100% !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }
-</style>
 <div class="box is-compact mb-4">
-    <div class="is-flex is-align-items-center is-flex-wrap-wrap ru-settings-bar" style="gap: 1rem; min-height: 2.5rem;">
+    <div class="is-flex is-align-items-center is-flex-wrap-wrap ru-settings-bar settings-bar" style="gap: 1rem; min-height: 2.5rem;">
         <h3 class="title is-6 mb-0 has-text-grey-darker">모니터링 설정</h3>
         
         <div class="is-flex is-align-items-center" style="gap: 0.5rem; flex: 1; min-width: 250px;">

@@ -4,37 +4,9 @@
 {% set is_upload = request.url.path == '/traffic-logs/upload' %}
 <!-- 원격 조회 섹션 -->
 <div id="tlRemoteSection" {% if is_upload %}style="display:none;"{% endif %}>
-	<style>
-		/* 설정 바 내부의 모든 입력/버튼/셀렉트 높이 강제 통일 */
-		.tl-settings-bar .button,
-		.tl-settings-bar .input,
-		.tl-settings-bar .select,
-		.tl-settings-bar .select select,
-		.tl-settings-bar .ts-wrapper .ts-control {
-			height: 32px !important;
-			min-height: 32px !important;
-			max-height: 32px !important;
-			padding-top: 0 !important;
-			padding-bottom: 0 !important;
-			margin: 0 !important;
-			display: flex !important;
-			align-items: center !important;
-			line-height: 1 !important;
-			vertical-align: middle !important;
-		}
-		.tl-settings-bar .select:not(.is-multiple):not(.is-loading)::after {
-			border-color: #4a4a4a !important;
-			top: 50% !important;
-			margin-top: -3px !important;
-		}
-		.tl-settings-bar .select select {
-			padding-left: 0.75rem !important;
-			padding-right: 2rem !important;
-		}
-	</style>
 	<!-- 제어 헤더 (컴팩트 버전) -->
 	<div class="box is-compact mb-4">
-		<div class="is-flex is-align-items-center is-flex-wrap-wrap tl-settings-bar" style="gap: 1rem; min-height: 2.5rem;">
+		<div class="is-flex is-align-items-center is-flex-wrap-wrap tl-settings-bar settings-bar" style="gap: 1rem; min-height: 2.5rem;">
 			<h3 class="title is-6 mb-0 has-text-grey-darker">로그 조회 설정</h3>
 			
 			<div class="is-flex is-align-items-center" style="gap: 0.5rem; flex: 1; min-width: 250px;">

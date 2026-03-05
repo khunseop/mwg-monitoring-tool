@@ -93,6 +93,7 @@ $(document).ready(function() {
             proxyTrigger: '#ruProxyTrigger',
             selectAll: '#ruSelectAll',
             selectionCounter: '#ruSelectionCounter',
+            storageKey: 'ru_state', // ResourceUsageState에서 사용하는 키와 맞춤
             onData: function(data) {
                 ru.groups = data.groups || [];
                 ru.proxies = data.proxies || [];

@@ -58,17 +58,14 @@
 	window.showTrafficLogDetail = showDetail;
 
 	function saveState(records){
-		const proxyIds = ($('#tlProxySelect').val() || []).map(v => parseInt(v, 10));
-		const state = {
-			proxyIds: proxyIds,
-			query: $('#tlQuery').val(),
-			limit: $('#tlLimit').val(),
-			direction: $('#tlDirection').val(),
-			view: CURRENT_VIEW,
-			records: records || []
-		};
 		try {
-			localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+			const current = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+			current.query = $('#tlQuery').val();
+			current.limit = $('#tlLimit').val();
+			current.direction = $('#tlDirection').val();
+			current.view = CURRENT_VIEW;
+			current.records = records || [];
+			localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
 		} catch(e) {}
 	}
 
@@ -83,16 +80,10 @@
 			if (state.limit !== undefined) $('#tlLimit').val(state.limit);
 			if (state.direction !== undefined) $('#tlDirection').val(state.direction);
 			
-			setTimeout(() => {
-				if (state.proxyIds && state.proxyIds.length > 0) {
-					const ts = document.getElementById('tlProxySelect')._tom;
-					if (ts) ts.setValue(state.proxyIds.map(String), false);
-				}
-				if (state.records && state.records.length > 0) {
-					renderTable(state.records);
-				}
-				IS_RESTORING = false;
-			}, 300);
+			if (state.records && state.records.length > 0) {
+				renderTable(state.records);
+			}
+			IS_RESTORING = false;
 		} catch(e) { IS_RESTORING = false; }
 	}
 
@@ -150,6 +141,7 @@
 			proxySelect: '#tlProxySelect',
 			proxyTrigger: '#tlProxyTrigger',
 			selectionCounter: '#tlSelectionCounter',
+			storageKey: STORAGE_KEY,
 			onData: (data) => {
 				PROXIES = data.proxies;
 				if (!IS_RESTORING) restoreState();

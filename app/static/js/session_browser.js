@@ -106,12 +106,9 @@
     }
 
     function persistState() {
-        const state = {
-            proxyIds: getSelectedProxyIds(),
-            groupId: $('#sbGroupSelect').val(),
-            records: sb.records.slice(0, 500) // 저장 용량 제한
-        };
-        localStorage.setItem(sb.storageKey, JSON.stringify(state));
+        const current = JSON.parse(localStorage.getItem(sb.storageKey) || '{}');
+        current.records = sb.records.slice(0, 500);
+        localStorage.setItem(sb.storageKey, JSON.stringify(current));
     }
 
     function restoreState() {
@@ -122,28 +119,12 @@
             const state = JSON.parse(saved);
             sb.isRestoring = true;
 
-            if (state.groupId) {
-                $('#sbGroupSelect').val(state.groupId).trigger('change');
+            if (state.records && state.records.length > 0) {
+                sb.records = state.records;
+                if (sb.gridApi) sb.gridApi.setGridOption('rowData', sb.records);
+                setStatus(`${sb.records.length}건 복원됨`, 'is-info');
             }
-
-            if (state.proxyIds && state.proxyIds.length > 0) {
-                // DeviceSelector가 프록시 목록을 채운 후 값을 설정해야 함
-                setTimeout(() => {
-                    const ts = document.getElementById('sbProxySelect')._tom;
-                    if (ts) {
-                        ts.setValue(state.proxyIds.map(String), false);
-                    }
-                    
-                    if (state.records && state.records.length > 0) {
-                        sb.records = state.records;
-                        if (sb.gridApi) sb.gridApi.setGridOption('rowData', sb.records);
-                        setStatus(`${sb.records.length}건 복원됨`, 'is-info');
-                    }
-                    sb.isRestoring = false;
-                }, 300);
-            } else {
-                sb.isRestoring = false;
-            }
+            sb.isRestoring = false;
         } catch (e) {
             console.warn('[SessionBrowser] State restore failed', e);
             sb.isRestoring = false;
@@ -182,6 +163,7 @@
             proxySelect: '#sbProxySelect',
             proxyTrigger: '#sbProxyTrigger',
             selectionCounter: '#sbSelectionCounter',
+            storageKey: sb.storageKey,
             onData: (data) => {
                 sb.groups = data.groups;
                 sb.proxies = data.proxies;

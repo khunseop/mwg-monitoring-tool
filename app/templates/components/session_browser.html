@@ -3,35 +3,7 @@
 {% block content %}
 <!-- 필터/액션 헤더 섹션 -->
 <div class="box mb-4">
-    <style>
-        /* 설정 바 내부의 모든 입력/버튼/셀렉트 높이 강제 통일 */
-        .sb-settings-bar .button,
-        .sb-settings-bar .input,
-        .sb-settings-bar .select,
-        .sb-settings-bar .select select,
-        .sb-settings-bar .ts-wrapper .ts-control {
-            height: 32px !important;
-            min-height: 32px !important;
-            max-height: 32px !important;
-            padding-top: 0 !important;
-            padding-bottom: 0 !important;
-            margin: 0 !important;
-            display: flex !important;
-            align-items: center !important;
-            line-height: 1 !important;
-            vertical-align: middle !important;
-        }
-        .sb-settings-bar .select:not(.is-multiple):not(.is-loading)::after {
-            border-color: #4a4a4a !important;
-            top: 50% !important;
-            margin-top: -3px !important;
-        }
-        .sb-settings-bar .select select {
-            padding-left: 0.75rem !important;
-            padding-right: 2rem !important;
-        }
-    </style>
-    <div class="is-flex is-align-items-center is-flex-wrap-wrap sb-settings-bar" style="gap: 1rem; min-height: 2.5rem;">
+    <div class="is-flex is-align-items-center is-flex-wrap-wrap sb-settings-bar settings-bar" style="gap: 1rem; min-height: 2.5rem;">
         <h3 class="title is-6 mb-0 has-text-grey-darker">세션 조회 설정</h3>
         
         <div class="is-flex is-align-items-center" style="gap: 0.5rem; flex: 1; min-width: 250px;">

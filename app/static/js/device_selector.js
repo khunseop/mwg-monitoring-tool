@@ -19,6 +19,35 @@
 			var apiGroups = options.apiGroups || '/api/proxy-groups';
 			var apiProxies = options.apiProxies || '/api/proxies';
 			var state = { groups: [], proxies: [], ts: null };
+			var storageKey = options.storageKey || null;
+
+			function saveToStorage() {
+				if (!storageKey || !state.ts) return;
+				try {
+					var current = JSON.parse(localStorage.getItem(storageKey) || '{}');
+					current.proxyIds = state.ts.getValue().map(function(v) { return parseInt(v, 10); });
+					if ($group.length) {
+						current.groupId = $group.val();
+					}
+					localStorage.setItem(storageKey, JSON.stringify(current));
+				} catch (e) { /* ignore */ }
+			}
+
+			function restoreFromStorage() {
+				if (!storageKey) return;
+				try {
+					var saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+					if (saved.groupId && $group.length) {
+						$group.val(saved.groupId);
+						populateProxies();
+					}
+					if (saved.proxyIds && Array.isArray(saved.proxyIds) && state.ts) {
+						state.ts.setValue(saved.proxyIds.map(String), false);
+					} else {
+						selectCurrentGroupProxies();
+					}
+				} catch (e) { /* ignore */ }
+			}
 
 			function updateCounter() {
 				if (!$counter.length) return;
@@ -168,16 +197,17 @@
 								try { 
 									$proxy.trigger('change'); 
 									updateCounter();
+									saveToStorage();
 								} catch (e) { /* ignore */ } 
 							},
 							onDropdownOpen: function() {
-								// 오픈 직후와 레이아웃 안착 후 두 번 실행
 								positionDropdown();
 								setTimeout(positionDropdown, 0);
 								setTimeout(positionDropdown, 100);
 							}
 						});
 						state.ts = ts;
+						restoreFromStorage();
 					} catch (e) { 
 						console.error('[DeviceSelector] TomSelect init failed:', e);
 					}
@@ -190,6 +220,7 @@
 						populateProxies();
 						selectCurrentGroupProxies();
 						updateCounter();
+						saveToStorage();
 					});
 				}
 				if ($trigger.length) {
