@@ -138,20 +138,16 @@
 			function positionDropdown() {
 				if (!state.ts || !state.ts.isOpen || !$trigger.length) return;
 				
-				// 트리거 버튼의 현재 위치 계산
-				var offset = $trigger.offset();
-				var height = $trigger.outerHeight();
-				var width = Math.max(300, $trigger.outerWidth());
-
-				// dropdownParent가 'body'일 때를 가정 (현재 기본값)
+				// 트리거 버튼의 부모(relative container) 기준 위치 고정
 				$(state.ts.dropdown).css({
-					top: (offset.top + height) + 'px',
-					left: offset.left + 'px',
-					width: width + 'px',
+					top: '32px',
+					left: '0',
+					width: '300px',
 					position: 'absolute',
-					zIndex: 2000,
+					zIndex: 9999,
 					display: 'block',
-					visibility: 'visible'
+					visibility: 'visible',
+					pointerEvents: 'auto'
 				});
 			}
 
@@ -163,6 +159,10 @@
 							try { state.ts.destroy(); } catch (e) { /* ignore */ }
 							state.ts = null;
 						}
+						
+						// 트리거 버튼의 부모를 드롭다운의 부모로 설정하여 상대 좌표 유지
+						var $container = $trigger.parent();
+						
 						var ts = new TomSelect($proxy[0], {
 							plugins: { 
 								remove_button: { title: '제거' },
@@ -174,7 +174,7 @@
 							closeAfterSelect: false,
 							hideSelected: false,
 							maxItems: null,
-							dropdownParent: 'body', 
+							dropdownParent: $container[0], // body 대신 컨테이너에 직접 삽입
 							allowEmptyOption: false,
 							render: {
 								option: function(data, escape) { 
@@ -188,7 +188,7 @@
 								$proxy[0]._tom = this; 
 								updateCounter();
 								var self = this;
-								// 기본 position 함수를 우리 것으로 대체
+								// 기본 position 기능을 커스텀으로 완전 교체
 								this.position = function() {
 									positionDropdown();
 								};
@@ -198,12 +198,14 @@
 									$proxy.trigger('change'); 
 									updateCounter();
 									saveToStorage();
+									// 체크 시 위치 고정
+									positionDropdown();
 								} catch (e) { /* ignore */ } 
 							},
 							onDropdownOpen: function() {
 								positionDropdown();
+								// 애니메이션 등 예외 상황 대비 이중 확인
 								setTimeout(positionDropdown, 0);
-								setTimeout(positionDropdown, 100);
 							}
 						});
 						state.ts = ts;
@@ -232,8 +234,9 @@
 								state.ts.close(); 
 							} else { 
 								// 드롭다운을 열기 전에 기존의 모든 TomSelect 드롭다운을 닫음 (충돌 방지)
-								$('.ts-dropdown').hide();
+								$('.ts-dropdown').css({ visibility: 'hidden', display: 'none' });
 								state.ts.open();
+								positionDropdown();
 							}
 						}
 					});
@@ -248,7 +251,8 @@
 				// 문서 클릭 시 드롭다운 닫기 (이벤트 전파 방지 때문)
 				$(document).off('.devicesel-close').on('click.devicesel-close', function(e) {
 					if (state.ts && state.ts.isOpen) {
-						if (!$(e.target).closest('.ts-wrapper, .ts-dropdown, ' + (options.proxyTrigger || '#ruProxyTrigger')).length) {
+						var $target = $(e.target);
+						if (!$target.closest('.ts-wrapper, .ts-dropdown, ' + (options.proxyTrigger || '#ruProxyTrigger')).length) {
 							state.ts.close();
 						}
 					}
