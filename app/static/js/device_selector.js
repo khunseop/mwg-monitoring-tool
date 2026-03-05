@@ -13,11 +13,19 @@
 			var $group = $(options.groupSelect);
 			var $proxy = $(options.proxySelect);
 			var $selectAll = options.selectAll ? $(options.selectAll) : $();
+			var $counter = options.selectionCounter ? $(options.selectionCounter) : $();
 			var allowAllGroups = (options.allowAllGroups === undefined) ? true : !!options.allowAllGroups;
 			var labelForProxy = (typeof options.labelForProxy === 'function') ? options.labelForProxy : defaultLabelForProxy;
 			var apiGroups = options.apiGroups || '/api/proxy-groups';
 			var apiProxies = options.apiProxies || '/api/proxies';
 			var state = { groups: [], proxies: [], ts: null };
+
+			function updateCounter() {
+				if (!$counter.length) return;
+				var totalCount = filteredProxies().length;
+				var selectedCount = (state.ts ? state.ts.getValue() : ($proxy.val() || [])).length;
+				$counter.text(selectedCount + ' / ' + totalCount + ' 프록시 선택됨');
+			}
 
 			function populateGroups() {
 				if ($group && $group.length) {
@@ -119,28 +127,38 @@
 							state.ts = null;
 						}
 						var ts = new TomSelect($proxy[0], {
-							plugins: { remove_button: { title: '제거' } },
+							plugins: { 
+								remove_button: { title: '제거' },
+								checkbox_options: {} // 체크박스 플러그인 활성화
+							},
 							create: false,
 							persist: true,
 							maxOptions: 10000,
 							closeAfterSelect: false,
-							hideSelected: true,
+							hideSelected: false, // 체크박스 사용 시 선택된 항목을 숨기지 않음
 							maxItems: null,
 							dropdownParent: 'body',
 							allowEmptyOption: false,
-							placeholder: '프록시를 선택하세요',
+							placeholder: '모니터링할 프록시를 선택하세요',
 							render: {
-								option: function(data, escape) { return '<div style="white-space:nowrap;">' + (data.text || '') + '</div>'; },
+								option: function(data, escape) { 
+									return '<div class="is-flex is-align-items-center">' +
+										'<span class="mr-2" style="display:inline-block; width:14px; height:14px; border:1px solid #ccc; border-radius:3px; position:relative;"></span>' +
+										'<span style="white-space:nowrap;">' + (data.text || '') + '</span>' +
+										'</div>'; 
+								},
 								item: function(data, escape) { return '<div style="white-space:nowrap;">' + (data.text || '') + '</div>'; },
 								no_results: function(data, escape) { return '<div class="no-results">일치하는 프록시가 없습니다</div>'; }
 							},
 							onInitialize: function() { 
 								$proxy[0]._tom = this; 
+								updateCounter();
 								console.log('[DeviceSelector] TomSelect initialized');
 							},
 							onChange: function() { 
 								try { 
 									$proxy.trigger('change'); 
+									updateCounter();
 									console.log('[DeviceSelector] Proxy selection changed:', this.getValue());
 								} catch (e) { /* ignore */ } 
 							}
@@ -197,6 +215,7 @@
 						} catch (e) { 
 							console.error('[DeviceSelector] Failed to auto-select proxies:', e);
 						}
+						updateCounter(); // Counter update after group change
 					});
 					// If user clicks the group select without changing value, still reconcile proxies for the visible group
 					$group.on('click.devicesel', function() { selectCurrentGroupProxies(); });
@@ -205,10 +224,11 @@
 					$selectAll.off('.devicesel').on('change.devicesel', function() {
 						var checked = $(this).is(':checked');
 						var vals = $proxy.find('option').map(function() { return $(this).val(); }).get();
-					try {
-						if (state.ts) { state.ts.setValue(checked ? vals : [], false); }
-						else { $proxy.find('option').prop('selected', checked); $proxy.trigger('change'); }
-					} catch (e) { /* ignore */ }
+						try {
+							if (state.ts) { state.ts.setValue(checked ? vals : [], false); }
+							else { $proxy.find('option').prop('selected', checked); $proxy.trigger('change'); }
+						} catch (e) { /* ignore */ }
+						updateCounter(); // Counter update after select all
 					});
 				}
 			}

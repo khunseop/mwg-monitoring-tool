@@ -3,62 +3,46 @@
 {% block content %}
 {% set is_history = request.url.path == '/resource/history' %}
 <div id="realtime-tab" class="tab-content" {% if is_history %}style="display:none;"{% endif %}>
-<!-- 필터/설정 섹션 -->
-<div class="box mb-4">
-    <div class="level mb-4">
-        <div class="level-left">
-            <div class="level-item">
-                <h3 class="title is-4 mb-0">자원사용률 모니터링</h3>
+<!-- 모니터링 설정 섹션 (컴팩트 버전) -->
+<div class="box is-compact mb-4">
+    <div class="is-flex is-align-items-center is-flex-wrap-wrap" style="gap: 1rem; min-height: 2.5rem;">
+        <h3 class="title is-6 mb-0 has-text-grey-darker">모니터링 설정</h3>
+        
+        <div class="is-flex is-align-items-center" style="gap: 0.5rem; flex: 1; min-width: 320px;">
+            <div style="width: 140px;">
+                <select id="ruGroupSelect"></select>
             </div>
+            <div style="flex: 1; position: relative;">
+                <select id="ruProxySelect" multiple class="ts-fullwidth"></select>
+            </div>
+            <span id="ruSelectionCounter" class="tag is-info is-light is-rounded is-small" style="font-size: 0.75rem; white-space: nowrap;">0 / 0</span>
+            <label class="checkbox is-size-7 user-select-none ml-1" style="white-space: nowrap;">
+                <input type="checkbox" id="ruSelectAll"> <span class="ml-1">전체</span>
+            </label>
         </div>
-        <div class="level-right">
-            <div class="level-item">
-                <div class="field has-addons">
-                    <p class="control">
-                        <span class="button is-static">주기(초)</span>
-                    </p>
-                    <p class="control">
-                        <input class="input" id="ruIntervalSec" type="number" min="5" step="1" value="60">
-                    </p>
-                </div>
-            </div>
-            <div class="level-item">
-                <div class="buttons">
-                    <button class="button is-primary" id="ruStartBtn">시작</button>
-                    <button class="button is-danger" id="ruStopBtn" disabled>중지</button>
-                    <span id="ruStatus" class="tag is-light ml-2">정지됨</span>
-                </div>
-            </div>
-        </div>
-    </div>
-    <p id="ruError" class="help is-danger" style="display:none;"></p>
 
-    <!-- 통합 필터바 -->
-    <div class="filter-bar">
-        <div class="filter-bar-content">
-            <div class="filter-item">
-                <span class="filter-label">그룹</span>
-                <div class="filter-control">
-                    <div class="select is-fullwidth">
-                        <select id="ruGroupSelect">
-                            <option value="">전체</option>
-                        </select>
-                    </div>
-                </div>
+        <div class="is-flex is-align-items-center" style="gap: 0.75rem; margin-left: auto;">
+            <div class="field has-addons mb-0">
+                <p class="control">
+                    <span class="button is-static is-small">주기</span>
+                </p>
+                <p class="control">
+                    <input class="input is-small has-text-centered" id="ruIntervalSec" type="number" min="5" value="60" style="width: 50px;">
+                </p>
+                <p class="control">
+                    <span class="button is-static is-small">초</span>
+                </p>
             </div>
-            <div class="filter-item filter-item-expanded">
-                <span class="filter-label">프록시</span>
-                <div class="filter-control">
-                    <select id="ruProxySelect" multiple class="ts-fullwidth"></select>
-                </div>
-            </div>
-            <div class="filter-item filter-item-checkbox">
-                <label class="checkbox">
-                    <input type="checkbox" id="ruSelectAll"> 모두 선택
-                </label>
-            </div>
+            
+            <button class="button is-primary is-small px-5" id="ruToggleBtn">시작</button>
+            
+            <span id="ruNavIndicator" class="ru-nav-indicator" style="display: none; padding: 0.2rem 0.5rem;">
+                <span class="ru-nav-spinner" style="width: 10px; height: 10px;"></span>
+                <span class="is-size-7 ml-1">수집 중</span>
+            </span>
         </div>
     </div>
+    <p id="ruError" class="help is-danger mt-1" style="display:none;"></p>
 </div>
 
 <!-- 히트맵 섹션 -->

@@ -173,14 +173,13 @@
          */
         setRunning(running) {
             const state = window.ResourceUsageState;
+            const $toggleBtn = $('#ruToggleBtn');
             if (running) {
-                $('#ruStartBtn').attr('disabled', true);
-                $('#ruStopBtn').attr('disabled', false);
-                $('#ruStatus').removeClass('is-light').removeClass('is-danger').addClass('is-success').text('실행 중');
+                $toggleBtn.removeClass('is-primary').addClass('is-danger').text('중지');
+                $('#ruIntervalSec').attr('disabled', true);
             } else {
-                $('#ruStartBtn').attr('disabled', false);
-                $('#ruStopBtn').attr('disabled', true);
-                $('#ruStatus').removeClass('is-success').removeClass('is-danger').addClass('is-light').text('정지됨');
+                $toggleBtn.removeClass('is-danger').addClass('is-primary').text('시작');
+                $('#ruIntervalSec').attr('disabled', false);
             }
             state.saveRunningState(running);
         },

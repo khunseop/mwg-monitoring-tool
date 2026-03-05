@@ -26,8 +26,13 @@ $(document).ready(function() {
     // 차트 DOM 초기화는 설정 로드 후에 수행 (설정에 등록된 인터페이스 정보 필요)
 
     // 이벤트 핸들러
-    $('#ruStartBtn').on('click', function() { polling.startPolling(); });
-    $('#ruStopBtn').on('click', function() { polling.stopPolling(); });
+    $('#ruToggleBtn').on('click', function() {
+        if (ru.intervalId) {
+            polling.stopPolling();
+        } else {
+            polling.startPolling();
+        }
+    });
     
     $('#ruGroupSelect').on('change', function() {
         ru.lastCumulativeByProxy = {};
@@ -86,6 +91,7 @@ $(document).ready(function() {
             groupSelect: '#ruGroupSelect',
             proxySelect: '#ruProxySelect',
             selectAll: '#ruSelectAll',
+            selectionCounter: '#ruSelectionCounter',
             onData: function(data) {
                 ru.groups = data.groups || [];
                 ru.proxies = data.proxies || [];

@@ -77,6 +77,28 @@
     color: var(--color-text) !important;
 }
 
+/* Tom Select Checkbox Styles */
+.ts-dropdown .option .mr-2 {
+    transition: all 0.2s ease;
+}
+
+.ts-dropdown .selected .mr-2 {
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+}
+
+.ts-dropdown .selected .mr-2::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    left: 4px;
+    width: 4px;
+    height: 8px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
 .ts-dropdown [data-selectable].option {
     cursor: pointer !important;
 }
