@@ -13,6 +13,7 @@
 			var $group = $(options.groupSelect);
 			var $proxy = $(options.proxySelect);
 			var $counter = options.selectionCounter ? $(options.selectionCounter) : $();
+			var $trigger = $('#ruProxyTrigger'); // 버튼 트리거 추가
 			var allowAllGroups = (options.allowAllGroups === undefined) ? true : !!options.allowAllGroups;
 			var labelForProxy = (typeof options.labelForProxy === 'function') ? options.labelForProxy : defaultLabelForProxy;
 			var apiGroups = options.apiGroups || '/api/proxy-groups';
@@ -26,12 +27,11 @@
 				var filteredIds = filtered.map(function(p) { return String(p.id); });
 				var allSelectedIds = state.ts ? state.ts.getValue() : ($proxy.val() || []);
 				
-				// 현재 필터링된 그룹에 속한 선택된 아이디들만 필터링
 				var selectedInCurrentGroup = allSelectedIds.filter(function(id) {
 					return filteredIds.indexOf(String(id)) !== -1;
 				});
 				var selectedCount = selectedInCurrentGroup.length;
-				$counter.text(selectedCount + ' / ' + totalCount + ' 프록시 선택됨');
+				$counter.text(selectedCount + ' / ' + totalCount + ' 선택됨');
 			}
 
 			function populateGroups() {
@@ -89,18 +89,6 @@
 				}
 			}
 
-			function selectAllCurrentProxiesIfNone() {
-				if (!$proxy || $proxy.length === 0) return;
-				var current = $proxy.val() || [];
-				if (current.length > 0) return;
-				var vals = $proxy.find('option').map(function() { return $(this).val(); }).get();
-				if (vals.length === 0) return;
-				try {
-					if (state.ts) { state.ts.setValue(vals, false); }
-					else { $proxy.find('option').prop('selected', true); $proxy.trigger('change'); }
-				} catch (e) { /* ignore */ }
-			}
-
 			function selectCurrentGroupProxies() {
 				if (!$proxy || $proxy.length === 0) return;
 				var vals = $proxy.find('option').map(function() { return $(this).val(); }).get();
@@ -131,16 +119,14 @@
 							maxItems: null,
 							dropdownParent: 'body',
 							allowEmptyOption: false,
-							placeholder: '모니터링할 프록시를 선택하세요',
 							render: {
 								option: function(data, escape) { 
 									return '<div class="is-flex is-align-items-center">' +
 										'<span style="white-space:nowrap;">' + (data.text || '') + '</span>' +
 										'</div>'; 
 								},
-								// 선택된 항목이 입력창에 표시되지 않도록 숨긴 요소 반환 (기능 유지 목적)
-								item: function(data, escape) { return '<div style="display:none;">' + (data.text || '') + '</div>'; },
-								no_results: function(data, escape) { return '<div class="no-results">일치하는 프록시가 없습니다</div>'; }
+								// 선택된 항목 숨김 (버튼에서 카운터로 표시)
+								item: function(data, escape) { return '<div style="display:none;">' + (data.text || '') + '</div>'; }
 							},
 							onInitialize: function() { 
 								$proxy[0]._tom = this; 
@@ -175,8 +161,7 @@
 								item: function(data, escape) { return '<div style="white-space:nowrap;">' + (data.text || '') + '</div>'; }
 							},
 							onInitialize: function() { $group[0]._tom = this; },
-							onChange: function() { try { $group.trigger('change'); } catch (e) { /* ignore */ } },
-							onDropdownClose: function() { selectAllCurrentProxiesIfNone(); }
+							onChange: function() { try { $group.trigger('change'); } catch (e) { /* ignore */ } }
 						});
 						state.gts = gts;
 					} catch (e) { /* ignore */ }
@@ -195,12 +180,19 @@
 								$proxy.find('option').prop('selected', true); 
 								$proxy.trigger('change'); 
 							}
-						} catch (e) { 
-							console.error('[DeviceSelector] Failed to auto-select proxies:', e);
-						}
+						} catch (e) { /* ignore */ }
 						updateCounter();
 					});
-					$group.on('click.devicesel', function() { selectCurrentGroupProxies(); });
+				}
+				// 버튼 클릭 시 드롭다운 열기
+				if ($trigger.length) {
+					$trigger.off('click').on('click', function(e) {
+						e.preventDefault();
+						if (state.ts) {
+							if (state.ts.isOpen) { state.ts.close(); }
+							else { state.ts.open(); state.ts.focus(); }
+						}
+					});
 				}
 			}
 

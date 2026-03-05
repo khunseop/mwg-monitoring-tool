@@ -8,14 +8,20 @@
     <div class="is-flex is-align-items-center is-flex-wrap-wrap" style="gap: 1rem; min-height: 2.5rem;">
         <h3 class="title is-6 mb-0 has-text-grey-darker">모니터링 설정</h3>
         
-        <div class="is-flex is-align-items-center" style="gap: 0.5rem; flex: 1; min-width: 320px;">
+        <div class="is-flex is-align-items-center" style="gap: 0.5rem; flex: 1; min-width: 250px;">
             <div style="width: 140px;">
                 <select id="ruGroupSelect"></select>
             </div>
-            <div style="flex: 1; position: relative;">
-                <select id="ruProxySelect" multiple class="ts-fullwidth"></select>
+            <!-- 실제 선택박스는 숨김 처리 -->
+            <div style="width: 0; height: 0; overflow: hidden; position: absolute;">
+                <select id="ruProxySelect" multiple></select>
             </div>
-            <span id="ruSelectionCounter" class="tag is-info is-light is-rounded is-small" style="font-size: 0.75rem; white-space: nowrap;">0 / 0</span>
+            <!-- 선택 현황을 보여주는 버튼 트리거 -->
+            <button id="ruProxyTrigger" class="button is-small is-info is-light is-rounded px-3" type="button">
+                <span class="icon is-small mr-1"><i class="fas fa-server"></i></span>
+                <span id="ruSelectionCounter">0 / 0</span>
+                <span class="icon is-small ml-1"><i class="fas fa-angle-down"></i></span>
+            </button>
         </div>
 
         <div class="is-flex is-align-items-center" style="gap: 0.75rem; margin-left: auto;">
