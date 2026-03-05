@@ -142,12 +142,14 @@
 							placeholder: '모니터링할 프록시를 선택하세요',
 							render: {
 								option: function(data, escape) { 
+									// checkbox_options 플러그인이 체크박스를 추가하므로 
+									// 여기서 별도의 체크박스 span을 렌더링하지 않음 (중복 방지)
 									return '<div class="is-flex is-align-items-center">' +
-										'<span class="mr-2" style="display:inline-block; width:14px; height:14px; border:1px solid #ccc; border-radius:3px; position:relative;"></span>' +
 										'<span style="white-space:nowrap;">' + (data.text || '') + '</span>' +
 										'</div>'; 
 								},
-								item: function(data, escape) { return '<div style="white-space:nowrap;">' + (data.text || '') + '</div>'; },
+								// 선택된 항목이 입력창에 표시되지 않도록 빈 문자열 반환
+								item: function(data, escape) { return ''; },
 								no_results: function(data, escape) { return '<div class="no-results">일치하는 프록시가 없습니다</div>'; }
 							},
 							onInitialize: function() { 
