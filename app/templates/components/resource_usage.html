@@ -15,23 +15,31 @@
 
     <!-- 모니터링 설정 바 (슬림 & 미니멀) -->
     <div class="settings-bar mb-5">
-        <div class="is-flex is-align-items-center" style="gap: 0.4rem; flex: 1;">
-            <div class="select is-small" style="width: 160px;">
-                <select id="ruGroupSelect"></select>
+        <div class="is-flex is-align-items-center" style="gap: 1rem;">
+            <!-- 그룹 선택 영역 -->
+            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                <span class="is-size-7 has-text-grey-light" style="white-space: nowrap; font-weight: 600;">그룹</span>
+                <div class="select is-small">
+                    <select id="ruGroupSelect"></select>
+                </div>
             </div>
-            <div style="position: relative;">
-                <button id="ruProxyTrigger" class="button is-small is-white px-3" type="button" style="border: 1px solid var(--color-border); min-width: 120px; justify-content: space-between;">
-                    <span class="icon is-small mr-1"><i class="fas fa-server"></i></span>
-                    <span id="ruSelectionCounter">0 / 0</span>
-                    <span class="icon is-small ml-1"><i class="fas fa-angle-down"></i></span>
-                </button>
-                <div style="position: absolute; visibility: hidden; height: 0;">
-                    <select id="ruProxySelect" multiple></select>
+            
+            <!-- 프록시 선택 영역 -->
+            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                <span class="is-size-7 has-text-grey-light" style="white-space: nowrap; font-weight: 600;">프록시</span>
+                <div style="position: relative;">
+                    <button id="ruProxyTrigger" class="button is-small is-white px-3" type="button" style="border: 1px solid var(--color-border); min-width: 120px; justify-content: space-between;">
+                        <span id="ruSelectionCounter">0 / 0</span>
+                        <span class="icon is-small ml-1"><i class="fas fa-angle-down"></i></span>
+                    </button>
+                    <div style="position: absolute; visibility: hidden; height: 0;">
+                        <select id="ruProxySelect" multiple></select>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="is-flex is-align-items-center" style="gap: 1rem;">
+        <div class="is-flex is-align-items-center" style="gap: 1rem; margin-left: auto;">
             <div class="field has-addons mb-0">
                 <p class="control">
                     <span class="button is-static is-small" style="background: transparent; border: none; font-weight: 600;">주기</span>
@@ -78,20 +86,25 @@
     
     <!-- 이력 조회 필터 바 (한 줄로 컴팩트하게) -->
     <div class="settings-bar mb-5" style="padding: 0.75rem 1.25rem;">
-        <div class="is-flex is-align-items-center is-flex-wrap-wrap" style="gap: 1rem; width: 100%;">
+        <div class="is-flex is-align-items-center is-flex-wrap-wrap" style="gap: 1.25rem; width: 100%;">
             <!-- 통합 디바이스 선택기 -->
-            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
-                <div class="select is-small" style="width: 150px;">
-                    <select id="ruHistoryGroupSelect"></select>
+            <div class="is-flex is-align-items-center" style="gap: 0.75rem;">
+                <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                    <span class="is-size-7 has-text-grey-light" style="white-space: nowrap; font-weight: 600;">그룹</span>
+                    <div class="select is-small">
+                        <select id="ruHistoryGroupSelect"></select>
+                    </div>
                 </div>
-                <div style="position: relative;">
-                    <button id="ruHistoryProxyTrigger" class="button is-small is-white px-3" type="button" style="border: 1px solid var(--color-border); min-width: 120px; justify-content: space-between;">
-                        <span class="icon is-small mr-1"><i class="fas fa-server"></i></span>
-                        <span id="ruHistorySelectionCounter">0 / 0</span>
-                        <span class="icon is-small ml-1"><i class="fas fa-angle-down"></i></span>
-                    </button>
-                    <div style="position: absolute; visibility: hidden; height: 0;">
-                        <select id="ruHistoryProxySelect" multiple></select>
+                <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                    <span class="is-size-7 has-text-grey-light" style="white-space: nowrap; font-weight: 600;">프록시</span>
+                    <div style="position: relative;">
+                        <button id="ruHistoryProxyTrigger" class="button is-small is-white px-3" type="button" style="border: 1px solid var(--color-border); min-width: 120px; justify-content: space-between;">
+                            <span id="ruHistorySelectionCounter">0 / 0</span>
+                            <span class="icon is-small ml-1"><i class="fas fa-angle-down"></i></span>
+                        </button>
+                        <div style="position: absolute; visibility: hidden; height: 0;">
+                            <select id="ruHistoryProxySelect" multiple></select>
+                        </div>
                     </div>
                 </div>
             </div>

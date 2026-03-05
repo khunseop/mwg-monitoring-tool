@@ -75,15 +75,14 @@
 }
 
 /* Settings Bar (Integrated) */
-.settings-bar .select:not(.is-multiple):not(.is-loading)::after {
-    display: none !important;
+.settings-bar .select {
+    width: auto !important; /* 컨테이너 너비를 자동 조절로 변경 */
 }
 
 .settings-bar .select select {
-    padding-right: 0.75rem !important;
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
+    width: 100% !important; /* 내부 select는 div를 꽉 채우게 */
+    padding-right: 1.5rem !important; /* 화살표 없어도 최소 여백 확보 */
+    min-width: 100px;
 }
 
 .settings-bar .button,
