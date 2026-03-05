@@ -151,6 +151,7 @@
 		window.DeviceSelector.init({
 			groupSelect: '#tlGroupSelect',
 			proxySelect: '#tlProxySelect',
+			proxyTrigger: '#tlProxyTrigger',
 			selectionCounter: '#tlSelectionCounter',
 			onData: (data) => {
 				PROXIES = data.proxies;

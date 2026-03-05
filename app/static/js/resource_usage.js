@@ -90,6 +90,7 @@ $(document).ready(function() {
         DeviceSelector.init({
             groupSelect: '#ruGroupSelect',
             proxySelect: '#ruProxySelect',
+            proxyTrigger: '#ruProxyTrigger',
             selectAll: '#ruSelectAll',
             selectionCounter: '#ruSelectionCounter',
             onData: function(data) {
@@ -98,7 +99,8 @@ $(document).ready(function() {
             }
         }),
         state.loadConfig()
-    ]).then(function() {
+    ])
+.then(function() {
         return state.restoreState();
     }).then(function() {
         // 복원된 히트맵 데이터가 있으면 표시 (설정 로드 후)

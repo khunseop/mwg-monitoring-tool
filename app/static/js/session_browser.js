@@ -180,6 +180,7 @@
         window.DeviceSelector.init({
             groupSelect: '#sbGroupSelect',
             proxySelect: '#sbProxySelect',
+            proxyTrigger: '#sbProxyTrigger',
             selectionCounter: '#sbSelectionCounter',
             onData: (data) => {
                 sb.groups = data.groups;

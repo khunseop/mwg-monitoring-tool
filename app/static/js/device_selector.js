@@ -13,7 +13,7 @@
 			var $group = $(options.groupSelect);
 			var $proxy = $(options.proxySelect);
 			var $counter = options.selectionCounter ? $(options.selectionCounter) : $();
-			var $trigger = $('#ruProxyTrigger'); 
+			var $trigger = $(options.proxyTrigger || '#ruProxyTrigger'); 
 			var allowAllGroups = (options.allowAllGroups === undefined) ? true : !!options.allowAllGroups;
 			var labelForProxy = (typeof options.labelForProxy === 'function') ? options.labelForProxy : defaultLabelForProxy;
 			var apiGroups = options.apiGroups || '/api/proxy-groups';
@@ -24,9 +24,12 @@
 				if (!$counter.length) return;
 				var filtered = filteredProxies();
 				var totalCount = filtered.length;
-				var filteredIds = filtered.map(function(p) { return String(p.id); });
 				var allSelectedIds = state.ts ? state.ts.getValue() : ($proxy.val() || []);
+				if (!Array.isArray(allSelectedIds)) {
+					allSelectedIds = allSelectedIds ? [allSelectedIds] : [];
+				}
 				
+				var filteredIds = filtered.map(function(p) { return String(p.id); });
 				var selectedInCurrentGroup = allSelectedIds.filter(function(id) {
 					return filteredIds.indexOf(String(id)) !== -1;
 				});
@@ -36,6 +39,7 @@
 
 			function populateGroups() {
 				if ($group && $group.length) {
+					var currentVal = $group.val();
 					$group.empty();
 					if (allowAllGroups) { $group.append('<option value="">전체</option>'); }
 					if (state.groups && state.groups.length > 0) {
@@ -43,6 +47,7 @@
 					} else if (!allowAllGroups) {
 						$group.append('<option value="">전체</option>');
 					}
+					if (currentVal) $group.val(currentVal);
 				}
 			}
 
@@ -75,9 +80,10 @@
 					try {
 						state.ts.clearOptions();
 						if (list.length > 0) {
-							list.forEach(function(p) { 
-								state.ts.addOption({ value: String(p.id), text: labelForProxy(p) }); 
+							var tsOptions = list.map(function(p) {
+								return { value: String(p.id), text: labelForProxy(p) };
 							});
+							state.ts.addOptions(tsOptions);
 						}
 						state.ts.refreshOptions(false);
 					} catch (e) { 
@@ -88,11 +94,36 @@
 
 			function selectCurrentGroupProxies() {
 				if (!$proxy || $proxy.length === 0) return;
-				var vals = $proxy.find('option').map(function() { return $(this).val(); }).get();
+				var list = filteredProxies();
+				var vals = list.map(function(p) { return String(p.id); });
 				try {
-					if (state.ts) { state.ts.setValue(vals, false); }
-					else { $proxy.find('option').prop('selected', true); $proxy.trigger('change'); }
+					if (state.ts) { 
+						state.ts.setValue(vals, false); 
+					} else { 
+						$proxy.find('option').prop('selected', true); 
+						$proxy.trigger('change'); 
+					}
 				} catch (e) { /* ignore */ }
+			}
+
+			function positionDropdown() {
+				if (!state.ts || !state.ts.isOpen || !$trigger.length) return;
+				
+				// 트리거 버튼의 현재 위치 계산
+				var offset = $trigger.offset();
+				var height = $trigger.outerHeight();
+				var width = Math.max(300, $trigger.outerWidth());
+
+				// dropdownParent가 'body'일 때를 가정 (현재 기본값)
+				$(state.ts.dropdown).css({
+					top: (offset.top + height) + 'px',
+					left: offset.left + 'px',
+					width: width + 'px',
+					position: 'absolute',
+					zIndex: 2000,
+					display: 'block',
+					visibility: 'visible'
+				});
 			}
 
 			function enhanceMultiSelect() {
@@ -128,14 +159,9 @@
 								$proxy[0]._tom = this; 
 								updateCounter();
 								var self = this;
+								// 기본 position 함수를 우리 것으로 대체
 								this.position = function() {
-									var offset = $trigger.offset();
-									var height = $trigger.outerHeight();
-									$(self.dropdown).css({
-										top: (offset.top + height) + 'px',
-										left: offset.left + 'px',
-										width: '300px'
-									});
+									positionDropdown();
 								};
 							},
 							onChange: function() { 
@@ -143,6 +169,12 @@
 									$proxy.trigger('change'); 
 									updateCounter();
 								} catch (e) { /* ignore */ } 
+							},
+							onDropdownOpen: function() {
+								// 오픈 직후와 레이아웃 안착 후 두 번 실행
+								positionDropdown();
+								setTimeout(positionDropdown, 0);
+								setTimeout(positionDropdown, 100);
 							}
 						});
 						state.ts = ts;
@@ -156,15 +188,7 @@
 				if ($group && $group.length) {
 					$group.off('.devicesel').on('change.devicesel', function() {
 						populateProxies();
-						var allVals = $proxy.find('option').map(function() { return $(this).val(); }).get().filter(function(v) { return v && v !== ''; });
-						try {
-							if (state.ts && allVals.length > 0) { 
-								state.ts.setValue(allVals, false); 
-							} else if (allVals.length > 0) { 
-								$proxy.find('option').prop('selected', true); 
-								$proxy.trigger('change'); 
-							}
-						} catch (e) { /* ignore */ }
+						selectCurrentGroupProxies();
 						updateCounter();
 					});
 				}
@@ -176,12 +200,28 @@
 							if (state.ts.isOpen) { 
 								state.ts.close(); 
 							} else { 
+								// 드롭다운을 열기 전에 기존의 모든 TomSelect 드롭다운을 닫음 (충돌 방지)
+								$('.ts-dropdown').hide();
 								state.ts.open();
-								state.ts.position();
 							}
 						}
 					});
 				}
+				// 윈도우 리사이즈/스크롤 시 드롭다운 위치 재조정
+				$(window).off('.devicesel-pos').on('resize.devicesel-pos scroll.devicesel-pos', function() {
+					if (state.ts && state.ts.isOpen) {
+						positionDropdown();
+					}
+				});
+				
+				// 문서 클릭 시 드롭다운 닫기 (이벤트 전파 방지 때문)
+				$(document).off('.devicesel-close').on('click.devicesel-close', function(e) {
+					if (state.ts && state.ts.isOpen) {
+						if (!$(e.target).closest('.ts-wrapper, .ts-dropdown, ' + (options.proxyTrigger || '#ruProxyTrigger')).length) {
+							state.ts.close();
+						}
+					}
+				});
 			}
 
 			var p1 = $.getJSON(apiGroups).then(function(data) { 
