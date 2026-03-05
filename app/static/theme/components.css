@@ -1,4 +1,73 @@
-/* 공통 설정 바 스타일 */
+/* Component Styles */
+
+/* Navbar - Modern Full Width */
+.navbar {
+    background: rgba(255, 255, 255, 0.8) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--color-border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    min-height: 3.5rem;
+    box-shadow: none; /* 카드형 그림자 제거 */
+}
+
+.navbar-item {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    padding: 0.5rem 1.25rem;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.navbar-item:hover {
+    color: var(--color-primary) !important;
+    background: transparent !important;
+}
+
+/* 활성화 상태: 텍스트 강조 (언더라인 제거) */
+.navbar-item.is-active {
+    color: var(--color-primary) !important;
+    font-weight: 700;
+    background: transparent !important;
+}
+
+.navbar-item.is-active::after {
+    display: none;
+}
+
+.navbar-dropdown.is-boxed {
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-lg);
+    margin-top: 0;
+}
+
+/* Box - Modern Card */
+.box {
+    background: var(--color-surface);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-sm);
+    padding: 1.5rem;
+}
+
+.box.is-compact {
+    padding: 1rem 1.25rem;
+}
+
+/* Settings Bar (Integrated) */
+.settings-bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
 .settings-bar .button,
 .settings-bar .input,
 .settings-bar .select,
@@ -6,38 +75,69 @@
 .settings-bar .ts-wrapper .ts-control {
     height: 32px !important;
     min-height: 32px !important;
-    max-height: 32px !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-    margin: 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    line-height: 1 !important;
-    vertical-align: middle !important;
+    font-size: 0.875rem !important;
 }
 
-.settings-bar .select:not(.is-multiple):not(.is-loading)::after {
-    border-color: #4a4a4a !important;
-    top: 50% !important;
-    margin-top: -3px !important;
+/* Buttons */
+.button {
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.settings-bar .select select {
-    padding-left: 0.75rem !important;
-    padding-right: 2rem !important;
+.button.is-primary {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.1);
 }
 
-/* TomSelect 내부 텍스트 정렬 보정 */
-.settings-bar .ts-wrapper .ts-control > .item,
-.settings-bar .ts-wrapper .ts-control > input {
-    display: flex !important;
-    align-items: center !important;
-    height: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
+.button.is-primary:hover {
+    background-color: var(--color-primary);
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.15);
 }
 
-/* 각 페이지별 별칭 유지 (기존 코드 호환성) */
+/* Tabs */
+.tabs.is-boxed ul {
+    border-bottom: 1px solid var(--color-border);
+}
+
+.tabs li.is-active a {
+    background-color: transparent !important;
+    border-color: transparent !important;
+    border-bottom: 2px solid var(--color-primary) !important;
+    color: var(--color-primary) !important;
+    font-weight: 600;
+}
+
+/* Indicator */
+.ru-nav-indicator {
+    display: inline-flex;
+    align-items: center;
+    background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+    padding: 0.4rem 0.8rem;
+    border-radius: 2rem;
+    color: var(--color-primary);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.ru-nav-spinner {
+    width: 12px;
+    height: 12px;
+    border: 2px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    margin-right: 0.5rem;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Custom Settings Bar 별칭 */
 .ru-settings-bar, .sb-settings-bar, .tl-settings-bar {
-    @extend .settings-bar;
+    /* 공통 스타일 상속 */
 }

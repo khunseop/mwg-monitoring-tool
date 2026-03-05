@@ -18,13 +18,17 @@ body {
 
 /* Basic layout */
 .section { 
-    padding: 1.5rem;
+    padding: 0; /* 네비바 밀착을 위해 패딩 제거 */
     background: var(--color-bg);
     min-height: 100vh;
 }
 
+.main-content {
+    padding: 2rem 1.5rem; /* 실제 컨텐츠 영역 패딩 */
+}
+
 .container { 
-    max-width: 1400px;
+    max-width: 1600px; /* 더 와이드하게 확장 */
     margin: 0 auto;
 }
 
@@ -37,15 +41,12 @@ body {
 .tab-content { display: none; }
 .tab-content.is-active { display: block; }
 
-.tab-panel { display: none; }
-.tab-panel.is-active { display: block; }
-
 /* Table container */
-.table-container { max-height: 600px; overflow-y: auto; }
+.table-container { max-height: 800px; overflow-y: auto; }
 .sb-table-wrap { overflow-x: auto; overflow-y: hidden; max-height: none; }
 
 /* Footer */
-.footer { background: var(--color-bg); }
+.footer { background: var(--color-bg); padding: 3rem 1.5rem; border-top: 1px solid var(--color-border); }
 
 /* Empty state */
-.empty-state { text-align: center; color: var(--color-text-muted); }
+.empty-state { text-align: center; color: var(--color-text-muted); padding: 4rem 2rem; }
