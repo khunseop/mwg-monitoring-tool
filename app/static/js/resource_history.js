@@ -34,26 +34,33 @@ $(document).ready(function() {
         pageSize: 500,
         totalCount: 0,
         hasMore: false,
-        gridApi: null
+        gridApi: null,
+        storageKey: 'ru_history_state'
     };
 
-    // Initialize history proxy select
-    function initHistoryProxySelect() {
-        const $select = $('#ruHistoryProxySelect');
-        $select.empty();
-        $select.append('<option value="">전체</option>');
-        (history.proxies || []).forEach(p => {
-            $select.append(`<option value="${p.id}">${p.host}</option>`);
+    // DeviceSelector 초기화
+    function initDeviceSelector() {
+        window.DeviceSelector.init({
+            groupSelect: '#ruHistoryGroupSelect',
+            proxySelect: '#ruHistoryProxySelect',
+            proxyTrigger: '#ruHistoryProxyTrigger',
+            selectionCounter: '#ruHistorySelectionCounter',
+            storageKey: history.storageKey,
+            onData: function(data) {
+                history.groups = data.groups || [];
+                history.proxies = data.proxies || [];
+                loadStatistics();
+            }
         });
-        // Initialize TomSelect if available
-        if (window.TomSelect && !$select[0]._tomSelect) {
-            new TomSelect($select[0], {
-                placeholder: '프록시 선택',
-                allowEmptyOption: true
-            });
-        }
     }
 
+    function getSelectedProxyIds() {
+        const select = document.getElementById('ruHistoryProxySelect');
+        if (select && select._tom) {
+            return select._tom.getValue().map(v => parseInt(v, 10));
+        }
+        return ($(select).val() || []).map(v => parseInt(v, 10));
+    }
 
     // Format datetime for display
     function formatDateTime(datetimeStr) {
@@ -110,48 +117,49 @@ $(document).ready(function() {
     
     // Search history with date range
     function searchHistory() {
-        const proxyId = $('#ruHistoryProxySelect').val();
+        const proxyIds = getSelectedProxyIds();
         const startTime = $('#ruHistoryStartTime').val();
         const endTime = $('#ruHistoryEndTime').val();
         const limit = parseInt($('#ruHistoryLimit').val(), 10) || 500;
         
+        if (proxyIds.length === 0) {
+            alert('조회할 프록시를 선택하세요.');
+            return;
+        }
+
         history.currentPage = 1;
         history.pageSize = limit;
 
         const params = {
             limit: limit,
-            offset: 0
+            offset: 0,
+            proxy_id: proxyIds[0] // API 호환성을 위해 첫 번째 ID 사용
         };
 
-        if (startTime) {
-            params.start_time = convertKSTToUTC(startTime);
-        }
-        if (endTime) {
-            params.end_time = convertKSTToUTC(endTime);
-        }
-        if (proxyId) {
-            params.proxy_id = parseInt(proxyId, 10);
-        }
+        if (startTime) params.start_time = convertKSTToUTC(startTime);
+        if (endTime) params.end_time = convertKSTToUTC(endTime);
 
         loadHistoryData(params);
     }
     
     // Load all history (no date filter)
     function loadAllHistory() {
-        const proxyId = $('#ruHistoryProxySelect').val();
+        const proxyIds = getSelectedProxyIds();
         const limit = parseInt($('#ruHistoryLimit').val(), 10) || 500;
         
+        if (proxyIds.length === 0) {
+            alert('프록시를 선택하세요.');
+            return;
+        }
+
         history.currentPage = 1;
         history.pageSize = limit;
 
         const params = {
             limit: limit,
-            offset: 0
+            offset: 0,
+            proxy_id: proxyIds[0]
         };
-
-        if (proxyId) {
-            params.proxy_id = parseInt(proxyId, 10);
-        }
 
         loadHistoryData(params);
     }
@@ -326,28 +334,20 @@ $(document).ready(function() {
                     rowModelType: 'clientSide',
                     pagination: true,
                     paginationPageSize: history.pageSize,
+                    suppressPaginationPanel: true, // 커스텀 페이지네이션 사용
                     enableFilter: true,
                     enableSorting: true,
                     animateRows: false,
-                    suppressRowClickSelection: false,
-                    headerHeight: 50,
-                    overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">조회된 데이터가 없습니다.</div>',
+                    suppressRowClickSelection: true,
+                    headerHeight: 40,
+                    rowHeight: 35,
+                    overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted); font-size: 0.875rem;">조회된 데이터가 없습니다.</div>',
                     onGridReady: function(params) {
                         history.gridApi = params.api;
-                        // 컬럼 너비 자동 조절
-                        setTimeout(function() {
-                            if (history.gridApi) {
-                                const allColumnIds = [];
-                                history.gridApi.getColumns().forEach(function(column) {
-                                    allColumnIds.push(column.getColId());
-                                });
-                                if (history.gridApi.autoSizeColumns) {
-                                    history.gridApi.autoSizeColumns(allColumnIds, { skipHeader: false });
-                                } else if (history.gridApi.sizeColumnsToFit) {
-                                    history.gridApi.sizeColumnsToFit();
-                                }
-                            }
-                        }, 200);
+                        // 초기 로드 시 컬럼 너비 최적화
+                        setTimeout(() => {
+                            if (history.gridApi) history.gridApi.sizeColumnsToFit();
+                        }, 100);
                         updateFilterCount();
                     },
                     onFilterChanged: function() {
@@ -557,15 +557,7 @@ $(document).ready(function() {
 
     // Load proxies on page load
     function loadProxies() {
-        return $.getJSON('/api/proxies').then(function(proxies) {
-            history.proxies = (proxies || []).filter(function(p) { return p.is_active; });
-            initHistoryProxySelect();
-            initDeleteProxySelect();
-            loadStatistics(); // Load statistics on page load
-        }).catch(function(err) {
-            console.error('Failed to load proxies:', err);
-            $('#ruHistoryError').text('프록시 목록을 불러오는데 실패했습니다.').show();
-        });
+        initDeviceSelector();
     }
 
     // Initialize when page loads

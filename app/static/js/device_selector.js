@@ -114,6 +114,8 @@
 							});
 							state.ts.addOptions(tsOptions);
 						}
+						// 검색어 초기화 및 옵션 새로고침
+						state.ts.clear(true); // 현재 선택된 값들 유지하며 검색어만 초기화 (true: silent)
 						state.ts.refreshOptions(false);
 					} catch (e) { 
 						console.error('[DeviceSelector] TomSelect refresh failed:', e);
