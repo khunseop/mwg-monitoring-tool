@@ -13,7 +13,7 @@
 			var $group = $(options.groupSelect);
 			var $proxy = $(options.proxySelect);
 			var $counter = options.selectionCounter ? $(options.selectionCounter) : $();
-			var $trigger = $('#ruProxyTrigger'); // 버튼 트리거 추가
+			var $trigger = $('#ruProxyTrigger'); 
 			var allowAllGroups = (options.allowAllGroups === undefined) ? true : !!options.allowAllGroups;
 			var labelForProxy = (typeof options.labelForProxy === 'function') ? options.labelForProxy : defaultLabelForProxy;
 			var apiGroups = options.apiGroups || '/api/proxy-groups';
@@ -31,7 +31,7 @@
 					return filteredIds.indexOf(String(id)) !== -1;
 				});
 				var selectedCount = selectedInCurrentGroup.length;
-				$counter.text(selectedCount + ' / ' + totalCount + ' 선택됨');
+				$counter.text(selectedCount + ' / ' + totalCount);
 			}
 
 			function populateGroups() {
@@ -50,10 +50,7 @@
 				var gid = $group && $group.length ? $group.val() : '';
 				if (!allowAllGroups && !gid && state.groups && state.groups.length > 0) {
 					gid = String(state.groups[0].id);
-					try {
-						if (state.gts) { state.gts.setValue(gid, false); }
-						else { $group.val(gid); }
-					} catch (e) { /* ignore */ }
+					$group.val(gid);
 				}
 				var filtered = (state.proxies || []).filter(function(p) {
 					if (!p || !p.is_active) return false;
@@ -117,20 +114,29 @@
 							closeAfterSelect: false,
 							hideSelected: false,
 							maxItems: null,
-							dropdownParent: 'body',
+							dropdownParent: 'body', 
 							allowEmptyOption: false,
 							render: {
 								option: function(data, escape) { 
-									return '<div class="is-flex is-align-items-center">' +
+									return '<div class="is-flex is-align-items-center" style="padding: 0.5rem;">' +
 										'<span style="white-space:nowrap;">' + (data.text || '') + '</span>' +
 										'</div>'; 
 								},
-								// 선택된 항목 숨김 (버튼에서 카운터로 표시)
 								item: function(data, escape) { return '<div style="display:none;">' + (data.text || '') + '</div>'; }
 							},
 							onInitialize: function() { 
 								$proxy[0]._tom = this; 
 								updateCounter();
+								var self = this;
+								this.position = function() {
+									var offset = $trigger.offset();
+									var height = $trigger.outerHeight();
+									$(self.dropdown).css({
+										top: (offset.top + height) + 'px',
+										left: offset.left + 'px',
+										width: '300px'
+									});
+								};
 							},
 							onChange: function() { 
 								try { 
@@ -143,28 +149,6 @@
 					} catch (e) { 
 						console.error('[DeviceSelector] TomSelect init failed:', e);
 					}
-				}
-			}
-
-			function enhanceGroupSelect() {
-				if (!$group || $group.length === 0) return;
-				if (window.TomSelect) {
-					try {
-						var gts = new TomSelect($group[0], {
-							create: false,
-							persist: true,
-							maxItems: 1,
-							allowEmptyOption: allowAllGroups,
-							dropdownParent: 'body',
-							render: {
-								option: function(data, escape) { return '<div style="white-space:nowrap;">' + (data.text || '') + '</div>'; },
-								item: function(data, escape) { return '<div style="white-space:nowrap;">' + (data.text || '') + '</div>'; }
-							},
-							onInitialize: function() { $group[0]._tom = this; },
-							onChange: function() { try { $group.trigger('change'); } catch (e) { /* ignore */ } }
-						});
-						state.gts = gts;
-					} catch (e) { /* ignore */ }
 				}
 			}
 
@@ -184,13 +168,17 @@
 						updateCounter();
 					});
 				}
-				// 버튼 클릭 시 드롭다운 열기
 				if ($trigger.length) {
 					$trigger.off('click').on('click', function(e) {
 						e.preventDefault();
+						e.stopPropagation();
 						if (state.ts) {
-							if (state.ts.isOpen) { state.ts.close(); }
-							else { state.ts.open(); state.ts.focus(); }
+							if (state.ts.isOpen) { 
+								state.ts.close(); 
+							} else { 
+								state.ts.open();
+								state.ts.position();
+							}
 						}
 					});
 				}
@@ -210,23 +198,14 @@
 			});
 			return Promise.all([p1, p2]).then(function() { 
 				populateProxies(); 
-				enhanceGroupSelect();
 				enhanceMultiSelect(); 
 				bindEvents(); 
 				if (!allowAllGroups) {
-					var currentVal = '';
-					try { 
-						currentVal = ($group && $group.length) ? ($group[0]._tom ? $group[0]._tom.getValue() : $group.val()) : ''; 
-					} catch (e) { 
-						currentVal = $group.val(); 
-					}
+					var currentVal = $group.val();
 					if (!currentVal) {
 						if (state.groups && state.groups.length > 0) {
 							var first = String(state.groups[0].id);
-							try { 
-								if (state.gts) { state.gts.setValue(first, false); } 
-								else { $group.val(first).trigger('change'); } 
-							} catch (e) { /* ignore */ }
+							$group.val(first).trigger('change');
 						} else {
 							populateProxies();
 						}
