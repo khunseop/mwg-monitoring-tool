@@ -1,609 +1,220 @@
-$(document).ready(function() {
-    const sb = { proxies: [], groups: [], gridApi: null, gridColumnApi: null };
-    const STORAGE_KEY = 'sb_state_v1';
+(function() {
+    'use strict';
 
-    // Helpers for robust localStorage persistence
-    function sanitizeItemsForStorage(items) {
-        // Drop heavy fields and bound array length to avoid quota errors
-        const MAX_ITEMS = 250; // keep most recent up to 250
-        const trimmed = Array.isArray(items) ? items.slice(0, MAX_ITEMS) : [];
-        return trimmed.map(function(it) {
-            if (!it || typeof it !== 'object') return {};
-            const out = {
-                id: it.id,
-                proxy_id: it.proxy_id,
-                creation_time: it.creation_time,
-                user_name: it.user_name,
-                client_ip: it.client_ip,
-                server_ip: it.server_ip,
-                cl_bytes_received: it.cl_bytes_received,
-                cl_bytes_sent: it.cl_bytes_sent,
-                age_seconds: it.age_seconds,
-                url: (typeof it.url === 'string') ? (it.url.length > 1000 ? it.url.slice(0, 1000) + '…' : it.url) : it.url,
-                collected_at: it.collected_at,
-                transaction: it.transaction,
-                protocol: it.protocol,
-                cust_id: it.cust_id,
-                client_side_mwg_ip: it.client_side_mwg_ip,
-                server_side_mwg_ip: it.server_side_mwg_ip,
-                srv_bytes_received: it.srv_bytes_received,
-                srv_bytes_sent: it.srv_bytes_sent,
-                trxn_index: it.trxn_index,
-                status: it.status,
-                in_use: it.in_use
-            };
-            return out;
+    const sb = {
+        groups: [],
+        proxies: [],
+        records: [],
+        gridApi: null,
+        columnApi: null,
+        isRestoring: false,
+        storageKey: 'sb_state_v1',
+        exportLimit: 10000,
+        analyzeStatus: 'idle'
+    };
+
+    const COLS = [
+        "id", "proxy_id", "client_ip", "client_port", "server_ip", "server_port",
+        "protocol", "status", "user_agent", "url", "received_bytes", "sent_bytes",
+        "duration", "created_at"
+    ];
+
+    function setStatus(text, cls) {
+        const $tag = $('#sbStatus');
+        $tag.text(text);
+        $tag.removeClass().addClass('tag').addClass(cls || 'is-light');
+    }
+
+    function showError(msg) {
+        $('#sbError').text(msg).show();
+    }
+
+    function clearError() {
+        $('#sbError').hide().text('');
+    }
+
+    function showDetail(record) {
+        const $body = $('#sbDetailBody');
+        $body.empty();
+        COLS.forEach(c => {
+            let v = record[c];
+            if (v === null || v === undefined) v = '';
+            let formatted = v;
+            
+            if (c === 'created_at') {
+                formatted = (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(v) : v;
+            } else if (c === 'received_bytes' || c === 'sent_bytes') {
+                formatted = (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(v) : v;
+            } else if (c === 'duration') {
+                formatted = (window.AppUtils && AppUtils.formatDurationMs) ? AppUtils.formatDurationMs(v) : v;
+            } else if (c === 'status') {
+                formatted = (window.AppUtils && AppUtils.renderStatusTag) ? AppUtils.renderStatusTag(v) : String(v);
+            }
+            
+            const isUrlish = (c === 'url' || c === 'user_agent');
+            const cls = isUrlish ? '' : (c === 'received_bytes' || c === 'sent_bytes' || c === 'duration' || c === 'status' ? 'num' : '');
+            $body.append(`<tr><th style="width: 220px;">${c}</th><td class="${cls}">${typeof formatted === 'string' ? escapeHtml(formatted) : String(formatted)}</td></tr>`);
         });
+        $('#sbDetailModal').addClass('is-active');
     }
 
-    function tryWriteState(state) {
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function getSelectedProxyIds() {
+        return ($('#sbProxySelect').val() || []).map(v => parseInt(v, 10));
+    }
+
+    async function loadSessions() {
+        const proxyIds = getSelectedProxyIds();
+        if (proxyIds.length === 0) {
+            showError('조회할 프록시를 최소 하나 이상 선택하세요.');
+            return;
+        }
+
+        clearError();
+        setStatus('조회 중...', 'is-warning');
+        $('#sbLoadingIndicator').show();
+
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-            return true;
-        } catch (e) {
-            return false;
+            const res = await fetch('/api/session-browser/query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ proxy_ids: proxyIds, limit: 1000 })
+            });
+
+            if (!res.ok) throw new Error('세션 정보를 가져오는데 실패했습니다.');
+
+            const data = await res.json();
+            sb.records = data.records || [];
+            
+            if (sb.gridApi) {
+                sb.gridApi.setGridOption('rowData', sb.records);
+            }
+            
+            setStatus(`${sb.records.length}건 조회됨`, 'is-success');
+            persistState();
+        } catch (err) {
+            showError(err.message);
+            setStatus('오류', 'is-danger');
+        } finally {
+            $('#sbLoadingIndicator').hide();
         }
     }
 
-    function persistState(state) {
-        // Attempt to persist; if it fails due to quota, progressively reduce items size
-        if (tryWriteState(state)) return true;
-        if (!state || !Array.isArray(state.items) || state.items.length === 0) return false;
-        // First, sanitize items by dropping heavy fields
-        var reduced = sanitizeItemsForStorage(state.items);
-        var temp = Object.assign({}, state, { items: reduced });
-        if (tryWriteState(temp)) return true;
-        // If still failing, aggressively reduce count
-        var count = Math.min(reduced.length, 120);
-        while (count > 0) {
-            var slice = reduced.slice(0, count);
-            temp = Object.assign({}, state, { items: slice });
-            if (tryWriteState(temp)) return true;
-            count = Math.floor(count / 2);
-        }
-        return false;
-    }
-
-    function showErr(msg) { $('#sbError').text(msg).show(); }
-    function clearErr() { $('#sbError').hide().text(''); }
-    function setStatus(text, isError) {
-        const $t = $('#sbStatus');
-        $t.text(text || '');
-        $t.removeClass('is-success is-danger is-light');
-        if (isError) $t.addClass('is-danger'); else $t.addClass(text ? 'is-success' : 'is-light');
-    }
-
-    // Selection UI is now handled by shared DeviceSelector
-
-    function getSelectedProxyIds() { return ($('#sbProxySelect').val() || []).map(v => parseInt(v, 10)); }
-
-    function updateTableVisibility() {
-        try { if (sb.gridApi && sb.gridApi.sizeColumnsToFit) { sb.gridApi.sizeColumnsToFit(); } } catch (e) { /* ignore */ }
-    }
-
-    function updateFilterCount() {
-        if (!sb.gridApi) return;
-        try {
-            var filterModel = sb.gridApi.getFilterModel();
-            var filterCount = 0;
-            if (filterModel) {
-                // 필터 모델에서 실제로 값이 있는 필터의 수를 계산
-                for (var colId in filterModel) {
-                    if (filterModel.hasOwnProperty(colId)) {
-                        var filter = filterModel[colId];
-                        // 필터가 있고 값이 있는지 확인
-                        if (filter && typeof filter === 'object') {
-                            // agTextColumnFilter의 경우 filter 속성 확인
-                            if (filter.filter && String(filter.filter).trim() !== '') {
-                                filterCount++;
-                            }
-                            // agNumberColumnFilter의 경우 filter, filterTo, filterTo 등 확인
-                            else if (filter.filter !== undefined && filter.filter !== null && filter.filter !== '') {
-                                filterCount++;
-                            }
-                            else if (filter.filterTo !== undefined && filter.filterTo !== null && filter.filterTo !== '') {
-                                filterCount++;
-                            }
-                            else if (filter.type && filter.type !== 'equals') {
-                                // 다른 필터 타입들
-                                filterCount++;
-                            }
-                        }
-                    }
-                }
-            }
-            var $filterCount = $('#sbFilterCount');
-            if (filterCount > 0) {
-                $filterCount.text('필터: ' + filterCount).show();
-            } else {
-                $filterCount.hide();
-            }
-        } catch (e) {
-            console.error('Failed to update filter count:', e);
-        }
-    }
-
-    function saveState(itemsForSave) {
-        var prevItems;
-        try {
-            var prevRaw = localStorage.getItem(STORAGE_KEY);
-            if (prevRaw) {
-                var prev = JSON.parse(prevRaw);
-                prevItems = Array.isArray(prev.items) ? prev.items : undefined;
-            }
-        } catch (e) { /* ignore */ }
-        // If itemsForSave is provided, use it as-is (including empty array to CLEAR)
-        var items = (itemsForSave !== undefined) ? (Array.isArray(itemsForSave) ? itemsForSave : undefined) : prevItems;
-        var groupVal;
-        try {
-            var gEl = $('#sbGroupSelect')[0];
-            if (gEl && gEl._tom && typeof gEl._tom.getValue === 'function') { groupVal = gEl._tom.getValue(); }
-            else { groupVal = $('#sbGroupSelect').val() || ''; }
-        } catch (e) { groupVal = $('#sbGroupSelect').val() || ''; }
-        var state = {
-            groupId: groupVal || '',
+    function persistState() {
+        const state = {
             proxyIds: getSelectedProxyIds(),
-            items: items,
-            savedAt: Date.now()
+            groupId: $('#sbGroupSelect').val(),
+            records: sb.records.slice(0, 500) // 저장 용량 제한
         };
-        var ok = persistState(state);
-        if (!ok) { try { setStatus('로컬 저장 실패', true); } catch (e) { /* ignore */ } }
+        localStorage.setItem(sb.storageKey, JSON.stringify(state));
     }
 
     function restoreState() {
         try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (!raw) return;
-            const state = JSON.parse(raw);
-            if (state.groupId !== undefined) {
-                var $g = $('#sbGroupSelect');
-                var gtom = ($g && $g[0]) ? $g[0]._tom : null;
-                if (gtom && typeof gtom.setValue === 'function') {
-                    try { gtom.setValue(String(state.groupId || ''), false); } catch (e) { /* ignore */ }
-                    try { $g.trigger('change'); } catch (e) { /* ignore */ }
-                } else {
-                    $g.val(state.groupId);
-                    // Trigger change so DeviceSelector repopulates proxies for selected group
-                    $g.trigger('change');
-                }
+            const saved = localStorage.getItem(sb.storageKey);
+            if (!saved) return;
+            
+            const state = JSON.parse(saved);
+            sb.isRestoring = true;
+
+            if (state.groupId) {
+                $('#sbGroupSelect').val(state.groupId).trigger('change');
             }
-            if (Array.isArray(state.proxyIds) && state.proxyIds.length > 0) {
-                const strIds = state.proxyIds.map(function(id){ return String(id); });
-                var $p = $('#sbProxySelect');
-                var ptom = ($p && $p[0]) ? $p[0]._tom : null;
-                if (ptom && typeof ptom.setValue === 'function') {
-                    try { ptom.setValue(strIds, false); } catch (e) { /* ignore */ }
-                } else {
-                    $p.find('option').each(function() { $(this).prop('selected', strIds.indexOf($(this).val()) !== -1); });
-                    try { $p.trigger('change'); } catch (e) { /* ignore */ }
-                }
+
+            if (state.proxyIds && state.proxyIds.length > 0) {
+                // DeviceSelector가 프록시 목록을 채운 후 값을 설정해야 함
+                setTimeout(() => {
+                    const ts = document.getElementById('sbProxySelect')._tom;
+                    if (ts) {
+                        ts.setValue(state.proxyIds.map(String), false);
+                    }
+                    
+                    if (state.records && state.records.length > 0) {
+                        sb.records = state.records;
+                        if (sb.gridApi) sb.gridApi.setGridOption('rowData', sb.records);
+                        setStatus(`${sb.records.length}건 복원됨`, 'is-info');
+                    }
+                    sb.isRestoring = false;
+                }, 300);
+            } else {
+                sb.isRestoring = false;
             }
-            // Do not restore cached items; rely on server-side data to persist last load
-        } catch (e) { /* ignore */ }
-    }
-
-    function showLoading() {
-        $('#sbLoadingIndicator').show();
-    }
-
-    function hideLoading() {
-        $('#sbLoadingIndicator').hide();
-    }
-
-    function loadGridData() {
-        if (!sb.gridApi) {
-            console.warn('[SessionBrowser] Grid API not available, skipping data load');
-            return;
+        } catch (e) {
+            console.warn('[SessionBrowser] State restore failed', e);
+            sb.isRestoring = false;
         }
-        
-        var proxyIds = getSelectedProxyIds();
-        if (proxyIds.length === 0) {
-            // Client-side model: clear data
-            try {
-                if (sb.gridApi.setRowData) {
-                    sb.gridApi.setRowData([]);
-                } else if (sb.gridApi.setGridOption) {
-                    sb.gridApi.setGridOption('rowData', []);
-                }
-            } catch (e) {
-                console.error('[SessionBrowser] Error clearing grid data:', e);
-            }
-            hideLoading();
-            return;
-        }
+    }
 
-        // Client-side model: load all data from API (no pagination on server)
-        showLoading();
-        var requestParams = {
-            proxy_ids: proxyIds.join(','),
-            startRow: 0,
-            endRow: 10000  // Request large range to get all data
+    function initGrid() {
+        const gridOptions = {
+            columnDefs: [
+                { field: 'id', headerName: 'ID', width: 80, hide: true },
+                { field: 'created_at', headerName: '시간', width: 180, sort: 'desc', valueFormatter: params => (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(params.value) : params.value },
+                { field: 'client_ip', headerName: '클라이언트', width: 140 },
+                { field: 'url', headerName: 'URL', flex: 1, minWidth: 300 },
+                { field: 'status', headerName: '상태', width: 100, cellRenderer: params => (window.AppUtils && AppUtils.renderStatusTag) ? AppUtils.renderStatusTag(params.value) : params.value },
+                { field: 'duration', headerName: '소요시간', width: 100, cellClass: 'num', valueFormatter: params => (window.AppUtils && AppUtils.formatDurationMs) ? AppUtils.formatDurationMs(params.value) : params.value },
+                { field: 'received_bytes', headerName: 'Received', width: 110, cellClass: 'num', valueFormatter: params => (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(params.value) : params.value },
+                { field: 'sent_bytes', headerName: 'Sent', width: 110, cellClass: 'num', valueFormatter: params => (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(params.value) : params.value }
+            ],
+            rowData: [],
+            pagination: true,
+            paginationPageSize: 100,
+            onRowDoubleClicked: params => showDetail(params.data),
+            theme: 'quartz'
         };
+
+        const gridDiv = document.querySelector('#sbTableGrid');
+        sb.gridApi = agGrid.createGrid(gridDiv, gridOptions);
+    }
+
+    $(document).ready(() => {
+        initGrid();
+
+        // DeviceSelector 초기화 (통합 모니터링 바 적용)
+        window.DeviceSelector.init({
+            groupSelect: '#sbGroupSelect',
+            proxySelect: '#sbProxySelect',
+            selectionCounter: '#sbSelectionCounter',
+            onData: (data) => {
+                sb.groups = data.groups;
+                sb.proxies = data.proxies;
+                if (!sb.isRestoring) restoreState();
+            }
+        });
+
+        $('#sbLoadBtn').on('click', loadSessions);
         
-        $.ajax({
-            url: '/api/session-browser/datatables',
-            method: 'GET',
-            data: requestParams
-        }).done(function(response) {
-            hideLoading();
-            try {
-                if (!sb.gridApi) {
-                    console.warn('[SessionBrowser] Grid API not available, cannot update data');
-                    return;
-                }
-                
-                if (!response) {
-                    console.error('[SessionBrowser] Empty response from server');
-                    showErr('서버에서 빈 응답을 받았습니다.');
-                    if (sb.gridApi.setRowData) {
-                        sb.gridApi.setRowData([]);
-                    } else if (sb.gridApi.setGridOption) {
-                        sb.gridApi.setGridOption('rowData', []);
-                    }
-                    return;
-                }
-                
-                var rowData = response.rowData;
-                if (!Array.isArray(rowData)) {
-                    console.error('[SessionBrowser] Invalid response format - rowData is not an array:', response);
-                    showErr('서버 응답 형식이 올바르지 않습니다. (rowData가 배열이 아님)');
-                    if (sb.gridApi.setRowData) {
-                        sb.gridApi.setRowData([]);
-                    } else if (sb.gridApi.setGridOption) {
-                        sb.gridApi.setGridOption('rowData', []);
-                    }
-                    return;
-                }
-                
-                // Update grid with all data (client-side handles pagination/filtering)
-                // Use setRowData for better compatibility with AG Grid Community
-                if (sb.gridApi.setRowData) {
-                    sb.gridApi.setRowData(rowData);
-                } else if (sb.gridApi.setGridOption) {
-                    sb.gridApi.setGridOption('rowData', rowData);
-                } else {
-                    console.error('[SessionBrowser] Cannot set row data - API methods not available');
-                    showErr('그리드 데이터를 업데이트할 수 없습니다.');
-                    return;
-                }
-                
-                updateFilterCount();
-                clearErr(); // Clear any previous errors on success
-                console.log('[SessionBrowser] Loaded', rowData.length, 'rows');
-            } catch (e) {
-                console.error('[SessionBrowser] Error updating grid data:', e);
-                showErr('데이터 업데이트 실패: ' + (e.message || String(e)));
-            }
-        }).fail(function(xhr, status, error) {
-            hideLoading();
-            console.error('[SessionBrowser] AJAX error:', status, error, xhr);
-            var errorMsg = '데이터 로드 실패';
-            if (xhr && xhr.responseJSON && xhr.responseJSON.detail) {
-                errorMsg += ': ' + xhr.responseJSON.detail;
-            } else if (error) {
-                errorMsg += ': ' + error;
-            } else if (status) {
-                errorMsg += ': ' + status;
-            }
-            showErr(errorMsg);
+        $('#sbQuickFilter').on('input', function() {
+            if (sb.gridApi) sb.gridApi.setGridOption('quickFilterText', $(this).val());
         });
-    }
 
-    function initTable() {
-        if (sb.gridApi) {
-            console.log('[SessionBrowser] Grid already initialized');
-            return;
-        }
-        try {
-            var gridOptions = {
-                columnDefs: AgGridConfig.getSessionBrowserColumns(),
-                rowData: [],
-                defaultColDef: {
-                    sortable: true,
-                    filter: 'agTextColumnFilter',
-                    filterParams: { applyButton: true, clearButton: true },
-                    resizable: true,
-                    minWidth: 100
-                },
-                rowModelType: 'clientSide',
-                pagination: true,
-                paginationPageSize: 100,
-                // Removed enableFilter and enableSorting - these are deprecated in AG Grid v32+
-                // Filtering and sorting are enabled by default via columnDefs
-                animateRows: false,
-                // Removed rowSelection - not needed for this grid (no row selection required)
-                headerHeight: 50,
-                overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">표시할 세션이 없습니다.<br><small style="margin-top: 8px; display: block;">프록시를 선택하고 "세션 불러오기" 버튼을 클릭하세요.</small></div>',
-                onGridReady: function(params) {
-                    try {
-                        sb.gridApi = params.api;
-                        if (params.columnApi) {
-                            sb.gridColumnApi = params.columnApi;
-                        }
-                        console.log('[SessionBrowser] Grid ready, API:', sb.gridApi ? 'available' : 'missing');
-                        
-                        // 컬럼 너비 자동 조절 (헤더 텍스트가 잘리지 않도록)
-                        setTimeout(function() {
-                            if (sb.gridApi) {
-                                try {
-                                    var allColumnIds = [];
-                                    var columns = sb.gridApi.getColumns();
-                                    if (columns && columns.length > 0) {
-                                        columns.forEach(function(column) {
-                                            if (column && column.getColDef && column.getColDef().field !== 'id') {
-                                                allColumnIds.push(column.getColId());
-                                            }
-                                        });
-                                        if (allColumnIds.length > 0) {
-                                            if (sb.gridApi.autoSizeColumns) {
-                                                // 헤더 텍스트를 기준으로 자동 크기 조절
-                                                sb.gridApi.autoSizeColumns(allColumnIds, { skipHeader: false });
-                                            } else if (sb.gridApi.sizeColumnsToFit) {
-                                                sb.gridApi.sizeColumnsToFit();
-                                            }
-                                        }
-                                    }
-                                } catch (e) {
-                                    console.warn('[SessionBrowser] Failed to auto-size columns:', e);
-                                }
-                            }
-                        }, 200);
-                        updateTableVisibility();
-                        // 초기 데이터는 로드하지 않음 (프록시 선택 후 수동으로 로드)
-                    } catch (e) {
-                        console.error('[SessionBrowser] onGridReady error:', e);
-                        showErr('그리드 준비 중 오류: ' + (e.message || String(e)));
-                    }
-                },
-                onRowDoubleClicked: function(params) {
-                    var itemId = params.data.id;
-                    if (!itemId) return;
-                    $.getJSON('/api/session-browser/item/' + itemId)
-                        .done(function(item){ fillDetailModal(item || {}); openSbModal(); })
-                        .fail(function(){ showErr('상세를 불러오지 못했습니다.'); });
-                },
-                onFilterChanged: function() {
-                    // Client-side model: filtering is handled automatically by AG Grid
-                    updateFilterCount();
-                }
-            };
-
-            var gridDiv = document.querySelector('#sbTableGrid');
-            if (!gridDiv) {
-                console.error('[SessionBrowser] Grid div #sbTableGrid not found');
-                showErr('그리드 컨테이너를 찾을 수 없습니다. 페이지를 새로고침해주세요.');
-                return;
-            }
-            
-            if (!window.agGrid) {
-                console.error('[SessionBrowser] ag-grid library not loaded');
-                showErr('AG Grid 라이브러리가 로드되지 않았습니다. 페이지를 새로고침해주세요.');
-                return;
-            }
-            
-            try {
-                if (typeof window.agGrid.createGrid === 'function') {
-                    // AG Grid v31+: createGrid returns Grid instance
-                    var gridInstance = window.agGrid.createGrid(gridDiv, gridOptions);
-                    // For v31+, API might be available immediately from gridInstance
-                    if (gridInstance && gridInstance.api && !sb.gridApi) {
-                        sb.gridApi = gridInstance.api;
-                        console.log('[SessionBrowser] Grid API set from gridInstance');
-                    }
-                    // API will also be set in onGridReady callback
-                    console.log('[SessionBrowser] Grid created using createGrid API');
-                } else if (window.agGrid.Grid) {
-                    // AG Grid v30 and below
-                    new window.agGrid.Grid(gridDiv, gridOptions);
-                    console.log('[SessionBrowser] Grid created using Grid constructor');
-                } else {
-                    console.error('[SessionBrowser] ag-grid API not available');
-                    showErr('AG Grid API를 사용할 수 없습니다. 라이브러리 버전을 확인해주세요.');
-                    return;
-                }
-            } catch (e) {
-                console.error('[SessionBrowser] ag-grid init failed:', e);
-                showErr('그리드 초기화 실패: ' + (e.message || String(e)));
-            }
-        } catch (e) {
-            console.error('[SessionBrowser] ag-grid init failed:', e);
-            showErr('그리드 초기화 실패: ' + (e.message || String(e)));
-        }
-    }
-
-    // Removed unused rowsFromItems/currentItemsById
-
-    function loadLatest() {
-        clearErr();
-        const proxyIds = getSelectedProxyIds();
-        if (proxyIds.length === 0) { showErr('프록시를 하나 이상 선택하세요.'); return; }
-        setStatus('수집 중...');
-        return $.ajax({
-            url: '/api/session-browser/collect',
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ proxy_ids: proxyIds })
-        }).then(res => {
-            // On collect, reload grid data
-            loadGridData();
-            $('#sbEmptyState').hide();
-            $('#sbTableWrap').show();
-            if (res && res.failed && res.failed > 0) { showErr('일부 프록시 수집에 실패했습니다.'); }
-            setStatus('완료');
-            // Clear any cached items to avoid mixing old data on next restore; persist only selection
-            saveState([]);
-            // 자동 분석 제거 - 통계 분석 버튼으로 대체
-        }).catch(() => { setStatus('오류', true); showErr('수집 요청 중 오류가 발생했습니다.'); });
-    }
-
-    $('#sbLoadBtn').on('click', function() { loadLatest(); });
-    
-    // 통계 분석 버튼 클릭 이벤트
-    $('#sbAnalyzeBtn').on('click', function() {
-        const proxyIds = getSelectedProxyIds();
-        if (proxyIds.length === 0) {
-            showErr('프록시를 하나 이상 선택하세요.');
-            return;
-        }
-        try {
-            if (window.SbAnalyze && typeof window.SbAnalyze.run === 'function') {
-                window.SbAnalyze.run({ proxyIds: proxyIds });
-                $('#sbAnalyzeSection').show();
-            } else {
-                showErr('분석 기능을 사용할 수 없습니다.');
-            }
-        } catch (e) {
-            console.error('Analysis error:', e);
-            showErr('분석 중 오류가 발생했습니다.');
-        }
-    });
-    // Removed analyze button and tabs; analysis auto-runs after collect
-    $('#sbExportBtn').on('click', function() {
-        const params = {};
-        const g = $('#sbGroupSelect').val();
-        if (g) params.group_id = g;
-        const pids = ($('#sbProxySelect').val() || []).join(',');
-        if (pids) params.proxy_ids = pids;
-        // Get quick filter from ag-grid if available
-        if (sb.gridApi) {
-            const quickFilter = sb.gridApi.getQuickFilter();
-            if (quickFilter) params['search[value]'] = quickFilter;
-            // Get sort model
-            const sortModel = sb.gridApi.getSortModel();
-            if (sortModel && sortModel.length > 0) {
-                // Convert ag-grid sort model to DataTables format for export endpoint
-                const colMapping = { 'host': 0, 'creation_time': 1, 'protocol': 2, 'user_name': 3, 'client_ip': 4, 'server_ip': 5, 'cl_bytes_received': 6, 'cl_bytes_sent': 7, 'age_seconds': 8, 'url': 9 };
-                const colId = sortModel[0].colId;
-                const colIdx = colMapping[colId];
-                if (colIdx !== undefined) {
-                    params['order[0][column]'] = colIdx;
-                    params['order[0][dir]'] = sortModel[0].sort === 'desc' ? 'desc' : 'asc';
-                }
-            }
-        }
-        const qs = $.param(params);
-        const url = '/api/session-browser/export' + (qs ? ('?' + qs) : '');
-        // open in new tab to trigger download without blocking UI
-        window.open(url, '_blank');
-    });
-    // Quick filter (전체 검색)
-    $('#sbQuickFilter').on('input', function() {
-        var filterText = $(this).val();
-        if (sb.gridApi) {
-            try {
-                // Use setQuickFilter for better compatibility
-                if (sb.gridApi.setQuickFilter) {
-                    sb.gridApi.setQuickFilter(filterText);
-                } else if (sb.gridApi.setGridOption) {
-                    sb.gridApi.setGridOption('quickFilterText', filterText);
-                }
-            } catch (e) {
-                console.error('[SessionBrowser] Error setting quick filter:', e);
-            }
-        }
-    });
-    
-    // 필터 초기화 버튼
-    $('#sbClearFilters').on('click', function() {
-        if (sb.gridApi) {
-            try {
-                if (sb.gridApi.setFilterModel) {
-                    sb.gridApi.setFilterModel(null);
-                }
-                if (sb.gridApi.setQuickFilter) {
-                    sb.gridApi.setQuickFilter('');
-                } else if (sb.gridApi.setGridOption) {
-                    sb.gridApi.setGridOption('quickFilterText', '');
-                }
-                $('#sbQuickFilter').val('');
-                updateFilterCount();
-            } catch (e) {
-                console.error('[SessionBrowser] Error clearing filters:', e);
-            }
-        }
-    });
-    
-    $('#sbGroupSelect').on('change', function() {
-        saveState(undefined);
-        // 그룹 변경 시 그리드 데이터 다시 로드
-        loadGridData();
-    });
-    $('#sbProxySelect').on('change', function() {
-        saveState(undefined);
-        // 프록시 선택 변경 시 그리드 데이터 다시 로드
-        loadGridData();
-    });
-
-    initTable();
-    // Always show table
-    $('#sbTableWrap').show();
-    DeviceSelector.init({ 
-        groupSelect: '#sbGroupSelect', 
-        proxySelect: '#sbProxySelect', 
-        selectAll: '#sbSelectAll',
-        allowAllGroups: false,
-        onData: function(data){ 
-            sb.groups = data.groups || []; 
-            sb.proxies = data.proxies || [];
-            console.log('[SessionBrowser] DeviceSelector onData - groups:', sb.groups.length, 'proxies:', sb.proxies.length);
-            var activeProxies = sb.proxies.filter(function(p) { return p && p.is_active; });
-            console.log('[SessionBrowser] Active proxies:', activeProxies.length);
-            
-            // 프록시가 없을 때 안내 메시지 표시
-            if (!sb.proxies || sb.proxies.length === 0) {
-                $('#sbError').text('프록시가 등록되어 있지 않습니다. 설정 > 프록시 관리에서 프록시를 등록하세요.').show();
-            } else if (activeProxies.length === 0) {
-                $('#sbError').text('활성화된 프록시가 없습니다. 설정 > 프록시 관리에서 프록시를 활성화하세요.').show();
-            } else {
-                $('#sbError').hide();
-            }
-        }
-    }).then(function(){ 
-        console.log('[SessionBrowser] DeviceSelector initialized');
-        restoreState(); 
-        // Grid가 준비되면 데이터 로드 (onGridReady에서 처리됨)
-    }).catch(function(err) {
-        console.error('[SessionBrowser] DeviceSelector init failed:', err);
-        $('#sbError').text('프록시 목록을 불러오는 중 오류가 발생했습니다: ' + (err.message || String(err))).show();
-    });
-
-    // Cross-tab sync: update UI when other tabs modify stored state
-    try {
-        window.addEventListener('storage', function(e) {
-            if (!e) return;
-            if (e.key === STORAGE_KEY) {
-                restoreState();
-                loadGridData();
+        $('#sbClearFilters').on('click', () => {
+            $('#sbQuickFilter').val('');
+            if (sb.gridApi) {
+                sb.gridApi.setGridOption('quickFilterText', '');
+                sb.gridApi.setColumnFilterModel(null);
             }
         });
-    } catch (e) { /* ignore */ }
-});
 
-function openSbModal(){ $('#sbDetailModal').addClass('is-active'); }
-function fillDetailModal(item){
-    const rows = [];
-    const kv = (k,v,cls) => `<tr><th style="white-space:nowrap;">${k}</th><td class="${cls||''}">${(v===null||v===undefined)?'':String(v)}</td></tr>`;
-    rows.push(kv('프록시 ID', item.proxy_id));
-    rows.push(kv('트랜잭션', item.transaction, 'mono'));
-    rows.push(kv('생성시각', (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(item.creation_time) : (item.creation_time ? new Date(item.creation_time).toLocaleString() : '')));
-    rows.push(kv('프로토콜', item.protocol));
-    rows.push(kv('사용자', item.user_name));
-    rows.push(kv('Cust ID', item.cust_id));
-    rows.push(kv('클라이언트 IP', item.client_ip, 'mono'));
-    rows.push(kv('Client-side MWG IP', item.client_side_mwg_ip, 'mono'));
-    rows.push(kv('Server-side MWG IP', item.server_side_mwg_ip, 'mono'));
-    rows.push(kv('서버 IP', item.server_ip, 'mono'));
-    rows.push(kv('클라이언트 수신(Bytes)', (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(item.cl_bytes_received) : item.cl_bytes_received, 'num'));
-    rows.push(kv('클라이언트 송신(Bytes)', (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(item.cl_bytes_sent) : item.cl_bytes_sent, 'num'));
-    rows.push(kv('서버 수신(Bytes)', (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(item.srv_bytes_received) : item.srv_bytes_received, 'num'));
-    rows.push(kv('서버 송신(Bytes)', (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(item.srv_bytes_sent) : item.srv_bytes_sent, 'num'));
-    rows.push(kv('Trxn Index', item.trxn_index));
-    rows.push(kv('Age(s)', (window.AppUtils && AppUtils.formatSeconds) ? AppUtils.formatSeconds(item.age_seconds) : item.age_seconds));
-    rows.push(kv('상태', item.status));
-    rows.push(kv('In Use', (window.AppUtils && AppUtils.renderBoolTag) ? AppUtils.renderBoolTag(item.in_use) : (item.in_use ? 'Y' : 'N')));
-    rows.push(kv('URL', item.url));
-    rows.push(kv('수집시각', (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(item.collected_at) : (item.collected_at ? new Date(item.collected_at).toLocaleString() : '')));
-    rows.push(kv('원본', item.raw_line));
-    $('#sbDetailBody').html(rows.join(''));
-}
+        $('#sbExportBtn').on('click', () => {
+            if (sb.gridApi) sb.gridApi.exportDataAsCsv({ fileName: `sessions_${new Date().toISOString().slice(0,10)}.csv` });
+        });
 
+        $('#sbAnalyzeBtn').on('click', () => {
+            $('#sbListSection').hide();
+            $('#sbAnalyzeSection').show();
+            if (window.sbAnalyze) window.sbAnalyze.run(sb.records);
+        });
+
+        $('.modal-background, .modal-card-head .delete, .modal-card-foot .button').on('click', () => {
+            $('.modal').removeClass('is-active');
+        });
+    });
+
+})();

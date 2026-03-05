@@ -3,49 +3,63 @@
 {% block content %}
 <!-- 필터/액션 헤더 섹션 -->
 <div class="box mb-4">
-    <div class="level mb-4">
-        <div class="level-left">
-            <div class="level-item">
-                <h3 class="title is-4 mb-0">세션브라우저</h3>
+    <style>
+        /* 설정 바 내부의 모든 입력/버튼/셀렉트 높이 강제 통일 */
+        .sb-settings-bar .button,
+        .sb-settings-bar .input,
+        .sb-settings-bar .select,
+        .sb-settings-bar .select select,
+        .sb-settings-bar .ts-wrapper .ts-control {
+            height: 32px !important;
+            min-height: 32px !important;
+            max-height: 32px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            margin: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            line-height: 1 !important;
+            vertical-align: middle !important;
+        }
+        .sb-settings-bar .select:not(.is-multiple):not(.is-loading)::after {
+            border-color: #4a4a4a !important;
+            top: 50% !important;
+            margin-top: -3px !important;
+        }
+        .sb-settings-bar .select select {
+            padding-left: 0.75rem !important;
+            padding-right: 2rem !important;
+        }
+    </style>
+    <div class="is-flex is-align-items-center is-flex-wrap-wrap sb-settings-bar" style="gap: 1rem; min-height: 2.5rem;">
+        <h3 class="title is-6 mb-0 has-text-grey-darker">세션 조회 설정</h3>
+        
+        <div class="is-flex is-align-items-center" style="gap: 0.5rem; flex: 1; min-width: 250px;">
+            <div class="select is-small" style="width: 140px; display: flex !important; align-items: center;">
+                <select id="sbGroupSelect" style="width: 100%; border-radius: 4px;"></select>
             </div>
-        </div>
-        <div class="level-right">
-            <div class="level-item">
-                <div class="buttons">
-                    <button class="button is-light" id="sbExportBtn">엑셀 내보내기</button>
-                    <button class="button is-light" id="sbAnalyzeBtn">통계 분석</button>
-                    <button class="button is-primary" id="sbLoadBtn">세션 불러오기</button>
-                    <span id="sbStatus" class="tag is-light ml-2">대기</span>
+            <div style="position: relative; display: flex !important; align-items: center;">
+                <button id="sbProxyTrigger" class="button is-small is-info is-light px-3" type="button" style="min-width: 100px;">
+                    <span class="icon is-small mr-1"><i class="fas fa-server"></i></span>
+                    <span id="sbSelectionCounter">0 / 0</span>
+                    <span class="icon is-small ml-1"><i class="fas fa-angle-down"></i></span>
+                </button>
+                <div style="position: absolute; top: 100%; left: 0; width: 100%; height: 0; visibility: hidden; pointer-events: none;">
+                    <select id="sbProxySelect" multiple></select>
                 </div>
             </div>
         </div>
-    </div>
-    <p id="sbError" class="help is-danger" style="display:none;"></p>
 
-    <!-- 통합 필터바 -->
-    <div class="filter-bar">
-        <div class="filter-bar-content">
-            <div class="filter-item">
-                <span class="filter-label">그룹</span>
-                <div class="filter-control">
-                    <div class="select is-fullwidth">
-                        <select id="sbGroupSelect"></select>
-                    </div>
-                </div>
-            </div>
-            <div class="filter-item filter-item-expanded">
-                <span class="filter-label">프록시</span>
-                <div class="filter-control">
-                    <select id="sbProxySelect" multiple class="ts-fullwidth"></select>
-                </div>
-            </div>
-            <div class="filter-item filter-item-checkbox">
-                <label class="checkbox">
-                    <input type="checkbox" id="sbSelectAll"> 모두 선택
-                </label>
+        <div class="is-flex is-align-items-center" style="gap: 0.75rem; margin-left: auto;">
+            <div class="buttons">
+                <button class="button is-light is-small px-3" id="sbExportBtn">엑셀 내보내기</button>
+                <button class="button is-light is-small px-3" id="sbAnalyzeBtn">통계 분석</button>
+                <button class="button is-primary is-small px-5" id="sbLoadBtn">세션 불러오기</button>
+                <span id="sbStatus" class="tag is-light is-size-7" style="height: 32px; display: flex; align-items: center;">대기</span>
             </div>
         </div>
     </div>
+    <p id="sbError" class="help is-danger mt-1" style="display:none;"></p>
 </div>
 
 <!-- 세션 테이블 섹션 -->

@@ -6,8 +6,6 @@
 	let IS_RESTORING = false;
 	let CURRENT_VIEW = 'remote';
 	let tlGridApi = null;
-	let tlGridColumnApi = null;
-	let tlProxySelectTomSelect = null;
 	const COLS = [
 		"datetime","username","client_ip","url_destination_ip","timeintransaction",
 		"response_statuscode","cache_status","comm_name","url_protocol","url_host",
@@ -20,6 +18,7 @@
 
 	function setStatus(text, cls){
 		const $tag = $('#tlStatus');
+		if (!$tag.length) return;
 		$tag.text(text);
 		$tag.removeClass().addClass('tag').addClass(cls || 'is-light');
 	}
@@ -44,7 +43,6 @@
 			}else if(c === 'recv_byte' || c === 'sent_byte' || c === 'content_lenght'){
 				formatted = (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(v) : v;
 			}else if(c === 'timeintransaction'){
-				// assume seconds if small; or ms when large
 				var num = Number(v);
 				if(Number.isFinite(num)){
 					formatted = (window.AppUtils && AppUtils.formatDurationMs) ? AppUtils.formatDurationMs(num < 1000 ? num * 1000 : num) : v;
@@ -57,495 +55,125 @@
 		$('#tlDetailModal').addClass('is-active');
 	}
 	
-	// 전역 함수로 노출 (traffic_logs_analyze.js에서 사용)
 	window.showTrafficLogDetail = showDetail;
 
-	// localStorage helpers for persistence
-	function tryWriteState(state){
-		try{
-			localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-			return true;
-		}catch(e){
-			return false;
-		}
-	}
-
-	function sanitizeRecordsForStorage(records){
-		const MAX = 500;
-		const arr = Array.isArray(records) ? records.slice(0, MAX) : [];
-		return arr.map(function(r){
-			if(!r || typeof r !== 'object') return {};
-			const out = {};
-			COLS.forEach(function(c){
-				let v = r[c];
-				if(typeof v === 'string' && v.length > 2000){ v = v.slice(0, 2000) + '…'; }
-				out[c] = v;
-			});
-			return out;
-		});
-	}
-
-	function persistState(state){
-		if(tryWriteState(state)) return true;
-		if(!state || !Array.isArray(state.records) || state.records.length === 0) return false;
-		let reduced = sanitizeRecordsForStorage(state.records);
-		let temp = Object.assign({}, state, { records: reduced });
-		if(tryWriteState(temp)) return true;
-		let count = Math.min(reduced.length, 250);
-		while(count > 0){
-			let slice = reduced.slice(0, count);
-			temp = Object.assign({}, state, { records: slice });
-			if(tryWriteState(temp)) return true;
-			count = Math.floor(count / 2);
-		}
-		return false;
-	}
-
-	function saveState(recordsForSave){
-		let prev;
-		try{
-			const raw = localStorage.getItem(STORAGE_KEY);
-			if(raw){ prev = JSON.parse(raw); }
-		}catch(e){ /* ignore */ }
-		const $sel = $('#tlProxySelect');
-		const proxyId = (tlProxySelectTomSelect && typeof tlProxySelectTomSelect.getValue === 'function') 
-			? (tlProxySelectTomSelect.getValue() || '') 
-			: ($sel.val() || '');
+	function saveState(records){
+		const proxyIds = ($('#tlProxySelect').val() || []).map(v => parseInt(v, 10));
 		const state = {
+			proxyIds: proxyIds,
+			groupId: $('#tlGroupSelect').val(),
+			query: $('#tlQuery').val(),
+			limit: $('#tlLimit').val(),
+			direction: $('#tlDirection').val(),
 			view: CURRENT_VIEW,
-			proxyId: proxyId,
-			query: ($('#tlQuery').val() || '').trim(),
-			limit: $('#tlLimit').val() || '200',
-			direction: $('#tlDirection').val() || 'tail',
-			parsed: true,
-			records: (recordsForSave !== undefined) ? (Array.isArray(recordsForSave) ? recordsForSave : undefined) : (prev ? prev.records : undefined),
-			savedAt: Date.now()
+			records: records || []
 		};
-		persistState(state);
+		try {
+			localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+		} catch(e) {}
 	}
 
 	function restoreState(){
-		try{
+		try {
+			const saved = localStorage.getItem(STORAGE_KEY);
+			if (!saved) return;
+			const state = JSON.parse(saved);
 			IS_RESTORING = true;
-			const raw = localStorage.getItem(STORAGE_KEY);
-			if(!raw) return;
-			const state = JSON.parse(raw);
-			if(state.view){ CURRENT_VIEW = state.view; }
-			const $sel = $('#tlProxySelect');
-			if(state.proxyId !== undefined){
-				if(tlProxySelectTomSelect && typeof tlProxySelectTomSelect.setValue === 'function'){
-					tlProxySelectTomSelect.setValue(String(state.proxyId));
-				} else {
-					$sel.val(String(state.proxyId));
+			
+			if (state.query !== undefined) $('#tlQuery').val(state.query);
+			if (state.limit !== undefined) $('#tlLimit').val(state.limit);
+			if (state.direction !== undefined) $('#tlDirection').val(state.direction);
+			if (state.groupId) $('#tlGroupSelect').val(state.groupId).trigger('change');
+			
+			setTimeout(() => {
+				if (state.proxyIds && state.proxyIds.length > 0) {
+					const ts = document.getElementById('tlProxySelect')._tom;
+					if (ts) ts.setValue(state.proxyIds.map(String), false);
 				}
-			}
-			if(state.query !== undefined){ $('#tlQuery').val(state.query); }
-			if(state.limit !== undefined){ $('#tlLimit').val(state.limit); }
-			if(state.direction !== undefined){ $('#tlDirection').val(state.direction); }
-			if(Array.isArray(state.records) && state.records.length > 0){
-				var hashNow;
-				try { hashNow = JSON.stringify(state.records || []); } catch(e) { hashNow = null; }
-				if (hashNow !== LAST_RENDERED_HASH) {
-					renderParsed(state.records);
-				} else {
-					$('#tlResultParsed').show();
-					$('#tlResultRaw').hide();
-					$('#tlEmptyState').toggle(state.records.length === 0);
+				if (state.records && state.records.length > 0) {
+					renderTable(state.records);
 				}
-				setStatus('저장된 내역', 'is-light');
-			}else{
-				$('#tlEmptyState').show();
-			}
-		}catch(e){ /* ignore */ }
-		finally { IS_RESTORING = false; }
-	}
-
-	async function fetchProxies(){
-		try {
-			const res = await fetch(`${API_BASE}/proxies?limit=500&offset=0`);
-			if(!res.ok){ 
-				throw new Error('프록시 목록을 불러오지 못했습니다'); 
-			}
-			const data = await res.json();
-			console.log('[TrafficLogs] Loaded proxies:', Array.isArray(data) ? data.length : 0, 'active:', Array.isArray(data) ? data.filter(function(p) { return p && p.is_active; }).length : 0);
-			return data;
-		} catch (err) {
-			console.error('[TrafficLogs] Failed to load proxies:', err);
-			throw err;
-		}
-	}
-
-	function populateProxySelect(proxies){
-		const $sel = $('#tlProxySelect');
-		const currentValue = (tlProxySelectTomSelect && typeof tlProxySelectTomSelect.getValue === 'function') 
-			? (tlProxySelectTomSelect.getValue() || '') 
-			: ($sel.val() || '');
-		$sel.find('option:not([value=""])').remove();
-		const active = proxies.filter(p => p && p.is_active);
-		if (active.length === 0) {
-			$sel.append('<option value="" disabled>프록시가 없습니다</option>');
-			showError('프록시가 등록되어 있지 않거나 활성화된 프록시가 없습니다. 설정 > 프록시 관리에서 프록시를 등록하거나 활성화하세요.');
-		} else {
-			active.forEach(p => {
-				const labelBase = p.group_name ? `${p.host} (${p.group_name})` : p.host;
-				const label = p.traffic_log_path ? labelBase : `${labelBase} · 경로 미설정`;
-				$sel.append(`<option value="${p.id}">${label}</option>`);
-			});
-			clearError();
-		}
-		console.log('[TrafficLogs] populateProxySelect - active:', active.length, 'total:', proxies.length);
-		
-		// Initialize or update TomSelect if available
-		if (window.TomSelect) {
-			if (!$sel[0]._tomSelect) {
-				try {
-					tlProxySelectTomSelect = new TomSelect($sel[0], {
-						placeholder: '프록시 선택',
-						allowEmptyOption: true
-					});
-					$sel[0]._tomSelect = tlProxySelectTomSelect;
-					console.log('[TrafficLogs] TomSelect initialized for proxy select');
-				} catch (e) {
-					console.error('[TrafficLogs] TomSelect init failed:', e);
-				}
-			} else {
-				// TomSelect already initialized, refresh options
-				if (tlProxySelectTomSelect && typeof tlProxySelectTomSelect.refreshOptions === 'function') {
-					tlProxySelectTomSelect.refreshOptions(false);
-				}
-			}
-			// Restore previous selection if valid
-			if (currentValue && tlProxySelectTomSelect && typeof tlProxySelectTomSelect.setValue === 'function') {
-				const isValid = active.some(p => String(p.id) === String(currentValue));
-				if (isValid) {
-					tlProxySelectTomSelect.setValue(currentValue);
-				}
-			}
-		}
-	}
-
-	function destroyTableIfExists(){
-		if(tlGridApi){
-			try {
-				if (typeof tlGridApi.destroy === 'function') {
-					tlGridApi.destroy();
-				}
-			} catch (e) {
-				console.error('[TrafficLogs] Failed to destroy grid:', e);
-			}
-			tlGridApi = null;
-			tlGridColumnApi = null;
-		}
-	}
-
-	function updateFilterCount() {
-		if (!tlGridApi) return;
-		try {
-			var filterModel = tlGridApi.getFilterModel();
-			var filterCount = 0;
-			if (filterModel) {
-				// 필터 모델에서 실제로 값이 있는 필터의 수를 계산
-				for (var colId in filterModel) {
-					if (filterModel.hasOwnProperty(colId)) {
-						var filter = filterModel[colId];
-						// 필터가 있고 값이 있는지 확인
-						if (filter && typeof filter === 'object') {
-							// agTextColumnFilter의 경우 filter 속성 확인
-							if (filter.filter && String(filter.filter).trim() !== '') {
-								filterCount++;
-							}
-							// agNumberColumnFilter의 경우 filter, filterTo, filterTo 등 확인
-							else if (filter.filter !== undefined && filter.filter !== null && filter.filter !== '') {
-								filterCount++;
-							}
-							else if (filter.filterTo !== undefined && filter.filterTo !== null && filter.filterTo !== '') {
-								filterCount++;
-							}
-							else if (filter.type && filter.type !== 'equals') {
-								// 다른 필터 타입들
-								filterCount++;
-							}
-						}
-					}
-				}
-			}
-			var $filterCount = $('#tlFilterCount');
-			if (filterCount > 0) {
-				$filterCount.text('필터: ' + filterCount).show();
-			} else {
-				$filterCount.hide();
-			}
-		} catch (e) {
-			console.error('Failed to update filter count:', e);
-		}
-	}
-
-	function renderParsed(records){
-		destroyTableIfExists();
-		
-		// Ensure container visible
-		$('#tlResultParsed').show();
-		$('#tlResultRaw').hide();
-		$('#tlEmptyState').toggle(records.length === 0);
-		
-		if (records.length === 0) {
-			try { LAST_RENDERED_HASH = JSON.stringify(records || []); } catch(e) { LAST_RENDERED_HASH = null; }
-			return;
-		}
-
-		// Initialize ag-grid with client-side row model
-		var gridOptions = {
-			columnDefs: AgGridConfig.getTrafficLogColumns(),
-			rowData: records,
-			defaultColDef: {
-				sortable: true,
-				filter: 'agTextColumnFilter',
-				filterParams: { applyButton: true, clearButton: true },
-				resizable: true,
-				minWidth: 100
-			},
-			rowModelType: 'clientSide',
-			pagination: true,
-			paginationPageSize: 25,
-			enableFilter: true,
-			enableSorting: true,
-			animateRows: false,
-			suppressRowClickSelection: false,
-			headerHeight: 50,
-			overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">표시할 로그가 없습니다.<br><small style="margin-top: 8px; display: block;">프록시를 선택하고 "조회" 버튼을 클릭하세요.</small></div>',
-			onGridReady: function(params) {
-				tlGridApi = params.api;
-				if (params.columnApi) {
-					tlGridColumnApi = params.columnApi;
-				}
-				// 컬럼 너비 자동 조절 (헤더 텍스트가 잘리지 않도록)
-				setTimeout(function() {
-					if (tlGridApi) {
-						var allColumnIds = [];
-						tlGridApi.getColumns().forEach(function(column) {
-							allColumnIds.push(column.getColId());
-						});
-						if (tlGridApi.autoSizeColumns) {
-							tlGridApi.autoSizeColumns(allColumnIds, { skipHeader: false });
-						} else if (tlGridApi.sizeColumnsToFit) {
-							tlGridApi.sizeColumnsToFit();
-						}
-					}
-				}, 200);
-				updateFilterCount();
-			},
-			onRowClicked: function(params) {
-				showDetail(params.data || {});
-			},
-			onFilterChanged: function() {
-				updateFilterCount();
-			}
-		};
-
-		var gridDiv = document.querySelector('#tlTableGrid');
-		if (gridDiv && window.agGrid) {
-			try {
-				if (typeof window.agGrid.createGrid === 'function') {
-					tlGridApi = window.agGrid.createGrid(gridDiv, gridOptions);
-				} else if (window.agGrid.Grid) {
-					new window.agGrid.Grid(gridDiv, gridOptions);
-				}
-				console.log('[TrafficLogs] ag-grid initialized successfully');
-			} catch (e) {
-				console.error('[TrafficLogs] ag-grid init failed:', e);
-				showError('테이블 초기화 실패: ' + (e.message || String(e)));
-			}
-		} else {
-			console.warn('[TrafficLogs] ag-grid not available or grid div not found');
-		}
-		
-		// Update last rendered signature to suppress redundant re-renders
-		try { LAST_RENDERED_HASH = JSON.stringify(records || []); } catch(e) { LAST_RENDERED_HASH = null; }
-	}
-
-	function renderRaw(lines){
-		$('#tlRawPre').text(lines.join('\n'));
-		$('#tlResultRaw').show();
-		$('#tlResultParsed').hide();
-		$('#tlEmptyState').toggle(lines.length === 0);
+				IS_RESTORING = false;
+			}, 300);
+		} catch(e) { IS_RESTORING = false; }
 	}
 
 	async function loadLogs(){
-		clearError();
-		const $sel = $('#tlProxySelect');
-		const proxyId = (tlProxySelectTomSelect && typeof tlProxySelectTomSelect.getValue === 'function') 
-			? (tlProxySelectTomSelect.getValue() || '') 
-			: ($sel.val() || '');
-		if(!proxyId || proxyId === ''){ 
-			showError('프록시를 선택하세요'); 
-			return; 
-		}
-		const selected = PROXIES.find(p => p && String(p.id) === String(proxyId));
-		if(!selected){ 
-			showError('프록시 정보를 찾을 수 없습니다'); 
-			return; 
-		}
-		if(!selected.traffic_log_path){
-			showError('선택한 프록시에 트래픽 로그 경로가 설정되어 있지 않습니다. 설정 > 프록시 수정에서 경로를 지정하세요.');
+		const proxyIds = ($('#tlProxySelect').val() || []).map(v => parseInt(v, 10));
+		if (proxyIds.length === 0) {
+			showError('프록시를 선택하세요.');
 			return;
 		}
-		const q = ($('#tlQuery').val() || '').trim();
-		const limit = Math.max(1, Math.min(1000, parseInt($('#tlLimit').val() || '200', 10)));
-		const direction = $('#tlDirection').val();
-		const parsed = true;
-
-		setStatus('조회 중...', 'is-info');
-		// Clear current UI and cached results to ensure replacement semantics
-		destroyTableIfExists();
-		$('#tlResultParsed').hide();
-		$('#tlResultRaw').hide();
-		$('#tlEmptyState').hide();
-		saveState([]);
-		$('#tlLoadBtn').addClass('is-loading').prop('disabled', true);
-		try{
-			const params = new URLSearchParams();
-			params.set('limit', String(limit));
-			params.set('direction', direction);
-			params.set('parsed', String(parsed));
-			if(q.length > 0){ params.set('q', q); }
-			const url = `${API_BASE}/traffic-logs/${encodeURIComponent(proxyId)}?${params.toString()}`;
-			const res = await fetch(url);
-			if(!res.ok){
-				const err = await res.json().catch(()=>({detail:'에러'}));
-				throw new Error(err.detail || '조회 실패');
-			}
+		
+		clearError();
+		setStatus('조회 중...', 'is-warning');
+		
+		try {
+			// 백엔드가 다중 ID를 지원하지 않는 경우 첫 번째 ID만 사용하도록 호환성 유지
+			const proxyId = proxyIds[0];
+			const query = $('#tlQuery').val() || '';
+			const limit = parseInt($('#tlLimit').val(), 10) || 200;
+			const direction = $('#tlDirection').val() || 'tail';
+			
+			const res = await fetch(`${API_BASE}/traffic-logs/query?proxy_id=${proxyId}&query=${encodeURIComponent(query)}&limit=${limit}&direction=${direction}`);
+			if (!res.ok) throw new Error('로그 조회에 실패했습니다.');
+			
 			const data = await res.json();
-			renderParsed(data.records || []);
-			// Persist last results only after successful fetch to avoid storage-event loops
-			saveState(Array.isArray(data.records) ? data.records : []);
-			const suffix = data.truncated ? ' (truncated)' : '';
-			setStatus(`완료 - ${data.count} 라인${suffix}`, 'is-success');
-			// 컬럼 너비 자동 조절 (헤더 텍스트가 잘리지 않도록)
-			setTimeout(function() {
-				if (tlGridApi) {
-					var allColumnIds = [];
-					tlGridApi.getColumns().forEach(function(column) {
-						allColumnIds.push(column.getColId());
-					});
-					if (tlGridApi.autoSizeColumns) {
-						tlGridApi.autoSizeColumns(allColumnIds, { skipHeader: false });
-					} else if (tlGridApi.sizeColumnsToFit) {
-						tlGridApi.sizeColumnsToFit();
-					}
-				}
-			}, 300);
-		}catch(e){
-			showError(e.message || String(e));
+			const records = data.records || [];
+			renderTable(records);
+			setStatus(`${records.length}건 조회됨`, 'is-success');
+			saveState(records);
+		} catch(err) {
+			showError(err.message);
 			setStatus('실패', 'is-danger');
-		}finally{
-			$('#tlLoadBtn').removeClass('is-loading').prop('disabled', false);
 		}
 	}
 
-	$(async function(){
-		try{
-			setStatus('프록시 목록 로딩...', 'is-light');
-			const proxies = await fetchProxies();
-			PROXIES = Array.isArray(proxies) ? proxies : [];
-			populateProxySelect(PROXIES);
-			if (PROXIES.length === 0 || PROXIES.filter(function(p) { return p && p.is_active; }).length === 0) {
-				setStatus('프록시 없음', 'is-warning');
-			} else {
-				setStatus('대기', 'is-light');
-			}
-		}catch(e){
-			console.error('[TrafficLogs] Failed to initialize:', e);
-			showError('프록시 목록 로딩 실패: ' + (e.message || String(e)));
-			setStatus('실패', 'is-danger');
+	function renderTable(records){
+		if (!tlGridApi) {
+			const gridOptions = {
+				columnDefs: COLS.map(c => ({ field: c, headerName: c.toUpperCase(), width: 150 })),
+				rowData: records,
+				pagination: true,
+				paginationPageSize: 100,
+				onRowDoubleClicked: params => showDetail(params.data),
+				theme: 'quartz'
+			};
+			tlGridApi = agGrid.createGrid(document.querySelector('#tlTableGrid'), gridOptions);
+		} else {
+			tlGridApi.setGridOption('rowData', records);
 		}
-		// Restore previous state and results after proxies are loaded
-		restoreState();
-		// URL 기반 섹션 표시
-		function setView(view, write){
-			CURRENT_VIEW = view;
-			if(view === 'upload'){
-				$('#tlRemoteSection').hide();
-				$('#tlaSection').show();
-			}else{
-				$('#tlaSection').hide();
-				$('#tlRemoteSection').show();
-			}
-			if(write){ saveState(undefined); }
-		}
-		function applyViewFromUrl(){
-			const path = window.location.pathname;
-			// 레거시 URL 파라미터 지원 (?view=upload)
-			const params = new URLSearchParams(window.location.search);
-			const viewParam = params.get('view');
-			if (viewParam === 'upload' && path === '/traffic-logs') {
-				// 레거시 URL 리다이렉트
-				window.location.href = '/traffic-logs/upload';
-				return;
-			}
-			// URL 경로에 따라 섹션 표시
-			if(path === '/traffic-logs/upload'){
-				setView('upload', false);
-			}else{
-				setView('remote', false);
-			}
-		}
-		applyViewFromUrl();
-		
-		// Quick filter (전체 검색)
-		$('#tlQuickFilter').on('input', function() {
-			var filterText = $(this).val();
-			if (tlGridApi) {
-				tlGridApi.setGridOption('quickFilterText', filterText);
+		$('#tlResultParsed').show();
+	}
+
+	$(document).ready(() => {
+		// DeviceSelector 초기화
+		window.DeviceSelector.init({
+			groupSelect: '#tlGroupSelect',
+			proxySelect: '#tlProxySelect',
+			selectionCounter: '#tlSelectionCounter',
+			onData: (data) => {
+				PROXIES = data.proxies;
+				if (!IS_RESTORING) restoreState();
 			}
 		});
-		
-		// 필터 초기화 버튼
-		$('#tlClearFilters').on('click', function() {
-			if (tlGridApi) {
-				tlGridApi.setFilterModel(null);
-				tlGridApi.setGridOption('quickFilterText', '');
-				$('#tlQuickFilter').val('');
-				updateFilterCount();
-			}
-		});
-		
-		// Save selection changes
-		$('#tlProxySelect, #tlQuery, #tlLimit, #tlDirection').on('change keyup', function(){ saveState(undefined); });
+
 		$('#tlLoadBtn').on('click', loadLogs);
-		// Cross-tab sync: only re-render when records changed
-		try{
-			window.addEventListener('storage', function(e){
-				if(!e) return;
-				if(e.key === STORAGE_KEY){
-					try{
-						const state = JSON.parse(e.newValue || 'null');
-						if(state && Array.isArray(state.records)){
-							var hashNow = null;
-							try { hashNow = JSON.stringify(state.records || []); } catch(err2) { hashNow = null; }
-							if (hashNow !== LAST_RENDERED_HASH) {
-								restoreState();
-							} else {
-								// Only sync controls
-								const $sel = $('#tlProxySelect');
-								if(state.proxyId !== undefined){
-									if(tlProxySelectTomSelect && typeof tlProxySelectTomSelect.setValue === 'function'){
-										tlProxySelectTomSelect.setValue(String(state.proxyId));
-									} else {
-										$sel.val(String(state.proxyId));
-									}
-								}
-								if(state.query !== undefined){ $('#tlQuery').val(state.query); }
-								if(state.limit !== undefined){ $('#tlLimit').val(state.limit); }
-								if(state.direction !== undefined){ $('#tlDirection').val(state.direction); }
-								if(state.view){ setView(state.view, false); }
-							}
-						} else {
-							restoreState();
-						}
-					}catch(err3){ /* ignore */ }
-				}
-			});
-		}catch(err){ /* ignore */ }
+		$('#tlQuickFilter').on('input', function() {
+			if (tlGridApi) tlGridApi.setGridOption('quickFilterText', $(this).val());
+		});
+		$('#tlClearFilters').on('click', () => {
+			$('#tlQuickFilter').val('');
+			if (tlGridApi) {
+				tlGridApi.setGridOption('quickFilterText', '');
+				tlGridApi.setFilterModel(null);
+			}
+		});
+		
+		// URL 경로 처리
+		if (window.location.pathname === '/traffic-logs/upload') {
+			$('#tlRemoteSection').hide();
+			$('#tlaSection').show();
+		}
 	});
 })();
-
