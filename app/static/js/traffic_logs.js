@@ -61,7 +61,6 @@
 		const proxyIds = ($('#tlProxySelect').val() || []).map(v => parseInt(v, 10));
 		const state = {
 			proxyIds: proxyIds,
-			groupId: $('#tlGroupSelect').val(),
 			query: $('#tlQuery').val(),
 			limit: $('#tlLimit').val(),
 			direction: $('#tlDirection').val(),
@@ -83,7 +82,6 @@
 			if (state.query !== undefined) $('#tlQuery').val(state.query);
 			if (state.limit !== undefined) $('#tlLimit').val(state.limit);
 			if (state.direction !== undefined) $('#tlDirection').val(state.direction);
-			if (state.groupId) $('#tlGroupSelect').val(state.groupId).trigger('change');
 			
 			setTimeout(() => {
 				if (state.proxyIds && state.proxyIds.length > 0) {
@@ -147,9 +145,8 @@
 	}
 
 	$(document).ready(() => {
-		// DeviceSelector 초기화
+		// DeviceSelector 초기화 (그룹 선택 없이 전체 프록시 표시)
 		window.DeviceSelector.init({
-			groupSelect: '#tlGroupSelect',
 			proxySelect: '#tlProxySelect',
 			proxyTrigger: '#tlProxyTrigger',
 			selectionCounter: '#tlSelectionCounter',
