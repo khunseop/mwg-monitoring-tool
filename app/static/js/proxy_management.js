@@ -1,22 +1,29 @@
-// URL 기반 섹션 표시
-document.addEventListener('DOMContentLoaded', function() {
-    // 레거시 URL 파라미터 지원 (?section=groups)
-    const params = new URLSearchParams(window.location.search);
-    const sectionParam = params.get('section');
-    if (sectionParam === 'groups' && window.location.pathname === '/proxy') {
-        // 레거시 URL 리다이렉트
-        window.location.href = '/proxy/groups';
-        return;
-    }
-    
-    // URL 경로에 따라 섹션 표시/숨김
-    const path = window.location.pathname;
-    if (path === '/proxy/groups') {
-        $('#proxy-list-section').hide();
-        $('#proxy-groups-section').show();
-    } else {
+// URL 및 탭 기반 섹션 표시
+function switchProxySection(section) {
+    if (section === 'list') {
+        $('#proxy-list-tab').addClass('is-active');
+        $('#proxy-groups-tab').removeClass('is-active');
         $('#proxy-list-section').show();
         $('#proxy-groups-section').hide();
+        // URL 업데이트 (히스토리 저장 없이)
+        window.history.replaceState(null, '', '/proxy');
+    } else {
+        $('#proxy-list-tab').removeClass('is-active');
+        $('#proxy-groups-tab').addClass('is-active');
+        $('#proxy-list-section').hide();
+        $('#proxy-groups-section').show();
+        // URL 업데이트
+        window.history.replaceState(null, '', '/proxy/groups');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // URL 경로에 따라 초기 섹션 설정
+    const path = window.location.pathname;
+    if (path === '/proxy/groups') {
+        switchProxySection('groups');
+    } else {
+        switchProxySection('list');
     }
 });
 
@@ -98,8 +105,8 @@ function addProxyInterfaceRow(name = '', in_oid = '', out_oid = '') {
             <td style="padding: 0.5rem 0.25rem;"><input class="input is-small if-in-oid" type="text" value="${in_oid}" placeholder="1.3.6.1..." style="background: white;"></td>
             <td style="padding: 0.5rem 0.25rem;"><input class="input is-small if-out-oid" type="text" value="${out_oid}" placeholder="1.3.6.1..." style="background: white;"></td>
             <td class="has-text-centered" style="padding: 0.5rem 0.25rem;">
-                <button class="button is-small is-ghost px-0 py-0" onclick="$(this).closest('tr').remove()" title="삭제" style="color: var(--color-text-muted); height: auto;">
-                    <span class="icon is-small"><i class="fas fa-times"></i></span>
+                <button class="button is-small is-ghost px-0 py-0" onclick="$(this).closest('tr').remove()" title="삭제" style="color: var(--color-text-muted); height: auto; font-weight: bold;">
+                    <span>삭제</span>
                 </button>
             </td>
         </tr>
@@ -115,16 +122,24 @@ function loadProxies() {
             tbody.empty();
             
             proxies.forEach(proxy => {
+                const statusTag = proxy.is_active 
+                    ? '<span class="tag is-success is-light" style="font-weight:600;">활성</span>' 
+                    : '<span class="tag is-danger is-light" style="font-weight:600;">비활성</span>';
+                
                 tbody.append(`
                     <tr>
-                        <td>${proxy.host}</td>
-                        <td>${proxy.group_name || '-'}</td>
-                        <td>${proxy.is_active ? '<span class="tag is-success">활성</span>' : '<span class="tag is-danger">비활성</span>'}</td>
-                        <td>${proxy.description || ''}</td>
-                        <td>
-                            <div class="buttons">
-                                <button class="button is-light" onclick="openModal('proxy', ${proxy.id})">수정</button>
-                                <button class="button is-danger" onclick="deleteProxy(${proxy.id})">삭제</button>
+                        <td class="px-5 py-3 has-text-weight-semibold">${proxy.host}</td>
+                        <td class="py-3">${proxy.group_name || '<span class="has-text-grey-light">없음</span>'}</td>
+                        <td class="has-text-centered py-3">${statusTag}</td>
+                        <td class="py-3 is-size-7 has-text-grey">${proxy.description || ''}</td>
+                        <td class="has-text-centered py-2">
+                            <div class="buttons is-centered">
+                                <button class="button is-white is-small border" onclick="openModal('proxy', ${proxy.id})">
+                                    <span>수정</span>
+                                </button>
+                                <button class="button is-white is-small border has-text-danger" onclick="deleteProxy(${proxy.id})">
+                                    <span>삭제</span>
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -225,13 +240,19 @@ function loadGroups() {
             groups.forEach(group => {
                 tbody.append(`
                     <tr>
-                        <td>${group.name}</td>
-                        <td>${group.description || ''}</td>
-                        <td>${group.proxies_count}</td>
-                        <td>
-                            <div class="buttons">
-                                <button class="button is-light" onclick="openModal('group', ${group.id})">수정</button>
-                                <button class="button is-danger" onclick="deleteGroup(${group.id})">삭제</button>
+                        <td class="px-5 py-3 has-text-weight-semibold">${group.name}</td>
+                        <td class="py-3 is-size-7 has-text-grey">${group.description || ''}</td>
+                        <td class="has-text-centered py-3">
+                            <span class="tag is-info is-light" style="font-weight:700;">${group.proxies_count}</span>
+                        </td>
+                        <td class="has-text-centered py-2">
+                            <div class="buttons is-centered">
+                                <button class="button is-white is-small border" onclick="openModal('group', ${group.id})">
+                                    <span>수정</span>
+                                </button>
+                                <button class="button is-white is-small border has-text-danger" onclick="deleteGroup(${group.id})">
+                                    <span>삭제</span>
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -478,6 +499,7 @@ $(document).ready(() => {
 });
 
 // expose for inline handlers
+window.switchProxySection = switchProxySection;
 window.openBulkProxyModal = openBulkProxyModal;
 window.closeBulkProxyModal = closeBulkProxyModal;
 window.submitBulkProxies = submitBulkProxies;

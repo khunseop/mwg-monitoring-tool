@@ -1,164 +1,212 @@
 {% extends "base.html" %}
 
 {% block content %}
-
-<!-- 통합 설정 폼 -->
-<div class="box mb-4">
-    <div class="level mb-4">
-        <div class="level-left">
-            <div class="level-item">
-                <h3 class="title is-4 mb-0">설정</h3>
-            </div>
-        </div>
-        <div class="level-right">
-            <div class="level-item">
-                <div class="buttons">
-                    <button class="button is-primary" onclick="saveAllConfig()">저장</button>
-                    <span id="cfgStatus" class="tag is-light ml-2">로딩 중...</span>
-                </div>
-            </div>
-        </div>
+<div class="is-flex is-align-items-center is-justify-content-between mb-5">
+    <h3 class="title is-4 mb-0">시스템 설정</h3>
+    <div class="buttons mb-0">
+        <span id="cfgStatus" class="tag is-light mr-3">준비됨</span>
+        <button class="button is-primary is-small px-5" onclick="saveAllConfig()" style="font-weight: 600;">설정 저장</button>
     </div>
 </div>
 
-<!-- SNMP 설정 섹션 -->
-<div class="box mb-4">
-    <h4 class="title is-5 mb-4">SNMP 설정</h4>
-    <div class="columns is-multiline">
-        <div class="column is-3">
-            <div class="field">
-                <label class="label">Community String</label>
-                <div class="control">
-                    <input class="input" id="cfgCommunity" type="text" placeholder="public" value="public">
-                </div>
-                <p class="help">SNMP v2c community string (기본값: public)</p>
+<div class="columns is-multiline">
+    <!-- SNMP 설정 -->
+    <div class="column is-12">
+        <div class="settings-container p-5" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
+            <div class="is-flex is-align-items-center mb-4">
+                <h4 class="title is-6 mb-0">SNMP 설정</h4>
             </div>
-        </div>
-    </div>
-</div>
-
-<!-- 자원 수집 설정 섹션 -->
-<div class="box mb-4">
-    <h4 class="title is-5 mb-4">자원 수집 설정</h4>
-    <p class="mb-3" style="color: var(--color-text-muted); font-size: 0.875rem;">각 항목의 OID와 경고 임계치를 설정합니다. 임계치는 비워두면 자동 스케일링만 사용합니다.</p>
-    <div class="table-container">
-        <table class="table is-fullwidth is-narrow">
-            <thead>
-                <tr>
-                    <th style="width: 15%;">항목</th>
-                    <th style="width: 45%;">OID</th>
-                    <th style="width: 30%;">임계치</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><strong>CPU</strong></td>
-                    <td><input class="input is-small" id="cfgOidCpu" placeholder="1.3.6.1.x"></td>
-                    <td><input class="input is-small" id="cfgThrCpu" type="number" step="1" min="0" placeholder="예: 80"></td>
-                </tr>
-                <tr>
-                    <td><strong>MEM</strong></td>
-                    <td><input class="input is-small" id="cfgOidMem" placeholder="1.3.6.1.x 또는 ssh"></td>
-                    <td><input class="input is-small" id="cfgThrMem" type="number" step="1" min="0" placeholder="예: 80"></td>
-                </tr>
-                <tr>
-                    <td><strong>DISK</strong></td>
-                    <td><input class="input is-small" id="cfgOidDisk" placeholder="1.3.6.1.x 또는 ssh"></td>
-                    <td><input class="input is-small" id="cfgThrDisk" type="number" step="1" min="0" placeholder="예: 90"></td>
-                </tr>
-                <tr>
-                    <td><strong>CC</strong></td>
-                    <td><input class="input is-small" id="cfgOidCc" placeholder="1.3.6.1.x"></td>
-                    <td><input class="input is-small" id="cfgThrCc" type="number" step="1" min="0" placeholder="숫자"></td>
-                </tr>
-                <tr>
-                    <td><strong>CS</strong></td>
-                    <td><input class="input is-small" id="cfgOidCs" placeholder="1.3.6.1.x"></td>
-                    <td><input class="input is-small" id="cfgThrCs" type="number" step="1" min="0" placeholder="숫자"></td>
-                </tr>
-                <tr>
-                    <td><strong>HTTP (누적)</strong></td>
-                    <td><input class="input is-small" id="cfgOidHttp" placeholder="1.3.6.1.x"></td>
-                    <td><input class="input is-small" id="cfgThrHttp" type="number" step="0.01" min="0" placeholder="Mbps (예: 100)"></td>
-                </tr>
-                <tr>
-                    <td><strong>HTTPS (누적)</strong></td>
-                    <td><input class="input is-small" id="cfgOidHttps" placeholder="1.3.6.1.x"></td>
-                    <td><input class="input is-small" id="cfgThrHttps" type="number" step="0.01" min="0" placeholder="Mbps (예: 100)"></td>
-                </tr>
-                <tr>
-                    <td><strong>FTP (누적)</strong></td>
-                    <td><input class="input is-small" id="cfgOidFtp" placeholder="1.3.6.1.x"></td>
-                    <td><input class="input is-small" id="cfgThrFtp" type="number" step="0.01" min="0" placeholder="Mbps (예: 100)"></td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-    <!-- 인터페이스 설정 섹션 -->
-    <div class="box mb-4">
-        <h4 class="title is-5 mb-4">인터페이스 설정</h4>
-        <p class="mb-3" style="color: var(--color-text-muted); font-size: 0.875rem;">모니터링할 인터페이스를 추가하세요.</p>
-        <div class="table-container">
-            <table class="table is-fullwidth is-narrow">
-                <thead>
-                    <tr>
-                        <th style="width: 12%;">인터페이스</th>
-                        <th style="width: 25%;">IN OID</th>
-                        <th style="width: 25%;">OUT OID</th>
-                        <th style="width: 15%;">임계치 (Mbps)</th>
-                        <th style="width: 15%;">대역폭 (Mbps)</th>
-                        <th style="width: 8%;"></th>
-                    </tr>
-                </thead>
-                <tbody id="cfgInterfaceList">
-                    <!-- 동적으로 추가됨 -->
-                </tbody>
-            </table>
-        </div>
-        <div class="field mt-3">
-            <button class="button is-primary is-small" id="cfgAddInterface" type="button">인터페이스 추가</button>
-        </div>
-    </div>
-
-<!-- 세션브라우저 설정 섹션 -->
-<div class="box mb-4">
-    <h4 class="title is-5 mb-4">세션브라우저 설정</h4>
-    <div class="columns is-multiline">
-        <div class="column is-3">
-            <div class="field">
-                <label class="label">SSH 포트</label>
-                <div class="control">
-                    <input class="input" id="sbCfgPort" type="number" min="1" max="65535" value="22">
+            <div class="columns">
+                <div class="column is-4">
+                    <div class="field">
+                        <label class="label is-small">Community String</label>
+                        <div class="control">
+                            <input class="input is-small" id="cfgCommunity" type="text" placeholder="public" value="public">
+                        </div>
+                        <p class="help is-size-7">SNMP v2c 통신을 위한 커뮤니티 문자열 (기본값: public)</p>
+                    </div>
                 </div>
             </div>
         </div>
-        
-        <div class="column is-3">
-            <div class="field">
-                <label class="label">타임아웃(초)</label>
-                <div class="control">
-                    <input class="input" id="sbCfgTimeout" type="number" min="1" max="120" value="10">
-                </div>
+    </div>
+
+    <!-- 자원 수집 설정 -->
+    <div class="column is-12">
+        <div class="settings-container p-5" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
+            <div class="is-flex is-align-items-center mb-4">
+                <h4 class="title is-6 mb-0">자원 수집 및 임계치 설정</h4>
+            </div>
+            <p class="is-size-7 has-text-grey-light mb-4">각 항목의 수집 OID와 시각화를 위한 경고 임계치를 설정합니다. (비워두면 자동 스케일링)</p>
+            
+            <div class="table-container">
+                <table class="table is-fullwidth is-narrow is-hoverable is-striped" style="font-size: 0.875rem;">
+                    <thead>
+                        <tr>
+                            <th style="width: 150px;">항목</th>
+                            <th>수집 OID (또는 SSH 명령어)</th>
+                            <th style="width: 200px;">임계치</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="has-text-weight-semibold">CPU 사용률</td>
+                            <td><input class="input is-small" id="cfgOidCpu" placeholder="1.3.6.1.x"></td>
+                            <td>
+                                <div class="field has-addons">
+                                    <p class="control is-expanded"><input class="input is-small has-text-right" id="cfgThrCpu" type="number" placeholder="80"></p>
+                                    <p class="control"><span class="button is-small is-static">%</span></p>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="has-text-weight-semibold">메모리 사용률</td>
+                            <td><input class="input is-small" id="cfgOidMem" placeholder="1.3.6.1.x 또는 ssh"></td>
+                            <td>
+                                <div class="field has-addons">
+                                    <p class="control is-expanded"><input class="input is-small has-text-right" id="cfgThrMem" type="number" placeholder="80"></p>
+                                    <p class="control"><span class="button is-small is-static">%</span></p>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="has-text-weight-semibold">디스크 사용률</td>
+                            <td><input class="input is-small" id="cfgOidDisk" placeholder="1.3.6.1.x 또는 ssh"></td>
+                            <td>
+                                <div class="field has-addons">
+                                    <p class="control is-expanded"><input class="input is-small has-text-right" id="cfgThrDisk" type="number" placeholder="90"></p>
+                                    <p class="control"><span class="button is-small is-static">%</span></p>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="has-text-weight-semibold">CC (Concurrent)</td>
+                            <td><input class="input is-small" id="cfgOidCc" placeholder="1.3.6.1.x"></td>
+                            <td>
+                                <div class="field has-addons">
+                                    <p class="control is-expanded"><input class="input is-small has-text-right" id="cfgThrCc" type="number" placeholder="10000"></p>
+                                    <p class="control"><span class="button is-small is-static">sess</span></p>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="has-text-weight-semibold">CS (Cps)</td>
+                            <td><input class="input is-small" id="cfgOidCs" placeholder="1.3.6.1.x"></td>
+                            <td>
+                                <div class="field has-addons">
+                                    <p class="control is-expanded"><input class="input is-small has-text-right" id="cfgThrCs" type="number" placeholder="500"></p>
+                                    <p class="control"><span class="button is-small is-static">cps</span></p>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="has-text-weight-semibold">HTTP (누적)</td>
+                            <td><input class="input is-small" id="cfgOidHttp" placeholder="1.3.6.1.x"></td>
+                            <td>
+                                <div class="field has-addons">
+                                    <p class="control is-expanded"><input class="input is-small has-text-right" id="cfgThrHttp" type="number" step="0.1" placeholder="100"></p>
+                                    <p class="control"><span class="button is-small is-static">Mbps</span></p>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="has-text-weight-semibold">HTTPS (누적)</td>
+                            <td><input class="input is-small" id="cfgOidHttps" placeholder="1.3.6.1.x"></td>
+                            <td>
+                                <div class="field has-addons">
+                                    <p class="control is-expanded"><input class="input is-small has-text-right" id="cfgThrHttps" type="number" step="0.1" placeholder="100"></p>
+                                    <p class="control"><span class="button is-small is-static">Mbps</span></p>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="has-text-weight-semibold">FTP (누적)</td>
+                            <td><input class="input is-small" id="cfgOidFtp" placeholder="1.3.6.1.x"></td>
+                            <td>
+                                <div class="field has-addons">
+                                    <p class="control is-expanded"><input class="input is-small has-text-right" id="cfgThrFtp" type="number" step="0.1" placeholder="100"></p>
+                                    <p class="control"><span class="button is-small is-static">Mbps</span></p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
-        <div class="column is-3">
-            <div class="field">
-                <label class="label">호스트키 정책</label>
-                <div class="control">
-                    <div class="select is-fullwidth">
-                        <select id="sbCfgHostKeyPolicy">
-                            <option value="auto_add">auto_add</option>
-                            <option value="reject">reject</option>
-                        </select>
+    </div>
+
+    <!-- 인터페이스 설정 -->
+    <div class="column is-12">
+        <div class="settings-container p-5" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
+            <div class="is-flex is-align-items-center is-justify-content-between mb-4">
+                <div class="is-flex is-align-items-center">
+                    <h4 class="title is-6 mb-0">인터페이스 설정</h4>
+                </div>
+                <button class="button is-primary is-small px-3" id="cfgAddInterface" type="button">
+                    <span>인터페이스 추가</span>
+                </button>
+            </div>
+            <p class="is-size-7 has-text-grey-light mb-4">모니터링할 공통 인터페이스 정보를 설정합니다. (장비별 개별 설정이 있는 경우 해당 설정이 우선 적용됨)</p>
+            
+            <div class="table-container">
+                <table class="table is-fullwidth is-narrow is-hoverable is-striped" style="font-size: 0.875rem;">
+                    <thead>
+                        <tr>
+                            <th style="width: 15%;">이름</th>
+                            <th style="width: 25%;">IN OID</th>
+                            <th style="width: 25%;">OUT OID</th>
+                            <th style="width: 15%;">임계치 (Mbps)</th>
+                            <th style="width: 15%;">대역폭 (Mbps)</th>
+                            <th style="width: 50px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="cfgInterfaceList">
+                        <!-- 동적으로 추가됨 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 세션브라우저 설정 -->
+    <div class="column is-12">
+        <div class="settings-container p-5" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
+            <div class="is-flex is-align-items-center mb-4">
+                <h4 class="title is-6 mb-0">세션브라우저 (SSH) 설정</h4>
+            </div>
+            <div class="columns">
+                <div class="column is-3">
+                    <div class="field">
+                        <label class="label is-small">SSH 포트</label>
+                        <div class="control">
+                            <input class="input is-small" id="sbCfgPort" type="number" min="1" max="65535" value="22">
+                        </div>
+                    </div>
+                </div>
+                <div class="column is-3">
+                    <div class="field">
+                        <label class="label is-small">타임아웃 (초)</label>
+                        <div class="control">
+                            <input class="input is-small" id="sbCfgTimeout" type="number" min="1" max="120" value="10">
+                        </div>
+                    </div>
+                </div>
+                <div class="column is-3">
+                    <div class="field">
+                        <label class="label is-small">호스트키 정책</label>
+                        <div class="control">
+                            <div class="select is-small is-fullwidth">
+                                <select id="sbCfgHostKeyPolicy">
+                                    <option value="auto_add">auto_add (자동 수락)</option>
+                                    <option value="reject">reject (엄격한 검증)</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-
 
 <script src="/static/js/settings.js?v={{ request.app.version }}"></script>
 {% endblock %}

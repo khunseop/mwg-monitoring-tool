@@ -3,6 +3,7 @@
 {% block content %}
 {% set is_history = request.url.path == '/resource/history' %}
 
+<!-- 실시간 모니터링 섹션 -->
 <div id="realtime-tab" class="tab-content" {% if is_history %}style="display:none;"{% endif %}>
     <!-- 페이지 헤더 -->
     <div class="is-flex is-align-items-center mb-5">
@@ -13,10 +14,9 @@
         </div>
     </div>
 
-    <!-- 모니터링 설정 바 (슬림 & 미니멀) -->
+    <!-- 모니터링 설정 바 -->
     <div class="settings-bar mb-5">
         <div class="is-flex is-align-items-center" style="gap: 1rem;">
-            <!-- 그룹 선택 영역 -->
             <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
                 <span class="is-size-7 has-text-grey-light" style="white-space: nowrap; font-weight: 600;">그룹</span>
                 <div class="select is-small">
@@ -24,13 +24,12 @@
                 </div>
             </div>
             
-            <!-- 프록시 선택 영역 -->
             <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
                 <span class="is-size-7 has-text-grey-light" style="white-space: nowrap; font-weight: 600;">프록시</span>
                 <div style="position: relative;">
                     <button id="ruProxyTrigger" class="button is-small is-white px-3" type="button" style="border: 1px solid var(--color-border); min-width: 120px; justify-content: space-between;">
                         <span id="ruSelectionCounter">0 / 0</span>
-                        <span class="icon is-small ml-1"><i class="fas fa-angle-down"></i></span>
+                        <span class="is-size-7 ml-2">▼</span>
                     </button>
                     <div style="position: absolute; visibility: hidden; height: 0;">
                         <select id="ruProxySelect" multiple></select>
@@ -56,7 +55,7 @@
         </div>
     </div>
 
-    <!-- 히트맵 섹션 (전체 너비 활용) -->
+    <!-- 히트맵 섹션 -->
     <div class="heatmap-container" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1.5rem; overflow: hidden;">
         <div class="is-flex is-align-items-center is-justify-content-between mb-4">
             <h4 class="title is-6 mb-0 has-text-grey">자원 사용률 히트맵</h4>
@@ -66,14 +65,15 @@
             <div id="ruHeatmapEl" style="min-width: 1000px;"></div>
         </div>
         <div id="ruEmptyState" class="empty-state">
-            <div class="has-text-centered">
-                <span class="icon is-large has-text-grey-lighter mb-3"><i class="fas fa-chart-line fa-3x"></i></span>
-                <p>표시할 데이터가 없습니다. 상단에서 대상을 선택하고 "시작"을 클릭하세요.</p>
+            <div class="has-text-centered py-6">
+                <p class="has-text-grey-light is-size-5 mb-2" style="font-weight: 700;">NO DATA</p>
+                <p class="has-text-grey-light">상단에서 대상을 선택하고 "시작"을 클릭하세요.</p>
             </div>
         </div>
     </div>
 </div>
 
+<!-- 이력 조회 섹션 -->
 <div id="history-tab" class="tab-content" {% if not is_history %}style="display:none;"{% endif %}>
     <!-- 이력 조회 헤더 -->
     <div class="is-flex is-align-items-center is-justify-content-between mb-5">
@@ -84,10 +84,9 @@
         </div>
     </div>
     
-    <!-- 이력 조회 필터 바 (한 줄로 컴팩트하게) -->
+    <!-- 이력 조회 필터 바 -->
     <div class="settings-bar mb-5" style="padding: 0.75rem 1.25rem;">
         <div class="is-flex is-align-items-center is-flex-wrap-wrap" style="gap: 1.25rem; width: 100%;">
-            <!-- 통합 디바이스 선택기 -->
             <div class="is-flex is-align-items-center" style="gap: 0.75rem;">
                 <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
                     <span class="is-size-7 has-text-grey-light" style="white-space: nowrap; font-weight: 600;">그룹</span>
@@ -100,7 +99,7 @@
                     <div style="position: relative;">
                         <button id="ruHistoryProxyTrigger" class="button is-small is-white px-3" type="button" style="border: 1px solid var(--color-border); min-width: 120px; justify-content: space-between;">
                             <span id="ruHistorySelectionCounter">0 / 0</span>
-                            <span class="icon is-small ml-1"><i class="fas fa-angle-down"></i></span>
+                            <span class="is-size-7 ml-2">▼</span>
                         </button>
                         <div style="position: absolute; visibility: hidden; height: 0;">
                             <select id="ruHistoryProxySelect" multiple></select>
@@ -126,9 +125,7 @@
             <div class="buttons mb-0 ml-auto">
                 <button class="button is-primary is-small px-4" id="ruHistorySearchBtn">조회</button>
                 <button class="button is-white is-small border" id="ruHistoryLoadAllBtn">전체</button>
-                <button class="button is-white is-small border" id="ruHistoryExportBtn">
-                    <span class="icon is-small"><i class="fas fa-download"></i></span>
-                </button>
+                <button class="button is-white is-small border" id="ruHistoryExportBtn">내보내기</button>
                 <button class="button is-danger is-light is-small border" id="ruHistoryDeleteBtn">삭제</button>
             </div>
         </div>
@@ -144,7 +141,6 @@
             <div id="ruHistoryTableGrid" class="ag-theme-quartz" style="height: 72vh; width: 100%;"></div>
         </div>
         
-        <!-- 하단 정보 및 페이지네이션 -->
         <div class="is-flex is-align-items-center is-justify-content-between mt-4">
             <p id="ruHistoryCount" class="is-size-7 has-text-grey-light"></p>
             <nav class="pagination is-small is-centered" role="navigation" id="ruHistoryPagination" style="display:none;">
@@ -156,214 +152,71 @@
     </div>
 </div>
 
-<!-- Local ApexCharts (MIT) for heatmap -->
-<script src="/static/vendor/apexcharts/apexcharts.min.js"></script>
-<!-- Resource Usage 모듈들 (의존성 순서대로 로드) -->
-<script src="/static/js/resource_usage_utils.js"></script>
-<script src="/static/js/resource_usage_state.js"></script>
-<script src="/static/js/resource_usage_heatmap.js"></script>
-<script src="/static/js/resource_usage_polling.js"></script>
-<script src="/static/js/resource_usage.js"></script>
-</div>
-
-<div id="history-tab" class="tab-content" {% if not is_history %}style="display:none;"{% endif %}>
-<!-- 조회 조건 섹션 -->
-<div class="box mb-4">
-    <div class="level mb-4">
-        <div class="level-left">
-            <div class="level-item">
-                <h3 class="title is-4 mb-0">자원사용률 이력 조회</h3>
-            </div>
-        </div>
-        <div class="level-right">
-            <div class="level-item">
-                <div class="tags">
-                    <span class="tag is-info">총 레코드</span>
-                    <span class="tag" id="ruHistoryTotalCount">-</span>
-                    <span class="tag is-info">보관 기간</span>
-                    <span class="tag">90일</span>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="columns is-multiline is-vcentered">
-        <div class="column is-2">
-            <div class="field">
-                <label class="label">프록시 선택</label>
-                <div class="control">
-                    <select id="ruHistoryProxySelect" class="ts-fullwidth">
-                        <option value="">전체</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-        <div class="column is-2">
-            <div class="field">
-                <label class="label">시작 시간</label>
-                <div class="control">
-                    <input class="input" id="ruHistoryStartTime" type="datetime-local" placeholder="선택사항">
-                </div>
-            </div>
-        </div>
-        <div class="column is-2">
-            <div class="field">
-                <label class="label">종료 시간</label>
-                <div class="control">
-                    <input class="input" id="ruHistoryEndTime" type="datetime-local" placeholder="선택사항">
-                </div>
-            </div>
-        </div>
-        <div class="column is-2">
-            <div class="field">
-                <label class="label">페이지당 개수</label>
-                <div class="control">
-                    <select class="input" id="ruHistoryLimit">
-                        <option value="100">100</option>
-                        <option value="500" selected>500</option>
-                        <option value="1000">1,000</option>
-                        <option value="5000">5,000</option>
-                        <option value="10000">10,000</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-        <div class="column is-4">
-            <div class="field">
-                <label class="label">&nbsp;</label>
-                <div class="control">
-                    <div class="buttons">
-                        <button class="button is-primary" id="ruHistorySearchBtn">기간 조회</button>
-                        <button class="button is-light" id="ruHistoryLoadAllBtn">전체 조회</button>
-                        <button class="button is-light" id="ruHistoryExportBtn">내보내기</button>
-                        <button class="button is-danger" id="ruHistoryDeleteBtn">삭제</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div id="ruHistoryStatsDetails" class="content is-small mt-3" style="display:none;">
-        <p id="ruHistoryStatsText" class="help"></p>
-    </div>
-    
-    <div class="help mt-3">
-        ※ 로그는 90일 이상 된 데이터가 자동으로 삭제됩니다.
-    </div>
-</div>
-    
-    <div id="ruHistoryLoading" class="has-text-centered mt-4" style="display:none;">
-        <p class="help">조회 중...</p>
-    </div>
-    
-    <div id="ruHistoryError" class="help is-danger mt-4" style="display:none;"></div>
-</div>
-
 <!-- 삭제 모달 -->
 <div class="modal" id="ruHistoryDeleteModal">
     <div class="modal-background"></div>
     <div class="modal-card">
-        <header class="modal-card-head">
-            <p class="modal-card-title">로그 삭제</p>
+        <header class="modal-card-head py-4 px-5">
+            <p class="modal-card-title is-size-5 has-text-weight-bold">로그 삭제</p>
             <button class="delete" aria-label="close"></button>
         </header>
-        <section class="modal-card-body">
+        <section class="modal-card-body p-5">
             <div class="field">
-                <label class="label">삭제 옵션 선택</label>
+                <label class="label is-small">삭제 옵션 선택</label>
                 <div class="control">
-                    <label class="radio">
+                    <label class="radio is-size-7">
                         <input type="radio" name="deleteOption" value="older" checked>
                         특정 기간 이상 된 데이터 삭제
                     </label>
-                    <label class="radio">
+                    <label class="radio is-size-7">
                         <input type="radio" name="deleteOption" value="range">
                         기간 지정 삭제
                     </label>
-                    <label class="radio">
+                    <label class="radio is-size-7">
                         <input type="radio" name="deleteOption" value="all">
                         전체 삭제 (위험)
                     </label>
                 </div>
             </div>
             <div id="ruDeleteOlderThan" class="field">
-                <label class="label">삭제할 기간 (일)</label>
+                <label class="label is-small">삭제할 기간 (일)</label>
                 <div class="control">
-                    <input class="input" type="number" id="ruDeleteOlderDays" min="1" value="90" placeholder="90">
+                    <input class="input is-small" type="number" id="ruDeleteOlderDays" min="1" value="90">
                 </div>
-                <p class="help">이 기간 이상 된 데이터가 삭제됩니다.</p>
             </div>
             <div id="ruDeleteRange" class="field" style="display:none;">
                 <div class="columns">
                     <div class="column">
-                        <label class="label">시작 시간</label>
-                        <input class="input" type="datetime-local" id="ruDeleteStartTime">
+                        <label class="label is-small">시작 시간</label>
+                        <input class="input is-small" type="datetime-local" id="ruDeleteStartTime">
                     </div>
                     <div class="column">
-                        <label class="label">종료 시간</label>
-                        <input class="input" type="datetime-local" id="ruDeleteEndTime">
+                        <label class="label is-small">종료 시간</label>
+                        <input class="input is-small" type="datetime-local" id="ruDeleteEndTime">
                     </div>
                 </div>
             </div>
             <div class="field">
-                <label class="label">프록시 선택 (선택사항)</label>
+                <label class="label is-small">프록시 선택 (선택사항)</label>
                 <div class="control">
                     <select id="ruDeleteProxySelect" class="ts-fullwidth">
                         <option value="">전체</option>
                     </select>
                 </div>
             </div>
-            <div class="notification is-warning">
+            <div class="notification is-warning is-light py-3 px-4 is-size-7">
                 <strong>경고:</strong> 삭제된 데이터는 복구할 수 없습니다.
             </div>
         </section>
-        <footer class="modal-card-foot">
-            <button class="button is-danger" id="ruHistoryDeleteConfirmBtn">삭제</button>
-            <button class="button" id="ruHistoryDeleteCancelBtn">취소</button>
+        <footer class="modal-card-foot is-justify-content-flex-end py-3 px-5">
+            <button class="button is-white is-small border px-4" id="ruHistoryDeleteCancelBtn">취소</button>
+            <button class="button is-danger is-small px-5" id="ruHistoryDeleteConfirmBtn">삭제</button>
         </footer>
     </div>
 </div>
 
-<!-- 결과 섹션 -->
-<div id="ruHistoryResults" style="display:none;">
-    <div class="box">
-        <div class="level mb-4">
-            <div class="level-left">
-                <div class="level-item">
-                    <h4 class="title is-5 mb-0">조회 결과</h4>
-                </div>
-                <div class="level-item">
-                    <p id="ruHistoryCount" class="help mb-0 ml-3"></p>
-                </div>
-            </div>
-            <div class="level-right">
-                <div class="level-item">
-                    <div class="pagination-info" id="ruHistoryPaginationInfo"></div>
-                </div>
-            </div>
-        </div>
-        <div id="ruHistoryTableGrid" style="height: 70vh; width: 100%;"></div>
-        <nav class="pagination is-centered mt-4" role="navigation" id="ruHistoryPagination" style="display:none;">
-            <a class="pagination-previous" id="ruHistoryPrevBtn">이전</a>
-            <a class="pagination-next" id="ruHistoryNextBtn">다음</a>
-            <ul class="pagination-list"></ul>
-        </nav>
-    </div>
-</div>
-</div>
-
 <script>
-// URL 기반 섹션 표시
 $(document).ready(function() {
-    // 레거시 URL 파라미터 지원 (?tab=history)
-    const urlParams = new URLSearchParams(window.location.search);
-    const tabParam = urlParams.get('tab');
-    if (tabParam === 'history' && window.location.pathname === '/resource') {
-        // 레거시 URL 리다이렉트
-        window.location.href = '/resource/history';
-        return;
-    }
-    
-    // URL 경로에 따라 섹션 표시/숨김
     const path = window.location.pathname;
     if (path === '/resource/history') {
         $('#realtime-tab').hide();
@@ -374,11 +227,19 @@ $(document).ready(function() {
     }
 });
 </script>
-<!-- ag-grid (local) -->
+
+<!-- Vendor & Apps Scripts -->
+<script src="/static/vendor/apexcharts/apexcharts.min.js"></script>
 <link rel="stylesheet" href="/static/vendor/ag-grid/ag-grid.css?v={{ request.app.version }}">
 <link rel="stylesheet" href="/static/vendor/ag-grid/ag-theme-quartz.css?v={{ request.app.version }}">
 <script src="/static/vendor/ag-grid/ag-grid-community.js?v={{ request.app.version }}"></script>
 <script src="/static/js/ag_grid_config.js"></script>
+
+<!-- Resource Usage Modules -->
+<script src="/static/js/resource_usage_utils.js"></script>
+<script src="/static/js/resource_usage_state.js"></script>
+<script src="/static/js/resource_usage_heatmap.js"></script>
+<script src="/static/js/resource_usage_polling.js"></script>
+<script src="/static/js/resource_usage.js"></script>
 <script src="/static/js/resource_history.js"></script>
 {% endblock %}
-

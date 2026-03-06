@@ -17,23 +17,25 @@ function addInterfaceRow(name = '', oids = {}, threshold = '', bandwidth = '') {
     const outOid = oids.out_oid || '';
     const row = $(`
         <tr class="interface-row" data-counter="${counter}">
-            <td>
+            <td class="py-2">
                 <input class="input is-small interface-name" type="text" placeholder="예: eth0" value="${name}">
             </td>
-            <td>
-                <input class="input is-small interface-in-oid" type="text" placeholder="예: 1.3.6.1.2.1.2.2.1.10.1" value="${inOid}">
+            <td class="py-2">
+                <input class="input is-small interface-in-oid" type="text" placeholder="1.3.6.1..." value="${inOid}">
             </td>
-            <td>
-                <input class="input is-small interface-out-oid" type="text" placeholder="예: 1.3.6.1.2.1.2.2.1.16.1" value="${outOid}">
+            <td class="py-2">
+                <input class="input is-small interface-out-oid" type="text" placeholder="1.3.6.1..." value="${outOid}">
             </td>
-            <td>
-                <input class="input is-small interface-threshold" type="number" step="0.01" min="0" placeholder="예: 100" value="${threshold}">
+            <td class="py-2">
+                <input class="input is-small interface-threshold" type="number" step="0.1" min="0" placeholder="100" value="${threshold}">
             </td>
-            <td>
-                <input class="input is-small interface-bandwidth" type="number" step="0.1" min="0" placeholder="예: 1000" value="${bandwidth}">
+            <td class="py-2">
+                <input class="input is-small interface-bandwidth" type="number" step="1" min="0" placeholder="1000" value="${bandwidth}">
             </td>
-            <td>
-                <button class="button is-danger is-small remove-interface" type="button">삭제</button>
+            <td class="has-text-centered py-2">
+                <button class="button is-white is-small border has-text-danger remove-interface" type="button">
+                    <span>삭제</span>
+                </button>
             </td>
         </tr>
     `);
@@ -41,6 +43,7 @@ function addInterfaceRow(name = '', oids = {}, threshold = '', bandwidth = '') {
     
     row.find('.remove-interface').on('click', function() {
         row.remove();
+        checkForChanges();
     });
 }
 
