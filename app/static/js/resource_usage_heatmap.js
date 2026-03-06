@@ -355,7 +355,11 @@
 
             // Calculate dynamic dimensions based on data size
             const minColWidth = 80;
-            const baseWidth = Math.max(800, xCategories.length * minColWidth);
+            const contentWidth = xCategories.length * minColWidth + 150; // columns * width + y-axis label width
+            const containerWidth = $('#ruHeatmapWrap').width() || 1000;
+            
+            // 컨테이너보다 내용이 많으면 내용 너비 사용, 아니면 컨테이너의 100% 사용
+            const finalWidth = Math.max(containerWidth, contentWidth);
             
             const rowCount = yCategories.length;
             const minHeight = 400;
@@ -367,9 +371,14 @@
                 chart: { 
                     type: 'heatmap', 
                     height: calculatedHeight,
-                    width: baseWidth,
+                    width: '100%', // Use 100% of parent element
                     animations: { enabled: false }, 
-                    toolbar: { show: false }
+                    toolbar: { show: false },
+                    events: {
+                        mounted: (chartContext, config) => {
+                            setTimeout(() => chartContext.resize(), 100);
+                        }
+                    }
                 },
                 dataLabels: { 
                     enabled: function(opts) {
@@ -556,6 +565,9 @@
                 series: seriesData
             };
 
+            // Apply final width to the element to trigger scrollbars if needed
+            $(el).css('width', finalWidth + 'px');
+
             // 차트가 이미 있으면 시리즈만 업데이트 (전체 재렌더링 방지)
             if (ru.apex) {
                 try {
@@ -565,7 +577,7 @@
                     const needsOptionsUpdate = ru._lastHeatmapOptions === undefined || 
                         JSON.stringify(ru._lastHeatmapOptions) !== JSON.stringify({
                             height: calculatedHeight,
-                            width: baseWidth,
+                            width: finalWidth,
                             xCategories: xCategories.length,
                             yCategories: yCategories.length
                         });
@@ -574,7 +586,7 @@
                         ru.apex.updateOptions(options, false, false);
                         ru._lastHeatmapOptions = {
                             height: calculatedHeight,
-                            width: baseWidth,
+                            width: finalWidth,
                             xCategories: xCategories.length,
                             yCategories: yCategories.length
                         };

@@ -52,6 +52,83 @@ $(document).ready(function() {
             });
         }
     });
+
+    // --- PJAX Navigation ---
+    function loadPage(url, pushState = true) {
+        // Only PJAX for internal links, exclude logout or external if any
+        if (url.includes('logout') || url.startsWith('http') && !url.includes(window.location.host)) {
+            window.location.href = url;
+            return;
+        }
+
+        const $content = $('.main-content .container');
+        // Add loading state
+        $content.css('opacity', '0.5');
+
+        fetch(url)
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.text();
+            })
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newContent = doc.querySelector('.main-content .container');
+                
+                if (newContent) {
+                    $content.html(newContent.innerHTML);
+                    if (pushState) history.pushState({ url: url }, '', url);
+                    
+                    // Update active navbar item
+                    $('.navbar-item').removeClass('is-active');
+                    $(`.navbar-item[href="${url}"], .navbar-item[href="${url.split('?')[0]}"]`).addClass('is-active');
+                    
+                    // Re-run scripts in the new content
+                    $content.find('script').each(function() {
+                        const newScript = document.createElement('script');
+                        if (this.src) {
+                            newScript.src = this.src;
+                        } else {
+                            newScript.textContent = this.textContent;
+                        }
+                        document.body.appendChild(newScript).parentNode.removeChild(newScript);
+                    });
+                    
+                    // Scroll to top
+                    window.scrollTo(0, 0);
+                    
+                    // Trigger custom event for page load
+                    $(document).trigger('pjax:complete', [url]);
+                } else {
+                    window.location.href = url;
+                }
+            })
+            .catch(error => {
+                console.error('PJAX error:', error);
+                window.location.href = url;
+            })
+            .finally(() => {
+                $content.css('opacity', '1');
+            });
+    }
+
+    // Handle navbar clicks
+    $(document).on('click', '.navbar-item:not(.has-dropdown)', function(e) {
+        const url = $(this).attr('href');
+        if (url && url !== '#' && !url.startsWith('javascript:')) {
+            e.preventDefault();
+            loadPage(url);
+        }
+    });
+
+    // Handle back/forward buttons
+    window.onpopstate = function(event) {
+        if (event.state && event.state.url) {
+            loadPage(event.state.url, false);
+        } else {
+            loadPage(window.location.pathname, false);
+        }
+    };
 });
 
 document.addEventListener("DOMContentLoaded", () => {

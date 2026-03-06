@@ -5,10 +5,10 @@
     let PROXIES = [];
     const STORAGE_KEY = 'tl_state_v1';
     let IS_RESTORING = false;
-    let CURRENT_VIEW = 'remote';
     let tlGridApi = null;
     let LOG_RECORDS = [];
 
+    // Columns defined in AgGridConfig are used, but we keep this for reference and detail view
     const COLS = [
         "datetime","username","client_ip","url_destination_ip","timeintransaction",
         "response_statuscode","cache_status","comm_name","url_protocol","url_host",
@@ -23,11 +23,12 @@
         const $tag = $('#tlStatus');
         if (!$tag.length) return;
         $tag.text(text);
-        $tag.removeClass().addClass('tag').addClass(cls || 'is-light');
+        $tag.removeClass().addClass('tag').addClass(cls || 'is-primary is-light');
     }
 
     function showError(msg){
         $('#tlError').text(msg).fadeIn();
+        setStatus('오류', 'is-danger is-light');
     }
 
     function clearError(){ $('#tlError').hide().text(''); }
@@ -36,27 +37,35 @@
         const $body = $('#tlDetailBody');
         const $raw = $('#tlDetailRaw');
         $body.empty();
-        $raw.text(record.url_path || ''); // 원본 라인 표시용 (있다면)
+        $raw.text(record._raw_line_ || '원본 로그 라인이 없습니다.');
 
         COLS.forEach(c => {
             let v = record[c];
             if(v === null || v === undefined) v = '';
             let formatted = v;
+            
             if(c === 'datetime' || c === 'collected_at'){
                 formatted = (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(v) : v;
-            }else if(c === 'response_statuscode'){
+            } else if(c === 'response_statuscode'){
                 formatted = (window.AppUtils && AppUtils.renderStatusTag) ? AppUtils.renderStatusTag(v) : String(v);
-            }else if(c === 'recv_byte' || c === 'sent_byte' || c === 'content_lenght'){
+            } else if(c === 'recv_byte' || c === 'sent_byte' || c === 'content_lenght'){
                 formatted = (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(v) : v;
-            }else if(c === 'timeintransaction'){
+            } else if(c === 'timeintransaction'){
                 var num = Number(v);
                 if(Number.isFinite(num)){
                     formatted = (window.AppUtils && AppUtils.formatDurationMs) ? AppUtils.formatDurationMs(num < 1000 ? num * 1000 : num) : v;
                 }
             }
-            const isUrlish = (c === 'url_path' || c === 'url_parametersstring' || c === 'referer' || c === 'url_host' || c === 'user_agent');
-            const cls = isUrlish ? '' : (c === 'recv_byte' || c === 'sent_byte' || c === 'content_lenght' || c === 'response_statuscode' ? 'num' : '');
-            $body.append(`<tr><th style="width: 220px; font-size: 0.75rem; color: #888;">${c.toUpperCase()}</th><td class="${cls}" style="font-size: 0.825rem;">${typeof formatted === 'string' ? formatted : String(formatted)}</td></tr>`);
+            
+            const isLongText = (c === 'url_path' || c === 'url_parametersstring' || c === 'referer' || c === 'user_agent');
+            const cls = isLongText ? '' : (c === 'recv_byte' || c === 'sent_byte' || c === 'content_lenght' || c === 'response_statuscode' ? 'num' : '');
+            
+            $body.append(`
+                <tr>
+                    <th style="width: 200px; background: #f8fafc; font-size: 0.75rem; color: #64748b;">${c.replace(/_/g, ' ').toUpperCase()}</th>
+                    <td class="${cls}" style="font-size: 0.8rem; ${isLongText ? 'word-break: break-all; white-space: normal;' : ''}">${typeof formatted === 'string' ? formatted : String(formatted)}</td>
+                </tr>
+            `);
         });
         $('#tlDetailModal').addClass('is-active');
     }
@@ -105,13 +114,18 @@
     async function loadLogs(){
         const proxyId = $('#tlProxySelect').val();
         if (!proxyId) {
-            showError('프록시를 선택하세요.');
+            showError('조회할 프록시를 선택하세요.');
             return;
         }
         
         clearError();
-        setStatus('조회 중...', 'is-warning');
+        setStatus('로그 조회 중...', 'is-warning is-light');
+        
+        // Reset view for new search
         $('#tlEmptyState').hide();
+        $('#tlResultParsed').hide();
+        $('#tlResultRaw').hide();
+        $('#tlLoadBtn').addClass('is-loading');
         
         try {
             const query = $('#tlQuery').val() || '';
@@ -119,52 +133,50 @@
             const direction = $('#tlDirection').val() || 'tail';
             
             const res = await fetch(`${API_BASE}/traffic-logs/${proxyId}?q=${encodeURIComponent(query)}&limit=${limit}&direction=${direction}&parsed=true`);
-            if (!res.ok) throw new Error('로그 조회에 실패했습니다. (SSH 연결 확인 필요)');
+            if (!res.ok) throw new Error('로그를 가져오지 못했습니다. SSH 연결 상태를 확인하세요.');
             
             const data = await res.json();
             const records = data.records || [];
             LOG_RECORDS = records;
 
             if (records.length === 0) {
-                $('#tlResultParsed').hide();
                 $('#tlEmptyState').fadeIn();
-                setStatus('데이터 없음', 'is-light');
+                setStatus('결과 없음', 'is-light');
             } else {
                 renderTable(records);
-                setStatus(`${records.length}건 조회됨`, 'is-success');
+                setStatus(`${records.length}건 조회됨`, 'is-primary is-light');
             }
             saveState(records);
         } catch(err) {
             showError(err.message);
-            setStatus('실패', 'is-danger');
+        } finally {
+            $('#tlLoadBtn').removeClass('is-loading');
         }
     }
 
     function renderTable(records){
         if (!tlGridApi) {
             const gridOptions = {
-                columnDefs: COLS.map(c => ({ 
-                    field: c, 
-                    headerName: c.replace(/_/g, ' ').toUpperCase(), 
-                    width: 150,
-                    filter: true,
-                    sortable: true
-                })),
+                columnDefs: window.AgGridConfig ? window.AgGridConfig.getTrafficLogColumns() : [],
                 defaultColDef: {
                     resizable: true,
+                    sortable: true,
                     filter: 'agTextColumnFilter',
-                    menuTabs: ['filterMenuTab']
+                    minWidth: 100
                 },
                 rowData: records,
                 pagination: true,
                 paginationPageSize: 100,
-                rowHeight: 32,
-                headerHeight: 38,
+                rowHeight: 35,
+                headerHeight: 45, // Increase header height to prevent text clipping
                 onRowDoubleClicked: params => showDetail(params.data),
                 theme: 'quartz',
-                overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">조회된 로그 데이터가 없습니다.</div>'
+                overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">로그가 비어있습니다.</div>'
             };
-            tlGridApi = agGrid.createGrid(document.querySelector('#tlTableGrid'), gridOptions);
+            const gridDiv = document.querySelector('#tlTableGrid');
+            if (gridDiv && window.agGrid) {
+                tlGridApi = window.agGrid.createGrid(gridDiv, gridOptions);
+            }
         } else {
             tlGridApi.setGridOption('rowData', records);
         }
@@ -172,13 +184,10 @@
     }
 
     $(document).ready(() => {
-        // DeviceSelector 초기화 (트래픽 로그용 커스텀: 단일 선택 지원을 위해 수동 연동)
-        // 기존 DeviceSelector.init은 multiple 위주이므로, 로그 조회는 단순 select로 처리
-        
         function loadGroups() {
             $.getJSON(`${API_BASE}/proxy-groups`).done(data => {
                 const $gs = $('#tlGroupSelect');
-                $gs.empty().append('<option value="">전체</option>');
+                $gs.empty().append('<option value="">전체 그룹</option>');
                 data.forEach(g => $gs.append(`<option value="${g.id}">${g.name}</option>`));
                 
                 $gs.on('change', () => {
@@ -209,11 +218,10 @@
             if (tlGridApi) tlGridApi.setGridOption('quickFilterText', $(this).val());
         });
 
-        $('.modal-background, .modal-card-head .delete, .modal-card-foot .button').on('click', () => {
-            $('.modal').removeClass('is-active');
+        $('#tlDetailModal .delete, #tlDetailModal .button, #tlDetailModal .modal-background').on('click', () => {
+            $('#tlDetailModal').removeClass('is-active');
         });
         
-        // URL 경로 처리
         if (window.location.pathname === '/traffic-logs/upload') {
             $('#tlRemoteSection').hide();
             $('#tlaSection').show();

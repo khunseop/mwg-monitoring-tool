@@ -6,62 +6,67 @@
         proxies: [],
         records: [],
         gridApi: null,
-        columnApi: null,
-        isRestoring: false,
         storageKey: 'sb_state_v1',
-        exportLimit: 10000,
         analyzeStatus: 'idle'
     };
 
     const COLS = [
-        "id", "proxy_id", "client_ip", "client_port", "server_ip", "server_port",
-        "protocol", "status", "user_agent", "url", "received_bytes", "sent_bytes",
-        "duration", "created_at"
+        "id", "host", "creation_time", "client_ip", "server_ip",
+        "protocol", "status", "user_name", "url", "cl_bytes_received", "cl_bytes_sent",
+        "age_seconds"
     ];
 
     function setStatus(text, cls) {
         const $tag = $('#sbStatus');
         $tag.text(text);
-        $tag.removeClass().addClass('tag').addClass(cls || 'is-light');
-    }
-
-    function showError(msg) {
-        $('#sbError').text(msg).show();
-    }
-
-    function clearError() {
-        $('#sbError').hide().text('');
+        $tag.removeClass().addClass('tag').addClass(cls || 'is-primary is-light');
     }
 
     function showDetail(record) {
         const $body = $('#sbDetailBody');
         $body.empty();
-        COLS.forEach(c => {
-            let v = record[c];
-            if (v === null || v === undefined) v = '';
+        
+        // Use a more comprehensive set of fields for detail view
+        const detailFields = [
+            { key: 'host', label: '프록시' },
+            { key: 'creation_time', label: '생성 시각', format: 'datetime' },
+            { key: 'protocol', label: '프로토콜' },
+            { key: 'status', label: '상태 코드', format: 'status' },
+            { key: 'user_name', label: '사용자' },
+            { key: 'client_ip', label: '클라이언트 IP' },
+            { key: 'server_ip', label: '서버 IP' },
+            { key: 'cl_bytes_received', label: '수신 데이터', format: 'bytes' },
+            { key: 'cl_bytes_sent', label: '송신 데이터', format: 'bytes' },
+            { key: 'age_seconds', label: '세션 유지(초)', format: 'seconds' },
+            { key: 'url', label: 'URL' }
+        ];
+
+        detailFields.forEach(f => {
+            let v = record[f.key];
+            if (v === null || v === undefined) v = '-';
             let formatted = v;
             
-            if (c === 'created_at') {
+            if (f.format === 'datetime') {
                 formatted = (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(v) : v;
-            } else if (c === 'received_bytes' || c === 'sent_bytes') {
+            } else if (f.format === 'bytes') {
                 formatted = (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(v) : v;
-            } else if (c === 'duration') {
-                formatted = (window.AppUtils && AppUtils.formatDurationMs) ? AppUtils.formatDurationMs(v) : v;
-            } else if (c === 'status') {
+            } else if (f.format === 'seconds') {
+                formatted = (window.AppUtils && AppUtils.formatSeconds) ? AppUtils.formatSeconds(v) : v;
+            } else if (f.format === 'status') {
                 formatted = (window.AppUtils && AppUtils.renderStatusTag) ? AppUtils.renderStatusTag(v) : String(v);
             }
             
-            const isUrlish = (c === 'url' || c === 'user_agent');
-            const cls = isUrlish ? '' : (c === 'received_bytes' || c === 'sent_bytes' || c === 'duration' || c === 'status' ? 'num' : '');
-            $body.append(`<tr><th style="width: 220px;">${c}</th><td class="${cls}">${typeof formatted === 'string' ? escapeHtml(formatted) : String(formatted)}</td></tr>`);
+            const isLongText = (f.key === 'url');
+            const cellStyle = isLongText ? 'style="word-break: break-all; white-space: normal;"' : '';
+            
+            $body.append(`
+                <tr>
+                    <th style="width: 180px; background: #f8fafc; font-size: 0.8rem; color: #64748b;">${f.label}</th>
+                    <td ${cellStyle}>${formatted}</td>
+                </tr>
+            `);
         });
         $('#sbDetailModal').addClass('is-active');
-    }
-
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 
     function getSelectedProxyIds() {
@@ -88,8 +93,8 @@
         records.forEach(r => {
             const status = parseInt(r.status, 10);
             if (status >= 400) stats.errors++;
-            if (r.duration >= 500) stats.slow++;
-            stats.traffic += (r.received_bytes || 0) + (r.sent_bytes || 0);
+            if (r.age_seconds >= 60) stats.slow++; // 1분 이상 세션
+            stats.traffic += (r.cl_bytes_received || 0) + (r.cl_bytes_sent || 0);
         });
 
         $('#stat-total').text(stats.total.toLocaleString());
@@ -103,49 +108,56 @@
     async function loadSessions() {
         const proxyIds = getSelectedProxyIds();
         if (proxyIds.length === 0) {
-            showError('조회할 프록시를 최소 하나 이상 선택하세요.');
+            alert('조회할 프록시를 선택하세요.');
             return;
         }
 
-        clearError();
-        setStatus('조회 중...', 'is-warning');
+        setStatus('데이터 수집 중...', 'is-warning is-light');
         $('#sbLoadingIndicator').css('display', 'flex'); 
+        $('#sbLoadBtn').addClass('is-loading');
 
         try {
-            const res = await fetch('/api/session-browser/query', {
+            const res = await fetch('/api/session-browser/load', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ proxy_ids: proxyIds, limit: 1000 })
+                body: JSON.stringify({ proxy_ids: proxyIds })
             });
 
-            if (!res.ok) throw new Error('세션 정보를 가져오는데 실패했습니다.');
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.detail || '세션 정보를 가져오는데 실패했습니다.');
+            }
 
             const data = await res.json();
-            sb.records = data.records || [];
+            sb.records = data.sessions || [];
             
             if (sb.gridApi) {
-                setTimeout(() => {
-                    sb.gridApi.setGridOption('rowData', sb.records);
-                    updateDashboard(sb.records);
-                }, 0);
+                sb.gridApi.setGridOption('rowData', sb.records);
+                updateDashboard(sb.records);
             }
             
-            setStatus(`${sb.records.length}건 조회됨`, 'is-success');
+            setStatus(`성공 (${sb.records.length}건)`, 'is-primary is-light');
             persistState();
         } catch (err) {
-            showError(err.message);
-            setStatus('오류', 'is-danger');
+            console.error('[SessionBrowser] Load failed:', err);
+            alert(err.message);
+            setStatus('수집 실패', 'is-danger is-light');
         } finally {
-            setTimeout(() => {
-                $('#sbLoadingIndicator').hide();
-            }, 200);
+            $('#sbLoadingIndicator').hide();
+            $('#sbLoadBtn').removeClass('is-loading');
         }
     }
 
     function persistState() {
-        const current = JSON.parse(localStorage.getItem(sb.storageKey) || '{}');
-        current.records = sb.records.slice(0, 500);
-        localStorage.setItem(sb.storageKey, JSON.stringify(current));
+        try {
+            const state = {
+                records: sb.records.slice(0, 1000), // 최대 1000건 저장
+                timestamp: new Date().getTime()
+            };
+            localStorage.setItem(sb.storageKey, JSON.stringify(state));
+        } catch (e) {
+            console.warn('[SessionBrowser] Failed to persist state:', e);
+        }
     }
 
     function restoreState() {
@@ -154,102 +166,74 @@
             if (!saved) return;
             
             const state = JSON.parse(saved);
+            // 1시간 이내 데이터만 복원
+            const oneHour = 60 * 60 * 1000;
+            if (new Date().getTime() - state.timestamp > oneHour) {
+                localStorage.removeItem(sb.storageKey);
+                return;
+            }
 
             if (state.records && state.records.length > 0) {
                 sb.records = state.records;
-                if (sb.gridApi) sb.gridApi.setGridOption('rowData', sb.records);
-                updateDashboard(sb.records);
-                setStatus(`${sb.records.length}건 복원됨`, 'is-info');
+                if (sb.gridApi) {
+                    sb.gridApi.setGridOption('rowData', sb.records);
+                    updateDashboard(sb.records);
+                    setStatus(`데이터 복원됨 (${sb.records.length}건)`, 'is-info is-light');
+                }
             }
         } catch (e) {
             console.warn('[SessionBrowser] State restore failed', e);
-        } finally {
-            $('#sbLoadingIndicator').hide();
         }
     }
 
     function initGrid() {
         const gridOptions = {
-            columnDefs: [
-                { field: 'id', headerName: 'ID', width: 80, hide: true },
-                { field: 'created_at', headerName: '시간', width: 170, sort: 'desc', filter: 'agDateColumnFilter', valueFormatter: params => (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(params.value) : params.value },
-                { field: 'client_ip', headerName: '클라이언트', width: 130, filter: 'agTextColumnFilter' },
-                { 
-                    field: 'url', 
-                    headerName: 'URL', 
-                    flex: 1, 
-                    minWidth: 300,
-                    filter: 'agTextColumnFilter',
-                    cellStyle: { 'font-size': '0.825rem' },
-                    tooltipField: 'url'
-                },
-                { 
-                    field: 'status', 
-                    headerName: '상태', 
-                    width: 85, 
-                    filter: 'agNumberColumnFilter',
-                    cellRenderer: params => {
-                        const val = parseInt(params.value, 10);
-                        let color = 'is-success';
-                        if (val >= 500) color = 'is-danger';
-                        else if (val >= 400) color = 'is-warning';
-                        else if (val === 0) color = 'is-light';
-                        return `<span class="tag ${color} is-light" style="width: 100%; font-weight: 600; font-size: 0.75rem;">${params.value || '-'}</span>`;
-                    }
-                },
-                { 
-                    field: 'duration', 
-                    headerName: '소요시간', 
-                    width: 95, 
-                    cellClass: 'num',
-                    filter: 'agNumberColumnFilter',
-                    valueFormatter: params => (window.AppUtils && AppUtils.formatDurationMs) ? AppUtils.formatDurationMs(params.value) : params.value,
-                    cellStyle: params => {
-                        if (params.value >= 1000) return { color: '#ff3860', 'font-weight': 'bold' };
-                        if (params.value >= 500) return { color: '#ffdd57', 'font-weight': 'bold' };
-                        return null;
-                    }
-                },
-                { field: 'received_bytes', headerName: 'Received', width: 105, cellClass: 'num', filter: 'agNumberColumnFilter', valueFormatter: params => (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(params.value) : params.value },
-                { field: 'sent_bytes', headerName: 'Sent', width: 105, cellClass: 'num', filter: 'agNumberColumnFilter', valueFormatter: params => (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(params.value) : params.value }
-            ],
+            columnDefs: window.AgGridConfig ? window.AgGridConfig.getSessionBrowserColumns() : [],
             defaultColDef: {
                 resizable: true,
                 sortable: true,
-                filter: true,
-                floatingFilter: false // 상단 검색창 제거
+                filter: 'agTextColumnFilter',
+                filterParams: { applyButton: true, clearButton: true },
+                minWidth: 100
             },
             rowData: [],
             pagination: true,
             paginationPageSize: 100,
-            rowHeight: 32,
-            headerHeight: 38, // 헤더 높이 복원
+            rowHeight: 35,
+            headerHeight: 40,
             onRowDoubleClicked: params => showDetail(params.data),
             theme: 'quartz',
             enableBrowserTooltips: true,
-            overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">조회된 세션 데이터가 없습니다.</div>'
+            overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted); font-size: 0.875rem;">조회된 세션 데이터가 없습니다. 상단에서 "세션 불러오기"를 클릭하세요.</div>',
+            onGridReady: (params) => {
+                sb.gridApi = params.api;
+                restoreState();
+            }
         };
 
         const gridDiv = document.querySelector('#sbTableGrid');
-        sb.gridApi = agGrid.createGrid(gridDiv, gridOptions);
+        if (gridDiv && window.agGrid) {
+            sb.gridApi = window.agGrid.createGrid(gridDiv, gridOptions);
+        }
     }
 
     $(document).ready(() => {
         initGrid();
 
-        // DeviceSelector 초기화 (통합 모니터링 바 적용)
-        window.DeviceSelector.init({
-            groupSelect: '#sbGroupSelect',
-            proxySelect: '#sbProxySelect',
-            proxyTrigger: '#sbProxyTrigger',
-            selectionCounter: '#sbSelectionCounter',
-            storageKey: sb.storageKey,
-            onData: (data) => {
-                sb.groups = data.groups;
-                sb.proxies = data.proxies;
-                if (!sb.isRestoring) restoreState();
-            }
-        });
+        // DeviceSelector 초기화
+        if (window.DeviceSelector) {
+            window.DeviceSelector.init({
+                groupSelect: '#sbGroupSelect',
+                proxySelect: '#sbProxySelect',
+                proxyTrigger: '#sbProxyTrigger',
+                selectionCounter: '#sbSelectionCounter',
+                storageKey: sb.storageKey,
+                onData: (data) => {
+                    sb.groups = data.groups;
+                    sb.proxies = data.proxies;
+                }
+            });
+        }
 
         $('#sbLoadBtn').on('click', loadSessions);
         
@@ -262,21 +246,37 @@
             if (sb.gridApi) {
                 sb.gridApi.setGridOption('quickFilterText', '');
                 sb.gridApi.setFilterModel(null);
+                // 필터 초기화 피드백
+                const originalText = $('#sbClearFilters span').text();
+                $('#sbClearFilters span').text('초기화 완료');
+                setTimeout(() => $('#sbClearFilters span').text(originalText), 1500);
             }
         });
 
         $('#sbExportBtn').on('click', () => {
-            if (sb.gridApi) sb.gridApi.exportDataAsCsv({ fileName: `sessions_${new Date().toISOString().slice(0,10)}.csv` });
+            if (sb.gridApi) {
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                sb.gridApi.exportDataAsCsv({ 
+                    fileName: `sessions_export_${timestamp}.csv`,
+                    allColumns: true
+                });
+            }
         });
 
-        $('#sbAnalyzeBtn').on('click', () => {
+        $('#sbAnalyzeBtn').on('click', (e) => {
+            e.preventDefault();
+            if (sb.records.length === 0) {
+                alert('분석할 세션 데이터가 없습니다. 먼저 데이터를 불러오세요.');
+                return;
+            }
             $('#sbListSection').hide();
             $('#sbAnalyzeSection').show();
             if (window.sbAnalyze) window.sbAnalyze.run(sb.records);
         });
 
-        $('.modal-background, .modal-card-head .delete, .modal-card-foot .button').on('click', () => {
-            $('.modal').removeClass('is-active');
+        // Modal closing handlers
+        $('#sbDetailModal .delete, #sbDetailModal .button, #sbDetailModal .modal-background').on('click', () => {
+            $('#sbDetailModal').removeClass('is-active');
         });
     });
 

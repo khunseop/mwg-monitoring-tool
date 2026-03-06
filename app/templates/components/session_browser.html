@@ -4,19 +4,11 @@
 <!-- 페이지 헤더 -->
 <div class="is-flex is-align-items-center is-justify-content-between mb-5">
     <h3 class="title is-4 mb-0">세션 브라우저</h3>
-    <div class="buttons">
-        <button class="button is-white is-small border" id="sbExportBtn">
-            <span class="icon is-small mr-1"><i class="fas fa-file-csv"></i></span>
-            <span>CSV 내보내기</span>
-        </button>
-        <span id="sbStatus" class="tag is-light is-size-7 ml-2" style="height: 28px;">대기</span>
-    </div>
 </div>
 
-<!-- 세션 조회 설정 바 (미니멀) -->
+<!-- 세션 조회 설정 바 (통합) -->
 <div class="settings-bar mb-5">
     <div class="is-flex is-align-items-center" style="gap: 1rem;">
-        <!-- 그룹 선택 영역 -->
         <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
             <span class="is-size-7 has-text-grey-light" style="white-space: nowrap; font-weight: 600;">그룹</span>
             <div class="select is-small">
@@ -24,23 +16,28 @@
             </div>
         </div>
         
-        <!-- 프록시 선택 영역 -->
         <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
             <span class="is-size-7 has-text-grey-light" style="white-space: nowrap; font-weight: 600;">프록시</span>
             <div style="position: relative;">
                 <button id="sbProxyTrigger" class="button is-small is-white px-3" type="button" style="border: 1px solid var(--color-border); min-width: 120px; justify-content: space-between;">
                     <span id="sbSelectionCounter">0 / 0</span>
-                    <span class="icon is-small ml-1"><i class="fas fa-angle-down"></i></span>
+                    <span class="is-size-7 ml-2">▼</span>
                 </button>
                 <div style="position: absolute; visibility: hidden; height: 0;">
                     <select id="sbProxySelect" multiple></select>
                 </div>
             </div>
         </div>
+
+        <!-- 상태 인디케이터 (설정바로 이동) -->
+        <div class="is-flex is-align-items-center ml-2">
+            <span id="sbStatus" class="tag is-primary is-light is-small" style="font-weight: 700; border-radius: 4px;">준비</span>
+        </div>
     </div>
 
     <div class="is-flex is-align-items-center" style="gap: 0.75rem; margin-left: auto;">
         <button class="button is-primary is-small px-5" id="sbLoadBtn" style="font-weight: 600;">세션 불러오기</button>
+        <button class="button is-white is-small border px-3" id="sbExportBtn">내보내기</button>
     </div>
 </div>
 
@@ -48,25 +45,25 @@
 <div class="columns is-multiline is-mobile mb-5" id="sbMiniDashboard" style="display:none;">
     <div class="column is-3-desktop is-6-mobile">
         <div class="box p-4 has-text-centered" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); height: 100%;">
-            <p class="heading has-text-grey mb-2">전체 세션</p>
+            <p class="heading has-text-grey mb-2" style="font-weight: 600;">전체 세션</p>
             <p class="title is-4" id="stat-total">-</p>
         </div>
     </div>
     <div class="column is-3-desktop is-6-mobile">
         <div class="box p-4 has-text-centered" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); height: 100%;">
-            <p class="heading has-text-grey mb-2">에러 (4xx/5xx)</p>
+            <p class="heading has-text-grey mb-2" style="font-weight: 600;">에러 (4xx/5xx)</p>
             <p class="title is-4 has-text-danger" id="stat-errors">-</p>
         </div>
     </div>
     <div class="column is-3-desktop is-6-mobile">
         <div class="box p-4 has-text-centered" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); height: 100%;">
-            <p class="heading has-text-grey mb-2">지연 (500ms+)</p>
+            <p class="heading has-text-grey mb-2" style="font-weight: 600;">지연 (500ms+)</p>
             <p class="title is-4 has-text-warning-dark" id="stat-slow">-</p>
         </div>
     </div>
     <div class="column is-3-desktop is-6-mobile">
         <div class="box p-4 has-text-centered" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); height: 100%;">
-            <p class="heading has-text-grey mb-2">트래픽 합계</p>
+            <p class="heading has-text-grey mb-2" style="font-weight: 600;">트래픽 합계</p>
             <p class="title is-5" id="stat-traffic">-</p>
         </div>
     </div>
@@ -74,20 +71,18 @@
 
 <!-- 세션 목록 영역 -->
 <div id="sbListSection">
-    <div class="level mb-4">
-        <div class="level-left">
-            <div class="level-item">
-                <button class="button is-small is-ghost" id="sbAnalyzeBtn">상세 분석 보기</button>
-            </div>
+    <div class="is-flex is-align-items-center is-justify-content-between mb-4">
+        <div class="is-flex is-align-items-center">
+            <a class="is-size-7 has-text-primary has-text-weight-bold" id="sbAnalyzeBtn" style="text-decoration: underline;">상세 분석 대시보드 보기</a>
         </div>
-        <div class="level-right">
-            <div class="field has-addons">
+        <div class="is-flex is-align-items-center" style="gap: 0.5rem;">
+            <div class="field has-addons mb-0">
                 <p class="control">
-                    <input class="input is-small" type="text" id="sbQuickFilter" placeholder="결과 내 검색..." style="width: 220px;">
+                    <input class="input is-small" type="text" id="sbQuickFilter" placeholder="결과 내 검색..." style="width: 200px;">
                 </p>
                 <p class="control">
-                    <button class="button is-small" id="sbClearFilters" title="필터 초기화">
-                        <span class="icon is-small"><i class="fas fa-sync-alt"></i></span>
+                    <button class="button is-small is-white border px-3" id="sbClearFilters">
+                        <span class="is-size-7">필터 초기화</span>
                     </button>
                 </p>
             </div>
@@ -97,57 +92,47 @@
     <div class="grid-container" style="position: relative; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden;">
         <div id="sbLoadingIndicator" style="display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.7); z-index: 100; align-items: center; justify-content: center; flex-direction: column;">
             <span class="loader" style="width: 2.5rem; height: 2.5rem; border-width: 3px;"></span>
-            <p class="mt-3 is-size-7 has-text-grey">데이터를 불러오는 중입니다...</p>
+            <p class="mt-3 is-size-7 has-text-grey">프록시 서버에서 세션 데이터를 가져오는 중입니다...</p>
         </div>
-        <div id="sbTableGrid" class="ag-theme-quartz" style="height: 75vh; width: 100%;"></div>
+        <div id="sbTableGrid" class="ag-theme-quartz" style="height: 72vh; width: 100%;"></div>
     </div>
 </div>
 
-<!-- 분석 섹션 (상세 분석 클릭 시 표시) -->
+<!-- 분석 섹션 -->
 <div id="sbAnalyzeSection" style="display:none;">
-    <div class="is-flex is-align-items-center is-justify-content-between mb-4">
+    <div class="is-flex is-align-items-center is-justify-content-between mb-5">
         <h4 class="title is-5 mb-0">세션 상세 분석</h4>
-        <button class="button is-small" onclick="$('#sbAnalyzeSection').hide(); $('#sbListSection').show();">목록으로 돌아가기</button>
+        <a class="is-size-7 has-text-primary has-text-weight-bold" style="text-decoration: underline;" onclick="$('#sbAnalyzeSection').hide(); $('#sbListSection').show();">목록으로 돌아가기</a>
     </div>
     
-    <div id="sbSummary" class="columns is-multiline mb-5">
-        <!-- 기존 분석 요약 내용이 들어갈 자리 -->
-    </div>
-
-    <div id="sbCharts">
-        <!-- 차트 영역 -->
-    </div>
+    <div id="sbSummary" class="columns is-multiline mb-5"></div>
+    <div id="sbCharts"></div>
 </div>
 
 <!-- 상세 모달 -->
 <div class="modal" id="sbDetailModal">
-    <div class="modal-background"></div>
-    <div class="modal-card is-wide">
-        <header class="modal-card-head">
-            <p class="modal-card-title">세션 상세</p>
+    <div class="modal-background" style="background: rgba(15, 23, 42, 0.1);"></div>
+    <div class="modal-card" style="width: 800px; max-width: 95vw;">
+        <header class="modal-card-head py-4 px-5">
+            <p class="modal-card-title is-size-5 has-text-weight-bold">세션 상세 정보</p>
             <button class="delete" aria-label="close" onclick="$('#sbDetailModal').removeClass('is-active');"></button>
         </header>
-        <section class="modal-card-body">
-            <div class="content">
-                <table class="table is-fullwidth is-striped is-narrow">
+        <section class="modal-card-body p-0">
+            <div class="table-container">
+                <table class="table is-fullwidth is-striped is-hoverable mb-0" style="font-size: 0.875rem;">
                     <tbody id="sbDetailBody"></tbody>
                 </table>
             </div>
         </section>
-        <footer class="modal-card-foot">
-            <button class="button" onclick="$('#sbDetailModal').removeClass('is-active');">닫기</button>
+        <footer class="modal-card-foot is-justify-content-flex-end py-3 px-5">
+            <button class="button is-primary is-small px-5" onclick="$('#sbDetailModal').removeClass('is-active');">확인</button>
         </footer>
     </div>
 </div>
 
-<!-- ag-grid (local) -->
-<link rel="stylesheet" href="/static/vendor/ag-grid/ag-grid.css?v={{ request.app.version }}">
-<link rel="stylesheet" href="/static/vendor/ag-grid/ag-theme-quartz.css?v={{ request.app.version }}">
+<!-- ag-grid & scripts -->
 <script src="/static/vendor/ag-grid/ag-grid-community.js?v={{ request.app.version }}"></script>
-
-<!-- ApexCharts (local) -->
 <script src="/static/vendor/apexcharts/apexcharts.min.js?v={{ request.app.version }}"></script>
-
 <script src="/static/js/ag_grid_config.js?v={{ request.app.version }}"></script>
 <script src="/static/js/session_browser.js?v={{ request.app.version }}"></script>
 <script src="/static/js/session_browser_analyze.js?v={{ request.app.version }}"></script>

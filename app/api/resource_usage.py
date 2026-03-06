@@ -1064,16 +1064,25 @@ class ResourceUsageStatsResponse(BaseModel):
 @router.get("/resource-usage/stats", response_model=ResourceUsageStatsResponse)
 async def get_resource_usage_stats(
     db: Session = Depends(get_db),
-    proxy_id: Optional[int] = Query(None, description="프록시 ID (선택사항)")
+    proxy_id: Optional[int] = Query(None, description="프록시 ID (선택사항)"),
+    proxy_ids: Optional[str] = Query(None, description="프록시 ID 목록 (쉼표로 구분)")
 ):
     """자원사용률 로그 통계를 조회합니다."""
     query = db.query(ResourceUsageModel)
-    
+
     if proxy_id:
         query = query.filter(ResourceUsageModel.proxy_id == proxy_id)
-    
+    elif proxy_ids:
+        try:
+            ids = [int(x.strip()) for x in proxy_ids.split(',') if x.strip()]
+            if ids:
+                query = query.filter(ResourceUsageModel.proxy_id.in_(ids))
+        except ValueError:
+            pass
+
     total_count = query.count()
-    
+    ...
+
     oldest = query.order_by(ResourceUsageModel.collected_at.asc()).first()
     newest = query.order_by(ResourceUsageModel.collected_at.desc()).first()
     
@@ -1158,6 +1167,7 @@ async def delete_resource_usage(
 async def export_resource_usage(
     db: Session = Depends(get_db),
     proxy_id: Optional[int] = Query(None),
+    proxy_ids: Optional[str] = Query(None),
     start_time: Optional[str] = Query(None),
     end_time: Optional[str] = Query(None),
     limit: int = Query(10000, ge=1, le=100000)
@@ -1170,6 +1180,13 @@ async def export_resource_usage(
     
     if proxy_id:
         query = query.filter(ResourceUsageModel.proxy_id == proxy_id)
+    elif proxy_ids:
+        try:
+            ids = [int(x.strip()) for x in proxy_ids.split(',') if x.strip()]
+            if ids:
+                query = query.filter(ResourceUsageModel.proxy_id.in_(ids))
+        except ValueError:
+            pass
     
     if start_time:
         try:

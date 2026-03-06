@@ -6,40 +6,38 @@
 		// 기본 컬럼 정의 (세션브라우저용)
 		getSessionBrowserColumns: function() {
 			return [
-				{ field: 'host', headerName: '프록시', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 120, width: 150 },
+				{ field: 'host', headerName: '프록시', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 120, width: 140 },
 				{ field: 'creation_time', headerName: '생성시각', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 160, width: 180,
 					valueFormatter: function(params) {
 						return (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(params.value) : params.value;
 					}
 				},
 				{ field: 'protocol', headerName: '프로토콜', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 90, width: 100 },
-				{ field: 'user_name', headerName: '사용자', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 100, width: 120 },
-				{ field: 'client_ip', headerName: '클라이언트 IP', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 130, width: 140, cellClass: 'mono' },
-				{ field: 'server_ip', headerName: '서버 IP', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 130, width: 140, cellClass: 'mono' },
-				{ field: 'cl_bytes_received', headerName: 'CL 수신', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 100, width: 120, cellClass: 'num',
+				{ field: 'user_name', headerName: '사용자', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 100, width: 130 },
+				{ field: 'client_ip', headerName: '클라이언트 IP', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 130, width: 150, cellClass: 'mono' },
+				{ field: 'server_ip', headerName: '서버 IP', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 130, width: 150, cellClass: 'mono' },
+				{ field: 'cl_bytes_received', headerName: '수신', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 90, width: 110, cellClass: 'num',
 					valueFormatter: function(params) {
 						return (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(params.value) : params.value;
 					}
 				},
-				{ field: 'cl_bytes_sent', headerName: 'CL 송신', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 100, width: 120, cellClass: 'num',
+				{ field: 'cl_bytes_sent', headerName: '송신', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 90, width: 110, cellClass: 'num',
 					valueFormatter: function(params) {
 						return (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(params.value) : params.value;
 					}
 				},
-				{ field: 'age_seconds', headerName: 'Age(s)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 80, width: 100,
+				{ field: 'age_seconds', headerName: 'Age(s)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 80, width: 90,
 					valueFormatter: function(params) {
 						return (window.AppUtils && AppUtils.formatSeconds) ? AppUtils.formatSeconds(params.value) : params.value;
 					}
 				},
-				{ field: 'url', headerName: 'URL', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 200, flex: 1, 
+				{ field: 'url', headerName: 'URL', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 300, flex: 2, 
 					cellRenderer: function(params) {
 						if (!params.value) return '';
 						var url = String(params.value);
-						var short = url.length > 100 ? url.substring(0, 100) + '…' : url;
-						return '<div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="' + url.replace(/"/g, '&quot;') + '">' + short + '</div>';
+						return '<div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="' + url.replace(/"/g, '&quot;') + '">' + url + '</div>';
 					}
-				},
-				{ field: 'id', headerName: 'id', hide: true }
+				}
 			];
 		},
 

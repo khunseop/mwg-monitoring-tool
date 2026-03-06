@@ -393,8 +393,8 @@ $(document).ready(function() {
 
     // Load statistics
     function loadStatistics() {
-        const proxyId = $('#ruHistoryProxySelect').val();
-        const params = proxyId ? { proxy_id: parseInt(proxyId, 10) } : {};
+        const proxyIds = getSelectedProxyIds();
+        const params = proxyIds.length > 0 ? { proxy_ids: proxyIds.join(',') } : {};
         
         $.getJSON('/api/resource-usage/stats', params).then(function(stats) {
             $('#ruHistoryTotalCount').text(stats.total_count.toLocaleString());
@@ -430,14 +430,18 @@ $(document).ready(function() {
     
     // Export function
     function exportHistory() {
-        const proxyId = $('#ruHistoryProxySelect').val();
+        const proxyIds = getSelectedProxyIds();
         const startTime = $('#ruHistoryStartTime').val();
         const endTime = $('#ruHistoryEndTime').val();
         
-        const params = {};
-        if (proxyId) {
-            params.proxy_id = parseInt(proxyId, 10);
+        if (proxyIds.length === 0) {
+            alert('내보낼 프록시를 선택하세요.');
+            return;
         }
+
+        const params = {
+            proxy_ids: proxyIds.join(',')
+        };
         if (startTime) {
             params.start_time = convertKSTToUTC(startTime);
         }
