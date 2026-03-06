@@ -133,7 +133,7 @@ $(document).ready(function() {
         const params = {
             limit: limit,
             offset: 0,
-            proxy_id: proxyIds[0] // API 호환성을 위해 첫 번째 ID 사용
+            proxy_ids: proxyIds.join(',') // 다중 프록시 조회를 위해 쉼표로 구분된 ID 목록 전달
         };
 
         if (startTime) params.start_time = convertKSTToUTC(startTime);
@@ -158,7 +158,7 @@ $(document).ready(function() {
         const params = {
             limit: limit,
             offset: 0,
-            proxy_id: proxyIds[0]
+            proxy_ids: proxyIds.join(',') // 다중 프록시 조회를 위해 쉼표로 구분된 ID 목록 전달
         };
 
         loadHistoryData(params);
@@ -308,6 +308,7 @@ $(document).ready(function() {
             proxy_name: proxyMap[row.proxy_id] || `#${row.proxy_id}`,
             cpu: row.cpu,
             mem: row.mem,
+            disk: row.disk,
             cc: row.cc,
             cs: row.cs,
             http: row.http,

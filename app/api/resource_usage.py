@@ -1206,8 +1206,8 @@ async def export_resource_usage(
     
     # Header
     writer.writerow([
-        '수집 시간', '프록시 ID', '프록시 호스트', 'CPU (%)', 'MEM (%)',
-        'CC', 'CS', 'HTTP (Bytes)', 'HTTPS (Bytes)', 'FTP (Bytes)', '인터페이스 MBPS'
+        '수집 시간', '프록시 ID', '프록시 호스트', 'CPU (%)', 'MEM (%)', 'Disk (%)',
+        'CC', 'CS', 'HTTP (Mbps)', 'HTTPS (Mbps)', 'FTP (Mbps)', '인터페이스 MBPS'
     ])
     
     # Data rows
@@ -1219,6 +1219,7 @@ async def export_resource_usage(
             proxy_host,
             row.cpu if row.cpu is not None else '',
             row.mem if row.mem is not None else '',
+            row.disk if row.disk is not None else '',
             row.cc if row.cc is not None else '',
             row.cs if row.cs is not None else '',
             row.http if row.http is not None else '',
