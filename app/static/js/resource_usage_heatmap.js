@@ -48,34 +48,13 @@
             
             ru.lastData = items || [];
             const rows = [];
-            const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
 
             (items || []).forEach(row => {
                 const proxyId = row.proxy_id;
-                const last = ru.lastCumulativeByProxy[proxyId] || {};
-                const deltas = { http: 0, https: 0, http2: 0 };
-                
-                // Mbps 계산 (누적값 차이 이용)
-                ['http','https','http2'].forEach(k => {
-                    const currentVal = row[k];
-                    const previousVal = last[k];
-                    
-                    if (typeof currentVal === 'number' && typeof previousVal === 'number' && previousVal > 0) {
-                        const mbps = utils.calculateTrafficMbps(currentVal, previousVal, intervalSec);
-                        deltas[k] = (mbps !== null && !isNaN(mbps) && mbps >= 0) ? mbps : 0;
-                    }
-                });
-                
-                // 누적값 캐시 업데이트
-                ru.lastCumulativeByProxy[proxyId] = {
-                    http: typeof row.http === 'number' && row.http > 0 ? row.http : (last.http || 0),
-                    https: typeof row.https === 'number' && row.https > 0 ? row.https : (last.https || 0),
-                    http2: typeof row.http2 === 'number' && row.http2 > 0 ? row.http2 : (last.http2 || 0),
-                };
-                
                 const proxy = (ru.proxies || []).find(p => p.id === proxyId);
                 const fullHost = proxy ? proxy.host : `#${proxyId}`;
                 
+                // 백엔드에서 이미 Mbps로 계산되어 오므로 그대로 사용 (CPU, MEM 등과 동일한 로직)
                 rows.push({
                     proxy_id: proxyId,
                     cpu: typeof row.cpu === 'number' ? row.cpu : null,
@@ -83,9 +62,9 @@
                     disk: typeof row.disk === 'number' ? row.disk : null,
                     cc: typeof row.cc === 'number' ? row.cc : null,
                     cs: typeof row.cs === 'number' ? row.cs : null,
-                    httpd: deltas.http,
-                    httpsd: deltas.https,
-                    http2d: deltas.http2,
+                    httpd: typeof row.http === 'number' ? row.http : 0,
+                    httpsd: typeof row.https === 'number' ? row.https : 0,
+                    http2d: typeof row.http2 === 'number' ? row.http2 : 0,
                     interface_mbps: row.interface_mbps || null,
                     _fullHost: fullHost
                 });
@@ -269,25 +248,12 @@
             });
 
             const rows = [headers.join('\t')];
-            const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
 
-            // 히트맵용으로 계산된 최신 deltas를 포함한 행 데이터를 생성
-            const items = ru.lastData;
-            items.forEach(row => {
+            ru.lastData.forEach(row => {
                 const proxyId = row.proxy_id;
                 const proxy = (ru.proxies || []).find(p => p.id === proxyId);
                 const host = proxy ? proxy.host : `#${proxyId}`;
-                const last = ru.lastCumulativeByProxy[proxyId] || {};
                 
-                const getMbps = (k) => {
-                    const currentVal = row[k];
-                    const previousVal = last[k];
-                    if (typeof currentVal === 'number' && typeof previousVal === 'number' && previousVal > 0) {
-                        return utils.calculateTrafficMbps(currentVal, previousVal, intervalSec) || 0;
-                    }
-                    return 0;
-                };
-
                 const line = [
                     host,
                     (row.cpu || 0).toFixed(1),
@@ -295,9 +261,9 @@
                     (row.disk || 0).toFixed(1),
                     row.cc || 0,
                     row.cs || 0,
-                    getMbps('http').toFixed(2),
-                    getMbps('https').toFixed(2),
-                    getMbps('http2').toFixed(2)
+                    (row.http || 0).toFixed(2),
+                    (row.https || 0).toFixed(2),
+                    (row.http2 || 0).toFixed(2)
                 ];
 
                 const if_mbps = row.interface_mbps ? (typeof row.interface_mbps === 'string' ? JSON.parse(row.interface_mbps) : row.interface_mbps) : {};

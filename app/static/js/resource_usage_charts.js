@@ -54,52 +54,20 @@
                 });
                 
                 const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
-                ['cpu','mem','cc','cs','disk'].forEach(k => {
+                // 모든 기본 메트릭 (이미 백엔드에서 계산된 값들임)
+                ['cpu','mem','cc','cs','disk','http','https','http2'].forEach(k => {
                     const v = row[k];
                     if (typeof v === 'number') {
+                        if (!ru.tsBuffer[proxyId][k]) ru.tsBuffer[proxyId][k] = [];
                         const arr = ru.tsBuffer[proxyId][k];
                         const last = arr[arr.length - 1];
                         if (last && last.x === ts) {
-                            // replace last if same bucket to avoid duplicate labels
                             arr[arr.length - 1] = { x: ts, y: v };
                         } else {
                             arr.push({ x: ts, y: v });
                         }
-                        if (ru.tsBuffer[proxyId][k].length > ru.bufferMaxPoints) {
-                            ru.tsBuffer[proxyId][k].shift();
-                        }
-                    }
-                });
-                
-                // 프록시 트래픽(http, https, ftp)은 누적값을 Mbps로 변환하여 저장
-                ['http','https','ftp'].forEach(k => {
-                    const v = row[k];
-                    if (typeof v === 'number') {
-                        const arr = ru.tsBuffer[proxyId][k];
-                        const lastCumulative = ru.lastCumulativeByProxy[proxyId] || {};
-                        const prevCumulative = lastCumulative[k];
-                        
-                        let mbpsValue = null;
-                        if (typeof prevCumulative === 'number') {
-                            // 이전 누적값이 있으면 델타 계산 및 Mbps 변환
-                            mbpsValue = utils.calculateTrafficMbps(v, prevCumulative, intervalSec);
-                        }
-                        
-                        // 누적값 업데이트
-                        ru.lastCumulativeByProxy[proxyId] = ru.lastCumulativeByProxy[proxyId] || {};
-                        ru.lastCumulativeByProxy[proxyId][k] = v;
-                        
-                        // Mbps 값이 유효한 경우에만 버퍼에 저장
-                        if (mbpsValue !== null && mbpsValue >= 0) {
-                            const last = arr[arr.length - 1];
-                            if (last && last.x === ts) {
-                                arr[arr.length - 1] = { x: ts, y: mbpsValue };
-                            } else {
-                                arr.push({ x: ts, y: mbpsValue });
-                            }
-                            if (ru.tsBuffer[proxyId][k].length > ru.bufferMaxPoints) {
-                                ru.tsBuffer[proxyId][k].shift();
-                            }
+                        if (arr.length > ru.bufferMaxPoints) {
+                            arr.shift();
                         }
                     }
                 });

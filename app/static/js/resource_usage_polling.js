@@ -200,17 +200,7 @@
                     self.fetchLatestForProxies(currentProxyIds).then(latestRows => {
                         const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
                         if (valid.length > 0) {
-                            // 누적값 캐시가 비어있다면 초기화 (첫 수집 또는 페이지 복귀 직후)
-                            if (Object.keys(ru.lastCumulativeByProxy).length === 0) {
-                                valid.forEach(row => {
-                                    ru.lastCumulativeByProxy[row.proxy_id] = {
-                                        http: typeof row.http === 'number' ? row.http : null,
-                                        https: typeof row.https === 'number' ? row.https : null,
-                                        http2: typeof row.http2 === 'number' ? row.http2 : null,
-                                    };
-                                });
-                            }
-                            // 히트맵 업데이트 (내부적으로 델타 계산 및 캐시 갱신 수행)
+                            // 히트맵 업데이트 (백엔드에서 계산된 Mbps 사용)
                             requestAnimationFrame(() => {
                                 heatmap.updateTable(valid);
                             });

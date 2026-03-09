@@ -48,7 +48,10 @@ IF_DESCR_OID = "1.3.6.1.2.1.2.2.1.2"  # ifDescr
 COUNTER32_MAX = 4294967295  # 2^32 - 1
 
 # Cache for previous counter values: {(proxy_id, interface_name): (counter_value, timestamp)} for OID-based collection
-_INTERFACE_COUNTER_CACHE: Dict[Tuple[int, str], Tuple[int, float]] = {}
+_INTERFACE_COUNTER_CACHE: Dict[Tuple[int, str, str], Tuple[int, float]] = {}
+
+# Cache for global traffic counters: {(proxy_id, metric_key): (counter_value, timestamp)}
+_GLOBAL_TRAFFIC_COUNTER_CACHE: Dict[Tuple[int, str], Tuple[int, float]] = {}
 
 # Cache for interface config: (interface_oids, interface_thresholds, interface_bandwidths, config_updated_at)
 _INTERFACE_CONFIG_CACHE: Optional[Tuple[Dict[str, Dict[str, str]], Dict[str, float], Dict[str, float], float]] = None
@@ -699,9 +702,43 @@ async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str,
         keys.append("interface_mbps")
 
     if tasks:
+        current_time = monotonic()
         values = await asyncio.gather(*tasks, return_exceptions=True)
         for key, value in zip(keys, values):
-            result[key] = None if isinstance(value, Exception) else value
+            if isinstance(value, Exception) or value is None:
+                result[key] = None
+                continue
+            
+            # If it's a global traffic metric (http, https, http2), calculate delta (Mbps)
+            if key in ["http", "https", "http2"]:
+                try:
+                    current_counter = int(value)
+                    cache_key = (proxy.id, key)
+                    cached = _GLOBAL_TRAFFIC_COUNTER_CACHE.get(cache_key)
+                    
+                    if cached:
+                        prev_counter, prev_time = cached
+                        time_diff = current_time - prev_time
+                        if time_diff >= 1.0:
+                            mbps = _calculate_mbps(current_counter, prev_counter, time_diff)
+                            result[key] = round(mbps, 3)
+                            # Update cache only after successful calculation with valid time diff
+                            _GLOBAL_TRAFFIC_COUNTER_CACHE[cache_key] = (current_counter, current_time)
+                        else:
+                            # Too soon to calculate new delta, keep previous result or return 0
+                            # To prevent "disappearing" data, we could potentially return the last known Mbps
+                            # but for simplicity we return 0.0 or previous known value if we had one.
+                            # For now, let's just not update the counter cache yet.
+                            result[key] = 0.0
+                    else:
+                        # First collection: initialize cache, return 0.0
+                        result[key] = 0.0
+                        _GLOBAL_TRAFFIC_COUNTER_CACHE[cache_key] = (current_counter, current_time)
+                except (ValueError, TypeError):
+                    result[key] = 0.0
+            else:
+                # Other metrics (cpu, mem, cc, cs, disk, interface_mbps)
+                result[key] = value
     
     # 모든 수집값을 콘솔 로그로 출력
     log_parts = [f"host={proxy.host}", f"proxy_id={proxy.id}"]
@@ -777,7 +814,7 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
             interface_mbps_json = json.dumps(interface_mbps_data) if interface_mbps_data else None
             
             # Prepare data for bulk insert
-            collected_data.append({
+            usage_data = {
                 "proxy_id": proxy_id,
                 "cpu": metrics.get("cpu"),
                 "mem": metrics.get("mem"),
@@ -785,15 +822,16 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
                 "cs": metrics.get("cs"),
                 "http": metrics.get("http"),
                 "https": metrics.get("https"),
-                "ftp": metrics.get("ftp"),
+                "http2": metrics.get("http2"),
                 "disk": metrics.get("disk"),
                 "interface_mbps": interface_mbps_json,
                 "community": payload.community,
-                "oids_raw": json.dumps(payload.oids),
+                "oids_raw": json_lib.dumps(payload.oids),
                 "collected_at": collected_at_ts,
                 "created_at": collected_at_ts,
                 "updated_at": collected_at_ts,
-            })
+            }
+            collected_data.append(usage_data)
         except Exception as e:
             errors[proxy.id] = str(e)
 
@@ -834,12 +872,19 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
     if errors:
         logger.warning(f"[resource_usage] Collection errors: {errors}")
 
+    # Return the collected data directly instead of refreshing from DB 
+    # to ensure the pre-calculated Mbps values are preserved in the response.
+    response_items = []
+    for d in collected_data:
+        # Map raw data to the schema (Pydantic will handle types)
+        response_items.append(d)
+
     return CollectResponse(
         requested=len(proxies),
-        succeeded=len(collected_models),
+        succeeded=len(collected_data), # Accurate succeeded count
         failed=len(errors),
         errors=errors,
-        items=collected_models,  # Pydantic will convert with from_attributes
+        items=response_items,
     )
 
     # enforce 30-day retention after successful commit
