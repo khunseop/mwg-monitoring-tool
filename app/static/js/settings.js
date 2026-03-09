@@ -389,7 +389,89 @@ $(document).ready(() => {
     });
 });
 
-// Expose functions for inline onclick handlers
-window.saveResourceConfig = saveResourceConfig;
-window.saveSessionConfig = saveSessionConfig;
-window.saveAllConfig = saveAllConfig;
+// 프리셋 적용
+function applyPreset(type) {
+    if (!confirm('현재 입력된 OID 설정이 프리셋으로 대체됩니다. 계속하시겠습니까?')) return;
+
+    if (type === 'mwg') {
+        $('#cfgOidCpu').val('1.3.6.1.4.1.21067.2.1.2.4.1.2.1');
+        $('#cfgOidMem').val('1.3.6.1.4.1.21067.2.1.2.4.1.3.1');
+        $('#cfgOidDisk').val('1.3.6.1.4.1.21067.2.1.2.4.1.4.1');
+        $('#cfgOidCc').val('1.3.6.1.4.1.21067.2.1.2.1.1.1.1');
+        $('#cfgOidCs').val('1.3.6.1.4.1.21067.2.1.2.1.1.2.1');
+        $('#cfgOidHttp').val('1.3.6.1.4.1.21067.2.1.2.2.1.1.1');
+        $('#cfgOidHttps').val('1.3.6.1.4.1.21067.2.1.2.2.1.2.1');
+        $('#cfgOidFtp').val('1.3.6.1.4.1.21067.2.1.2.2.1.3.1');
+        
+        // 기본 인터페이스 예시 추가 (필요시)
+        if ($('#cfgInterfaceList tr').length === 0) {
+            addInterfaceRow('eth0', { in_oid: '1.3.6.1.2.1.2.2.1.10.1', out_oid: '1.3.6.1.2.1.2.2.1.16.1' }, 800, 1000);
+        }
+    } else if (type === 'linux') {
+        $('#cfgOidCpu').val('1.3.6.1.4.1.2021.11.11.0');
+        $('#cfgOidMem').val('1.3.6.1.4.1.2021.4.6.0');
+        $('#cfgOidDisk').val('1.3.6.1.4.1.2021.9.1.9.1');
+        $('#cfgOidCc').val('');
+        $('#cfgOidCs').val('');
+        $('#cfgOidHttp').val('');
+        $('#cfgOidHttps').val('');
+        $('#cfgOidFtp').val('');
+    }
+    
+    checkForChanges();
+}
+
+// 설정 내보내기/가져오기
+function exportConfig() {
+    window.location.href = '/api/config/export';
+}
+
+function updateImportFileName() {
+    const fileInput = document.getElementById('cfgImportFile');
+    const fileName = document.getElementById('cfgImportFileName');
+    if (fileInput.files.length > 0) {
+        fileName.textContent = fileInput.files[0].name;
+    } else {
+        fileName.textContent = '선택된 파일 없음';
+    }
+}
+
+function importConfig() {
+    const fileInput = document.getElementById('cfgImportFile');
+    if (fileInput.files.length === 0) {
+        alert('가져올 JSON 파일을 선택하세요.');
+        return;
+    }
+
+    if (!confirm('주의: 설정을 불러오면 기존의 프록시, 그룹 및 모든 시스템 설정이 업데이트되거나 추가됩니다. 계속하시겠습니까?')) {
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    $('#cfgStatus').removeClass('is-success is-danger').text('가져오는 중...');
+
+    $.ajax({
+        url: '/api/config/import',
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: (res) => {
+            alert('설정을 성공적으로 불러왔습니다. 페이지를 새로고침합니다.');
+            window.location.reload();
+        },
+        error: (xhr) => {
+            const detail = xhr.responseJSON ? xhr.responseJSON.detail : '알 수 없는 오류';
+            alert('설정 불러오기 실패: ' + detail);
+            $('#cfgStatus').addClass('is-danger').text('가져오기 실패');
+        }
+    });
+}
+
+// Expose to window
+window.applyPreset = applyPreset;
+window.exportConfig = exportConfig;
+window.importConfig = importConfig;
+window.updateImportFileName = updateImportFileName;

@@ -138,10 +138,13 @@ function loadProxies() {
                         <td class="py-3 is-size-7 has-text-grey">${proxy.description || ''}</td>
                         <td class="has-text-centered py-2">
                             <div class="buttons is-centered">
-                                <button class="button is-white is-small border" onclick="openModal('proxy', ${proxy.id})">
+                                <button class="button is-white is-small border" onclick="openModal('proxy', ${proxy.id})" title="수정">
                                     <span>수정</span>
                                 </button>
-                                <button class="button is-white is-small border has-text-danger" onclick="deleteProxy(${proxy.id})">
+                                <button class="button is-white is-small border" onclick="cloneProxy(${proxy.id})" title="복제">
+                                    <span>복제</span>
+                                </button>
+                                <button class="button is-white is-small border has-text-danger" onclick="deleteProxy(${proxy.id})" title="삭제">
                                     <span>삭제</span>
                                 </button>
                             </div>
@@ -496,9 +499,117 @@ function submitBulkProxies() {
     });
 }
 
+function cloneProxy(id) {
+    $.get(`/api/proxies/${id}`)
+        .done(data => {
+            // 새 프록시 등록 모달을 열되, 기존 데이터로 채움
+            try { document.getElementById(`proxyForm`).reset(); } catch (e) {}
+            $('#proxyId').val(''); // ID는 비움 (신규 등록)
+            $('#host').val(''); // Host도 비움 (수동 입력 필요)
+            $('#username').val(data.username);
+            $('#password').val(''); // 비밀번호는 보안상 비움
+            $('#traffic_log_path').val(data.traffic_log_path || '');
+            $('#group_id').val(data.group_id || '');
+            $('#description').val(`${data.host} 복제본`);
+            $('#is_active').prop('checked', data.is_active);
+
+            // OID 개별 설정 복제
+            $('#proxyInterfaceList').empty();
+            $('#use_custom_oids').prop('checked', false);
+            $('#customOidSection').hide();
+
+            if (data.oids_json) {
+                try {
+                    const oids = JSON.parse(data.oids_json);
+                    if (oids && oids.__interface_oids__ && Object.keys(oids.__interface_oids__).length > 0) {
+                        $('#use_custom_oids').prop('checked', true);
+                        $('#customOidSection').show();
+                        for (const [name, config] of Object.entries(oids.__interface_oids__)) {
+                            const in_oid = typeof config === 'string' ? config : (config.in_oid || '');
+                            const out_oid = typeof config === 'object' ? (config.out_oid || '') : '';
+                            addProxyInterfaceRow(name, in_oid, out_oid);
+                        }
+                    }
+                } catch (e) {}
+            }
+            $('#proxyModal').addClass('is-active');
+        })
+        .fail(() => (window.AppUtils && AppUtils.showError('데이터를 불러오는데 실패했습니다.')));
+}
+
+async function syncGroupOids() {
+    const proxies = await $.get('/api/proxies');
+    if (!proxies || proxies.length === 0) return;
+
+    // 커스텀 OID가 설정된 프록시 목록 추출
+    const sourceProxies = proxies.filter(p => {
+        if (!p.oids_json) return false;
+        try {
+            const oids = JSON.parse(p.oids_json);
+            return oids && oids.__interface_oids__ && Object.keys(oids.__interface_oids__).length > 0;
+        } catch(e) { return false; }
+    });
+
+    if (sourceProxies.length === 0) {
+        alert('그룹에 적용할 커스텀 OID 설정이 있는 프록시가 없습니다.\n먼저 하나의 프록시에 대해 OID 개별 설정을 완료하세요.');
+        return;
+    }
+
+    // 소스 선택 팝업 (간단하게 prompt/confirm 조합으로 구현하거나 전용 모달 필요하지만, 여기선 confirm 활용)
+    let msg = "OID 설정을 복사할 소스 장비를 선택하세요 (번호 입력):\n\n";
+    sourceProxies.forEach((p, i) => {
+        msg += `${i+1}. ${p.host} (${p.group_name || '그룹없음'})\n`;
+    });
+
+    const choice = prompt(msg);
+    if (!choice) return;
+    
+    const idx = parseInt(choice, 10) - 1;
+    if (isNaN(idx) || !sourceProxies[idx]) {
+        alert('잘못된 선택입니다.');
+        return;
+    }
+
+    const source = sourceProxies[idx];
+    const targetGroup = source.group_id;
+    const targets = proxies.filter(p => p.group_id === targetGroup && p.id !== source.id);
+
+    if (targets.length === 0) {
+        alert(`'${source.group_name}' 그룹에 다른 장비가 없습니다.`);
+        return;
+    }
+
+    if (!confirm(`${source.host}의 OID 설정을 '${source.group_name}' 그룹 내 다른 ${targets.length}개 장비에 모두 동일하게 적용하시겠습니까?`)) {
+        return;
+    }
+
+    let successCount = 0;
+    for (const target of targets) {
+        try {
+            const updateData = {
+                oids_json: source.oids_json
+            };
+            await $.ajax({
+                url: `/api/proxies/${target.id}`,
+                method: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify(updateData)
+            });
+            successCount++;
+        } catch (e) {
+            console.error(`Failed to sync for ${target.host}:`, e);
+        }
+    }
+
+    alert(`${successCount}개 장비의 OID 설정 동기화 완료`);
+    loadProxies();
+}
+
 // 초기화
 $(document).ready(() => {
     initProxyPage();
+    
+    $('#btnSyncGroupOids').on('click', syncGroupOids);
 });
 
 // PJAX 지원: 페이지 전환 후 초기화 재실행
@@ -509,6 +620,8 @@ $(document).on('pjax:complete', function(e, url) {
 });
 
 // expose for inline handlers
+window.cloneProxy = cloneProxy;
+window.syncGroupOids = syncGroupOids;
 window.switchProxySection = switchProxySection;
 window.openBulkProxyModal = openBulkProxyModal;
 window.closeBulkProxyModal = closeBulkProxyModal;
