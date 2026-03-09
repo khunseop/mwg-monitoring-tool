@@ -44,27 +44,27 @@
 <!-- 미니 대시보드 요약 섹션 -->
 <div class="columns is-multiline is-mobile mb-5" id="sbMiniDashboard" style="display:none;">
     <div class="column is-3-desktop is-6-mobile">
-        <div class="box p-4 has-text-centered" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); height: 100%;">
-            <p class="heading has-text-grey mb-2" style="font-weight: 600;">전체 세션</p>
-            <p class="title is-4" id="stat-total">-</p>
+        <div class="box p-3 has-text-centered" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); height: 100%;">
+            <p class="heading has-text-grey mb-1" style="font-weight: 600; font-size: 0.7rem;">전체 세션</p>
+            <p class="title is-5 mb-0" id="stat-total">-</p>
         </div>
     </div>
     <div class="column is-3-desktop is-6-mobile">
-        <div class="box p-4 has-text-centered" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); height: 100%;">
-            <p class="heading has-text-grey mb-2" style="font-weight: 600;">에러 (4xx/5xx)</p>
-            <p class="title is-4 has-text-danger" id="stat-errors">-</p>
+        <div class="box p-3 has-text-centered" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); height: 100%; overflow: hidden;">
+            <p class="heading has-text-grey mb-1" style="font-weight: 600; font-size: 0.7rem;">TOP 송수신 URL</p>
+            <p class="is-size-7 has-text-weight-bold has-text-truncate" id="stat-top-url" title="-">-</p>
         </div>
     </div>
     <div class="column is-3-desktop is-6-mobile">
-        <div class="box p-4 has-text-centered" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); height: 100%;">
-            <p class="heading has-text-grey mb-2" style="font-weight: 600;">지연 (500ms+)</p>
-            <p class="title is-4 has-text-warning-dark" id="stat-slow">-</p>
+        <div class="box p-3 has-text-centered" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); height: 100%; overflow: hidden;">
+            <p class="heading has-text-grey mb-1" style="font-weight: 600; font-size: 0.7rem;">최장 세션유지 URL</p>
+            <p class="is-size-7 has-text-weight-bold has-text-truncate" id="stat-longest-url" title="-">-</p>
         </div>
     </div>
     <div class="column is-3-desktop is-6-mobile">
-        <div class="box p-4 has-text-centered" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); height: 100%;">
-            <p class="heading has-text-grey mb-2" style="font-weight: 600;">트래픽 합계</p>
-            <p class="title is-5" id="stat-traffic">-</p>
+        <div class="box p-3 has-text-centered" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); height: 100%;">
+            <p class="heading has-text-grey mb-1" style="font-weight: 600; font-size: 0.7rem;">최다 요청 클라이언트</p>
+            <p class="title is-5 mb-0" id="stat-top-client">-</p>
         </div>
     </div>
 </div>
@@ -73,7 +73,7 @@
 <div id="sbListSection">
     <div class="is-flex is-align-items-center is-justify-content-between mb-4">
         <div class="is-flex is-align-items-center">
-            <a class="is-size-7 has-text-primary has-text-weight-bold" id="sbAnalyzeBtn" style="text-decoration: underline;">상세 분석 대시보드 보기</a>
+            <!-- 상세 분석 버튼 제거됨 -->
         </div>
         <div class="is-flex is-align-items-center" style="gap: 0.5rem;">
             <div class="field has-addons mb-0">
@@ -96,17 +96,6 @@
         </div>
         <div id="sbTableGrid" class="ag-theme-quartz" style="height: 72vh; width: 100%;"></div>
     </div>
-</div>
-
-<!-- 분석 섹션 -->
-<div id="sbAnalyzeSection" style="display:none;">
-    <div class="is-flex is-align-items-center is-justify-content-between mb-5">
-        <h4 class="title is-5 mb-0">세션 상세 분석</h4>
-        <a class="is-size-7 has-text-primary has-text-weight-bold" style="text-decoration: underline;" onclick="$('#sbAnalyzeSection').hide(); $('#sbListSection').show();">목록으로 돌아가기</a>
-    </div>
-    
-    <div id="sbSummary" class="columns is-multiline mb-5"></div>
-    <div id="sbCharts"></div>
 </div>
 
 <!-- 상세 모달 -->
@@ -135,5 +124,4 @@
 <script src="/static/vendor/apexcharts/apexcharts.min.js?v={{ request.app.version }}"></script>
 <script src="/static/js/ag_grid_config.js?v={{ request.app.version }}"></script>
 <script src="/static/js/session_browser.js?v={{ request.app.version }}"></script>
-<script src="/static/js/session_browser_analyze.js?v={{ request.app.version }}"></script>
 {% endblock %}

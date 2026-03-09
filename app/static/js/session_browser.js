@@ -6,8 +6,7 @@
         proxies: [],
         records: [],
         gridApi: null,
-        storageKey: 'sb_state_v1',
-        analyzeStatus: 'idle'
+        storageKey: 'sb_state_v1'
     };
 
     const COLS = [
@@ -104,22 +103,58 @@
 
         const stats = {
             total: records.length,
-            errors: 0,
-            slow: 0,
-            traffic: 0
+            urlTraffic: {}, // {url: bytes}
+            urlAge: { url: '-', age: 0 },
+            clients: {} // {ip: count}
         };
 
         records.forEach(r => {
-            const status = parseInt(r.status, 10);
-            if (status >= 400) stats.errors++;
-            if (r.age_seconds >= 60) stats.slow++; // 1분 이상 세션
-            stats.traffic += (r.cl_bytes_received || 0) + (r.cl_bytes_sent || 0);
+            // URL별 트래픽 합계 (수신 + 송신)
+            const url = r.url || '-';
+            const traffic = (r.cl_bytes_received || 0) + (r.cl_bytes_sent || 0);
+            stats.urlTraffic[url] = (stats.urlTraffic[url] || 0) + traffic;
+
+            // 최장 세션 유지 URL
+            const age = parseInt(r.age_seconds || 0, 10);
+            if (age > stats.urlAge.age) {
+                stats.urlAge = { url: url, age: age };
+            }
+
+            // 클라이언트별 요청 수
+            const ip = r.client_ip || '-';
+            stats.clients[ip] = (stats.clients[ip] || 0) + 1;
         });
 
+        // TOP 송수신 URL 찾기
+        let topUrl = '-';
+        let maxTraffic = -1;
+        for (const [url, traffic] of Object.entries(stats.urlTraffic)) {
+            if (traffic > maxTraffic) {
+                maxTraffic = traffic;
+                topUrl = url;
+            }
+        }
+
+        // 최다 요청 클라이언트 찾기
+        let topClient = '-';
+        let maxReqs = -1;
+        for (const [ip, count] of Object.entries(stats.clients)) {
+            if (count > maxReqs) {
+                maxReqs = count;
+                topClient = ip;
+            }
+        }
+
         $('#stat-total').text(stats.total.toLocaleString());
-        $('#stat-errors').text(stats.errors.toLocaleString());
-        $('#stat-slow').text(stats.slow.toLocaleString());
-        $('#stat-traffic').text((window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(stats.traffic) : stats.traffic);
+        
+        const $topUrl = $('#stat-top-url');
+        $topUrl.text(topUrl).attr('title', topUrl);
+        
+        const $longestUrl = $('#stat-longest-url');
+        const ageStr = (window.AppUtils && AppUtils.formatSeconds) ? AppUtils.formatSeconds(stats.urlAge.age) : stats.urlAge.age + 's';
+        $longestUrl.text(`${stats.urlAge.url} (${ageStr})`).attr('title', stats.urlAge.url);
+        
+        $('#stat-top-client').text(topClient);
         
         $('#sbMiniDashboard').fadeIn();
     }
@@ -170,10 +205,22 @@
     function persistState() {
         try {
             const state = {
-                records: sb.records.slice(0, 1000), // 최대 1000건 저장
+                records: sb.records, // 모든 레코드 저장 시도
                 timestamp: new Date().getTime()
             };
-            localStorage.setItem(sb.storageKey, JSON.stringify(state));
+            try {
+                localStorage.setItem(sb.storageKey, JSON.stringify(state));
+            } catch (quotaExceeded) {
+                // 용량 초과 시 개수 제한하여 재시도
+                console.warn('[SessionBrowser] localStorage quota exceeded, slicing records...');
+                state.records = sb.records.slice(0, 5000);
+                try {
+                    localStorage.setItem(sb.storageKey, JSON.stringify(state));
+                } catch (e) {
+                    state.records = sb.records.slice(0, 1000);
+                    localStorage.setItem(sb.storageKey, JSON.stringify(state));
+                }
+            }
         } catch (e) {
             console.warn('[SessionBrowser] Failed to persist state:', e);
         }
@@ -280,17 +327,6 @@
                     allColumns: true
                 });
             }
-        });
-
-        $('#sbAnalyzeBtn').on('click', (e) => {
-            e.preventDefault();
-            if (sb.records.length === 0) {
-                alert('분석할 세션 데이터가 없습니다. 먼저 데이터를 불러오세요.');
-                return;
-            }
-            $('#sbListSection').hide();
-            $('#sbAnalyzeSection').show();
-            if (window.sbAnalyze) window.sbAnalyze.run(sb.records);
         });
 
         // Modal closing handlers
