@@ -148,7 +148,7 @@
                 const out = {};
                 Object.keys(obj).forEach(pid => {
                     const byMetric = obj[pid] || {};
-                    out[pid] = { cpu: [], mem: [], cc: [], cs: [], disk: [], http: [], https: [], ftp: [] };
+                    out[pid] = { cpu: [], mem: [], cc: [], cs: [], disk: [], http: [], https: [], http2: [] };
                     // Process basic metrics
                     Object.keys(out[pid]).forEach(m => {
                         const arr = Array.isArray(byMetric[m]) ? byMetric[m] : [];

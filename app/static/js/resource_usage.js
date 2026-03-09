@@ -55,6 +55,12 @@
             state.saveState(undefined); 
         });
 
+        $('#ruHeatmapHeightSlider').off('input').on('input', function() {
+            if (ru.apex && ru.lastData && ru.lastData.length > 0) {
+                heatmap.updateTable(ru.lastData);
+            }
+        });
+
         // 초기화: DeviceSelector 및 설정 로드
         Promise.all([
             window.DeviceSelector.init({

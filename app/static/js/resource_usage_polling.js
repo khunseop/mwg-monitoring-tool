@@ -127,9 +127,6 @@
             const charts = window.ResourceUsageCharts;
             const heatmap = window.ResourceUsageHeatmap;
             
-            // Reset cumulative cache to prevent wrong delta calculations
-            ru.lastCumulativeByProxy = {};
-            
             // If collection is running, fetch latest data and resync
             if (ru.taskId && ru.intervalId === 'background') {
                 const proxyIds = state.getSelectedProxyIds();
@@ -211,7 +208,7 @@
                                     ru.lastCumulativeByProxy[row.proxy_id] = {
                                         http: typeof row.http === 'number' ? row.http : null,
                                         https: typeof row.https === 'number' ? row.https : null,
-                                        ftp: typeof row.ftp === 'number' ? row.ftp : null,
+                                        http2: typeof row.http2 === 'number' ? row.http2 : null,
                                     };
                                 });
                             }

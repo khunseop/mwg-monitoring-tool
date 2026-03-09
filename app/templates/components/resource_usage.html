@@ -64,9 +64,15 @@
     <div class="heatmap-container" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1.5rem; overflow: hidden;">
         <div class="is-flex is-align-items-center is-justify-content-between mb-4">
             <h4 class="title is-6 mb-0 has-text-grey">자원 사용률 히트맵</h4>
-            <div id="ruHeatmapLegend" class="is-size-7"></div>
+            <div class="is-flex is-align-items-center" style="gap: 1rem;">
+                <div class="is-flex is-align-items-center" style="gap: 0.5rem;">
+                    <span class="is-size-7 has-text-grey">프레임 높이</span>
+                    <input class="slider is-small is-circle" id="ruHeatmapHeightSlider" type="range" min="300" max="2000" value="600" step="50" style="width: 100px; margin: 0;">
+                </div>
+                <div id="ruHeatmapLegend" class="is-size-7"></div>
+            </div>
         </div>
-        <div id="ruHeatmapWrap" style="overflow-x: auto; overflow-y: auto; max-height: 75vh;">
+        <div id="ruHeatmapWrap" style="overflow-x: auto; overflow-y: auto;">
             <div id="ruHeatmapEl" style="width: 100%; min-width: 1000px;"></div>
         </div>
         <div id="ruEmptyState" class="empty-state">
