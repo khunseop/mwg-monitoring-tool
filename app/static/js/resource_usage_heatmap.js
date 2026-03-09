@@ -315,8 +315,8 @@
                 if (metricKey === 'httpsd') return 'https';
                 if (metricKey === 'http2d') return 'http2';
                 if (metricKey.startsWith('if_')) {
-                    // if_${ifName} 형태에서 인터페이스 이름 추출
-                    const ifName = metricKey.replace(/^if_/, '');
+                    // if_${ifName}_in 또는 if_${ifName}_out 형태에서 순수 인터페이스 이름만 추출
+                    const ifName = metricKey.replace(/^if_/, '').replace(/_in$|_out$/, '');
                     return interfaceThr[ifName] !== undefined ? `__interface_${ifName}__` : 'interface_mbps';
                 }
                 return metricKey;
@@ -370,7 +370,7 @@
             seriesData.reverse();
 
             // Calculate dynamic dimensions based on data size
-            const minColWidth = 80;
+            const minColWidth = 65; // 너비 줄임 (기존 80)
             const contentWidth = xCategories.length * minColWidth + 150; // columns * width + y-axis label width
             const containerWidth = $('#ruHeatmapWrap').width() || 1000;
             
@@ -378,9 +378,9 @@
             const finalWidth = Math.max(containerWidth, contentWidth);
             
             const rowCount = yCategories.length;
-            const minHeight = 400;
-            const maxHeight = 1200;
-            const rowHeight = 25;
+            const minHeight = 500; // 최소 높이 키움 (기존 400)
+            const maxHeight = 2000; // 최대 높이 키움 (기존 1200)
+            const rowHeight = 35; // 행 높이 키움 (기존 25)
             const calculatedHeight = Math.max(minHeight, Math.min(maxHeight, rowCount * rowHeight + 150));
             
             const options = {
