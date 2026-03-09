@@ -38,6 +38,10 @@
                 polling.startPolling();
             }
         });
+
+        $('#ruCopyBtn').off('click').on('click', function() {
+            heatmap.copyCurrentValues();
+        });
         
         $('#ruGroupSelect').off('change').on('change', function() {
             ru.lastCumulativeByProxy = {};

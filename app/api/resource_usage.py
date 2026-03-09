@@ -1180,9 +1180,10 @@ async def export_resource_usage(
     end_time: Optional[str] = Query(None),
     limit: int = Query(10000, ge=1, le=100000)
 ):
-    """자원사용률 로그를 CSV 형식으로 내보냅니다."""
-    import csv
-    from io import StringIO
+    """자원사용률 로그를 Excel 형식으로 내보냅니다. (인터페이스 상세 포함)"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    import io
     
     query = db.query(ResourceUsageModel)
     
@@ -1220,47 +1221,73 @@ async def export_resource_usage(
     
     # Get proxy names
     proxy_map = {}
-    proxy_ids = set(r.proxy_id for r in rows)
-    if proxy_ids:
-        proxies = db.query(Proxy).filter(Proxy.id.in_(proxy_ids)).all()
+    p_ids = set(r.proxy_id for r in rows)
+    if p_ids:
+        proxies = db.query(Proxy).filter(Proxy.id.in_(p_ids)).all()
         proxy_map = {p.id: p.host for p in proxies}
     
-    # Create CSV
-    output = StringIO()
-    writer = csv.writer(output)
+    # Create Excel
+    wb = Workbook()
     
-    # Header
-    writer.writerow([
+    def apply_header_style(ws):
+        header_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+        header_font = Font(bold=True)
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center")
+
+    # 1. Main Metrics Sheet
+    ws_main = wb.active
+    ws_main.title = "MainMetrics"
+    ws_main.append([
         '수집 시간', '프록시 ID', '프록시 호스트', 'CPU (%)', 'MEM (%)', 'Disk (%)',
-        'CC', 'CS', 'HTTP (Mbps)', 'HTTPS (Mbps)', 'FTP (Mbps)', '인터페이스 MBPS'
+        'CC', 'CS', 'HTTP (Mbps)', 'HTTPS (Mbps)', 'HTTP2 (Mbps)'
     ])
+    
+    # 2. Interface Details Sheet
+    ws_if = wb.create_sheet("InterfaceDetails")
+    ws_if.append(['수집 시간', '프록시 ID', '프록시 호스트', '인터페이스 명', 'IN (Mbps)', 'OUT (Mbps)'])
     
     # Data rows
     for row in rows:
         proxy_host = proxy_map.get(row.proxy_id, f"#{row.proxy_id}")
-        writer.writerow([
-            row.collected_at.isoformat() if row.collected_at else '',
-            row.proxy_id,
-            proxy_host,
-            row.cpu if row.cpu is not None else '',
-            row.mem if row.mem is not None else '',
-            row.disk if row.disk is not None else '',
-            row.cc if row.cc is not None else '',
-            row.cs if row.cs is not None else '',
-            row.http if row.http is not None else '',
-            row.https if row.https is not None else '',
-            row.ftp if row.ftp is not None else '',
-            row.interface_mbps if row.interface_mbps else ''
+        ts_str = row.collected_at.strftime('%Y-%m-%d %H:%M:%S') if row.collected_at else ''
+        
+        # Add main metrics
+        ws_main.append([
+            ts_str, row.proxy_id, proxy_host,
+            row.cpu, row.mem, row.disk, row.cc, row.cs,
+            row.http, row.https, row.http2
         ])
+        
+        # Add interface details (one row per interface)
+        if row.interface_mbps:
+            try:
+                if_data = json.loads(row.interface_mbps) if isinstance(row.interface_mbps, str) else row.interface_mbps
+                if isinstance(if_data, dict):
+                    for if_idx, info in if_data.items():
+                        if_name = info.get("name", f"IF{if_idx}")
+                        ws_if.append([
+                            ts_str, row.proxy_id, proxy_host,
+                            if_name, info.get("in_mbps", 0), info.get("out_mbps", 0)
+                        ])
+            except: pass
+            
+    apply_header_style(ws_main)
+    apply_header_style(ws_if)
     
-    from fastapi.responses import Response
-    from datetime import datetime as dt
+    # Save to stream
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
     
-    filename = f"resource_usage_{dt.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    filename = f"resource_usage_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     
-    return Response(
-        content="\ufeff" + output.getvalue(),
-        media_type="text/csv",
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 

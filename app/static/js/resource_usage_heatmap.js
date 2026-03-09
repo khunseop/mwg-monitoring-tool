@@ -662,6 +662,108 @@
             if (state && typeof state.saveHeatmapState === 'function') {
                 state.saveHeatmapState();
             }
+        },
+
+        /**
+         * 현재 표시된 모든 수집값을 클립보드에 복사 (탭 구분 형식)
+         */
+        copyCurrentValues() {
+            const ru = window.ru;
+            if (!ru.lastData || ru.lastData.length === 0) {
+                alert('복사할 데이터가 없습니다. 먼저 수집을 시작하세요.');
+                return;
+            }
+
+            const utils = window.ResourceUsageUtils;
+            
+            // 헤더 구성
+            const headers = ['Proxy', 'CPU (%)', 'MEM (%)', 'DISK (%)', 'CC', 'CS', 'HTTP (Mbps)', 'HTTPS (Mbps)', 'HTTP2 (Mbps)'];
+            
+            // 인터페이스 목록 추출 (헤더용)
+            const interfaceOids = (ru.cachedConfig && ru.cachedConfig.interface_oids) ? ru.cachedConfig.interface_oids : {};
+            const configuredInterfaceNames = Object.keys(interfaceOids);
+            configuredInterfaceNames.forEach(name => {
+                headers.push(`${name} IN`);
+                headers.push(`${name} OUT`);
+            });
+
+            const rows = [headers.join('\t')];
+
+            // 데이터 행 구성
+            const items = ru.lastData;
+            const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
+
+            items.forEach(row => {
+                const proxyId = row.proxy_id;
+                const proxy = (ru.proxies || []).find(p => p.id === proxyId);
+                const host = proxy ? proxy.host : `#${proxyId}`;
+                
+                // 델타 계산 (Mbps)
+                const last = ru.lastCumulativeByProxy[proxyId] || {};
+                const getDelta = (k) => {
+                    const buffer = ru.tsBuffer[proxyId] || {};
+                    const series = buffer[k] || [];
+                    if (series.length > 0) return series[series.length - 1].y;
+                    
+                    const v = row[k];
+                    if (typeof v === 'number' && typeof last[k] === 'number') {
+                        return utils.calculateTrafficMbps(v, last[k], intervalSec) || 0;
+                    }
+                    return 0;
+                };
+
+                const line = [
+                    host,
+                    (row.cpu || 0).toFixed(1),
+                    (row.mem || 0).toFixed(1),
+                    (row.disk || 0).toFixed(1),
+                    row.cc || 0,
+                    row.cs || 0,
+                    getDelta('http').toFixed(2),
+                    getDelta('https').toFixed(2),
+                    getDelta('http2').toFixed(2)
+                ];
+
+                // 인터페이스 데이터
+                const if_mbps = row.interface_mbps ? (typeof row.interface_mbps === 'string' ? JSON.parse(row.interface_mbps) : row.interface_mbps) : {};
+                configuredInterfaceNames.forEach(name => {
+                    let in_val = 0, out_val = 0;
+                    Object.keys(if_mbps).forEach(k => {
+                        const info = if_mbps[k];
+                        if (info && (info.name === name || k === name)) {
+                            in_val = info.in_mbps || 0;
+                            out_val = info.out_mbps || 0;
+                        }
+                    });
+                    line.push(in_val.toFixed(2));
+                    line.push(out_val.toFixed(2));
+                });
+
+                rows.push(line.join('\t'));
+            });
+
+            const text = rows.join('\n');
+            
+            // 클립보드 복사
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = text;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            try {
+                document.execCommand('copy');
+                const $btn = $('#ruCopyBtn');
+                const originalText = $btn.find('span').text();
+                $btn.find('span').text('복사 완료!');
+                $btn.addClass('is-success is-light');
+                setTimeout(() => {
+                    $btn.find('span').text(originalText);
+                    $btn.removeClass('is-success is-light');
+                }, 2000);
+            } catch (err) {
+                console.error('Copy failed', err);
+                alert('클립보드 복사에 실패했습니다.');
+            }
+            document.body.removeChild(tempTextArea);
         }
     };
 
