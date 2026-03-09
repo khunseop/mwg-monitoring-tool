@@ -29,6 +29,8 @@ class SessionRecordBase(BaseModel):
 class SessionRecord(SessionRecordBase, TimestampModel):
     id: int
     proxy_id: int
+    host: Optional[str] = None
+    proxy_name: Optional[str] = None
     collected_at: Optional[datetime] = None
 
     class Config:

@@ -278,6 +278,7 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
                         "raw_line": rec.get("raw_line"),
                         # enrich for UI convenience
                         "host": proxy.host,
+                        "proxy_name": proxy.host,
                     }
                     enriched.append(row)
                 per_proxy_records[proxy_id] = enriched
@@ -358,6 +359,8 @@ async def list_sessions(
         for idx, rec in enumerate(latest):
             item = dict(rec)
             item.setdefault("proxy_id", p.id)
+            item.setdefault("host", p.host)
+            item.setdefault("proxy_name", p.host)
             # build stable numeric id: proxy + collected_at + line index
             rid = temp_store.build_record_id(p.id, str(item.get("collected_at") or ""), idx)
             item["id"] = rid
@@ -377,11 +380,16 @@ async def list_sessions(
 
 @router.get("/session-browser/latest/{proxy_id}", response_model=List[SessionRecordSchema])
 async def latest_sessions(proxy_id: int, db: Session = Depends(get_db)):
+    proxy = db.query(Proxy).filter(Proxy.id == proxy_id).first()
+    host = proxy.host if proxy else f"#{proxy_id}"
+    
     latest = temp_store.read_latest(proxy_id)
     out: List[SessionRecordSchema] = []
     for idx, rec in enumerate(latest):
         r = dict(rec)
         r.setdefault("proxy_id", proxy_id)
+        r.setdefault("host", host)
+        r.setdefault("proxy_name", host)
         rid = temp_store.build_record_id(proxy_id, str(r.get("collected_at") or ""), idx)
         r["id"] = rid
         out.append(SessionRecordSchema(**_ensure_timestamps(r)))
@@ -643,6 +651,7 @@ async def sessions_datatables(
         
         row_data.append({
             "host": host,
+            "proxy_name": host,
             "creation_time": ct_str,
             "protocol": rec.get("protocol") or "",
             "user_name": rec.get("user_name") or "",

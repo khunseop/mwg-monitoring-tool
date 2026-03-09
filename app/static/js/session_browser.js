@@ -29,15 +29,23 @@
         // Use a more comprehensive set of fields for detail view
         const detailFields = [
             { key: 'host', label: '프록시' },
+            { key: 'transaction', label: '트랜잭션 ID' },
             { key: 'creation_time', label: '생성 시각', format: 'datetime' },
             { key: 'protocol', label: '프로토콜' },
             { key: 'status', label: '상태 코드', format: 'status' },
             { key: 'user_name', label: '사용자' },
+            { key: 'cust_id', label: '고객 ID' },
             { key: 'client_ip', label: '클라이언트 IP' },
+            { key: 'client_side_mwg_ip', label: 'Client-side MWG IP' },
+            { key: 'server_side_mwg_ip', label: 'Server-side MWG IP' },
             { key: 'server_ip', label: '서버 IP' },
-            { key: 'cl_bytes_received', label: '수신 데이터', format: 'bytes' },
-            { key: 'cl_bytes_sent', label: '송신 데이터', format: 'bytes' },
+            { key: 'cl_bytes_received', label: '클라이언트 수신', format: 'bytes' },
+            { key: 'cl_bytes_sent', label: '클라이언트 송신', format: 'bytes' },
+            { key: 'srv_bytes_received', label: '서버 수신', format: 'bytes' },
+            { key: 'srv_bytes_sent', label: '서버 송신', format: 'bytes' },
+            { key: 'trxn_index', label: 'Trxn Index' },
             { key: 'age_seconds', label: '세션 유지(초)', format: 'seconds' },
+            { key: 'in_use', label: '사용 중 여부' },
             { key: 'url', label: 'URL' }
         ];
 
@@ -66,6 +74,17 @@
                 </tr>
             `);
         });
+
+        // Add raw line at the bottom
+        if (record.raw_line) {
+            $body.append(`
+                <tr>
+                    <th style="width: 180px; background: #f8fafc; font-size: 0.8rem; color: #64748b;">원본 로그</th>
+                    <td style="word-break: break-all; white-space: normal; font-family: monospace; font-size: 0.75rem; background: #f1f5f9;">${record.raw_line}</td>
+                </tr>
+            `);
+        }
+
         $('#sbDetailModal').addClass('is-active');
     }
 
