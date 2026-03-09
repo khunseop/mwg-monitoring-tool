@@ -160,19 +160,21 @@
 
     async function restoreState() {
         try {
-            // 1. localStorage에서 선택 상태 복원 (DeviceSelector가 처리하지만 필요시 여기서도 확인)
+            // 1. localStorage에서 선택 상태 확인
             const saved = localStorage.getItem(sb.storageKey);
             if (!saved) return;
             
             const meta = JSON.parse(saved);
-            const oneHour = 60 * 60 * 1000;
-            if (new Date().getTime() - meta.timestamp > oneHour) {
-                localStorage.removeItem(sb.storageKey);
+            
+            // 2. 시간 제한 확인 (24시간으로 연장)
+            const ttl = 24 * 60 * 60 * 1000;
+            if (new Date().getTime() - meta.timestamp > ttl) {
+                // 시간 초과 시 데이터만 삭제 (선택 정보는 유지될 수도 있음)
                 if (window.AppDB) await window.AppDB.delete(sb.storageKey + '_records');
                 return;
             }
 
-            // 2. IndexedDB에서 대용량 세션 데이터 복원
+            // 3. IndexedDB에서 대용량 세션 데이터 복원
             if (window.AppDB) {
                 const data = await window.AppDB.get(sb.storageKey + '_records');
                 if (data && data.records && data.records.length > 0) {
@@ -220,8 +222,14 @@
         }
     }
 
-    $(document).ready(() => {
-        initGrid();
+    function initSessionBrowser() {
+        // 그리드 초기화 (이미 있으면 무시)
+        if (!sb.gridApi) {
+            initGrid();
+        } else {
+            // PJAX로 돌아온 경우 데이터 복원 재시도
+            restoreState();
+        }
 
         // DeviceSelector 초기화
         if (window.DeviceSelector) {
@@ -237,6 +245,11 @@
                 }
             });
         }
+    }
+
+    // 초기화 및 PJAX 지원
+    $(document).ready(() => {
+        initSessionBrowser();
 
         $('#sbLoadBtn').on('click', loadSessions);
         
@@ -270,6 +283,13 @@
         $('#sbDetailModal .delete, #sbDetailModal .button, #sbDetailModal .modal-background').on('click', () => {
             $('#sbDetailModal').removeClass('is-active');
         });
+    });
+
+    // PJAX 페이지 전환 대응
+    $(document).on('pjax:complete', function(e, url) {
+        if (url.includes('/session-browser')) {
+            initSessionBrowser();
+        }
     });
 
 })();
