@@ -200,10 +200,8 @@
                     self.fetchLatestForProxies(currentProxyIds).then(latestRows => {
                         const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
                         if (valid.length > 0) {
-                            // Only update cumulative cache if we have previous data
-                            const hasPreviousData = Object.keys(ru.lastCumulativeByProxy).length > 0;
-                            if (!hasPreviousData) {
-                                // First collection or after page return - initialize cache without calculating deltas
+                            // 누적값 캐시가 비어있다면 초기화 (첫 수집 또는 페이지 복귀 직후)
+                            if (Object.keys(ru.lastCumulativeByProxy).length === 0) {
                                 valid.forEach(row => {
                                     ru.lastCumulativeByProxy[row.proxy_id] = {
                                         http: typeof row.http === 'number' ? row.http : null,
@@ -212,7 +210,7 @@
                                     };
                                 });
                             }
-                            // Update heatmap with fresh data
+                            // 히트맵 업데이트 (내부적으로 델타 계산 및 캐시 갱신 수행)
                             requestAnimationFrame(() => {
                                 heatmap.updateTable(valid);
                             });

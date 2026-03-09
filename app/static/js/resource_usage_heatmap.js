@@ -16,7 +16,6 @@
          * @param {Array} items - 데이터 아이템 배열
          */
         updateTable(items) {
-            // Debounce: 빠른 연속 업데이트 방지
             pendingUpdate = items;
             if (updateTimeout) clearTimeout(updateTimeout);
             updateTimeout = setTimeout(() => {
@@ -24,18 +23,12 @@
                     this._updateTableInternal(pendingUpdate);
                     pendingUpdate = null;
                 }
-            }, 100); // 100ms debounce
+            }, 100);
         },
 
-        /**
-         * 실제 히트맵 업데이트 로직
-         * @param {Array} items - 데이터 아이템 배열
-         */
         _updateTableInternal(items) {
             if (isUpdating) return;
             isUpdating = true;
-            
-            // requestAnimationFrame으로 렌더링 최적화
             requestAnimationFrame(() => {
                 try {
                     this._doUpdate(items);
@@ -47,60 +40,39 @@
 
         /**
          * 히트맵 업데이트 실행
-         * @param {Array} items - 데이터 아이템 배열
          */
         _doUpdate(items) {
             const ru = window.ru;
             const utils = window.ResourceUsageUtils;
             const state = window.ResourceUsageState;
             
-            // Store latest data for interface name lookup
             ru.lastData = items || [];
-            
             const rows = [];
-            
-            // First pass: collect all interface indices and process rows
             const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
+
             (items || []).forEach(row => {
                 const proxyId = row.proxy_id;
                 const last = ru.lastCumulativeByProxy[proxyId] || {};
-                const deltas = { http: null, https: null, http2: null };
+                const deltas = { http: 0, https: 0, http2: 0 };
                 
-                // 차트 버퍼에서 최신 Mbps 값을 가져와서 사용 (가장 정확하고 안정적임)
+                // Mbps 계산 (누적값 차이 이용)
                 ['http','https','http2'].forEach(k => {
-                    const buffer = ru.tsBuffer[proxyId] || {};
-                    const series = buffer[k] || [];
-                    if (series.length > 0) {
-                        const latestPoint = series[series.length - 1];
-                        if (latestPoint && typeof latestPoint.y === 'number' && latestPoint.y >= 0) {
-                            deltas[k] = latestPoint.y; 
-                        }
-                    }
+                    const currentVal = row[k];
+                    const previousVal = last[k];
                     
-                    // 버퍼에 값이 없거나 비정상적이면 현재 누적치와 이전 누적치를 비교해 계산
-                    if (deltas[k] === null || isNaN(deltas[k])) {
-                        const v = row[k];
-                        const prev = last[k];
-                        if (typeof v === 'number' && typeof prev === 'number' && v >= prev) {
-                            const mbps = utils.calculateTrafficMbps(v, prev, intervalSec);
-                            deltas[k] = (mbps !== null && mbps >= 0) ? mbps : 0;
-                        } else {
-                            deltas[k] = 0;
-                        }
+                    if (typeof currentVal === 'number' && typeof previousVal === 'number' && previousVal > 0) {
+                        const mbps = utils.calculateTrafficMbps(currentVal, previousVal, intervalSec);
+                        deltas[k] = (mbps !== null && !isNaN(mbps) && mbps >= 0) ? mbps : 0;
                     }
                 });
                 
-                // 누적값 캐시 업데이트 (다음 주기 계산용)
-                // 만약 현재 수집값이 이전보다 작으면 (Counter Wrap 또는 재시작), 
-                // 계산 로직(calculateTrafficMbps -> calculateDeltaWithWrap)에서 처리되지만
-                // 일단 수집된 최신 값을 다음 주기를 위해 무조건 저장함
+                // 누적값 캐시 업데이트
                 ru.lastCumulativeByProxy[proxyId] = {
-                    http: typeof row.http === 'number' ? row.http : last.http,
-                    https: typeof row.https === 'number' ? row.https : last.https,
-                    http2: typeof row.http2 === 'number' ? row.http2 : last.http2,
+                    http: typeof row.http === 'number' && row.http > 0 ? row.http : (last.http || 0),
+                    https: typeof row.https === 'number' && row.https > 0 ? row.https : (last.https || 0),
+                    http2: typeof row.http2 === 'number' && row.http2 > 0 ? row.http2 : (last.http2 || 0),
                 };
                 
-                // Store proxy info for later use
                 const proxy = (ru.proxies || []).find(p => p.id === proxyId);
                 const fullHost = proxy ? proxy.host : `#${proxyId}`;
                 
@@ -119,26 +91,20 @@
                 });
             });
 
-            rows.sort((a, b) => {
-                const na = a._fullHost || String(a.proxy_id);
-                const nb = b._fullHost || String(b.proxy_id);
-                return na.localeCompare(nb);
-            });
+            rows.sort((a, b) => (a._fullHost || '').localeCompare(b._fullHost || ''));
 
-            // Get configured interfaces from config
             const interfaceOids = (ru.cachedConfig && ru.cachedConfig.interface_oids) ? ru.cachedConfig.interface_oids : {};
             const configuredInterfaceNames = Object.keys(interfaceOids);
             
-            // Build metrics
             const basicMetrics = [
                 { key: 'cpu', title: 'CPU' },
                 { key: 'mem', title: 'MEM' },
                 { key: 'disk', title: 'DISK' },
                 { key: 'cc', title: 'CC' },
                 { key: 'cs', title: 'CS' },
-                { key: 'httpd', title: 'HTTP Δ' },
-                { key: 'httpsd', title: 'HTTPS Δ' },
-                { key: 'http2d', title: 'HTTP2 Δ' },
+                { key: 'httpd', title: 'HTTP' },
+                { key: 'httpsd', title: 'HTTPS' },
+                { key: 'http2d', title: 'HTTP2' },
             ];
             
             const interfaceMetrics = [];
@@ -150,31 +116,25 @@
             
             const metrics = [...basicMetrics, ...interfaceMetrics];
 
-            // Max values for scaling
+            // Scaling을 위한 최대값 계산 (색상 결정용)
             const maxByMetric = {};
             metrics.forEach(m => {
                 const existingMax = ru.heatmapMaxByMetric[m.key];
                 let vals;
                 if (m.isInterface) {
-                    const ifName = m.ifName;
-                    const dir = m.direction;
                     vals = rows.map(r => {
-                        if (!r.interface_mbps || typeof r.interface_mbps !== 'object') return null;
-                        let ifData = r.interface_mbps[ifName];
-                        if (!ifData) {
-                            const key = Object.keys(r.interface_mbps).find(k => r.interface_mbps[k] && r.interface_mbps[k].name === ifName);
-                            if (key) ifData = r.interface_mbps[key];
-                        }
-                        if (!ifData) return null;
-                        return (dir === 'in') ? ifData.in_mbps : ifData.out_mbps;
-                    }).filter(v => typeof v === 'number' && isFinite(v)).sort((a,b) => a-b);
+                        if (!r.interface_mbps) return null;
+                        const info = r.interface_mbps[m.ifName] || Object.values(r.interface_mbps).find(v => v.name === m.ifName);
+                        return info ? (m.direction === 'in' ? info.in_mbps : info.out_mbps) : null;
+                    });
                 } else {
-                    vals = rows.map(r => r[m.key]).filter(v => typeof v === 'number' && isFinite(v)).sort((a,b) => a-b);
+                    vals = rows.map(r => r[m.key]);
                 }
+                const cleanVals = vals.filter(v => typeof v === 'number' && isFinite(v)).sort((a,b) => a-b);
                 let max = 0;
-                if (vals.length > 0) {
-                    const idx = Math.max(0, Math.floor(vals.length * 0.95) - 1);
-                    max = vals[idx];
+                if (cleanVals.length > 0) {
+                    const idx = Math.max(0, Math.floor(cleanVals.length * 0.95) - 1);
+                    max = cleanVals[idx];
                 }
                 if ((m.key === 'cpu' || m.key === 'mem' || m.key === 'disk') && max < 100) max = 100;
                 maxByMetric[m.key] = Math.max(existingMax || 0, max || 1);
@@ -182,112 +142,71 @@
             ru.heatmapMaxByMetric = maxByMetric;
 
             const xCategories = metrics.map(m => m.title);
-            const yCategories = rows.map(r => r._fullHost || `#${r.proxy_id}`);
-
-            const data = [];
-            rows.forEach((r, y) => {
-                metrics.forEach((m, x) => {
+            const seriesData = rows.map((r, rowIdx) => {
+                const dataPoints = metrics.map((m, colIdx) => {
                     let raw = null;
                     if (m.isInterface) {
-                        const ifName = m.ifName;
-                        const dir = m.direction;
-                        let ifData = r.interface_mbps ? r.interface_mbps[ifName] : null;
-                        if (!ifData && r.interface_mbps) {
-                            const key = Object.keys(r.interface_mbps).find(k => r.interface_mbps[k] && r.interface_mbps[k].name === ifName);
-                            if (key) ifData = r.interface_mbps[key];
-                        }
-                        if (ifData) raw = (dir === 'in') ? ifData.in_mbps : ifData.out_mbps;
+                        const info = r.interface_mbps ? (r.interface_mbps[m.ifName] || Object.values(r.interface_mbps).find(v => v.name === m.ifName)) : null;
+                        if (info) raw = (m.direction === 'in' ? info.in_mbps : info.out_mbps);
                     } else {
                         raw = r[m.key];
                     }
-                    if (typeof raw === 'number' && isFinite(raw)) {
-                        const ratio = raw <= 0 ? 0 : raw / (maxByMetric[m.key] || 1);
-                        data.push({ value: [x, y, ratio], raw: raw });
-                    } else {
-                        data.push({ value: [x, y, null], raw: null });
-                    }
+                    
+                    const thr = (ru.cachedConfig && ru.cachedConfig.thresholds) ? ru.cachedConfig.thresholds : {};
+                    const interfaceThr = (ru.cachedConfig && ru.cachedConfig.interface_thresholds) ? ru.cachedConfig.interface_thresholds : {};
+                    let t = m.isInterface ? (interfaceThr[m.ifName] || maxByMetric[m.key] || 1) : (thr[m.key.replace(/d$/, '')] || maxByMetric[m.key] || 1);
+                    
+                    const scaled = (typeof raw === 'number' && isFinite(raw)) ? Math.max(0, Math.min(150, Math.round((raw / t) * 100))) : null;
+                    return { x: m.title, y: scaled, rawValue: raw };
                 });
+                return { name: r._fullHost, data: dataPoints };
             });
+
+            seriesData.reverse();
 
             const el = document.getElementById('ruHeatmapEl');
             if (!el || !window.ApexCharts) return;
             
-            if (!items || items.length === 0) { 
+            if (rows.length === 0) {
                 $('#ruHeatmapWrap').hide(); $('#ruEmptyState').show(); return;
-            } else { 
+            } else {
                 $('#ruEmptyState').hide(); $('#ruHeatmapWrap').show();
             }
 
-            const isVisible = el.closest('#ruHeatmapWrap').offsetParent !== null;
+            // 외부 프레임 높이 조절
+            const containerHeight = parseInt($('#ruHeatmapHeightSlider').val(), 10) || 600;
+            $('#ruHeatmapWrap').css('height', containerHeight + 'px');
 
-            // Threshold scaling
-            const thr = (ru.cachedConfig && ru.cachedConfig.thresholds) ? ru.cachedConfig.thresholds : {};
-            const interfaceThr = (ru.cachedConfig && ru.cachedConfig.interface_thresholds) ? ru.cachedConfig.interface_thresholds : {};
-            const interfaceBandwidths = (ru.cachedConfig && ru.cachedConfig.interface_bandwidths) ? ru.cachedConfig.interface_bandwidths : {};
-            
-            const scaleForCol = metrics.map(m => {
-                let t;
-                if (m.isInterface) {
-                    t = interfaceThr[m.ifName] || (maxByMetric[m.key] || 1);
-                } else {
-                    const baseKey = m.key.replace(/d$/, ''); // httpd -> http
-                    t = thr[baseKey] || (maxByMetric[m.key] || 1);
-                }
-                return (v) => (typeof v !== 'number' || !isFinite(v)) ? null : Math.max(0, Math.min(150, Math.round((v / t) * 100)));
-            });
+            // 내부 차트 조밀하게 (셀 높이 축소)
+            const rowHeight = 24; 
+            const chartHeight = Math.max(400, rows.length * rowHeight + 100);
 
-            ru._heatRaw = yCategories.map(() => new Array(xCategories.length).fill(null));
-            ru._heatRows = rows.map(r => r._fullHost || `#${r.proxy_id}`);
+            // 셀 너비 축소
+            const minColWidth = 50; 
+            const finalWidth = Math.max($('#ruHeatmapWrap').width() || 1000, xCategories.length * minColWidth + 160);
+            $(el).css('width', finalWidth + 'px');
 
-            const seriesData = yCategories.map((rowLabel, rowIdx) => {
-                const dataPoints = xCategories.map((colLabel, colIdx) => {
-                    const point = data.find(d => d.value[0] === colIdx && d.value[1] === rowIdx);
-                    const raw = point ? point.raw : null;
-                    ru._heatRaw[rowIdx][colIdx] = raw;
-                    const scaled = (typeof raw === 'number') ? scaleForCol[colIdx](raw) : null;
-                    return { x: colLabel, y: scaled };
-                });
-                return { name: rowLabel, data: dataPoints };
-            });
-
-            ru._heatRaw.reverse();
-            ru._heatRows.reverse();
-            seriesData.reverse();
-
-            // Dimensions: Smaller columns, Adjustable height
-            const minColWidth = 60; // 줄임
-            const finalWidth = Math.max($('#ruHeatmapWrap').width() || 1000, xCategories.length * minColWidth + 150);
-            
-            // Slider 기반 높이 조절
-            const sliderVal = parseInt($('#ruHeatmapHeightSlider').val(), 10) || 600;
-            const calculatedHeight = sliderVal;
-            
             const options = {
                 chart: { 
-                    type: 'heatmap', height: calculatedHeight, width: '100%',
+                    type: 'heatmap', height: chartHeight, width: '100%',
                     animations: { enabled: false }, toolbar: { show: false },
                     events: { mounted: (ctx) => setTimeout(() => { if(ctx && ctx.resize) ctx.resize(); }, 100) }
                 },
                 dataLabels: { 
                     enabled: true, 
-                    style: { colors: ['#111827'], fontSize: '12px', fontWeight: 600 }, // 크게
+                    style: { colors: ['#111827'], fontSize: '11px', fontWeight: 700 }, // 글자 강조
                     formatter: function(val, opts) {
-                        const y = opts.seriesIndex; const x = opts.dataPointIndex;
-                        const raw = (ru._heatRaw && ru._heatRaw[y]) ? ru._heatRaw[y][x] : null;
+                        const raw = opts.w.config.series[opts.seriesIndex].data[opts.dataPointIndex].rawValue;
                         if (raw == null) return '';
-                        const metric = metrics[x];
-                        if (metric.isInterface) {
-                            const bw = interfaceBandwidths[metric.ifName];
-                            return bw ? Math.round((raw/bw)*100)+'%' : raw.toFixed(1);
-                        }
-                        if (['httpd','httpsd','http2d'].includes(metric.key)) return raw.toFixed(1);
-                        if (['cpu','mem','disk'].includes(metric.key)) return Math.round(raw)+'%';
-                        return Math.round(raw);
+                        const metric = metrics[opts.dataPointIndex];
+                        if (['cpu','mem','disk'].includes(metric.key)) return Math.round(raw);
+                        if (metric.key === 'cc') return utils.abbreviateNumber(raw);
+                        return raw.toFixed(raw >= 10 ? 0 : 1);
                     }
                 },
                 plotOptions: {
                     heatmap: {
-                        shadeIntensity: 0.5, radius: 2, enableShades: true,
+                        shadeIntensity: 0.5, radius: 1, enableShades: true,
                         colorScale: {
                             ranges: [
                                 { from: -1, to: -0.1, color: '#f3f4f6', name: 'N/A' },
@@ -304,25 +223,28 @@
                     labels: { rotate: -45, rotateAlways: true, style: { fontSize: '10px' } }
                 },
                 yaxis: { labels: { style: { fontSize: '11px', fontWeight: 600 }, maxWidth: 300 } },
+                tooltip: {
+                    y: {
+                        formatter: (val, opts) => {
+                            const raw = opts.w.config.series[opts.seriesIndex].data[opts.dataPointIndex].rawValue;
+                            if (raw == null) return 'N/A';
+                            return raw.toFixed(2) + (val !== null ? ` (${val}%)` : '');
+                        }
+                    }
+                },
                 series: seriesData
             };
 
-            $(el).css('width', finalWidth + 'px');
-
             if (ru.apex) {
                 try {
-                    ru.apex.updateSeries(seriesData, false);
-                    ru.apex.updateOptions({ chart: { height: calculatedHeight } }, false);
+                    ru.apex.updateOptions({ chart: { height: chartHeight }, series: seriesData }, false);
                 } catch (e) {
                     if (ru.apex.destroy) ru.apex.destroy();
-                    ru.apex = new ApexCharts(el, options);
-                    ru.apex.render();
+                    ru.apex = new ApexCharts(el, options); ru.apex.render();
                 }
             } else {
-                ru.apex = new ApexCharts(el, options);
-                ru.apex.render();
+                ru.apex = new ApexCharts(el, options); ru.apex.render();
             }
-            
             if (state && state.saveHeatmapState) state.saveHeatmapState();
         },
 
@@ -337,48 +259,31 @@
             }
 
             const utils = window.ResourceUsageUtils;
-            
-            // 헤더 구성
-            const headers = ['Proxy', 'CPU (%)', 'MEM (%)', 'DISK (%)', 'CC', 'CS', 'HTTP (Mbps)', 'HTTPS (Mbps)', 'HTTP2 (Mbps)'];
-            
-            // 인터페이스 목록 추출 (헤더용)
             const interfaceOids = (ru.cachedConfig && ru.cachedConfig.interface_oids) ? ru.cachedConfig.interface_oids : {};
             const configuredInterfaceNames = Object.keys(interfaceOids);
+            
+            const headers = ['Proxy', 'CPU (%)', 'MEM (%)', 'DISK (%)', 'CC', 'CS', 'HTTP (Mbps)', 'HTTPS (Mbps)', 'HTTP2 (Mbps)'];
             configuredInterfaceNames.forEach(name => {
                 headers.push(`${name} IN`);
                 headers.push(`${name} OUT`);
             });
 
             const rows = [headers.join('\t')];
-
-            // 데이터 행 구성
-            const items = ru.lastData;
             const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
 
+            // 히트맵용으로 계산된 최신 deltas를 포함한 행 데이터를 생성
+            const items = ru.lastData;
             items.forEach(row => {
                 const proxyId = row.proxy_id;
                 const proxy = (ru.proxies || []).find(p => p.id === proxyId);
                 const host = proxy ? proxy.host : `#${proxyId}`;
-                
-                // 델타 계산 (Mbps)
                 const last = ru.lastCumulativeByProxy[proxyId] || {};
-                const getDelta = (k) => {
-                    // 1. 차트 버퍼에서 가장 최신 Mbps 값 가져오기 (가장 정확함)
-                    const buffer = ru.tsBuffer[proxyId] || {};
-                    const series = buffer[k] || [];
-                    if (series.length > 0) {
-                        const latest = series[series.length - 1];
-                        if (latest && typeof latest.y === 'number' && !isNaN(latest.y)) {
-                            return latest.y;
-                        }
-                    }
-                    
-                    // 2. 버퍼에 없으면 현재값과 캐시된 이전값을 비교해 직접 계산
-                    const v = row[k];
-                    const prev = last[k];
-                    if (typeof v === 'number' && typeof prev === 'number') {
-                        const mbps = utils.calculateTrafficMbps(v, prev, intervalSec);
-                        return (mbps !== null && !isNaN(mbps) && mbps >= 0) ? mbps : 0;
+                
+                const getMbps = (k) => {
+                    const currentVal = row[k];
+                    const previousVal = last[k];
+                    if (typeof currentVal === 'number' && typeof previousVal === 'number' && previousVal > 0) {
+                        return utils.calculateTrafficMbps(currentVal, previousVal, intervalSec) || 0;
                     }
                     return 0;
                 };
@@ -390,35 +295,23 @@
                     (row.disk || 0).toFixed(1),
                     row.cc || 0,
                     row.cs || 0,
-                    getDelta('http').toFixed(2),
-                    getDelta('https').toFixed(2),
-                    getDelta('http2').toFixed(2)
+                    getMbps('http').toFixed(2),
+                    getMbps('https').toFixed(2),
+                    getMbps('http2').toFixed(2)
                 ];
 
-                // 인터페이스 데이터
                 const if_mbps = row.interface_mbps ? (typeof row.interface_mbps === 'string' ? JSON.parse(row.interface_mbps) : row.interface_mbps) : {};
                 configuredInterfaceNames.forEach(name => {
-                    let in_val = 0, out_val = 0;
-                    // if_mbps는 { "index": { name: "eth0", in_mbps: 1.2, ... } } 구조임
-                    Object.keys(if_mbps).forEach(k => {
-                        const info = if_mbps[k];
-                        if (info && (info.name === name || k === name)) {
-                            in_val = info.in_mbps || 0;
-                            out_val = info.out_mbps || 0;
-                        }
-                    });
-                    line.push(in_val.toFixed(2));
-                    line.push(out_val.toFixed(2));
+                    let info = if_mbps[name] || Object.values(if_mbps).find(v => v.name === name);
+                    line.push((info ? info.in_mbps : 0).toFixed(2));
+                    line.push((info ? info.out_mbps : 0).toFixed(2));
                 });
 
                 rows.push(line.join('\t'));
             });
 
-            const text = rows.join('\n');
-            
-            // 클립보드 복사
             const tempTextArea = document.createElement('textarea');
-            tempTextArea.value = text;
+            tempTextArea.value = rows.join('\n');
             document.body.appendChild(tempTextArea);
             tempTextArea.select();
             try {
@@ -432,13 +325,11 @@
                     $btn.removeClass('is-success is-light');
                 }, 2000);
             } catch (err) {
-                console.error('Copy failed', err);
                 alert('클립보드 복사에 실패했습니다.');
             }
             document.body.removeChild(tempTextArea);
         }
     };
 
-    // 전역으로 노출
     window.ResourceUsageHeatmap = ResourceUsageHeatmap;
 })(window);
