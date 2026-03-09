@@ -36,6 +36,7 @@
     - `SESSION_TMP_DIR`: 세션 브라우저 임시 파일 저장 경로. (기본값: 시스템 임시 디렉터리 하위 `session_browser/`)
     - `CORS_ALLOW_ORIGINS`: CORS 허용 출처 목록 (쉼표로 구분). (기본값: `*`)
     - `CORS_ALLOW_CREDENTIALS`: CORS 자격증명 허용 여부. (기본값: `false`)
+    - `SESSION_CACHE_TTL`: 세션 브라우저 데이터 메모리 캐시 유지 시간(초). (기본값: `300`)
     - `ENABLE_DOCS`: API 문서(Swagger/ReDoc) 활성화 여부. (기본값: `true`)
     - `PROXY_PASSWORD_KEY`: 프록시 비밀번호 암호화용 Fernet 키. 미설정 시 `./.secret/proxy_key.key`가 자동으로 생성되어 사용됩니다. 컨테이너 또는 다중 서버 환경에서는 이 키를 동일하게 유지해야 암호화된 비밀번호를 일관되게 복호화할 수 있습니다.
 
@@ -101,6 +102,14 @@ SNMP 표준 OID 외에 SSH를 통해 직접 서버의 메모리 사용률을 수
   - `RU_SSH_MAX_CONCURRENCY`: 동시 SSH 수집 작업 최대 개수 (기본값: 8)
   - `RU_SSH_TIMEOUT_SEC`: SSH 연결 및 명령어 실행 타임아웃(초). (기본값: 5)
 - **디버깅**: 로그 레벨을 `DEBUG`로 설정하면 SSH 수집 관련 상세 로그를 확인할 수 있습니다.
+
+### 프론트엔드 대용량 데이터 저장 (AppDB)
+
+세션 브라우저와 트래픽 로그 조회 결과 등 브라우저의 `localStorage` 용량 제한(약 5MB)을 초과할 수 있는 대용량 데이터를 저장하기 위해 `IndexedDB`를 사용합니다.
+
+- **모듈**: `/app/static/js/common.js` 내 `AppDB` 객체
+- **저장소 명**: `pmt_db` (Store: `kv_store`)
+- **특징**: 페이지를 새로고침하거나 다른 메뉴로 이동했다가 돌아와도 대규모 데이터(수만 건)를 유실 없이 복원할 수 있도록 설계되었습니다. 데이터 보존 시간은 기본 24시간(세션) 또는 1시간(로그)으로 설정되어 있습니다.
 
 ### 프론트엔드 테이블 공통 모듈
 
