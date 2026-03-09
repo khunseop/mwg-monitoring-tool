@@ -346,8 +346,7 @@ function saveAllConfig() {
         });
 }
 
-// 초기화
-$(document).ready(() => {
+function initSettingsPage() {
     // 두 설정을 모두 로드한 후 "불러옴" 표시
     Promise.all([loadResourceConfig(), loadSessionConfig()])
         .then(() => {
@@ -357,13 +356,13 @@ $(document).ready(() => {
             // 에러는 각 함수에서 이미 처리됨
         });
     
-    // Add interface button handler
-    $('#cfgAddInterface').on('click', function() {
+    // Add interface button handler (중복 방지)
+    $('#cfgAddInterface').off('click').on('click', function() {
         addInterfaceRow('', {}, '', '');
         checkForChanges();
     });
     
-    // 모든 입력 필드 변경 감지
+    // 모든 입력 필드 변경 감지 (중복 방지)
     const configInputs = [
         '#cfgCommunity', '#cfgOidCpu', '#cfgOidMem', '#cfgOidDisk', '#cfgOidCc', '#cfgOidCs', 
         '#cfgOidHttp', '#cfgOidHttps', '#cfgOidFtp',
@@ -373,20 +372,33 @@ $(document).ready(() => {
     ];
     
     configInputs.forEach(selector => {
-        $(document).on('input change', selector, function() {
+        $(document).off('input.settings change.settings', selector).on('input.settings change.settings', selector, function() {
             checkForChanges();
         });
     });
     
     // 인터페이스 행의 입력 필드 변경 감지
-    $(document).on('input change', '.interface-name, .interface-in-oid, .interface-out-oid, .interface-threshold, .interface-bandwidth', function() {
+    $(document).off('input.settings_if change.settings_if', '.interface-name, .interface-in-oid, .interface-out-oid, .interface-threshold, .interface-bandwidth')
+               .on('input.settings_if change.settings_if', '.interface-name, .interface-in-oid, .interface-out-oid, .interface-threshold, .interface-bandwidth', function() {
         checkForChanges();
     });
     
     // 인터페이스 행 삭제 감지
-    $(document).on('click', '.remove-interface', function() {
+    $(document).off('click.settings_if', '.remove-interface').on('click.settings_if', '.remove-interface', function() {
         setTimeout(() => checkForChanges(), 100);
     });
+}
+
+// 초기화
+$(document).ready(() => {
+    initSettingsPage();
+});
+
+// PJAX 지원
+$(document).off('pjax:complete.settings').on('pjax:complete.settings', function(e, url) {
+    if (url.includes('/settings')) {
+        initSettingsPage();
+    }
 });
 
 // 프리셋 적용

@@ -248,19 +248,15 @@
                 }
             });
         }
-    }
 
-    // 초기화 및 PJAX 지원
-    $(document).ready(() => {
-        initSessionBrowser();
-
-        $('#sbLoadBtn').on('click', loadSessions);
+        // 버튼 이벤트 바인딩 (중복 바인딩 방지)
+        $('#sbLoadBtn').off('click').on('click', loadSessions);
         
-        $('#sbQuickFilter').on('input', function() {
+        $('#sbQuickFilter').off('input').on('input', function() {
             if (sb.gridApi) sb.gridApi.setGridOption('quickFilterText', $(this).val());
         });
 
-        $('#sbClearFilters').on('click', () => {
+        $('#sbClearFilters').off('click').on('click', () => {
             $('#sbQuickFilter').val('');
             if (sb.gridApi) {
                 sb.gridApi.setGridOption('quickFilterText', '');
@@ -272,7 +268,7 @@
             }
         });
 
-        $('#sbExportBtn').on('click', () => {
+        $('#sbExportBtn').off('click').on('click', () => {
             if (sb.gridApi) {
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
                 sb.gridApi.exportDataAsCsv({ 
@@ -283,14 +279,21 @@
         });
 
         // Modal closing handlers
-        $('#sbDetailModal .delete, #sbDetailModal .button, #sbDetailModal .modal-background').on('click', () => {
+        $('#sbDetailModal .delete, #sbDetailModal .button, #sbDetailModal .modal-background').off('click').on('click', () => {
             $('#sbDetailModal').removeClass('is-active');
         });
+    }
+
+    // 초기화 및 PJAX 지원
+    $(document).ready(() => {
+        // PJAX 환경에서는 document.ready가 로드 시 한 번만 실행될 수도 있고, 
+        // base.js에서 스크립트를 수동으로 실행할 때 즉시 실행될 수도 있음.
+        initSessionBrowser();
     });
 
-    // PJAX 페이지 전환 대응
-    $(document).on('pjax:complete', function(e, url) {
-        if (url.includes('/session-browser')) {
+    // PJAX 페이지 전환 대응 (네임스페이스 사용하여 중복 등록 방지)
+    $(document).off('pjax:complete.sb').on('pjax:complete.sb', function(e, url) {
+        if (url.includes('/session')) {
             initSessionBrowser();
         }
     });

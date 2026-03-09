@@ -213,14 +213,14 @@
         $('#tlResultParsed').fadeIn();
     }
 
-    $(document).ready(() => {
+    function initTrafficLogs() {
         function loadGroups() {
             $.getJSON(`${API_BASE}/proxy-groups`).done(data => {
                 const $gs = $('#tlGroupSelect');
                 $gs.empty().append('<option value="">전체 그룹</option>');
                 data.forEach(g => $gs.append(`<option value="${g.id}">${g.name}</option>`));
                 
-                $gs.on('change', () => {
+                $gs.off('change').on('change', () => {
                     const gid = $gs.val();
                     const filtered = PROXIES.filter(p => !gid || String(p.group_id) === String(gid));
                     const $ps = $('#tlProxySelect');
@@ -242,19 +242,30 @@
         loadGroups();
         loadProxiesList();
 
-        $('#tlLoadBtn').on('click', loadLogs);
+        $('#tlLoadBtn').off('click').on('click', loadLogs);
         
-        $('#tlQuickFilter').on('input', function() {
+        $('#tlQuickFilter').off('input').on('input', function() {
             if (tlGridApi) tlGridApi.setGridOption('quickFilterText', $(this).val());
         });
 
-        $('#tlDetailModal .delete, #tlDetailModal .button, #tlDetailModal .modal-background').on('click', () => {
+        $('#tlDetailModal .delete, #tlDetailModal .button, #tlDetailModal .modal-background').off('click').on('click', () => {
             $('#tlDetailModal').removeClass('is-active');
         });
         
         if (window.location.pathname === '/traffic-logs/upload') {
             $('#tlRemoteSection').hide();
             $('#tlaSection').show();
+        }
+    }
+
+    $(document).ready(() => {
+        initTrafficLogs();
+    });
+
+    // PJAX 페이지 전환 대응
+    $(document).off('pjax:complete.tl').on('pjax:complete.tl', function(e, url) {
+        if (url.includes('/traffic-logs')) {
+            initTrafficLogs();
         }
     });
 })();

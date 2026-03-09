@@ -609,11 +609,11 @@ async function syncGroupOids() {
 $(document).ready(() => {
     initProxyPage();
     
-    $('#btnSyncGroupOids').on('click', syncGroupOids);
+    $('#btnSyncGroupOids').off('click').on('click', syncGroupOids);
 });
 
-// PJAX 지원: 페이지 전환 후 초기화 재실행
-$(document).on('pjax:complete', function(e, url) {
+// PJAX 지원: 페이지 전환 후 초기화 재실행 (네임스페이스 사용하여 중복 등록 방지)
+$(document).off('pjax:complete.proxy').on('pjax:complete.proxy', function(e, url) {
     if (url.includes('/proxy')) {
         initProxyPage();
     }

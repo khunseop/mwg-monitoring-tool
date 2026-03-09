@@ -526,45 +526,65 @@ $(document).ready(function() {
         }
     }
 
-    // Event handlers
-    $('#ruHistorySearchBtn').on('click', searchHistory);
-    $('#ruHistoryLoadAllBtn').on('click', loadAllHistory);
-    $('#ruHistoryExportBtn').on('click', exportHistory);
-    $('#ruHistoryDeleteBtn').on('click', function() {
-        initDeleteProxySelect();
-        $('#ruHistoryDeleteModal').addClass('is-active');
-    });
-    
-    $('#ruHistoryDeleteModal').find('input[name="deleteOption"]').on('change', function() {
-        const option = $(this).val();
-        $('#ruDeleteOlderThan').toggle(option === 'older');
-        $('#ruDeleteRange').toggle(option === 'range');
-    });
-    
-    $('#ruHistoryDeleteConfirmBtn').on('click', deleteHistory);
-    $('#ruHistoryDeleteCancelBtn, #ruHistoryDeleteModal .delete, #ruHistoryDeleteModal .modal-background').on('click', function() {
-        $('#ruHistoryDeleteModal').removeClass('is-active');
-    });
-    
-    $('#ruHistoryPrevBtn').on('click', function() {
-        if (!$(this).hasClass('is-disabled')) {
-            loadPrevPage();
-        }
-    });
-    $('#ruHistoryNextBtn').on('click', function() {
-        if (!$(this).hasClass('is-disabled')) {
-            loadNextPage();
-        }
-    });
-    
-    // Load statistics when proxy selection changes
-    $('#ruHistoryProxySelect').on('change', loadStatistics);
-
-    // Load proxies on page load
-    function loadProxies() {
+    function initResourceHistory() {
+        // DeviceSelector 초기화
         initDeviceSelector();
+
+        // Event handlers (중복 바인딩 방지)
+        $('#ruHistorySearchBtn').off('click').on('click', searchHistory);
+        $('#ruHistoryLoadAllBtn').off('click').on('click', loadAllHistory);
+        $('#ruHistoryExportBtn').off('click').on('click', exportHistory);
+        
+        $('#ruHistoryClearFiltersBtn').off('click').on('click', () => {
+            if (history.gridApi) {
+                history.gridApi.setFilterModel(null);
+                // 필터 초기화 피드백
+                const originalText = $('#ruHistoryClearFiltersBtn').text();
+                $('#ruHistoryClearFiltersBtn').text('초기화 완료');
+                setTimeout(() => $('#ruHistoryClearFiltersBtn').text(originalText), 1500);
+            }
+        });
+
+        $('#ruHistoryDeleteBtn').off('click').on('click', function() {
+            initDeleteProxySelect();
+            $('#ruHistoryDeleteModal').addClass('is-active');
+        });
+        
+        $('#ruHistoryDeleteModal').find('input[name="deleteOption"]').off('change').on('change', function() {
+            const option = $(this).val();
+            $('#ruDeleteOlderThan').toggle(option === 'older');
+            $('#ruDeleteRange').toggle(option === 'range');
+        });
+        
+        $('#ruHistoryDeleteConfirmBtn').off('click').on('click', deleteHistory);
+        $('#ruHistoryDeleteCancelBtn, #ruHistoryDeleteModal .delete, #ruHistoryDeleteModal .modal-background').off('click').on('click', function() {
+            $('#ruHistoryDeleteModal').removeClass('is-active');
+        });
+        
+        $('#ruHistoryPrevBtn').off('click').on('click', function() {
+            if (!$(this).hasClass('is-disabled')) {
+                loadPrevPage();
+            }
+        });
+        $('#ruHistoryNextBtn').off('click').on('click', function() {
+            if (!$(this).hasClass('is-disabled')) {
+                loadNextPage();
+            }
+        });
+        
+        // Load statistics when proxy selection changes
+        $('#ruHistoryProxySelect').off('change').on('change', loadStatistics);
     }
 
     // Initialize when page loads
-    loadProxies();
+    $(document).ready(() => {
+        initResourceHistory();
+    });
+
+    // PJAX 페이지 전환 대응
+    $(document).off('pjax:complete.rh').on('pjax:complete.rh', function(e, url) {
+        if (url.includes('/resource/history')) {
+            initResourceHistory();
+        }
+    });
 });
