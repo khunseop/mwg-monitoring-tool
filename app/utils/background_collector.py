@@ -232,7 +232,7 @@ class BackgroundCollector:
                         "cs": metrics.get("cs"),
                         "http": metrics.get("http"),
                         "https": metrics.get("https"),
-                        "ftp": metrics.get("ftp"),
+                        "http2": metrics.get("http2"),
                         "disk": metrics.get("disk"),
                         "interface_mbps": interface_mbps_json,
                         "community": community,
@@ -245,7 +245,7 @@ class BackgroundCollector:
                     # 저장 전 데이터 확인 로그
                     logger.debug(f"[BackgroundCollector] Preparing data for proxy_id={proxy_id}: "
                                f"cpu={metrics.get('cpu')}, mem={metrics.get('mem')}, "
-                               f"http={metrics.get('http')}, https={metrics.get('https')}, ftp={metrics.get('ftp')}, "
+                               f"http={metrics.get('http')}, https={metrics.get('https')}, http2={metrics.get('http2')}, "
                                f"interface_mbps={'present' if interface_mbps_json else 'none'}")
                 except Exception as e:
                     errors[proxy.id] = str(e)

@@ -39,7 +39,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-SUPPORTED_KEYS = {"cpu", "mem", "cc", "cs", "http", "https", "ftp", "disk"}
+SUPPORTED_KEYS = {"cpu", "mem", "cc", "cs", "http", "https", "http2", "disk"}
 
 # Interface MBPS calculation constants
 IF_IN_OCTETS_OID = "1.3.6.1.2.1.2.2.1.10"  # ifInOctets

@@ -160,15 +160,22 @@
                 { key: 'http2d', title: 'HTTP2 Δ' },
             ];
             
-            // Add interface metrics with names (in and out combined)
+            // Add interface metrics with names (IN/OUT separate for better readability)
             const interfaceMetrics = [];
             configuredInterfaceNames.forEach(ifName => {
                 const displayName = utils.abbreviateInterfaceName(ifName);
                 interfaceMetrics.push({
-                    key: `if_${ifName}`,
-                    title: displayName,
-                    fullName: ifName,
+                    key: `if_${ifName}_in`,
+                    title: `${displayName} IN`,
                     ifName: ifName,
+                    direction: 'in',
+                    isInterface: true
+                });
+                interfaceMetrics.push({
+                    key: `if_${ifName}_out`,
+                    title: `${displayName} OUT`,
+                    ifName: ifName,
+                    direction: 'out',
                     isInterface: true
                 });
             });
@@ -184,7 +191,7 @@
                 let vals;
                 if (m.isInterface) {
                     const ifName = m.ifName;
-                    // 인터페이스의 경우 in과 out 중 더 큰 값을 사용하여 스케일 계산
+                    const dir = m.direction;
                     vals = rows
                         .map(r => {
                             if (!r.interface_mbps || typeof r.interface_mbps !== 'object') return null;
@@ -200,10 +207,9 @@
                                 });
                             }
                             if (!ifData || typeof ifData !== 'object') return null;
-                            const inMbps = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
-                            const outMbps = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
-                            // in과 out 중 더 큰 값을 사용
-                            return Math.max(inMbps, outMbps);
+                            
+                            const val = (dir === 'in') ? ifData.in_mbps : ifData.out_mbps;
+                            return typeof val === 'number' ? val : 0;
                         })
                         .filter(v => typeof v === 'number' && isFinite(v) && v >= 0)
                         .sort((a, b) => a - b);
@@ -246,6 +252,7 @@
                     let rawOut = null;
                     if (m.isInterface) {
                         const ifName = m.ifName;
+                        const dir = m.direction;
                         if (r.interface_mbps && typeof r.interface_mbps === 'object') {
                             let ifData = null;
                             if (r.interface_mbps[ifName]) {
@@ -261,8 +268,7 @@
                             if (ifData && typeof ifData === 'object') {
                                 rawIn = typeof ifData.in_mbps === 'number' ? ifData.in_mbps : 0;
                                 rawOut = typeof ifData.out_mbps === 'number' ? ifData.out_mbps : 0;
-                                // 스케일 계산을 위해 더 큰 값 사용
-                                raw = Math.max(rawIn, rawOut);
+                                raw = (dir === 'in') ? rawIn : rawOut;
                             }
                         }
                     } else {
@@ -410,28 +416,11 @@
                         const key = metric.key;
                         const isLargeDataset = rowCount > 20 || xCategories.length > 10;
                         
-                        // 인터페이스의 경우 in/out 값을 함께 표시 (퍼센트로)
+                        // 인터페이스의 경우 단일 방향(IN 또는 OUT) 값 표시
                         if (metric.isInterface) {
-                            const rawIn = (ru._heatRawIn && ru._heatRawIn[y]) ? ru._heatRawIn[y][x] : null;
-                            const rawOut = (ru._heatRawOut && ru._heatRawOut[y]) ? ru._heatRawOut[y][x] : null;
-                            if (rawIn != null && rawOut != null) {
-                                // 인터페이스 이름 추출
-                                const ifName = metric.ifName || metric.key.replace(/^if_/, '').replace(/_in$|_out$/, '');
-                                const bandwidth = interfaceBandwidths[ifName];
-                                
-                                if (bandwidth && bandwidth > 0) {
-                                    // 대역폭이 설정되어 있으면 퍼센트로 표시
-                                    const percentIn = Math.round((rawIn / bandwidth) * 100);
-                                    const percentOut = Math.round((rawOut / bandwidth) * 100);
-                                    return `${percentIn}/${percentOut}`;
-                                } else {
-                                    // 대역폭이 없으면 Mbps로 표시 (간단하게)
-                                    return `${rawIn.toFixed(1)}/${rawOut.toFixed(1)}`;
-                                }
-                            }
                             if (raw != null) {
                                 // 인터페이스 이름 추출
-                                const ifName = metric.ifName || metric.key.replace(/^if_/, '').replace(/_in$|_out$/, '');
+                                const ifName = metric.ifName;
                                 const bandwidth = interfaceBandwidths[ifName];
                                 
                                 if (bandwidth && bandwidth > 0) {
@@ -440,7 +429,7 @@
                                     return `${percent}%`;
                                 } else {
                                     // 대역폭이 없으면 Mbps로 표시
-                                    return raw.toFixed(isLargeDataset ? 1 : 2);
+                                    return raw.toFixed(isLargeDataset ? 0 : 1);
                                 }
                             }
                             return '';
@@ -513,35 +502,17 @@
                             const metric = metrics[dataPointIndex];
                             let formattedRaw = String(Math.round(raw));
                             
-                            // 인터페이스의 경우 in/out 값을 함께 표시 (퍼센트 또는 Mbps)
+                            // 인터페이스의 경우 단일 방향(IN 또는 OUT) 값 표시
                             if (metric && metric.isInterface) {
-                                const rawIn = (ru._heatRawIn && ru._heatRawIn[seriesIndex]) ? ru._heatRawIn[seriesIndex][dataPointIndex] : null;
-                                const rawOut = (ru._heatRawOut && ru._heatRawOut[seriesIndex]) ? ru._heatRawOut[seriesIndex][dataPointIndex] : null;
-                                if (rawIn != null && rawOut != null) {
-                                    // 인터페이스 이름 추출
-                                    const ifName = metric.ifName || metric.key.replace(/^if_/, '').replace(/_in$|_out$/, '');
-                                    const bandwidth = interfaceBandwidths[ifName];
-                                    
-                                    if (bandwidth && bandwidth > 0) {
-                                        // 대역폭이 설정되어 있으면 퍼센트로 표시
-                                        const percentIn = ((rawIn / bandwidth) * 100).toFixed(1);
-                                        const percentOut = ((rawOut / bandwidth) * 100).toFixed(1);
-                                        formattedRaw = `IN: ${percentIn}% (${rawIn.toFixed(2)} Mbps) / OUT: ${percentOut}% (${rawOut.toFixed(2)} Mbps)`;
-                                    } else {
-                                        // 대역폭이 없으면 Mbps로 표시
-                                        formattedRaw = `IN: ${rawIn.toFixed(2)} Mbps / OUT: ${rawOut.toFixed(2)} Mbps`;
-                                    }
+                                const ifName = metric.ifName;
+                                const dir = metric.direction.toUpperCase();
+                                const bandwidth = interfaceBandwidths[ifName];
+                                
+                                if (bandwidth && bandwidth > 0) {
+                                    const percent = ((raw / bandwidth) * 100).toFixed(1);
+                                    formattedRaw = `${dir}: ${percent}% (${raw.toFixed(2)} Mbps)`;
                                 } else {
-                                    // 인터페이스 이름 추출
-                                    const ifName = metric.ifName || metric.key.replace(/^if_/, '').replace(/_in$|_out$/, '');
-                                    const bandwidth = interfaceBandwidths[ifName];
-                                    
-                                    if (bandwidth && bandwidth > 0) {
-                                        const percent = ((raw / bandwidth) * 100).toFixed(1);
-                                        formattedRaw = `${percent}% (${raw.toFixed(2)} Mbps)`;
-                                    } else {
-                                        formattedRaw = raw.toFixed(2) + ' Mbps';
-                                    }
+                                    formattedRaw = `${dir}: ${raw.toFixed(2)} Mbps`;
                                 }
                             } else if (metric) {
                                 const key = metric.key;
