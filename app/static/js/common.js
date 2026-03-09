@@ -141,8 +141,70 @@
 			var cls = v ? 'is-success' : 'is-light';
 			return '<span class="tag ' + cls + ' mono">' + (v ? 'Y' : 'N') + '</span>';
 		}
-	};
+		};
 
-	window.AppUtils = AppUtils;
+		/**
+		* IndexedDB Wrapper for larger data storage (Session Browser records, etc.)
+		*/
+		const AppDB = {
+		dbName: 'pmt_db',
+		dbVersion: 1,
+		storeName: 'kv_store',
+		_db: null,
 
-})(window);
+		async _init() {
+			if (this._db) return this._db;
+			return new Promise((resolve, reject) => {
+				const request = indexedDB.open(this.dbName, this.dbVersion);
+				request.onupgradeneeded = (e) => {
+					const db = e.target.result;
+					if (!db.objectStoreNames.contains(this.storeName)) {
+						db.createObjectStore(this.storeName);
+					}
+				};
+				request.onsuccess = (e) => {
+					this._db = e.target.result;
+					resolve(this._db);
+				};
+				request.onerror = (e) => reject(e.target.error);
+			});
+		},
+
+		async get(key) {
+			const db = await this._init();
+			return new Promise((resolve, reject) => {
+				const tx = db.transaction(this.storeName, 'readonly');
+				const store = tx.objectStore(this.storeName);
+				const request = store.get(key);
+				request.onsuccess = () => resolve(request.result);
+				request.onerror = () => reject(request.error);
+			});
+		},
+
+		async set(key, value) {
+			const db = await this._init();
+			return new Promise((resolve, reject) => {
+				const tx = db.transaction(this.storeName, 'readwrite');
+				const store = tx.objectStore(this.storeName);
+				const request = store.put(value, key);
+				request.onsuccess = () => resolve();
+				request.onerror = () => reject(request.error);
+			});
+		},
+
+		async delete(key) {
+			const db = await this._init();
+			return new Promise((resolve, reject) => {
+				const tx = db.transaction(this.storeName, 'readwrite');
+				const store = tx.objectStore(this.storeName);
+				const request = store.delete(key);
+				request.onsuccess = () => resolve();
+				request.onerror = () => reject(request.error);
+			});
+		}
+		};
+
+		window.AppUtils = AppUtils;
+		window.AppDB = AppDB;
+
+		})(window);

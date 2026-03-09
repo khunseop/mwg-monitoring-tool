@@ -126,7 +126,7 @@
             }
             
             setStatus(`성공 (${sb.records.length}건)`, 'is-primary is-light');
-            persistState();
+            await persistState();
         } catch (err) {
             console.error('[SessionBrowser] Load failed:', err);
             alert(err.message);
@@ -137,48 +137,50 @@
         }
     }
 
-    function persistState() {
+    async function persistState() {
         try {
-            const state = {
-                records: sb.records, // 모든 레코드 저장 시도
-                timestamp: new Date().getTime()
-            };
-            try {
-                localStorage.setItem(sb.storageKey, JSON.stringify(state));
-            } catch (quotaExceeded) {
-                // 용량 초과 시 개수 제한하여 재시도
-                console.warn('[SessionBrowser] localStorage quota exceeded, slicing records...');
-                state.records = sb.records.slice(0, 5000);
-                try {
-                    localStorage.setItem(sb.storageKey, JSON.stringify(state));
-                } catch (e) {
-                    state.records = sb.records.slice(0, 1000);
-                    localStorage.setItem(sb.storageKey, JSON.stringify(state));
-                }
+            // 1. 세션 데이터는 용량이 크므로 IndexedDB에 저장
+            if (window.AppDB) {
+                await window.AppDB.set(sb.storageKey + '_records', {
+                    records: sb.records,
+                    timestamp: new Date().getTime()
+                });
             }
+
+            // 2. 선택 상태(proxyIds 등)는 localStorage에 병합 저장 (DeviceSelector와 호환)
+            const current = JSON.parse(localStorage.getItem(sb.storageKey) || '{}');
+            current.hasRecords = (sb.records.length > 0);
+            current.timestamp = new Date().getTime();
+            localStorage.setItem(sb.storageKey, JSON.stringify(current));
+            
         } catch (e) {
             console.warn('[SessionBrowser] Failed to persist state:', e);
         }
     }
 
-    function restoreState() {
+    async function restoreState() {
         try {
+            // 1. localStorage에서 선택 상태 복원 (DeviceSelector가 처리하지만 필요시 여기서도 확인)
             const saved = localStorage.getItem(sb.storageKey);
             if (!saved) return;
             
-            const state = JSON.parse(saved);
-            // 1시간 이내 데이터만 복원
+            const meta = JSON.parse(saved);
             const oneHour = 60 * 60 * 1000;
-            if (new Date().getTime() - state.timestamp > oneHour) {
+            if (new Date().getTime() - meta.timestamp > oneHour) {
                 localStorage.removeItem(sb.storageKey);
+                if (window.AppDB) await window.AppDB.delete(sb.storageKey + '_records');
                 return;
             }
 
-            if (state.records && state.records.length > 0) {
-                sb.records = state.records;
-                if (sb.gridApi) {
-                    sb.gridApi.setGridOption('rowData', sb.records);
-                    setStatus(`데이터 복원됨 (${sb.records.length}건)`, 'is-info is-light');
+            // 2. IndexedDB에서 대용량 세션 데이터 복원
+            if (window.AppDB) {
+                const data = await window.AppDB.get(sb.storageKey + '_records');
+                if (data && data.records && data.records.length > 0) {
+                    sb.records = data.records;
+                    if (sb.gridApi) {
+                        sb.gridApi.setGridOption('rowData', sb.records);
+                        setStatus(`데이터 복원됨 (${sb.records.length}건)`, 'is-info is-light');
+                    }
                 }
             }
         } catch (e) {
@@ -206,9 +208,9 @@
             theme: 'quartz',
             enableBrowserTooltips: true,
             overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted); font-size: 0.875rem;">조회된 세션 데이터가 없습니다. 상단에서 "세션 불러오기"를 클릭하세요.</div>',
-            onGridReady: (params) => {
+            onGridReady: async (params) => {
                 sb.gridApi = params.api;
-                restoreState();
+                await restoreState();
             }
         };
 
