@@ -72,7 +72,7 @@
     
     window.showTrafficLogDetail = showDetail;
 
-    function saveState(records){
+    async function saveState(records){
         try {
             const state = {
                 proxyId: $('#tlProxySelect').val(),
@@ -80,35 +80,62 @@
                 query: $('#tlQuery').val(),
                 limit: $('#tlLimit').val(),
                 direction: $('#tlDirection').val(),
-                records: records || []
+                timestamp: new Date().getTime()
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        } catch(e) {}
+
+            // 대용량 데이터는 IndexedDB에 저장
+            if (window.AppDB) {
+                await window.AppDB.set(STORAGE_KEY + '_records', {
+                    records: records || [],
+                    timestamp: new Date().getTime()
+                });
+            }
+        } catch(e) { console.warn('Failed to save state', e); }
     }
 
-    function restoreState(){
+    async function restoreState(){
         try {
             const saved = localStorage.getItem(STORAGE_KEY);
             if (!saved) return;
             const state = JSON.parse(saved);
+            
+            // 1시간 초과 시 만료
+            const now = new Date().getTime();
+            if (state.timestamp && (now - state.timestamp > 3600000)) {
+                localStorage.removeItem(STORAGE_KEY);
+                if (window.AppDB) await window.AppDB.delete(STORAGE_KEY + '_records');
+                return;
+            }
+
             IS_RESTORING = true;
             
             if (state.query !== undefined) $('#tlQuery').val(state.query);
             if (state.limit !== undefined) $('#tlLimit').val(state.limit);
             if (state.direction !== undefined) $('#tlDirection').val(state.direction);
             
-            setTimeout(() => {
+            setTimeout(async () => {
                 if (state.groupId) $('#tlGroupSelect').val(state.groupId).trigger('change');
+                
+                // IndexedDB에서 데이터 복원
+                if (window.AppDB) {
+                    const data = await window.AppDB.get(STORAGE_KEY + '_records');
+                    if (data && data.records && data.records.length > 0) {
+                        LOG_RECORDS = data.records;
+                        renderTable(LOG_RECORDS);
+                        setStatus(`${LOG_RECORDS.length}건 복원됨`, 'is-info is-light');
+                    }
+                }
+
                 setTimeout(() => {
                     if (state.proxyId) $('#tlProxySelect').val(state.proxyId);
-                    if (state.records && state.records.length > 0) {
-                        LOG_RECORDS = state.records;
-                        renderTable(LOG_RECORDS);
-                    }
                     IS_RESTORING = false;
                 }, 150);
             }, 100);
-        } catch(e) { IS_RESTORING = false; }
+        } catch(e) { 
+            console.warn('Failed to restore state', e);
+            IS_RESTORING = false; 
+        }
     }
 
     async function loadLogs(){
@@ -146,7 +173,7 @@
                 renderTable(records);
                 setStatus(`${records.length}건 조회됨`, 'is-primary is-light');
             }
-            saveState(records);
+            await saveState(records);
         } catch(err) {
             showError(err.message);
         } finally {

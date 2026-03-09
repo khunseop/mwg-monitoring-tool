@@ -174,7 +174,7 @@
                 return;
             }
 
-            // 3. IndexedDB에서 대용량 세션 데이터 복원
+            // 2. IndexedDB에서 대용량 세션 데이터 복원
             if (window.AppDB) {
                 const data = await window.AppDB.get(sb.storageKey + '_records');
                 if (data && data.records && data.records.length > 0) {
@@ -182,9 +182,12 @@
                     if (sb.gridApi) {
                         sb.gridApi.setGridOption('rowData', sb.records);
                         setStatus(`데이터 복원됨 (${sb.records.length}건)`, 'is-info is-light');
+                        // 데이터가 있으면 목록 섹션이 보여야 함
+                        $('#sbListSection').show();
                     }
                 }
             }
+
         } catch (e) {
             console.warn('[SessionBrowser] State restore failed', e);
         }
