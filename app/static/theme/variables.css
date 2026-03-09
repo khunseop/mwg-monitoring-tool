@@ -23,7 +23,7 @@
     --color-text: #0f172a; /* slate-900 */
     --color-text-muted: #64748b; /* slate-500 */
     --color-border: #e2e8f0; /* slate-200 */
-    --color-primary: #2563eb; /* blue-600 */
+    --color-primary: #3b82f6; /* blue-500, slightly lighter than blue-600 */
     --color-primary-contrast: #ffffff;
 
     /* Border Radius */
