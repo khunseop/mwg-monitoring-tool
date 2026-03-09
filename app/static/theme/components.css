@@ -119,6 +119,12 @@
     border-color: #adc9f3 !important;
 }
 
+.button.is-primary,
+.button.is-info,
+.button.is-danger {
+    color: #ffffff !important;
+}
+
 .button.is-primary {
     background-color: var(--color-primary);
     border-color: var(--color-primary);

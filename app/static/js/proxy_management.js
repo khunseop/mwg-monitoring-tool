@@ -138,13 +138,13 @@ function loadProxies() {
                         <td class="py-3 is-size-7 has-text-grey">${proxy.description || ''}</td>
                         <td class="has-text-centered py-2">
                             <div class="buttons is-centered">
-                                <button class="button is-white is-small border" onclick="openModal('proxy', ${proxy.id})" title="수정">
+                                <button class="button is-subtle is-small" onclick="openModal('proxy', ${proxy.id})" title="수정">
                                     <span>수정</span>
                                 </button>
-                                <button class="button is-white is-small border" onclick="cloneProxy(${proxy.id})" title="복제">
+                                <button class="button is-subtle is-small" onclick="cloneProxy(${proxy.id})" title="복제">
                                     <span>복제</span>
                                 </button>
-                                <button class="button is-white is-small border has-text-danger" onclick="deleteProxy(${proxy.id})" title="삭제">
+                                <button class="button is-subtle is-small has-text-danger" onclick="deleteProxy(${proxy.id})" title="삭제">
                                     <span>삭제</span>
                                 </button>
                             </div>
@@ -254,10 +254,10 @@ function loadGroups() {
                         </td>
                         <td class="has-text-centered py-2">
                             <div class="buttons is-centered">
-                                <button class="button is-white is-small border" onclick="openModal('group', ${group.id})">
+                                <button class="button is-subtle is-small" onclick="openModal('group', ${group.id})">
                                     <span>수정</span>
                                 </button>
-                                <button class="button is-white is-small border has-text-danger" onclick="deleteGroup(${group.id})">
+                                <button class="button is-subtle is-small has-text-danger" onclick="deleteGroup(${group.id})">
                                     <span>삭제</span>
                                 </button>
                             </div>
