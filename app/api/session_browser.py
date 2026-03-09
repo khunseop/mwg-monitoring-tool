@@ -294,6 +294,9 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
     for pid, rows in per_proxy_records.items():
         try:
             temp_store.write_batch(pid, collected_at_ts, rows)
+            # Invalidate cache since we have new data
+            _session_cache.invalidate(pid)
+            
             total_written += len(rows or [])
             # For CollectResponse, we need to return items as well
             for idx, r in enumerate(rows):
@@ -399,6 +402,33 @@ async def latest_sessions(proxy_id: int, db: Session = Depends(get_db)):
  
 
 
+# Simple in-memory cache for latest batches per proxy to avoid redundant parsing
+class SimpleSessionCache:
+    def __init__(self, ttl_sec: int = 300):
+        self._cache: Dict[int, Tuple[List[Dict[str, Any]], float]] = {}
+        self._ttl = ttl_sec
+
+    def get(self, proxy_id: int) -> Optional[List[Dict[str, Any]]]:
+        if proxy_id not in self._cache:
+            return None
+        data, ts = self._cache[proxy_id]
+        if time.perf_counter() - ts > self._ttl:
+            del self._cache[proxy_id]
+            return None
+        return data
+
+    def set(self, proxy_id: int, data: List[Dict[str, Any]]):
+        self._cache[proxy_id] = (data, time.perf_counter())
+
+    def invalidate(self, proxy_id: Optional[int] = None):
+        if proxy_id is None:
+            self._cache.clear()
+        elif proxy_id in self._cache:
+            del self._cache[proxy_id]
+
+_session_cache = SimpleSessionCache(ttl_sec=float(os.getenv("SESSION_CACHE_TTL", "300")))
+
+
 # DataTables server-side endpoint for large datasets
 def _load_latest_rows_for_proxies(db: Session, target_ids: List[int]) -> List[Dict[str, Any]]:
     host_map: Dict[int, str] = {}
@@ -408,6 +438,11 @@ def _load_latest_rows_for_proxies(db: Session, target_ids: List[int]) -> List[Di
     
     def _read_and_process_proxy(pid: int) -> List[Dict[str, Any]]:
         """Read and process records for a single proxy"""
+        # Check cache first
+        cached = _session_cache.get(pid)
+        if cached is not None:
+            return cached
+            
         batch = temp_store.read_latest(pid)
         proxy_rows: List[Dict[str, Any]] = []
         for idx, rec in enumerate(batch):
@@ -423,6 +458,9 @@ def _load_latest_rows_for_proxies(db: Session, target_ids: List[int]) -> List[Di
             except Exception:
                 pass
             proxy_rows.append(r)
+        
+        # Cache the processed rows
+        _session_cache.set(pid, proxy_rows)
         return proxy_rows
     
     # Read from multiple proxies in parallel using ThreadPoolExecutor

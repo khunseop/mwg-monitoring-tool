@@ -117,41 +117,26 @@ class BackgroundCollector:
         oids: dict,
         interval_sec: int
     ):
-        """주기적 수집 실행 (정확한 주기 유지)"""
+        """주기적 수집 실행 (작업 중첩 방지 및 정확한 주기 유지 시도)"""
         import time
         try:
-            # 첫 수집은 즉시 실행
-            next_collect_time = time.time()
-            
             while True:
-                # 정확한 주기 유지를 위해 다음 수집 시간 계산
-                current_time = time.time()
-                sleep_time = next_collect_time - current_time
-                
-                # 수집 시간이 주기보다 길어지면 즉시 다음 수집 시작
-                if sleep_time < 0:
-                    logger.warning(f"[BackgroundCollector] Collection took longer than interval ({interval_sec}s), starting next immediately")
-                    sleep_time = 0
-                
-                # 대기 (첫 수집이 아닌 경우에만)
-                if sleep_time > 0:
-                    await asyncio.sleep(sleep_time)
-                
-                # 다음 수집 시간 설정 (현재 시간 기준으로 정확히 interval_sec 후)
-                next_collect_time = time.time() + interval_sec
+                cycle_start_time = time.time()
                 
                 # 수집 시작 알림
-                collect_start_time = time.time()
                 await self._broadcast_status(task_id, "collecting")
                 
                 # 수집 실행
                 try:
                     result = await self._collect_once(proxy_ids, community, oids)
-                    collect_duration = time.time() - collect_start_time
+                    collect_duration = time.time() - cycle_start_time
                     
                     logger.info(f"[BackgroundCollector] Collection completed for task {task_id}: "
                               f"succeeded={result['succeeded']}, failed={result['failed']}, "
                               f"duration={collect_duration:.2f}s, next_in={interval_sec}s")
+                    
+                    # 다음 수집 예정 시간 계산
+                    next_collect_time = cycle_start_time + interval_sec
                     
                     await self._broadcast_status(
                         task_id,
@@ -166,12 +151,23 @@ class BackgroundCollector:
                         }
                     )
                 except Exception as e:
-                    collect_duration = time.time() - collect_start_time
+                    collect_duration = time.time() - cycle_start_time
                     logger.error(f"[BackgroundCollector] Collection error for task {task_id} (duration={collect_duration:.2f}s): {e}", exc_info=True)
                     await self._broadcast_status(task_id, "error", {
                         "error": str(e),
                         "duration_sec": round(collect_duration, 2)
                     })
+                    next_collect_time = cycle_start_time + interval_sec
+
+                # 작업 중첩 방지: 수집이 끝난 후 남은 시간만큼만 대기
+                now = time.time()
+                sleep_time = next_collect_time - now
+                if sleep_time < 0:
+                    logger.warning(f"[BackgroundCollector] Task {task_id} cycle took longer than interval ({collect_duration:.2f}s > {interval_sec}s). Starting next cycle immediately.")
+                    sleep_time = 0
+                
+                await asyncio.sleep(sleep_time)
+                
         except asyncio.CancelledError:
             logger.info(f"[BackgroundCollector] Collection task {task_id} cancelled")
             raise
@@ -344,15 +340,13 @@ class BackgroundCollector:
             while True:
                 await asyncio.sleep(self._retention_interval_sec)
                 
-                db = SessionLocal()
                 try:
                     logger.info("[BackgroundCollector] Running retention policy (90 days)")
-                    _enforce_resource_usage_retention(db, days=90)
+                    # Run in thread pool to not block event loop
+                    await asyncio.to_thread(_enforce_resource_usage_retention, days=90)
                     logger.info("[BackgroundCollector] Retention policy completed")
                 except Exception as e:
                     logger.error(f"[BackgroundCollector] Retention policy error: {e}", exc_info=True)
-                finally:
-                    db.close()
         except asyncio.CancelledError:
             logger.info("[BackgroundCollector] Retention policy task cancelled")
             raise

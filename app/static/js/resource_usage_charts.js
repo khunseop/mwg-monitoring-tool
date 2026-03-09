@@ -374,13 +374,15 @@
         },
 
         /**
-         * 모든 차트 렌더링
+         * 모든 차트 렌더링 (최적화: 보이는 차트만 갱신)
          */
         renderAllCharts() {
             const ru = window.ru;
             const state = window.ResourceUsageState;
             if (!window.ApexCharts) return;
             const currentHeight = parseInt($('#ruChartHeightSlider').val(), 10) || 300;
+            
+            // DOM 구조 확인 및 초기화 (필요한 경우에만)
             this.ensureApexChartsDom(false, null, currentHeight);
             
             // Get configured interfaces from config
@@ -388,7 +390,6 @@
             const configuredInterfaceNames = Object.keys(interfaceOids);
             
             const basicMetrics = ['cpu','mem','cc','cs','disk','http','https','ftp'];
-            // Interface metrics: in and out separately
             const interfaceMetrics = [];
             configuredInterfaceNames.forEach(ifName => {
                 interfaceMetrics.push(`if_${ifName}_in`);
@@ -396,7 +397,19 @@
             });
             const metrics = [...basicMetrics, ...interfaceMetrics];
             
-            metrics.forEach(m => this.renderMetricChart(m, false));
+            metrics.forEach(m => {
+                // 최적화: 패널이 펼쳐져 있는 경우에만 렌더링/업데이트
+                const $panel = $(`#ruChartPanel-${m}`);
+                const isExpanded = $panel.length > 0 && $panel.attr('data-collapsed') !== 'true';
+                
+                if (isExpanded) {
+                    this.renderMetricChart(m, false);
+                } else {
+                    // 접혀있는 경우, 차트 인스턴스가 있다면 데이터만 내부적으로 들고 있거나 
+                    // 다음 펼쳐질 때 업데이트하도록 처리 (여기서는 단순히 스킵)
+                    // 만약 차트 인스턴스가 없는데 접혀있다면 생성하지 않음 (지연 생성)
+                }
+            });
         },
 
         /**
@@ -640,7 +653,10 @@
                 $panel.data('collapsed', true);
             } else {
                 // 펼치기
-                $content.slideDown(200);
+                $content.slideDown(200, () => {
+                    // 펼쳐진 후 즉시 렌더링 (그렇지 않으면 다음 갱신 주기까지 비어있음)
+                    this.renderMetricChart(metricKey, false);
+                });
                 $btn.text('▲');
                 $panel.attr('data-collapsed', 'false');
                 $panel.data('collapsed', false);

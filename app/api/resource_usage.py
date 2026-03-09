@@ -827,8 +827,8 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
             for model in collected_models:
                 db.refresh(model)
 
-    # Enforce 90-day retention after successful commit
-    _enforce_resource_usage_retention(db, days=90)
+    # Enforce 90-day retention in the background
+    asyncio.create_task(asyncio.to_thread(_enforce_resource_usage_retention, days=90))
 
     logger.info(f"[resource_usage] Collect completed requested={len(proxies)} succeeded={len(collected_models)} failed={len(errors)}")
     if errors:
@@ -1039,17 +1039,25 @@ async def get_resource_usage_history(
 
 # series endpoint removed; UI uses collect + latest buffering
 
-def _enforce_resource_usage_retention(db: Session, days: int = 90) -> None:
+from app.database.database import get_db, SessionLocal
+
+# ... (other imports)
+
+def _enforce_resource_usage_retention(days: int = 90) -> None:
+    db = SessionLocal()
     cutoff = now_kst() - timedelta(days=days)
     try:
         db.query(ResourceUsageModel).filter(ResourceUsageModel.collected_at < cutoff).delete(synchronize_session=False)
         db.commit()
-    except Exception:
+        logger.info(f"[resource_usage] Enforced retention policy: records older than {days} days deleted.")
+    except Exception as e:
+        logger.error(f"[resource_usage] Failed to enforce retention policy: {e}")
         try:
             db.rollback()
         except Exception:
             pass
-        return
+    finally:
+        db.close()
 
 
 # 통계 및 관리 API
