@@ -522,6 +522,7 @@ function importConfig() {
 }
 
 // Expose to window
+window.saveAllConfig = saveAllConfig;
 window.applyPreset = applyPreset;
 window.exportConfig = exportConfig;
 window.importConfig = importConfig;

@@ -217,32 +217,36 @@
                 <h4 class="title is-6 mb-0">설정 백업 및 복구</h4>
             </div>
             <div class="p-5">
-                <p class="is-size-7 has-text-grey-light mb-5">시스템의 모든 설정(프록시, 그룹, 리소스 설정 등)을 엑셀 파일로 백업하거나 복구합니다.</p>
-                <div class="columns">
-                    <div class="column is-6">
-                        <div class="has-text-centered py-5" style="border: 1px dashed var(--color-border); border-radius: var(--radius-sm); background: #fcfcfc;">
-                            <p class="mb-3 is-size-7 has-text-grey">현재 시스템의 모든 설정을 Excel 파일로 내보냅니다.</p>
-                            <button class="button is-subtle is-small px-5" type="button" onclick="exportConfig()">
-                                <span style="font-weight: 600;">설정 내보내기 (.xlsx)</span>
+                <div class="columns is-vcentered">
+                    <div class="column is-5">
+                        <div class="is-flex is-align-items-center p-4" style="border: 1px dashed var(--color-border); border-radius: var(--radius-sm); background: #fcfcfc; gap: 1.5rem;">
+                            <div class="is-flex-grow-1">
+                                <p class="is-size-7 has-text-weight-bold mb-1">설정 내보내기</p>
+                                <p class="is-size-7 has-text-grey">현재 모든 설정을 Excel 파일로 저장</p>
+                            </div>
+                            <button class="button is-subtle is-small px-4" type="button" onclick="exportConfig()">
+                                <span style="font-weight: 600;">내보내기</span>
                             </button>
                         </div>
                     </div>
-                    <div class="column is-6">
-                        <div class="py-4 px-5" style="border: 1px dashed var(--color-border); border-radius: var(--radius-sm); background: #fcfcfc;">
-                            <div class="file is-small has-name is-fullwidth mb-3">
-                                <label class="file-label">
+                    <div class="column is-7">
+                        <div class="is-flex is-align-items-center p-4" style="border: 1px dashed var(--color-border); border-radius: var(--radius-sm); background: #fcfcfc; gap: 1rem;">
+                            <div style="min-width: 80px;">
+                                <p class="is-size-7 has-text-weight-bold mb-1">설정 복구</p>
+                                <p class="is-size-7 has-text-grey">파일 불러오기</p>
+                            </div>
+                            <div class="file is-small has-name is-flex-grow-1">
+                                <label class="file-label" style="width: 100%;">
                                     <input class="file-input" type="file" id="cfgImportFile" accept=".xlsx" onchange="updateImportFileName()">
                                     <span class="file-cta">
-                                        <span class="file-label">Excel 파일 선택</span>
+                                        <span class="file-label">파일 선택</span>
                                     </span>
-                                    <span class="file-name" id="cfgImportFileName">선택된 파일 없음</span>
+                                    <span class="file-name is-flex-grow-1" id="cfgImportFileName" style="max-width: 150px;">선택된 파일 없음</span>
                                 </label>
                             </div>
-                            <div class="has-text-centered">
-                                <button class="button is-danger is-light is-small px-5" type="button" onclick="importConfig()">
-                                    <span style="font-weight: 600;">설정 복구하기</span>
-                                </button>
-                            </div>
+                            <button class="button is-danger is-light is-small px-4" type="button" onclick="importConfig()">
+                                <span style="font-weight: 600;">복구 실행</span>
+                            </button>
                         </div>
                     </div>
                 </div>
