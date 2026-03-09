@@ -286,6 +286,16 @@
             if (!el) return;
             if (!window.ApexCharts) return;
             
+            // 데이터가 있으면 컨테이너를 먼저 표시하여 visibility 체크가 성공하도록 함
+            if (!items || items.length === 0) { 
+                $('#ruHeatmapWrap').hide(); 
+                $('#ruEmptyState').show(); 
+                return;
+            } else { 
+                $('#ruEmptyState').hide(); 
+                $('#ruHeatmapWrap').show();
+            }
+
             // 컨테이너가 보이는지 확인
             const container = el.closest('#ruHeatmapWrap');
             const isVisible = container && container.offsetParent !== null;
@@ -635,24 +645,17 @@
                 
                 ru._lastHeatmapOptions = {
                     height: calculatedHeight,
-                    width: baseWidth,
+                    width: finalWidth,
                     xCategories: xCategories.length,
                     yCategories: yCategories.length
                 };
             }
 
-            if (!items || items.length === 0) { 
-                $('#ruHeatmapWrap').hide(); 
-                $('#ruEmptyState').show(); 
-            } else { 
-                $('#ruEmptyState').hide(); 
-                $('#ruHeatmapWrap').show();
-                // 히트맵이 표시될 때 resize 호출하여 레이블 표시 보장
-                if (ru.apex && typeof ru.apex.resize === 'function') {
-                    setTimeout(() => {
-                        ru.apex.resize();
-                    }, 150);
-                }
+            // 히트맵이 표시될 때 resize 호출하여 레이블 표시 보장
+            if (ru.apex && typeof ru.apex.resize === 'function') {
+                setTimeout(() => {
+                    ru.apex.resize();
+                }, 150);
             }
             
             // 상태 저장 (히트맵 데이터 및 스케일)

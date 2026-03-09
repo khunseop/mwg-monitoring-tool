@@ -155,6 +155,9 @@
     }
 
     function renderTable(records){
+        // Ensure empty state is hidden when rendering results
+        $('#tlEmptyState').hide();
+        
         if (!tlGridApi) {
             const gridOptions = {
                 columnDefs: window.AgGridConfig ? window.AgGridConfig.getTrafficLogColumns() : [],

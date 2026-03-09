@@ -289,10 +289,17 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
     # Write temp batches per proxy for real-time use
     t_tmp_write_start = time.perf_counter()
     total_written = 0
+    all_items: List[Dict[str, Any]] = []
     for pid, rows in per_proxy_records.items():
         try:
             temp_store.write_batch(pid, collected_at_ts, rows)
             total_written += len(rows or [])
+            # For CollectResponse, we need to return items as well
+            for idx, r in enumerate(rows):
+                item = dict(r)
+                item["id"] = temp_store.build_record_id(pid, collected_at_ts.isoformat(), idx)
+                item["collected_at"] = collected_at_ts
+                all_items.append(item)
         except Exception as e:
             errors[pid] = str(e)
     t_tmp_write_end = time.perf_counter()
@@ -320,9 +327,21 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
         succeeded=len(proxies) - len(errors),
         failed=len(errors),
         errors=errors,
-        # Keep payload light; UI reloads from server-side table anyway
-        items=[],
+        items=all_items,
     )
+
+
+@router.post("/session-browser/load")
+async def load_sessions(payload: CollectRequest, db: Session = Depends(get_db)):
+    """Legacy/Alias endpoint for collect_sessions that returns data in the format expected by some frontend versions."""
+    res = await collect_sessions(payload, db)
+    return {
+        "requested": res.requested,
+        "succeeded": res.succeeded,
+        "failed": res.failed,
+        "errors": res.errors,
+        "sessions": res.items
+    }
 
 
 @router.get("/session-browser", response_model=List[SessionRecordSchema])

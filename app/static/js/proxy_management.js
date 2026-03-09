@@ -17,7 +17,8 @@ function switchProxySection(section) {
     }
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+// 초기화 함수
+function initProxyPage() {
     // URL 경로에 따라 초기 섹션 설정
     const path = window.location.pathname;
     if (path === '/proxy/groups') {
@@ -25,7 +26,10 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         switchProxySection('list');
     }
-});
+    
+    loadProxies();
+    loadGroups();
+}
 
 // 모달 관리
 function openModal(type, id = null) {
@@ -494,8 +498,14 @@ function submitBulkProxies() {
 
 // 초기화
 $(document).ready(() => {
-    loadProxies();
-    loadGroups();
+    initProxyPage();
+});
+
+// PJAX 지원: 페이지 전환 후 초기화 재실행
+$(document).on('pjax:complete', function(e, url) {
+    if (url.includes('/proxy')) {
+        initProxyPage();
+    }
 });
 
 // expose for inline handlers
