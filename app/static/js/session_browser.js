@@ -21,70 +21,82 @@
         $tag.removeClass().addClass('tag').addClass(cls || 'is-primary is-light');
     }
 
-    function showDetail(record) {
-        const $body = $('#sbDetailBody');
-        $body.empty();
+    async function showDetail(record) {
+        if (!record || !record.id) return;
         
-        // Use a more comprehensive set of fields for detail view
-        const detailFields = [
-            { key: 'host', label: '프록시' },
-            { key: 'transaction', label: '트랜잭션 ID' },
-            { key: 'creation_time', label: '생성 시각', format: 'datetime' },
-            { key: 'protocol', label: '프로토콜' },
-            { key: 'status', label: '상태 코드', format: 'status' },
-            { key: 'user_name', label: '사용자' },
-            { key: 'cust_id', label: '고객 ID' },
-            { key: 'client_ip', label: '클라이언트 IP' },
-            { key: 'client_side_mwg_ip', label: 'Client-side MWG IP' },
-            { key: 'server_side_mwg_ip', label: 'Server-side MWG IP' },
-            { key: 'server_ip', label: '서버 IP' },
-            { key: 'cl_bytes_received', label: '클라이언트 수신', format: 'bytes' },
-            { key: 'cl_bytes_sent', label: '클라이언트 송신', format: 'bytes' },
-            { key: 'srv_bytes_received', label: '서버 수신', format: 'bytes' },
-            { key: 'srv_bytes_sent', label: '서버 송신', format: 'bytes' },
-            { key: 'trxn_index', label: 'Trxn Index' },
-            { key: 'age_seconds', label: '세션 유지(초)', format: 'seconds' },
-            { key: 'in_use', label: '사용 중 여부' },
-            { key: 'url', label: 'URL' }
-        ];
-
-        detailFields.forEach(f => {
-            let v = record[f.key];
-            if (v === null || v === undefined) v = '-';
-            let formatted = v;
+        try {
+            // Fetch full details (including raw_line) from server
+            const res = await fetch(`/api/session-browser/item/${record.id}`);
+            if (!res.ok) throw new Error('상세 정보를 가져오는데 실패했습니다.');
+            const fullRecord = await res.json();
             
-            if (f.format === 'datetime') {
-                formatted = (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(v) : v;
-            } else if (f.format === 'bytes') {
-                formatted = (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(v) : v;
-            } else if (f.format === 'seconds') {
-                formatted = (window.AppUtils && AppUtils.formatSeconds) ? AppUtils.formatSeconds(v) : v;
-            } else if (f.format === 'status') {
-                formatted = (window.AppUtils && AppUtils.renderStatusTag) ? AppUtils.renderStatusTag(v) : String(v);
+            const $body = $('#sbDetailBody');
+            $body.empty();
+            
+            // Use a more comprehensive set of fields for detail view
+            const detailFields = [
+                { key: 'host', label: '프록시' },
+                { key: 'transaction', label: '트랜잭션 ID' },
+                { key: 'creation_time', label: '생성 시각', format: 'datetime' },
+                { key: 'protocol', label: '프로토콜' },
+                { key: 'status', label: '상태 코드', format: 'status' },
+                { key: 'user_name', label: '사용자' },
+                { key: 'cust_id', label: '고객 ID' },
+                { key: 'client_ip', label: '클라이언트 IP' },
+                { key: 'client_side_mwg_ip', label: 'Client-side MWG IP' },
+                { key: 'server_side_mwg_ip', label: 'Server-side MWG IP' },
+                { key: 'server_ip', label: '서버 IP' },
+                { key: 'cl_bytes_received', label: '클라이언트 수신', format: 'bytes' },
+                { key: 'cl_bytes_sent', label: '클라이언트 송신', format: 'bytes' },
+                { key: 'srv_bytes_received', label: '서버 수신', format: 'bytes' },
+                { key: 'srv_bytes_sent', label: '서버 송신', format: 'bytes' },
+                { key: 'trxn_index', label: 'Trxn Index' },
+                { key: 'age_seconds', label: '세션 유지(초)', format: 'seconds' },
+                { key: 'in_use', label: '사용 중 여부' },
+                { key: 'url', label: 'URL' }
+            ];
+
+            detailFields.forEach(f => {
+                let v = fullRecord[f.key];
+                if (v === null || v === undefined) v = '-';
+                let formatted = v;
+                
+                if (f.format === 'datetime') {
+                    formatted = (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(v) : v;
+                } else if (f.format === 'bytes') {
+                    formatted = (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(v) : v;
+                } else if (f.format === 'seconds') {
+                    formatted = (window.AppUtils && AppUtils.formatSeconds) ? AppUtils.formatSeconds(v) : v;
+                } else if (f.format === 'status') {
+                    formatted = (window.AppUtils && AppUtils.renderStatusTag) ? AppUtils.renderStatusTag(v) : String(v);
+                }
+                
+                const isLongText = (f.key === 'url');
+                const cellStyle = isLongText ? 'style="word-break: break-all; white-space: normal;"' : '';
+                
+                $body.append(`
+                    <tr>
+                        <th style="width: 180px; background: #f8fafc; font-size: 0.8rem; color: #64748b;">${f.label}</th>
+                        <td ${cellStyle}>${formatted}</td>
+                    </tr>
+                `);
+            });
+
+            // Add raw line at the bottom
+            if (fullRecord.raw_line) {
+                $body.append(`
+                    <tr>
+                        <th style="width: 180px; background: #f8fafc; font-size: 0.8rem; color: #64748b;">원본 로그</th>
+                        <td style="word-break: break-all; white-space: normal; font-family: monospace; font-size: 0.75rem; background: #f1f5f9;">${fullRecord.raw_line}</td>
+                    </tr>
+                `);
             }
-            
-            const isLongText = (f.key === 'url');
-            const cellStyle = isLongText ? 'style="word-break: break-all; white-space: normal;"' : '';
-            
-            $body.append(`
-                <tr>
-                    <th style="width: 180px; background: #f8fafc; font-size: 0.8rem; color: #64748b;">${f.label}</th>
-                    <td ${cellStyle}>${formatted}</td>
-                </tr>
-            `);
-        });
 
-        // Add raw line at the bottom
-        if (record.raw_line) {
-            $body.append(`
-                <tr>
-                    <th style="width: 180px; background: #f8fafc; font-size: 0.8rem; color: #64748b;">원본 로그</th>
-                    <td style="word-break: break-all; white-space: normal; font-family: monospace; font-size: 0.75rem; background: #f1f5f9;">${record.raw_line}</td>
-                </tr>
-            `);
+            $('#sbDetailModal').addClass('is-active');
+        } catch (err) {
+            console.error('[SessionBrowser] Detail fetch failed:', err);
+            alert(err.message);
         }
-
-        $('#sbDetailModal').addClass('is-active');
     }
 
     function getSelectedProxyIds() {

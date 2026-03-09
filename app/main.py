@@ -54,6 +54,8 @@ allow_origins = [o.strip() for o in cors_origins.split(",") if o.strip()]
 allow_credentials_env = os.getenv("CORS_ALLOW_CREDENTIALS", "false").lower() in {"1", "true", "yes"}
 # Starlette forbids wildcard origins with credentials; disable credentials if wildcard is present
 allow_credentials = False if ("*" in allow_origins and len(allow_origins) == 1) else allow_credentials_env
+from fastapi.middleware.gzip import GZipMiddleware
+...
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins,
@@ -61,6 +63,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Enable docs only when enabled via env (default true)
 if os.getenv("ENABLE_DOCS", "true").lower() in {"1", "true", "yes"}:
     StandaloneDocs(app)

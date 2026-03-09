@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, UJSONResponse
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Tuple, Iterable, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -276,7 +276,7 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
                         "status": rec.get("status"),
                         "in_use": rec.get("in_use"),
                         "url": rec.get("url"),
-                        "raw_line": rec.get("raw_line"),
+                        # raw_line is EXCLUDED here for bulk performance
                         # enrich for UI convenience
                         "host": proxy.host,
                         "proxy_name": proxy.host,
@@ -327,26 +327,54 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
         (time.perf_counter() - t_overall_start) * 1000.0,
     )
 
-    return CollectResponse(
-        requested=len(proxies),
-        succeeded=len(proxies) - len(errors),
-        failed=len(errors),
-        errors=errors,
-        items=all_items,
-    )
+    return UJSONResponse(content={
+        "requested": len(proxies),
+        "succeeded": len(proxies) - len(errors),
+        "failed": len(errors),
+        "errors": errors,
+        "items": all_items,
+    })
 
 
 @router.post("/session-browser/load")
 async def load_sessions(payload: CollectRequest, db: Session = Depends(get_db)):
     """Legacy/Alias endpoint for collect_sessions that returns data in the format expected by some frontend versions."""
     res = await collect_sessions(payload, db)
-    return {
-        "requested": res.requested,
-        "succeeded": res.succeeded,
-        "failed": res.failed,
-        "errors": res.errors,
-        "sessions": res.items
-    }
+    # res is now a UJSONResponse, but for this alias we want to restructure it
+    # We can extract data from the response content
+    import ujson
+    data = json.loads(res.body)
+    return UJSONResponse(content={
+        "requested": data["requested"],
+        "succeeded": data["succeeded"],
+        "failed": data["failed"],
+        "errors": data["errors"],
+        "sessions": data["items"]
+    })
+
+
+@router.get("/session-browser/item/{record_id}")
+async def get_session_detail(record_id: str):
+    """특정 세션의 상세 정보(원본 로그 포함)를 가져옵니다."""
+    try:
+        # record_id format: {proxy_id}_{timestamp_iso}_{index}
+        parts = record_id.split('_')
+        if len(parts) < 3:
+            raise HTTPException(status_code=400, detail="Invalid record ID format")
+        
+        proxy_id = int(parts[0])
+        # Find the last part as index, everything in between is timestamp
+        idx = int(parts[-1])
+        
+        # Read full batch from temp_store
+        batch = temp_store.read_latest(proxy_id)
+        if not batch or idx >= len(batch):
+            raise HTTPException(status_code=404, detail="Record not found")
+            
+        return batch[idx]
+    except Exception as e:
+        logger.error(f"[session_browser] Detail fetch failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/session-browser", response_model=List[SessionRecordSchema])
