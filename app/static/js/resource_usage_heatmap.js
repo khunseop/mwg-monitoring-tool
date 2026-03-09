@@ -65,10 +65,10 @@
             (items || []).forEach(row => {
                 const proxyId = row.proxy_id;
                 const last = ru.lastCumulativeByProxy[proxyId] || {};
-                const deltas = { http: null, https: null, ftp: null };
+                const deltas = { http: null, https: null, http2: null };
                 
                 // 차트 버퍼에서 최신 값을 가져와서 사용 (차트와 동일한 데이터 소스)
-                ['http','https','ftp'].forEach(k => {
+                ['http','https','http2'].forEach(k => {
                     const buffer = ru.tsBuffer[proxyId] || {};
                     const series = buffer[k] || [];
                     // 버퍼에서 가장 최신 값 가져오기
@@ -94,7 +94,7 @@
                 ru.lastCumulativeByProxy[proxyId] = {
                     http: typeof row.http === 'number' ? row.http : (last.http || null),
                     https: typeof row.https === 'number' ? row.https : (last.https || null),
-                    ftp: typeof row.ftp === 'number' ? row.ftp : (last.ftp || null),
+                    http2: typeof row.http2 === 'number' ? row.http2 : (last.http2 || null),
                 };
                 
                 // Store proxy info for later use
@@ -110,7 +110,7 @@
                     cs: typeof row.cs === 'number' ? row.cs : null,
                     httpd: deltas.http,
                     httpsd: deltas.https,
-                    ftpd: deltas.ftp,
+                    http2d: deltas.http2,
                     interface_mbps: row.interface_mbps || null,
                     _fullHost: fullHost
                 });
@@ -157,7 +157,7 @@
                 { key: 'cs', title: 'CS' },
                 { key: 'httpd', title: 'HTTP Δ' },
                 { key: 'httpsd', title: 'HTTPS Δ' },
-                { key: 'ftpd', title: 'FTP Δ' },
+                { key: 'http2d', title: 'HTTP2 Δ' },
             ];
             
             // Add interface metrics with names (in and out combined)
@@ -307,7 +307,7 @@
             function baseKeyFor(metricKey) {
                 if (metricKey === 'httpd') return 'http';
                 if (metricKey === 'httpsd') return 'https';
-                if (metricKey === 'ftpd') return 'ftp';
+                if (metricKey === 'http2d') return 'http2';
                 if (metricKey.startsWith('if_')) {
                     // if_${ifName} 형태에서 인터페이스 이름 추출
                     const ifName = metricKey.replace(/^if_/, '');
@@ -442,7 +442,7 @@
                             return '';
                         }
                         
-                        if (key === 'httpd' || key === 'httpsd' || key === 'ftpd') {
+                        if (key === 'httpd' || key === 'httpsd' || key === 'http2d') {
                             return isLargeDataset ? raw.toFixed(1) + 'M' : raw.toFixed(2) + ' Mbps';
                         }
                         if (key === 'cc' || key === 'cs') {
@@ -541,7 +541,7 @@
                                 }
                             } else if (metric) {
                                 const key = metric.key;
-                                if (key === 'httpd' || key === 'httpsd' || key === 'ftpd') {
+                                if (key === 'httpd' || key === 'httpsd' || key === 'http2d') {
                                     formattedRaw = raw.toFixed(2) + ' Mbps';
                                 } else if (key === 'cc' || key === 'cs') {
                                     formattedRaw = utils.formatNumber(raw);

@@ -12,7 +12,7 @@ class ResourceUsageBase(BaseModel):
     cs: Optional[float] = None
     http: Optional[float] = None
     https: Optional[float] = None
-    ftp: Optional[float] = None
+    http2: Optional[float] = None
     disk: Optional[float] = None
     interface_mbps: Optional[Dict[str, Dict[str, Union[float, str]]]] = None
   # {interface_index: {"in_mbps": float, "out_mbps": float, "name": str}}
@@ -44,7 +44,7 @@ class ResourceUsage(ResourceUsageBase, TimestampModel):
 class ResourceUsageCreate(BaseModel):
     proxy_id: int
     community: Optional[str] = Field(default="public")
-    # Map of metric key to OID string. Supported keys: cpu, mem, cc, cs, http, https, ftp, disk
+    # Map of metric key to OID string. Supported keys: cpu, mem, cc, cs, http, https, http2, disk
     oids: Dict[str, str]
 
 
@@ -53,7 +53,7 @@ class CollectRequest(BaseModel):
     proxy_ids: List[int]
     # Community string (required)
     community: str = Field(min_length=1)
-    # OIDs mapping (keys: cpu, mem, cc, cs, http, https, ftp, disk) (required)
+    # OIDs mapping (keys: cpu, mem, cc, cs, http, https, http2, disk) (required)
     oids: Dict[str, str]
 
 
@@ -77,7 +77,7 @@ class SeriesPoint(BaseModel):
     cs: Optional[float] = None
     http: Optional[float] = None
     https: Optional[float] = None
-    ftp: Optional[float] = None
+    http2: Optional[float] = None
     disk: Optional[float] = None
 
 

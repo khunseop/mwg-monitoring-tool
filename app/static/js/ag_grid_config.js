@@ -125,7 +125,7 @@
 						return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + size;
 					}
 				},
-				{ field: 'ftp', headerName: 'FTP (누적)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 120, width: 150, cellClass: 'num',
+				{ field: 'http2', headerName: 'HTTP2 (누적)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 120, width: 150, cellClass: 'num',
 					valueFormatter: function(params) {
 						if (params.value == null || params.value === undefined) return '-';
 						const bytes = params.value;

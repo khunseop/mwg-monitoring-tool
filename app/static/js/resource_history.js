@@ -313,7 +313,7 @@ $(document).ready(function() {
             cs: row.cs,
             http: row.http,
             https: row.https,
-            ftp: row.ftp,
+            http2: row.http2,
             interface_mbps: row.interface_mbps
         }));
 

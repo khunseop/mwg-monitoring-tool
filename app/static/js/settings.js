@@ -136,7 +136,7 @@ function getResourceConfigData() {
             cs: $('#cfgOidCs').val() || undefined,
             http: $('#cfgOidHttp').val() || undefined,
             https: $('#cfgOidHttps').val() || undefined,
-            ftp: $('#cfgOidFtp').val() || undefined,
+            http2: $('#cfgOidHttp2').val() || undefined,
             disk: $('#cfgOidDisk').val() || undefined,
         },
         thresholds: {
@@ -147,7 +147,7 @@ function getResourceConfigData() {
             cs: numOrUndef('#cfgThrCs'),
             http: numOrUndef('#cfgThrHttp'),
             https: numOrUndef('#cfgThrHttps'),
-            ftp: numOrUndef('#cfgThrFtp'),
+            http2: numOrUndef('#cfgThrHttp2'),
         },
         interface_oids: interfaceOids,
         interface_thresholds: interfaceThresholds,
@@ -172,7 +172,7 @@ function loadResourceConfig() {
             $('#cfgOidCs').val(oids.cs || '');
             $('#cfgOidHttp').val(oids.http || '');
             $('#cfgOidHttps').val(oids.https || '');
-            $('#cfgOidFtp').val(oids.ftp || '');
+            $('#cfgOidHttp2').val(oids.http2 || '');
             $('#cfgOidDisk').val(oids.disk || '');
             const th = cfg.thresholds || {};
             $('#cfgThrCpu').val(th.cpu ?? '');
@@ -182,7 +182,7 @@ function loadResourceConfig() {
             $('#cfgThrCs').val(th.cs ?? '');
             $('#cfgThrHttp').val(th.http ?? '');
             $('#cfgThrHttps').val(th.https ?? '');
-            $('#cfgThrFtp').val(th.ftp ?? '');
+            $('#cfgThrHttp2').val(th.http2 ?? '');
             
             // Load interface settings (통합된 형태로 로드)
             $('#cfgInterfaceList').empty();
@@ -365,9 +365,9 @@ function initSettingsPage() {
     // 모든 입력 필드 변경 감지 (중복 방지)
     const configInputs = [
         '#cfgCommunity', '#cfgOidCpu', '#cfgOidMem', '#cfgOidDisk', '#cfgOidCc', '#cfgOidCs', 
-        '#cfgOidHttp', '#cfgOidHttps', '#cfgOidFtp',
+        '#cfgOidHttp', '#cfgOidHttps', '#cfgOidHttp2',
         '#cfgThrCpu', '#cfgThrMem', '#cfgThrDisk', '#cfgThrCc', '#cfgThrCs',
-        '#cfgThrHttp', '#cfgThrHttps', '#cfgThrFtp',
+        '#cfgThrHttp', '#cfgThrHttps', '#cfgThrHttp2',
         '#sbCfgPort', '#sbCfgTimeout', '#sbCfgHostKeyPolicy'
     ];
     
@@ -413,7 +413,7 @@ function applyPreset(type) {
         $('#cfgOidCs').val('1.3.6.1.4.1.21067.2.1.2.1.1.2.1');
         $('#cfgOidHttp').val('1.3.6.1.4.1.21067.2.1.2.2.1.1.1');
         $('#cfgOidHttps').val('1.3.6.1.4.1.21067.2.1.2.2.1.2.1');
-        $('#cfgOidFtp').val('1.3.6.1.4.1.21067.2.1.2.2.1.3.1');
+        $('#cfgOidHttp2').val('1.3.6.1.4.1.21067.2.1.2.2.1.3.1');
         
         // 기본 인터페이스 예시 추가 (필요시)
         if ($('#cfgInterfaceList tr').length === 0) {
@@ -427,7 +427,7 @@ function applyPreset(type) {
         $('#cfgOidCs').val('');
         $('#cfgOidHttp').val('');
         $('#cfgOidHttps').val('');
-        $('#cfgOidFtp').val('');
+        $('#cfgOidHttp2').val('');
     }
     
     checkForChanges();

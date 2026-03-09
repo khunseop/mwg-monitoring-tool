@@ -216,8 +216,8 @@
                     return true;
                 }
                 
-                const basicMetrics = ['cpu','mem','cc','cs','disk','http','https','ftp'];
-                const basicTitles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', disk: 'DISK', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
+                const basicMetrics = ['cpu','mem','cc','cs','disk','http','https','http2'];
+                const basicTitles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', disk: 'DISK', http: 'HTTP', https: 'HTTPS', http2: 'HTTP2' };
                 
                 // Get configured interfaces from config
                 const interfaceOids = (ru.cachedConfig && ru.cachedConfig.interface_oids) ? ru.cachedConfig.interface_oids : {};
@@ -389,7 +389,7 @@
             const interfaceOids = (ru.cachedConfig && ru.cachedConfig.interface_oids) ? ru.cachedConfig.interface_oids : {};
             const configuredInterfaceNames = Object.keys(interfaceOids);
             
-            const basicMetrics = ['cpu','mem','cc','cs','disk','http','https','ftp'];
+            const basicMetrics = ['cpu','mem','cc','cs','disk','http','https','http2'];
             const interfaceMetrics = [];
             configuredInterfaceNames.forEach(ifName => {
                 interfaceMetrics.push(`if_${ifName}_in`);
@@ -724,7 +724,7 @@
          */
         openModal(metricKey) {
             const ru = window.ru;
-            const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', disk: 'DISK', http: 'HTTP', https: 'HTTPS', ftp: 'FTP' };
+            const titles = { cpu: 'CPU', mem: 'MEM', cc: 'CC', cs: 'CS', disk: 'DISK', http: 'HTTP', https: 'HTTPS', http2: 'HTTP2' };
             if (metricKey.startsWith('if_')) {
                 const ifName = metricKey.replace(/^if_/, '').replace(/_in$|_out$/, '');
                 const direction = metricKey.endsWith('_in') ? 'IN' : (metricKey.endsWith('_out') ? 'OUT' : '');

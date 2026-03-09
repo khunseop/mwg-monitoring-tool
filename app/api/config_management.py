@@ -77,7 +77,7 @@ async def export_full_config_excel(db: Session = Depends(get_db)):
         metric_map = {
             "cpu": ("CPU사용률", "%"), "mem": ("메모리사용률", "%"), "disk": ("디스크사용률", "%"),
             "cc": ("동시접속수(CC)", "sess"), "cs": ("초당접속수(CS)", "cps"),
-            "http": ("HTTP트래픽", "Mbps"), "https": ("HTTPS트래픽", "Mbps"), "ftp": ("FTP트래픽", "Mbps")
+            "http": ("HTTP트래픽", "Mbps"), "https": ("HTTPS트래픽", "Mbps"), "http2": ("HTTP2트래픽", "Mbps")
         }
         for key, (label, unit) in metric_map.items():
             ws_res.append([label, oids.get(key, ""), th.get(key, ""), unit, f"{key} 관련 설정"])
@@ -187,7 +187,7 @@ async def import_full_config_excel(file: UploadFile = File(...), db: Session = D
             metric_rev_map = {
                 "CPU사용률": "cpu", "메모리사용률": "mem", "디스크사용률": "disk",
                 "동시접속수(CC)": "cc", "초당접속수(CS)": "cs",
-                "HTTP트래픽": "http", "HTTPS트래픽": "https", "FTP트래픽": "ftp"
+                "HTTP트래픽": "http", "HTTPS트래픽": "https", "HTTP2트래픽": "http2"
             }
             for row in ws.iter_rows(min_row=2, values_only=True):
                 m_key = metric_rev_map.get(str(row[0]))

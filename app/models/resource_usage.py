@@ -20,7 +20,7 @@ class ResourceUsage(Base):
     cs = Column(Float, nullable=True)
     http = Column(Float, nullable=True)
     https = Column(Float, nullable=True)
-    ftp = Column(Float, nullable=True)
+    http2 = Column(Float, nullable=True)
     disk = Column(Float, nullable=True)  # Disk usage percentage
 
     # Interface MBPS: JSON string mapping interface index to {"in_mbps": float, "out_mbps": float}
