@@ -439,7 +439,7 @@ function updateImportFileName() {
 function importConfig() {
     const fileInput = document.getElementById('cfgImportFile');
     if (fileInput.files.length === 0) {
-        alert('가져올 JSON 파일을 선택하세요.');
+        alert('가져올 Excel(.xlsx) 파일을 선택하세요.');
         return;
     }
 
