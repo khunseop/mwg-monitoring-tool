@@ -95,70 +95,6 @@
         return ($(select).val() || []).map(v => parseInt(v, 10));
     }
 
-    function updateDashboard(records) {
-        if (!records || records.length === 0) {
-            $('#sbMiniDashboard').hide();
-            return;
-        }
-
-        const stats = {
-            total: records.length,
-            urlTraffic: {}, // {url: bytes}
-            urlAge: { url: '-', age: 0 },
-            clients: {} // {ip: count}
-        };
-
-        records.forEach(r => {
-            // URL별 트래픽 합계 (수신 + 송신)
-            const url = r.url || '-';
-            const traffic = (r.cl_bytes_received || 0) + (r.cl_bytes_sent || 0);
-            stats.urlTraffic[url] = (stats.urlTraffic[url] || 0) + traffic;
-
-            // 최장 세션 유지 URL
-            const age = parseInt(r.age_seconds || 0, 10);
-            if (age > stats.urlAge.age) {
-                stats.urlAge = { url: url, age: age };
-            }
-
-            // 클라이언트별 요청 수
-            const ip = r.client_ip || '-';
-            stats.clients[ip] = (stats.clients[ip] || 0) + 1;
-        });
-
-        // TOP 송수신 URL 찾기
-        let topUrl = '-';
-        let maxTraffic = -1;
-        for (const [url, traffic] of Object.entries(stats.urlTraffic)) {
-            if (traffic > maxTraffic) {
-                maxTraffic = traffic;
-                topUrl = url;
-            }
-        }
-
-        // 최다 요청 클라이언트 찾기
-        let topClient = '-';
-        let maxReqs = -1;
-        for (const [ip, count] of Object.entries(stats.clients)) {
-            if (count > maxReqs) {
-                maxReqs = count;
-                topClient = ip;
-            }
-        }
-
-        $('#stat-total').text(stats.total.toLocaleString());
-        
-        const $topUrl = $('#stat-top-url');
-        $topUrl.text(topUrl).attr('title', topUrl);
-        
-        const $longestUrl = $('#stat-longest-url');
-        const ageStr = (window.AppUtils && AppUtils.formatSeconds) ? AppUtils.formatSeconds(stats.urlAge.age) : stats.urlAge.age + 's';
-        $longestUrl.text(`${stats.urlAge.url} (${ageStr})`).attr('title', stats.urlAge.url);
-        
-        $('#stat-top-client').text(topClient);
-        
-        $('#sbMiniDashboard').fadeIn();
-    }
-
     async function loadSessions() {
         const proxyIds = getSelectedProxyIds();
         if (proxyIds.length === 0) {
@@ -187,7 +123,6 @@
             
             if (sb.gridApi) {
                 sb.gridApi.setGridOption('rowData', sb.records);
-                updateDashboard(sb.records);
             }
             
             setStatus(`성공 (${sb.records.length}건)`, 'is-primary is-light');
@@ -243,7 +178,6 @@
                 sb.records = state.records;
                 if (sb.gridApi) {
                     sb.gridApi.setGridOption('rowData', sb.records);
-                    updateDashboard(sb.records);
                     setStatus(`데이터 복원됨 (${sb.records.length}건)`, 'is-info is-light');
                 }
             }
@@ -267,6 +201,7 @@
             paginationPageSize: 100,
             rowHeight: 35,
             headerHeight: 40,
+            animateRows: true, // 추가
             onRowDoubleClicked: params => showDetail(params.data),
             theme: 'quartz',
             enableBrowserTooltips: true,

@@ -12,7 +12,22 @@
 						return (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(params.value) : params.value;
 					}
 				},
-				{ field: 'protocol', headerName: '프로토콜', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 90, width: 100 },
+				{ field: 'protocol', headerName: '프로토콜', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 90, width: 100,
+					cellRenderer: function(params) {
+						if(!params.value) return '';
+						var val = String(params.value).toUpperCase();
+						var cls = 'is-light';
+						if(val === 'HTTP') cls = 'is-info is-light';
+						else if(val === 'HTTPS') cls = 'is-link is-light';
+						else if(val === 'FTP') cls = 'is-warning is-light';
+						return '<span class="tag ' + cls + ' mono" style="font-weight: 600; font-size: 0.7rem;">' + val + '</span>';
+					}
+				},
+				{ field: 'status', headerName: '상태', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 80, width: 90,
+					cellRenderer: function(params) {
+						return (window.AppUtils && AppUtils.renderStatusTag) ? AppUtils.renderStatusTag(params.value) : params.value;
+					}
+				},
 				{ field: 'user_name', headerName: '사용자', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 100, width: 130 },
 				{ field: 'client_ip', headerName: '클라이언트 IP', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 130, width: 150, cellClass: 'mono' },
 				{ field: 'server_ip', headerName: '서버 IP', sortable: true, filter: 'agTextColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 130, width: 150, cellClass: 'mono' },
@@ -26,7 +41,7 @@
 						return (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(params.value) : params.value;
 					}
 				},
-				{ field: 'age_seconds', headerName: 'Age(s)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 80, width: 90,
+				{ field: 'age_seconds', headerName: 'Age(s)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 80, width: 90, cellClass: 'num',
 					valueFormatter: function(params) {
 						return (window.AppUtils && AppUtils.formatSeconds) ? AppUtils.formatSeconds(params.value) : params.value;
 					}
