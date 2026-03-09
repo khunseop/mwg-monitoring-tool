@@ -179,8 +179,8 @@
 					sortable: true,
 					filter: 'agTextColumnFilter',
 					filterParams: { applyButton: true, clearButton: true },
-					minWidth: 120,
-					width: 150
+					minWidth: 140,
+					width: 180
 				};
 				
 				// 특정 컬럼에 대한 포맷터 설정

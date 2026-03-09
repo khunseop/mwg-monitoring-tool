@@ -85,7 +85,6 @@
     min-width: 100px;
 }
 
-.settings-bar .button,
 .settings-bar .input,
 .settings-bar .select,
 .settings-bar .select select,
@@ -96,11 +95,28 @@
     background-color: white !important;
 }
 
+.settings-bar .button {
+    height: 32px !important;
+    min-height: 32px !important;
+    font-size: 0.875rem !important;
+}
+
 /* Buttons */
 .button {
     border-radius: var(--radius-sm);
     font-weight: 500;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.button.is-subtle {
+    background-color: #f0f7ff !important; /* Very light blue */
+    border-color: #cbdcf7 !important;
+    color: #1e40af !important; /* Darker blue for text */
+}
+
+.button.is-subtle:hover {
+    background-color: #e0efff !important;
+    border-color: #adc9f3 !important;
 }
 
 .button.is-primary {
