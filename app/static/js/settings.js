@@ -1,15 +1,18 @@
-// 레거시 URL 파라미터 지원 (리다이렉트)
-document.addEventListener('DOMContentLoaded', function() {
-    const params = new URLSearchParams(window.location.search);
-    const tab = params.get('tab');
-    if (tab && (tab === 'resource-config' || tab === 'session-config')) {
-        // 레거시 URL 파라미터 제거하고 통합 페이지로 리다이렉트
-        window.history.replaceState({}, '', '/settings');
-    }
-});
+(function(window, $) {
+    'use strict';
 
-// Interface OID management
-let interfaceOidCounter = 0;
+    // 레거시 URL 파라미터 지원 (리다이렉트)
+    $(document).ready(function() {
+        const params = new URLSearchParams(window.location.search);
+        const tab = params.get('tab');
+        if (tab && (tab === 'resource-config' || tab === 'session-config')) {
+            // 레거시 URL 파라미터 제거하고 통합 페이지로 리다이렉트
+            window.history.replaceState({}, '', '/settings');
+        }
+    });
+
+    // Interface OID management
+    let interfaceOidCounter = 0;
 
 function addInterfaceRow(name = '', oids = {}, threshold = '', bandwidth = '') {
     const counter = interfaceOidCounter++;
@@ -523,3 +526,5 @@ window.applyPreset = applyPreset;
 window.exportConfig = exportConfig;
 window.importConfig = importConfig;
 window.updateImportFileName = updateImportFileName;
+
+})(window, jQuery);

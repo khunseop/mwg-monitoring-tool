@@ -200,7 +200,6 @@
                 rowHeight: 35,
                 headerHeight: 45, // Increase header height to prevent text clipping
                 onRowDoubleClicked: params => showDetail(params.data),
-                theme: 'quartz',
                 overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">로그가 비어있습니다.</div>'
             };
             const gridDiv = document.querySelector('#tlTableGrid');

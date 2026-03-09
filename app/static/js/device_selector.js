@@ -157,6 +157,11 @@
 				if (!$proxy || $proxy.length === 0) return;
 				if (window.TomSelect) {
 					try {
+						// 기존 인스턴스가 있다면 파괴 (PJAX 등 재진입 시 중복 방지)
+						if ($proxy[0].tomselect) {
+							try { $proxy[0].tomselect.destroy(); } catch (e) { /* ignore */ }
+						}
+						
 						if (state.ts && state.ts.destroy) {
 							try { state.ts.destroy(); } catch (e) { /* ignore */ }
 							state.ts = null;

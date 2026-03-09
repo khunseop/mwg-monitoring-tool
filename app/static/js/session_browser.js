@@ -210,7 +210,6 @@
             headerHeight: 40,
             animateRows: true, // 추가
             onRowDoubleClicked: params => showDetail(params.data),
-            theme: 'quartz',
             enableBrowserTooltips: true,
             overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted); font-size: 0.875rem;">조회된 세션 데이터가 없습니다. 상단에서 "세션 불러오기"를 클릭하세요.</div>',
             onGridReady: async (params) => {
