@@ -422,8 +422,44 @@ function applyPreset(type) {
 }
 
 // 설정 내보내기/가져오기
-function exportConfig() {
-    window.location.href = '/api/config/export';
+async function exportConfig() {
+    try {
+        $('#cfgStatus').removeClass('is-success is-danger').text('내보내는 중...');
+        const response = await fetch('/api/config/export', {
+            method: 'GET',
+        });
+        
+        if (!response.ok) {
+            throw new Error(`서버 에러: ${response.status}`);
+        }
+        
+        const blob = await response.blob();
+        
+        // Get filename from Content-Disposition if available
+        let filename = `PMT_Config_Backup_${new Date().toISOString().replace(/[:.]/g, '_')}.xlsx`;
+        const disposition = response.headers.get('Content-Disposition');
+        if (disposition && disposition.indexOf('filename=') !== -1) {
+            const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+            if (matches != null && matches[1]) { 
+                filename = matches[1].replace(/['"]/g, '');
+            }
+        }
+        
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        $('#cfgStatus').removeClass('is-danger').addClass('is-success').text('내보내기 완료');
+    } catch (err) {
+        console.error('Export failed:', err);
+        alert('설정 내보내기 실패: ' + err.message);
+        $('#cfgStatus').addClass('is-danger').text('내보내기 실패');
+    }
 }
 
 function updateImportFileName() {

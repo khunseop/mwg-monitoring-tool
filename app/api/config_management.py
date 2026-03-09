@@ -65,9 +65,7 @@ async def export_full_config_excel(db: Session = Depends(get_db)):
     res_cfg = db.query(ResourceConfig).first()
     if res_cfg:
         ws_sys.append(["Resource", "Community", res_cfg.community, "SNMP Community String"])
-        ws_sys.append(["Resource", "OIDs_JSON", res_cfg.oids_json, "Common OIDs"])
-        ws_sys.append(["Resource", "Thresholds_JSON", res_cfg.thresholds_json, "Alert Thresholds"])
-        ws_sys.append(["Resource", "Bandwidth_Mbps", res_cfg.bandwidth_mbps, "Default Bandwidth"])
+        ws_sys.append(["Resource", "OIDs_JSON", res_cfg.oids_json, "Raw OIDs JSON (includes embedded settings)"])
     
     # Session Browser Config
     sb_cfg = db.query(SessionBrowserConfig).first()
@@ -173,8 +171,6 @@ async def import_full_config_excel(file: UploadFile = File(...), db: Session = D
                 
                 if "Community" in res_data: existing.community = str(res_data["Community"])
                 if "OIDs_JSON" in res_data: existing.oids_json = str(res_data["OIDs_JSON"]) if res_data["OIDs_JSON"] else None
-                if "Thresholds_JSON" in res_data: existing.thresholds_json = str(res_data["Thresholds_JSON"]) if res_data["Thresholds_JSON"] else None
-                if "Bandwidth_Mbps" in res_data: existing.bandwidth_mbps = float(res_data["Bandwidth_Mbps"])
                 db.commit()
                 
             if sb_data:
