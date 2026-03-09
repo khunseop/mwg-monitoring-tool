@@ -386,7 +386,11 @@
                     toolbar: { show: false },
                     events: {
                         mounted: (chartContext, config) => {
-                            setTimeout(() => chartContext.resize(), 100);
+                            setTimeout(() => {
+                                if (chartContext && typeof chartContext.resize === 'function') {
+                                    chartContext.resize();
+                                }
+                            }, 100);
                         }
                     }
                 },
