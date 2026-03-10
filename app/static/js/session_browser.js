@@ -114,6 +114,8 @@
             return;
         }
 
+        const query = $('#sbQuery').val() || '';
+
         setStatus('데이터 수집 중...', 'is-warning is-light');
         $('#sbLoadingIndicator').css('display', 'flex'); 
         $('#sbLoadBtn').addClass('is-loading');
@@ -122,7 +124,10 @@
             const res = await fetch('/api/session-browser/load', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ proxy_ids: proxyIds })
+                body: JSON.stringify({ 
+                    proxy_ids: proxyIds,
+                    q: query
+                })
             });
 
             if (!res.ok) {
@@ -163,6 +168,7 @@
             const current = JSON.parse(localStorage.getItem(sb.storageKey) || '{}');
             current.hasRecords = (sb.records.length > 0);
             current.timestamp = new Date().getTime();
+            current.query = $('#sbQuery').val(); // 검색어 저장
             localStorage.setItem(sb.storageKey, JSON.stringify(current));
             
         } catch (e) {
@@ -177,6 +183,7 @@
             if (!saved) return;
             
             const meta = JSON.parse(saved);
+            if (meta.query) $('#sbQuery').val(meta.query); // 검색어 복원
             
             // 2. 시간 제한 확인 (24시간으로 연장)
             const ttl = 24 * 60 * 60 * 1000;

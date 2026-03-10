@@ -39,6 +39,7 @@ class SessionRecord(SessionRecordBase, TimestampModel):
 
 class CollectRequest(BaseModel):
     proxy_ids: List[int] = Field(min_length=1)
+    q: Optional[str] = None
 
 
 class CollectResponse(BaseModel):

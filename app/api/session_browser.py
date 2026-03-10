@@ -187,10 +187,15 @@ def _parse_sessions(output: str) -> List[Dict[str, Any]]:
     return records
 
 
-def _collect_for_proxy(proxy: Proxy, cfg: SessionBrowserConfigModel) -> Tuple[int, List[Dict[str, Any]] | None, str | None]:
+def _collect_for_proxy(proxy: Proxy, cfg: SessionBrowserConfigModel, q: Optional[str] = None) -> Tuple[int, List[Dict[str, Any]] | None, str | None]:
     if not proxy.username:
         return proxy.id, None, "Proxy is missing SSH username"
     command = f"{cfg.command_path} {cfg.command_args}".strip()
+    if q:
+        import shlex
+        safe_q = shlex.quote(q)
+        command += f" | grep -F -- {safe_q}"
+    
     try:
         t0 = time.perf_counter()
         stdout_str = ssh_exec(
@@ -246,7 +251,7 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
 
     t_fetch_parse_start = time.perf_counter()
     with ThreadPoolExecutor(max_workers=cfg.max_workers or 4) as executor:
-        future_to_proxy = {executor.submit(_collect_for_proxy, p, cfg): p for p in proxies}
+        future_to_proxy = {executor.submit(_collect_for_proxy, p, cfg, payload.q): p for p in proxies}
         for future in as_completed(future_to_proxy):
             proxy = future_to_proxy[future]
             try:
