@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse, UJSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Tuple, Iterable, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -332,7 +332,7 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
         (time.perf_counter() - t_overall_start) * 1000.0,
     )
 
-    return UJSONResponse(content={
+    return JSONResponse(content={
         "requested": len(proxies),
         "succeeded": len(proxies) - len(errors),
         "failed": len(errors),
@@ -345,11 +345,11 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
 async def load_sessions(payload: CollectRequest, db: Session = Depends(get_db)):
     """Legacy/Alias endpoint for collect_sessions that returns data in the format expected by some frontend versions."""
     res = await collect_sessions(payload, db)
-    # res is now a UJSONResponse, but for this alias we want to restructure it
+    # res is now a JSONResponse, but for this alias we want to restructure it
     # We can extract data from the response content
     import ujson
     data = json.loads(res.body)
-    return UJSONResponse(content={
+    return JSONResponse(content={
         "requested": data["requested"],
         "succeeded": data["succeeded"],
         "failed": data["failed"],
