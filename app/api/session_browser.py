@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Tuple, Iterable, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -321,18 +322,18 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
         pass
 
     logger.info(
-        "session-collect: proxies=%d ok=%d fail=%d records=%d delete_ms=%.1f fetch_parse_ms=%.1f db_insert_ms=%.1f total_ms=%.1f",
+        "session-collect: proxies=%d ok=%d fail=%d records=%d fetch_parse_ms=%.1f db_insert_ms=%.1f total_ms=%.1f",
         len(proxies),
         len(proxies) - len(errors),
         len(errors),
         total_written,
-        0.0,
         (t_fetch_parse_end - t_fetch_parse_start) * 1000.0,
         (t_tmp_write_end - t_tmp_write_start) * 1000.0,
         (time.perf_counter() - t_overall_start) * 1000.0,
     )
 
-    return JSONResponse(content={
+    # FastAPI의 jsonable_encoder를 사용하여 datetime 객체를 안전하게 변환
+    return jsonable_encoder({
         "requested": len(proxies),
         "succeeded": len(proxies) - len(errors),
         "failed": len(errors),
@@ -344,18 +345,15 @@ async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db
 @router.post("/session-browser/load")
 async def load_sessions(payload: CollectRequest, db: Session = Depends(get_db)):
     """Legacy/Alias endpoint for collect_sessions that returns data in the format expected by some frontend versions."""
-    res = await collect_sessions(payload, db)
-    # res is now a JSONResponse, but for this alias we want to restructure it
-    # We can extract data from the response content
-    import ujson
-    data = json.loads(res.body)
-    return JSONResponse(content={
+    data = await collect_sessions(payload, db)
+    # 이미 jsonable_encoder 처리가 된 data를 재구성
+    return {
         "requested": data["requested"],
         "succeeded": data["succeeded"],
         "failed": data["failed"],
         "errors": data["errors"],
         "sessions": data["items"]
-    })
+    }
 
 
 @router.get("/session-browser/item/{record_id}")
