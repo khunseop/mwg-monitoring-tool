@@ -74,8 +74,16 @@
 
     async function saveState(records){
         try {
+            const $ps = $('#tlProxySelect');
+            let proxyIds = [];
+            if ($ps[0] && $ps[0].tomselect) {
+                proxyIds = $ps[0].tomselect.getValue();
+            } else {
+                proxyIds = $ps.val() || [];
+            }
+
             const state = {
-                proxyId: $('#tlProxySelect').val(),
+                proxyIds: proxyIds,
                 groupId: $('#tlGroupSelect').val(),
                 query: $('#tlQuery').val(),
                 limit: $('#tlLimit').val(),
@@ -114,24 +122,17 @@
             if (state.limit !== undefined) $('#tlLimit').val(state.limit);
             if (state.direction !== undefined) $('#tlDirection').val(state.direction);
             
-            setTimeout(async () => {
-                if (state.groupId) $('#tlGroupSelect').val(state.groupId).trigger('change');
-                
-                // IndexedDB에서 데이터 복원
-                if (window.AppDB) {
-                    const data = await window.AppDB.get(STORAGE_KEY + '_records');
-                    if (data && data.records && data.records.length > 0) {
-                        LOG_RECORDS = data.records;
-                        renderTable(LOG_RECORDS);
-                        setStatus(`${LOG_RECORDS.length}건 복원됨`, 'is-info is-light');
-                    }
+            // DeviceSelector가 초기화된 후 상태 복원 수행 (initTrafficLogs에서 처리됨)
+            // 여기서는 데이터만 복원
+            if (window.AppDB) {
+                const data = await window.AppDB.get(STORAGE_KEY + '_records');
+                if (data && data.records && data.records.length > 0) {
+                    LOG_RECORDS = data.records;
+                    renderTable(LOG_RECORDS);
+                    setStatus(`${LOG_RECORDS.length}건 복원됨`, 'is-info is-light');
                 }
-
-                setTimeout(() => {
-                    if (state.proxyId) $('#tlProxySelect').val(state.proxyId);
-                    IS_RESTORING = false;
-                }, 150);
-            }, 100);
+            }
+            IS_RESTORING = false;
         } catch(e) { 
             console.warn('Failed to restore state', e);
             IS_RESTORING = false; 
@@ -139,16 +140,22 @@
     }
 
     async function loadLogs(){
-        const proxyId = $('#tlProxySelect').val();
-        if (!proxyId) {
-            showError('조회할 프록시를 선택하세요.');
+        let proxyIds = [];
+        const $ps = $('#tlProxySelect');
+        if ($ps[0] && $ps[0].tomselect) {
+            proxyIds = $ps[0].tomselect.getValue();
+        } else {
+            proxyIds = $ps.val() || [];
+        }
+
+        if (!proxyIds || proxyIds.length === 0) {
+            showError('조회할 프록시를 적어도 하나 선택하세요.');
             return;
         }
         
         clearError();
         setStatus('로그 조회 중...', 'is-warning is-light');
         
-        // Reset view for new search
         $('#tlEmptyState').hide();
         $('#tlResultParsed').hide();
         $('#tlResultRaw').hide();
@@ -159,8 +166,14 @@
             const limit = $('#tlLimit').val() || 200;
             const direction = $('#tlDirection').val() || 'tail';
             
-            const res = await fetch(`${API_BASE}/traffic-logs/${proxyId}?q=${encodeURIComponent(query)}&limit=${limit}&direction=${direction}&parsed=true`);
-            if (!res.ok) throw new Error('로그를 가져오지 못했습니다. SSH 연결 상태를 확인하세요.');
+            // 다중 프록시 조회를 위해 쉼표로 구분된 ID 전달
+            const pIdsParam = Array.isArray(proxyIds) ? proxyIds.join(',') : proxyIds;
+            const res = await fetch(`${API_BASE}/traffic-logs?proxy_ids=${pIdsParam}&q=${encodeURIComponent(query)}&limit=${limit}&direction=${direction}`);
+            
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.detail || '로그를 가져오지 못했습니다. SSH 연결 상태를 확인하세요.');
+            }
             
             const data = await res.json();
             const records = data.records || [];
@@ -171,7 +184,11 @@
                 setStatus('결과 없음', 'is-light');
             } else {
                 renderTable(records);
-                setStatus(`${records.length}건 조회됨`, 'is-primary is-light');
+                let statusText = `${records.length}건 조회됨`;
+                if (data.failed > 0) {
+                    statusText += ` (성공:${data.succeeded}, 실패:${data.failed})`;
+                }
+                setStatus(statusText, 'is-primary is-light');
             }
             await saveState(records);
         } catch(err) {
@@ -213,38 +230,37 @@
     }
 
     function initTrafficLogs() {
-        function loadGroups() {
-            $.getJSON(`${API_BASE}/proxy-groups`).done(data => {
-                const $gs = $('#tlGroupSelect');
-                $gs.empty().append('<option value="">전체 그룹</option>');
-                data.forEach(g => $gs.append(`<option value="${g.id}">${g.name}</option>`));
-                
-                $gs.off('change').on('change', () => {
-                    const gid = $gs.val();
-                    const filtered = PROXIES.filter(p => !gid || String(p.group_id) === String(gid));
-                    const $ps = $('#tlProxySelect');
-                    $ps.empty();
-                    if (filtered.length === 0) $ps.append('<option value="">프록시 없음</option>');
-                    filtered.forEach(p => $ps.append(`<option value="${p.id}">${p.host}</option>`));
-                });
+        if (window.DeviceSelector) {
+            window.DeviceSelector.init({
+                groupSelect: '#tlGroupSelect',
+                proxySelect: '#tlProxySelect',
+                proxyTrigger: '#tlProxyTrigger',
+                selectionCounter: '#tlSelectionCounter',
+                storageKey: STORAGE_KEY,
+                onData: (data) => {
+                    PROXIES = data.proxies;
+                    if (!IS_RESTORING) restoreState();
+                },
+                onGroupChange: (groupId) => {
+                    // 그룹 변경 시 이전 결과와 에러 메시지 초기화
+                    clearError();
+                    setStatus('준비', 'is-primary is-light');
+                }
             });
         }
-
-        function loadProxiesList() {
-            $.getJSON(`${API_BASE}/proxies`).done(data => {
-                PROXIES = data.filter(p => p.is_active);
-                $('#tlGroupSelect').trigger('change');
-                if (!IS_RESTORING) restoreState();
-            });
-        }
-
-        loadGroups();
-        loadProxiesList();
 
         $('#tlLoadBtn').off('click').on('click', loadLogs);
         
         $('#tlQuickFilter').off('input').on('input', function() {
             if (tlGridApi) tlGridApi.setGridOption('quickFilterText', $(this).val());
+        });
+
+        $('#tlClearFiltersBtn').off('click').on('click', () => {
+            $('#tlQuickFilter').val('');
+            if (tlGridApi) {
+                tlGridApi.setGridOption('quickFilterText', '');
+                tlGridApi.setFilterModel(null);
+            }
         });
 
         $('#tlDetailModal .delete, #tlDetailModal .button, #tlDetailModal .modal-background').off('click').on('click', () => {

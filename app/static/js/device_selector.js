@@ -131,7 +131,7 @@
 					if (state.ts) { 
 						state.ts.setValue(vals, false); 
 					} else { 
-						$proxy.find('option').prop('selected', true); 
+						$proxy.val(vals);
 						$proxy.trigger('change'); 
 					}
 				} catch (e) { /* ignore */ }
@@ -230,6 +230,9 @@
 						selectCurrentGroupProxies();
 						updateCounter();
 						saveToStorage();
+						if (typeof options.onGroupChange === 'function') {
+							options.onGroupChange($group.val());
+						}
 					});
 				}
 				if ($trigger.length) {

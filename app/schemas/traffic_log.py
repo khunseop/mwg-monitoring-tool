@@ -46,6 +46,15 @@ class TrafficLogResponse(BaseModel):
 	count: int
 
 
+class MultiTrafficLogResponse(BaseModel):
+	requested: int
+	succeeded: int
+	failed: int
+	errors: Dict[int, str] = Field(default_factory=dict)
+	records: List[TrafficLogRecord]
+	count: int
+
+
 class TrafficLogDB(BaseModel):
 	id: int
 	proxy_id: int

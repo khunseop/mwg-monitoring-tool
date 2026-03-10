@@ -19,10 +19,15 @@
                 </div>
             </div>
 
-            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+            <div class="is-flex is-align-items-center" style="gap: 0.4rem; position: relative;">
                 <span class="is-size-7 has-text-grey-light" style="white-space: nowrap; font-weight: 600;">프록시</span>
-                <div class="select is-small" style="min-width: 180px;">
-                    <select id="tlProxySelect"></select>
+                <button class="button is-subtle is-small px-3" id="tlProxyTrigger" style="min-width: 180px; justify-content: space-between;">
+                    <span id="tlSelectionCounter">프록시 선택</span>
+                    <span class="is-size-7 ml-2">▼</span>
+                </button>
+                <!-- Hidden select for TomSelect -->
+                <div style="position: absolute; visibility: hidden; height: 0;">
+                    <select id="tlProxySelect" multiple></select>
                 </div>
             </div>
             

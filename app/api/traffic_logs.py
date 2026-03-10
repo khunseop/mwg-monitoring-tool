@@ -7,10 +7,11 @@ from app.utils.ssh import ssh_exec
 
 from app.database.database import get_db
 from app.models.proxy import Proxy
-from app.schemas.traffic_log import TrafficLogResponse, TrafficLogRecord, TrafficLogDB
+from app.schemas.traffic_log import TrafficLogResponse, TrafficLogRecord, TrafficLogDB, MultiTrafficLogResponse
 from app.models.traffic_log import TrafficLog as TrafficLogModel
 from app.utils.traffic_log_parser import parse_log_line
 from app.utils.crypto import decrypt_string_if_encrypted
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 router = APIRouter()
@@ -62,6 +63,124 @@ def _ssh_exec(host: str, port: int, username: str, password: Optional[str], comm
         raise HTTPException(status_code=502, detail=f"ssh error: {str(e)}")
 
 
+def _fetch_and_parse_for_proxy(db_proxy: Proxy, q: Optional[str], limit: int, direction: str, db: Session) -> Tuple[List[TrafficLogRecord], str | None]:
+    try:
+        command = _build_remote_command(db_proxy.traffic_log_path, q, limit, direction)
+        raw = _ssh_exec(db_proxy.host, db_proxy.port or 22, db_proxy.username, decrypt_string_if_encrypted(db_proxy.password), command)
+        lines = [ln for ln in raw.split("\n") if ln]
+        
+        records: List[TrafficLogRecord] = []
+        to_insert: List[Dict[str, Any]] = []
+        collected_ts = datetime.utcnow()
+        
+        for ln in lines:
+            try:
+                rec_dict = parse_log_line(ln)
+                # Ensure proxy_id is set in the record
+                rec_dict["proxy_id"] = str(db_proxy.id)
+                records.append(TrafficLogRecord(**rec_dict))
+                row = {
+                    "proxy_id": db_proxy.id,
+                    "collected_at": collected_ts,
+                }
+                row.update(rec_dict)
+                to_insert.append(row)
+            except Exception:
+                # Add unparseable line as url_path for some visibility
+                records.append(TrafficLogRecord(url_path=ln, proxy_id=str(db_proxy.id)))
+        
+        if to_insert:
+            # We use a separate thread for DB to avoid blocking, but since this is called from ThreadPoolExecutor already, it's fine.
+            # But we must be careful with session thread-safety. 
+            # In get_multi_proxy_traffic_logs, we'll give each call its own session or a lock.
+            try:
+                # Delete old snapshot for this proxy
+                db.query(TrafficLogModel).filter(TrafficLogModel.proxy_id == db_proxy.id).delete(synchronize_session=False)
+                db.bulk_insert_mappings(TrafficLogModel, to_insert)
+                db.commit()
+            except Exception as e:
+                db.rollback()
+                logger.error(f"DB insert failed for proxy {db_proxy.id}: {e}")
+        
+        return records, None
+    except Exception as e:
+        return [], str(e)
+
+
+@router.get("/traffic-logs", response_model=MultiTrafficLogResponse)
+def get_multi_proxy_traffic_logs(
+    proxy_ids: str = Query(..., description="Comma-separated list of proxy IDs"),
+    db: Session = Depends(get_db),
+    q: Optional[str] = Query(default=None, max_length=256, description="Fixed-string search (grep -F)"),
+    limit: int = Query(default=200, ge=1, le=1000),
+    direction: str = Query(default="tail", pattern=r"^(head|tail)$"),
+):
+    """여러 프록시의 로그를 동시에 조회합니다."""
+    try:
+        p_ids = [int(x.strip()) for x in proxy_ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid proxy_ids format")
+
+    if not p_ids:
+        raise HTTPException(status_code=400, detail="No proxy IDs provided")
+
+    proxies = db.query(Proxy).filter(Proxy.id.in_(p_ids)).filter(Proxy.is_active == True).all()
+    if not proxies:
+        return MultiTrafficLogResponse(requested=len(p_ids), succeeded=0, failed=len(p_ids), records=[], count=0)
+
+    q_valid = _validate_query(q)
+    
+    all_records: List[TrafficLogRecord] = []
+    errors: Dict[int, str] = {}
+    succeeded = 0
+    
+    # Use ThreadPoolExecutor for parallel SSH
+    from app.database.database import SessionLocal
+    
+    with ThreadPoolExecutor(max_workers=min(10, len(proxies))) as executor:
+        # Each thread gets its own DB session
+        def task(p):
+            local_db = SessionLocal()
+            try:
+                return _fetch_and_parse_for_proxy(p, q_valid, limit, direction, local_db)
+            finally:
+                local_db.close()
+                
+        future_to_proxy = {executor.submit(task, p): p for p in proxies}
+        
+        for future in as_completed(future_to_proxy):
+            proxy = future_to_proxy[future]
+            try:
+                records, err = future.result()
+                if err:
+                    errors[proxy.id] = err
+                else:
+                    all_records.extend(records)
+                    succeeded += 1
+            except Exception as e:
+                errors[proxy.id] = str(e)
+
+    # Sort all records by datetime if possible (most recent first)
+    # Note: datetime format is "dd/MMM/yyyy:HH:mm:ss Z" or similar
+    def parse_ts(r):
+        if not r.datetime: return 0
+        try:
+            s = r.datetime.strip("[]")
+            return datetime.strptime(s, "%d/%b/%Y:%H:%M:%S %z").timestamp()
+        except: return 0
+
+    all_records.sort(key=parse_ts, reverse=True)
+
+    return MultiTrafficLogResponse(
+        requested=len(p_ids),
+        succeeded=succeeded,
+        failed=len(p_ids) - succeeded,
+        errors=errors,
+        records=all_records,
+        count=len(all_records)
+    )
+
+
 @router.get("/traffic-logs/{proxy_id}", response_model=TrafficLogResponse)
 def get_proxy_traffic_logs(
 	proxy_id: int,
@@ -74,54 +193,20 @@ def get_proxy_traffic_logs(
 	db_proxy = db.query(Proxy).filter(Proxy.id == proxy_id).first()
 	if not db_proxy:
 		raise HTTPException(status_code=404, detail="Proxy not found")
-	if not db_proxy.is_active:
-		raise HTTPException(status_code=400, detail="Proxy is inactive")
-	if not db_proxy.traffic_log_path:
-		raise HTTPException(status_code=400, detail="traffic_log_path not configured for this proxy")
-	if not db_proxy.host or not db_proxy.username:
-		raise HTTPException(status_code=400, detail="proxy host/username not configured")
-
-	q_valid = _validate_query(q)
-
-	command = _build_remote_command(db_proxy.traffic_log_path, q_valid, limit, direction)
-	raw = _ssh_exec(db_proxy.host, db_proxy.port or 22, db_proxy.username, decrypt_string_if_encrypted(db_proxy.password), command)
-	lines = [ln for ln in raw.split("\n") if ln]
-	truncated = len(lines) >= min(limit, len(lines)) and len(lines) == limit
-
+	
+    # Single proxy fetch using the helper
+	records, err = _fetch_and_parse_for_proxy(db_proxy, _validate_query(q), limit, direction, db)
+	if err:
+		raise HTTPException(status_code=502, detail=err)
+        
 	if not parsed:
-		return TrafficLogResponse(proxy_id=proxy_id, lines=lines, records=None, truncated=truncated, count=len(lines))
+		# Compatibility: return lines if requested (raw)
+		command = _build_remote_command(db_proxy.traffic_log_path, q, limit, direction)
+		raw = _ssh_exec(db_proxy.host, db_proxy.port or 22, db_proxy.username, decrypt_string_if_encrypted(db_proxy.password), command)
+		lines = [ln for ln in raw.split("\n") if ln]
+		return TrafficLogResponse(proxy_id=proxy_id, lines=lines, records=None, truncated=len(lines) == limit, count=len(lines))
 
-	records: List[TrafficLogRecord] = []
-	to_insert: List[Dict[str, Any]] = []
-	collected_ts = datetime.utcnow()
-	for ln in lines:
-		try:
-			rec_dict = parse_log_line(ln)
-			records.append(TrafficLogRecord(**rec_dict))
-			row = {
-				"proxy_id": proxy_id,
-				"collected_at": collected_ts,
-			}
-			row.update(rec_dict)
-			to_insert.append(row)
-		except Exception:
-			records.append(TrafficLogRecord(url_path=ln))
-	# Optional replacement semantics per request scope: if head/tail fetch is used, we choose to append current snapshot.
-	# For analysis and detail view, we persist snapshot rows.
-	if to_insert:
-		try:
-			# Replacement semantics for parsed snapshot: keep only latest records for this proxy
-			# Clear existing rows to avoid accumulation
-			db.query(TrafficLogModel).filter(TrafficLogModel.proxy_id == proxy_id).delete(synchronize_session=False)
-			# Use bulk insert for performance
-			db.bulk_insert_mappings(TrafficLogModel, to_insert)
-			db.commit()
-		except Exception:
-			# Fallback to row-by-row on error
-			for r in to_insert:
-				db.add(TrafficLogModel(**r))
-			db.commit()
-	return TrafficLogResponse(proxy_id=proxy_id, lines=None, records=records, truncated=truncated, count=len(records))
+	return TrafficLogResponse(proxy_id=proxy_id, lines=None, records=records, truncated=len(records) == limit, count=len(records))
 
 
 @router.get("/traffic-logs/item/{record_id}", response_model=TrafficLogDB)
