@@ -361,22 +361,24 @@ async def get_session_detail(record_id: str):
     """특정 세션의 상세 정보(원본 로그 포함)를 가져옵니다."""
     try:
         # record_id format: {proxy_id}_{timestamp_iso}_{index}
-        parts = record_id.split('_')
-        if len(parts) < 3:
+        # Example: 1_2026-03-10T14:38:00+09:00_0
+        first_underscore = record_id.find('_')
+        last_underscore = record_id.rfind('_')
+        
+        if first_underscore == -1 or last_underscore == -1 or first_underscore == last_underscore:
             raise HTTPException(status_code=400, detail="Invalid record ID format")
         
-        proxy_id = int(parts[0])
-        # Find the last part as index, everything in between is timestamp
-        idx = int(parts[-1])
+        proxy_id = int(record_id[:first_underscore])
+        idx = int(record_id[last_underscore+1:])
         
         # Read full batch from temp_store
         batch = temp_store.read_latest(proxy_id)
         if not batch or idx >= len(batch):
             raise HTTPException(status_code=404, detail="Record not found")
             
-        return batch[idx]
+        return jsonable_encoder(batch[idx])
     except Exception as e:
-        logger.error(f"[session_browser] Detail fetch failed: {e}")
+        logger.error(f"[session_browser] Detail fetch failed for {record_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -738,16 +740,6 @@ async def sessions_datatables(
         "rowData": row_data,
         "rowCount": records_filtered,
     }
-
-
-@router.get("/session-browser/item/{record_id}")
-async def get_session_record(record_id: int, db: Session = Depends(get_db)):
-    item = temp_store.read_item_by_id(record_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="Record not found")
-    item = dict(item)
-    item["id"] = record_id
-    return _ensure_timestamps(item)
 
 
 @router.get("/session-browser/export")

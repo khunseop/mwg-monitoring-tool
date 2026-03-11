@@ -109,20 +109,47 @@
 }
 
 .button.is-subtle {
-    background-color: #f0f7ff !important; /* Very light blue */
-    border-color: #cbdcf7 !important;
-    color: #1e40af !important; /* Darker blue for text */
+    background-color: #f0f7ff !important;
+    border-color: #bfdbfe !important;
+    color: #2563eb !important;
+    border-width: 1px !important;
 }
 
 .button.is-subtle:hover {
     background-color: #e0efff !important;
-    border-color: #adc9f3 !important;
+    border-color: #93c5fd !important;
 }
 
+/* Specific styling for subtle blue but with slightly stronger presence for primary-like subtle actions */
+.button.is-subtle-primary {
+    background-color: #eff6ff !important;
+    border-color: #3b82f6 !important;
+    color: #1d4ed8 !important;
+    border-width: 1px !important;
+}
+
+.button.is-subtle-primary:hover {
+    background-color: #dbeafe !important;
+    filter: brightness(0.95);
+}
+
+/* Red subtle button for secondary delete actions - enhanced visibility */
+.button.is-subtle-danger {
+    background-color: #fef2f2 !important;
+    border-color: #fecaca !important;
+    color: #dc2626 !important;
+    border-width: 1px !important;
+}
+
+.button.is-subtle-danger:hover {
+    background-color: #fee2e2 !important;
+    border-color: #fca5a5 !important;
+}
 .button.is-primary,
 .button.is-info,
 .button.is-danger {
     color: #ffffff !important;
+    font-weight: 600;
 }
 
 .button.is-primary {

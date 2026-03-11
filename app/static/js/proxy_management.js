@@ -141,10 +141,10 @@ function loadProxies() {
                                 <button class="button is-subtle is-small" onclick="openModal('proxy', ${proxy.id})" title="수정">
                                     <span>수정</span>
                                 </button>
-                                <button class="button is-subtle is-small" onclick="cloneProxy(${proxy.id})" title="복제">
+                                <button class="button is-info is-light is-small border" onclick="cloneProxy(${proxy.id})" title="복제" style="border-color: #bfdbfe !important;">
                                     <span>복제</span>
                                 </button>
-                                <button class="button is-subtle is-small has-text-danger" onclick="deleteProxy(${proxy.id})" title="삭제">
+                                <button class="button is-subtle-danger is-small" onclick="deleteProxy(${proxy.id})" title="삭제">
                                     <span>삭제</span>
                                 </button>
                             </div>

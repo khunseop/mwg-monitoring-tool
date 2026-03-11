@@ -4,8 +4,8 @@
 <div class="is-flex is-align-items-center is-justify-content-between mb-5">
     <h3 class="title is-4 mb-0">프록시 관리</h3>
     <div class="buttons">
-        <button class="button is-info is-light is-small" id="btnSyncGroupOids" title="특정 장비의 OID 설정을 해당 그룹 내 모든 장비에 동일하게 적용합니다.">
-            <span>그룹 내 OID 동기화</span>
+        <button class="button is-info is-small px-4" id="btnSyncGroupOids" title="특정 장비의 OID 설정을 해당 그룹 내 모든 장비에 동일하게 적용합니다.">
+            <span style="font-weight: 600;">그룹 내 OID 동기화</span>
         </button>
     </div>
 </div>
@@ -14,20 +14,16 @@
 <div class="tabs is-boxed mb-0">
     <ul>
         <li id="proxy-list-tab" class="is-active">
-            <a onclick="switchProxySection('list')">
-                <span>프록시 목록</span>
-            </a>
+            <a onclick="switchProxySection('list')">프록시 목록</a>
         </li>
         <li id="proxy-groups-tab">
-            <a onclick="switchProxySection('groups')">
-                <span>프록시 그룹</span>
-            </a>
+            <a onclick="switchProxySection('groups')">프록시 그룹 관리</a>
         </li>
     </ul>
 </div>
 
 <!-- 프록시 목록 섹션 -->
-<div id="proxy-list-section" class="tab-content mt-5">
+<div id="proxy-list-section" class="box p-5 mt-0 is-shadowless" style="border: 1px solid var(--color-border); border-top: none; border-radius: 0 0 var(--radius-md) var(--radius-md); background: var(--color-surface);">
     <div class="settings-bar mb-5">
         <div class="buttons mb-0">
             <button class="button is-primary is-small px-4" onclick="openModal('proxy')">
@@ -47,138 +43,77 @@
         </div>
     </div>
 
-    <div class="grid-container" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden;">
-        <div class="table-container">
-            <table class="table is-fullwidth is-hoverable is-striped mb-0">
-                <thead>
-                    <tr>
-                        <th class="px-5">호스트</th>
-                        <th>그룹</th>
-                        <th class="has-text-centered">상태</th>
-                        <th>설명</th>
-                        <th class="has-text-centered">작업</th>
-                    </tr>
-                </thead>
-                <tbody id="proxyTableBody">
-                    <!-- JS에서 동적 추가 -->
-                </tbody>
-            </table>
-        </div>
+    <div class="table-container">
+        <table class="table is-fullwidth is-hoverable is-striped" style="font-size: 0.875rem;">
+            <thead>
+                <tr>
+                    <th class="px-5">호스트(IP)</th>
+                    <th>그룹</th>
+                    <th class="has-text-centered">상태</th>
+                    <th>설명</th>
+                    <th class="has-text-centered">작업</th>
+                </tr>
+            </thead>
+            <tbody id="proxyTableBody">
+                <!-- 동적으로 채워짐 -->
+            </tbody>
+        </table>
     </div>
 </div>
 
-<!-- 프록시 그룹 섹션 -->
-<div id="proxy-groups-section" class="tab-content mt-5" style="display:none;">
-    <div class="settings-bar mb-5">
-        <div class="buttons mb-0">
-            <button class="button is-primary is-small px-4" onclick="openModal('group')">
-                <span>그룹 추가</span>
-            </button>
-        </div>
+<!-- 그룹 관리 섹션 -->
+<div id="proxy-groups-section" class="box p-5 mt-0 is-shadowless" style="display:none; border: 1px solid var(--color-border); border-top: none; border-radius: 0 0 var(--radius-md) var(--radius-md); background: var(--color-surface);">
+    <div class="is-flex is-align-items-center is-justify-content-between mb-5">
+        <h4 class="title is-6 mb-0">프록시 그룹 목록</h4>
+        <button class="button is-primary is-small px-4" onclick="openModal('group')">
+            <span>그룹 추가</span>
+        </button>
     </div>
 
-    <div class="grid-container" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden;">
-        <div class="table-container">
-            <table class="table is-fullwidth is-hoverable is-striped mb-0">
-                <thead>
-                    <tr>
-                        <th class="px-5">그룹명</th>
-                        <th>설명</th>
-                        <th class="has-text-centered">프록시 수</th>
-                        <th class="has-text-centered">작업</th>
-                    </tr>
-                </thead>
-                <tbody id="groupTableBody">
-                    <!-- JS에서 동적 추가 -->
-                </tbody>
-            </table>
-        </div>
+    <div class="table-container">
+        <table class="table is-fullwidth is-hoverable is-striped" style="font-size: 0.875rem;">
+            <thead>
+                <tr>
+                    <th class="px-5">그룹명</th>
+                    <th>설명</th>
+                    <th class="has-text-centered">장비 수</th>
+                    <th class="has-text-centered">작업</th>
+                </tr>
+            </thead>
+            <tbody id="groupTableBody">
+                <!-- 동적으로 채워짐 -->
+            </tbody>
+        </table>
     </div>
 </div>
 
-<!-- 프록시 일괄 등록 모달 -->
-<div class="modal" id="bulkProxyModal">
-    <div class="modal-background" onclick="closeBulkProxyModal()"></div>
-    <div class="modal-card" style="width: 700px; max-width: 95vw;">
-        <header class="modal-card-head py-4 px-5">
-            <p class="modal-card-title is-size-5 has-text-weight-bold">프록시 일괄 등록</p>
-            <button class="delete" aria-label="close" onclick="closeBulkProxyModal()"></button>
-        </header>
-        <section class="modal-card-body p-5">
-            <div class="notification is-light is-info py-3 px-4 mb-4" style="font-size: 0.85rem;">
-                <p class="mb-2"><strong>입력 형식:</strong> 한 줄에 하나씩 CSV 형식으로 입력하세요.</p>
-                <code style="background: rgba(0,0,0,0.05); padding: 2px 5px; border-radius: 4px; display: block;">host,user,pass[,group][,log_path][,active][,desc][,oids_json]</code>
-                <p class="mt-2 is-size-7">* oids_json은 큰따옴표(")로 감싸서 입력하세요. 상단 '샘플' 다운로드를 참고하세요.</p>
-            </div>
-            <div class="field">
-                <label class="label is-small">CSV 데이터</label>
-                <div class="control">
-                    <textarea class="textarea is-small" id="bulkProxyInput" placeholder="ex)
-proxy-01.local,admin,pass123,서울센터,/var/log/proxy/traffic.log,true,서울센터 1호기
-10.0.0.5,root,Secret!,,,,false,임시 서버" rows="12" style="font-family: monospace;"></textarea>
-                </div>
-                <p class="help has-text-grey-light">빈 값은 생략하거나 비워둘 수 있습니다. 공백만 있는 줄은 무시됩니다.</p>
-            </div>
-        </section>
-        <footer class="modal-card-foot is-justify-content-flex-end py-3 px-5">
-            <button class="button is-subtle is-small px-4" onclick="closeBulkProxyModal()">취소</button>
-            <button class="button is-primary is-small px-5" onclick="submitBulkProxies()">등록 시작</button>
-        </footer>
-    </div>
-</div>
-
-<!-- 프록시 추가/수정 모달 -->
+<!-- 프록시 등록/수정 모달 -->
 <div class="modal" id="proxyModal">
-    <div class="modal-background" onclick="closeModal('proxy')"></div>
-    <div class="modal-card" style="width: 600px; max-width: 95vw;">
+    <div class="modal-background" style="background: rgba(15, 23, 42, 0.1);"></div>
+    <div class="modal-card" style="width: 600px;">
         <header class="modal-card-head py-4 px-5">
-            <p class="modal-card-title is-size-5 has-text-weight-bold">프록시 정보 설정</p>
+            <p class="modal-card-title is-size-5 has-text-weight-bold" id="proxyModalTitle">프록시 정보</p>
             <button class="delete" aria-label="close" onclick="closeModal('proxy')"></button>
         </header>
         <section class="modal-card-body p-5">
-            <form id="proxyForm" onsubmit="return false;">
+            <form id="proxyForm">
                 <input type="hidden" id="proxyId">
                 <div class="columns is-multiline">
-                    <div class="column is-12">
+                    <div class="column is-6">
                         <div class="field">
-                            <label class="label is-small">호스트 (FQDN/IP)</label>
+                            <label class="label is-small">호스트 (IP/Domain)</label>
                             <div class="control">
-                                <input class="input is-small" type="text" id="host" required placeholder="예: proxy.example.com">
+                                <input class="input is-small" type="text" id="host" required placeholder="1.1.1.1">
                             </div>
                         </div>
                     </div>
                     <div class="column is-6">
                         <div class="field">
-                            <label class="label is-small">사용자명</label>
-                            <div class="control">
-                                <input class="input is-small" type="text" id="username" required>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="column is-6">
-                        <div class="field">
-                            <label class="label is-small">비밀번호</label>
-                            <div class="control">
-                                <input class="input is-small" type="password" id="password" placeholder="변경 시에만 입력">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="column is-12">
-                        <div class="field">
-                            <label class="label is-small">트래픽 로그 경로</label>
-                            <div class="control">
-                                <input class="input is-small" type="text" id="traffic_log_path" placeholder="예: /var/log/proxy/traffic.log">
-                            </div>
-                            <p class="help is-size-7 has-text-grey-light">프록시 서버 내 실제 로그 파일의 절대 경로를 입력하세요.</p>
-                        </div>
-                    </div>
-                    <div class="column is-6">
-                        <div class="field">
-                            <label class="label is-small">소속 그룹</label>
+                            <label class="label is-small">그룹</label>
                             <div class="control">
                                 <div class="select is-small is-fullwidth">
-                                    <select id="group_id">
-                                        <option value="">그룹 선택 안 함</option>
+                                    <select id="group_id" required>
+                                        <option value="">그룹 선택...</option>
                                     </select>
                                 </div>
                             </div>
@@ -186,12 +121,26 @@ proxy-01.local,admin,pass123,서울센터,/var/log/proxy/traffic.log,true,서울
                     </div>
                     <div class="column is-6">
                         <div class="field">
-                            <label class="label is-small">&nbsp;</label>
-                            <div class="control mt-1">
-                                <label class="checkbox is-size-7">
-                                    <input type="checkbox" id="is_active" checked>
-                                    장비 활성화 (수집 대상 포함)
-                                </label>
+                            <label class="label is-small">SSH 사용자명</label>
+                            <div class="control">
+                                <input class="input is-small" type="text" id="username" required placeholder="admin">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="column is-6">
+                        <div class="field">
+                            <label class="label is-small">SSH 비밀번호</label>
+                            <div class="control">
+                                <input class="input is-small" type="password" id="password" placeholder="비밀번호">
+                            </div>
+                            <p class="help is-size-7" id="pwHelp">수정 시 입력하지 않으면 기존 비밀번호 유지</p>
+                        </div>
+                    </div>
+                    <div class="column is-12">
+                        <div class="field">
+                            <label class="label is-small">트래픽 로그 경로 (Remote)</label>
+                            <div class="control">
+                                <input class="input is-small" type="text" id="traffic_log_path" placeholder="/opt/mwg/log/gw/access.log">
                             </div>
                         </div>
                     </div>
@@ -199,40 +148,49 @@ proxy-01.local,admin,pass123,서울센터,/var/log/proxy/traffic.log,true,서울
                         <div class="field">
                             <label class="label is-small">설명</label>
                             <div class="control">
-                                <textarea class="textarea is-small" id="description" rows="2"></textarea>
+                                <input class="input is-small" type="text" id="description" placeholder="상세 위치 또는 용도">
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <div class="mt-4 pt-4" style="border-top: 1px solid var(--color-border);">
-                    <div class="field">
-                        <label class="checkbox is-size-7 has-text-weight-bold">
-                            <input type="checkbox" id="use_custom_oids" onchange="toggleCustomOids()">
-                            인터페이스 OID 개별 설정 사용
-                        </label>
+                    <div class="column is-12">
+                        <div class="field">
+                            <div class="control">
+                                <label class="checkbox is-size-7">
+                                    <input type="checkbox" id="is_active" checked> 활성 (모니터링 대상 포함)
+                                </label>
+                            </div>
+                        </div>
                     </div>
 
-                    <div id="customOidSection" class="mt-3 p-3" style="display: none; background: #f1f5f9; border-radius: var(--radius-sm);">
-                        <div class="is-flex is-justify-content-space-between is-align-items-center mb-2">
-                            <span class="is-size-7 has-text-weight-bold has-text-grey">인터페이스 목록</span>
-                            <button class="button is-small is-subtle border px-2" type="button" onclick="addProxyInterfaceRow()" style="height: 24px;">
-                                <span>추가</span>
+                    <!-- 개별 OID 설정 (Accordion-like but simple) -->
+                    <div class="column is-12 mt-2">
+                        <div class="field">
+                            <div class="control">
+                                <label class="checkbox is-size-7 has-text-weight-bold">
+                                    <input type="checkbox" id="use_custom_oids" onchange="toggleCustomOids()"> 이 장비에만 개별 OID 설정 사용
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="customOidSection" class="column is-12" style="display:none; background: #f8fafc; border-radius: var(--radius-sm); border: 1px solid var(--color-border);">
+                        <div class="is-flex is-align-items-center is-justify-content-between mb-3">
+                            <span class="is-size-7 has-text-weight-bold">개별 인터페이스 OID</span>
+                            <button class="button is-small is-subtle px-2" type="button" onclick="addProxyInterfaceRow()">
+                                <span>+ 추가</span>
                             </button>
                         </div>
                         <div class="table-container">
                             <table class="table is-fullwidth is-narrow is-transparent" style="background: transparent; font-size: 0.75rem;">
                                 <thead>
                                     <tr>
-                                        <th style="width: 25%;">이름</th>
+                                        <th>이름</th>
                                         <th>IN OID</th>
                                         <th>OUT OID</th>
-                                        <th style="width: 30px;"></th>
+                                        <th style="width: 40px;"></th>
                                     </tr>
                                 </thead>
-                                <tbody id="proxyInterfaceList">
-                                    <!-- 동적 추가 -->
-                                </tbody>
+                                <tbody id="proxyInterfaceList"></tbody>
                             </table>
                         </div>
                     </div>
@@ -246,27 +204,27 @@ proxy-01.local,admin,pass123,서울센터,/var/log/proxy/traffic.log,true,서울
     </div>
 </div>
 
-<!-- 그룹 추가/수정 모달 -->
+<!-- 그룹 등록/수정 모달 -->
 <div class="modal" id="groupModal">
-    <div class="modal-background" onclick="closeModal('group')"></div>
-    <div class="modal-card" style="width: 450px; max-width: 95vw;">
+    <div class="modal-background" style="background: rgba(15, 23, 42, 0.1);"></div>
+    <div class="modal-card" style="width: 450px;">
         <header class="modal-card-head py-4 px-5">
-            <p class="modal-card-title is-size-5 has-text-weight-bold">그룹 정보 설정</p>
+            <p class="modal-card-title is-size-5 has-text-weight-bold" id="groupModalTitle">그룹 정보</p>
             <button class="delete" aria-label="close" onclick="closeModal('group')"></button>
         </header>
         <section class="modal-card-body p-5">
-            <form id="groupForm" onsubmit="return false;">
+            <form id="groupForm">
                 <input type="hidden" id="groupId">
                 <div class="field">
                     <label class="label is-small">그룹명</label>
                     <div class="control">
-                        <input class="input is-small" type="text" id="groupName" required placeholder="예: 서울센터">
+                        <input class="input is-small" type="text" id="groupName" required placeholder="예: 1센터 프록시">
                     </div>
                 </div>
                 <div class="field">
                     <label class="label is-small">설명</label>
                     <div class="control">
-                        <textarea class="textarea is-small" id="groupDescription" rows="3"></textarea>
+                        <input class="input is-small" id="groupDescription" placeholder="그룹 상세 설명">
                     </div>
                 </div>
             </form>
@@ -274,6 +232,38 @@ proxy-01.local,admin,pass123,서울센터,/var/log/proxy/traffic.log,true,서울
         <footer class="modal-card-foot is-justify-content-flex-end py-3 px-5">
             <button class="button is-subtle is-small px-4" onclick="closeModal('group')">취소</button>
             <button class="button is-primary is-small px-5" onclick="saveGroup()">저장</button>
+        </footer>
+    </div>
+</div>
+
+<!-- 일괄 등록 모달 -->
+<div class="modal" id="bulkProxyModal">
+    <div class="modal-background" style="background: rgba(15, 23, 42, 0.1);"></div>
+    <div class="modal-card" style="width: 500px;">
+        <header class="modal-card-head py-4 px-5">
+            <p class="modal-card-title is-size-5 has-text-weight-bold">프록시 일괄 등록</p>
+            <button class="delete" aria-label="close" onclick="closeBulkProxyModal()"></button>
+        </header>
+        <section class="modal-card-body p-5">
+            <div class="notification is-info is-light p-4 is-size-7 mb-4">
+                CSV 파일을 업로드하여 여러 프록시를 한 번에 등록합니다.
+                <br>형식: <strong>host, username, password, group_name, traffic_log_path, description</strong>
+            </div>
+            <div class="field">
+                <div class="file is-small has-name is-fullwidth">
+                    <label class="file-label">
+                        <input class="file-input" type="file" id="bulkProxyFile" accept=".csv" onchange="$('#bulkProxyFileName').text(this.files[0]?.name || '선택된 파일 없음')">
+                        <span class="file-cta">
+                            <span class="file-label">CSV 파일 선택...</span>
+                        </span>
+                        <span class="file-name" id="bulkProxyFileName">선택된 파일 없음</span>
+                    </label>
+                </div>
+            </div>
+        </section>
+        <footer class="modal-card-foot is-justify-content-flex-end py-3 px-5">
+            <button class="button is-subtle is-small px-4" onclick="closeBulkProxyModal()">취소</button>
+            <button class="button is-primary is-small px-5" onclick="submitBulkProxies()">업로드</button>
         </footer>
     </div>
 </div>

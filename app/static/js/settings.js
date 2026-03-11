@@ -36,7 +36,7 @@ function addInterfaceRow(name = '', oids = {}, threshold = '', bandwidth = '') {
                 <input class="input is-small interface-bandwidth" type="number" step="1" min="0" placeholder="1000" value="${bandwidth}">
             </td>
             <td class="has-text-centered py-2">
-                <button class="button is-white is-small border has-text-danger remove-interface" type="button">
+                <button class="button is-subtle-danger is-small remove-interface" type="button">
                     <span>삭제</span>
                 </button>
             </td>
