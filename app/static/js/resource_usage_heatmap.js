@@ -135,7 +135,14 @@
                     
                     const thr = (ru.cachedConfig && ru.cachedConfig.thresholds) ? ru.cachedConfig.thresholds : {};
                     const interfaceThr = (ru.cachedConfig && ru.cachedConfig.interface_thresholds) ? ru.cachedConfig.interface_thresholds : {};
-                    let t = m.isInterface ? (interfaceThr[m.ifName] || maxByMetric[m.key] || 1) : (thr[m.key.replace(/d$/, '')] || maxByMetric[m.key] || 1);
+                    
+                    let metricThresholdKey = m.key;
+                    // Map UI metric keys to threshold config keys
+                    if (metricThresholdKey === 'httpd') metricThresholdKey = 'http';
+                    else if (metricThresholdKey === 'httpsd') metricThresholdKey = 'https';
+                    else if (metricThresholdKey === 'http2d') metricThresholdKey = 'http2';
+                    
+                    let t = m.isInterface ? (interfaceThr[m.ifName] || maxByMetric[m.key] || 1) : (thr[metricThresholdKey] || maxByMetric[m.key] || 1);
                     
                     const scaled = (typeof raw === 'number' && isFinite(raw)) ? Math.max(0, Math.min(150, Math.round((raw / t) * 100))) : null;
                     return { x: m.title, y: scaled, rawValue: raw };
@@ -181,7 +188,7 @@
                         if (raw == null) return '';
                         const metric = metrics[opts.dataPointIndex];
                         if (['cpu','mem','disk'].includes(metric.key)) return Math.round(raw);
-                        if (metric.key === 'cc') return utils.abbreviateNumber(raw);
+                        if (['cc', 'cs', 'blocked'].includes(metric.key)) return utils.abbreviateNumber(raw);
                         return raw.toFixed(raw >= 10 ? 0 : 1);
                     }
                 },
