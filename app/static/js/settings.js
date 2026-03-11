@@ -521,8 +521,34 @@ function importConfig() {
     });
 }
 
+async function resetConfig() {
+    if (!confirm('경고: 시스템의 모든 설정(프록시, 그룹, 리소스 설정 등)과 수집 데이터가 삭제됩니다. 정말로 초기화하시겠습니까?')) {
+        return;
+    }
+
+    if (!confirm('정말로 모든 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+        return;
+    }
+
+    $('#cfgStatus').removeClass('is-success is-danger').text('초기화 중...');
+
+    try {
+        const res = await fetch('/api/config/reset', { method: 'POST' });
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || '초기화에 실패했습니다.');
+        }
+        alert('시스템이 성공적으로 초기화되었습니다. 페이지를 새로고침합니다.');
+        window.location.reload();
+    } catch (err) {
+        alert('초기화 실패: ' + err.message);
+        $('#cfgStatus').addClass('is-danger').text('초기화 실패');
+    }
+}
+
 // Expose to window
 window.saveAllConfig = saveAllConfig;
+window.resetConfig = resetConfig;
 window.applyPreset = applyPreset;
 window.exportConfig = exportConfig;
 window.importConfig = importConfig;

@@ -305,3 +305,27 @@ async def import_full_config_excel(file: UploadFile = File(...), db: Session = D
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Import failed: {str(e)}")
+
+
+@router.post("/config/reset")
+async def reset_full_config(db: Session = Depends(get_db)):
+    """시스템의 모든 설정을 초기화합니다 (프록시, 그룹 포함 모든 데이터 삭제)."""
+    try:
+        from app.models.traffic_log import TrafficLog
+        from app.models.resource_usage import ResourceUsage
+        
+        # 1. 관련 데이터 우선 삭제
+        db.query(TrafficLog).delete()
+        db.query(ResourceUsage).delete()
+        
+        # 2. 메인 설정 삭제
+        db.query(Proxy).delete()
+        db.query(ProxyGroup).delete()
+        db.query(ResourceConfig).delete()
+        db.query(SessionBrowserConfig).delete()
+        
+        db.commit()
+        return {"status": "success", "message": "System configuration has been reset successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Reset failed: {str(e)}")
