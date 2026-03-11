@@ -754,9 +754,9 @@ async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str,
         if val is not None:
             if key in ['cpu', 'mem', 'disk']:
                 log_parts.append(f"{key}={val:.2f}%")
-            elif key in ['cc', 'cs']:
+            elif key in ['cc', 'cs', 'blocked']:
                 log_parts.append(f"{key}={val}")
-            elif key in ['http', 'https', 'ftp']:
+            elif key in ['http', 'https', 'http2']:
                 log_parts.append(f"{key}={val}")
     
     # 인터페이스 데이터 로그 출력

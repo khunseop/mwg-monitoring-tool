@@ -107,40 +107,22 @@
 						return params.value.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,');
 					}
 				},
-				{ field: 'http', headerName: 'HTTP (누적)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 120, width: 150, cellClass: 'num',
+				{ field: 'http', headerName: 'HTTP (Mbps)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 120, width: 150, cellClass: 'num',
 					valueFormatter: function(params) {
 						if (params.value == null || params.value === undefined) return '-';
-						const bytes = params.value;
-						if (bytes === 0) return '0 Bytes';
-						const k = 1024;
-						const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-						const i = Math.floor(Math.log(bytes) / Math.log(k));
-						const size = i >= sizes.length ? sizes[sizes.length - 1] : sizes[i];
-						return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + size;
+						return params.value.toFixed(2) + ' Mbps';
 					}
 				},
-				{ field: 'https', headerName: 'HTTPS (누적)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 120, width: 150, cellClass: 'num',
+				{ field: 'https', headerName: 'HTTPS (Mbps)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 120, width: 150, cellClass: 'num',
 					valueFormatter: function(params) {
 						if (params.value == null || params.value === undefined) return '-';
-						const bytes = params.value;
-						if (bytes === 0) return '0 Bytes';
-						const k = 1024;
-						const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-						const i = Math.floor(Math.log(bytes) / Math.log(k));
-						const size = i >= sizes.length ? sizes[sizes.length - 1] : sizes[i];
-						return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + size;
+						return params.value.toFixed(2) + ' Mbps';
 					}
 				},
-				{ field: 'http2', headerName: 'HTTP2 (누적)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 120, width: 150, cellClass: 'num',
+				{ field: 'http2', headerName: 'HTTP2 (Mbps)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 120, width: 150, cellClass: 'num',
 					valueFormatter: function(params) {
 						if (params.value == null || params.value === undefined) return '-';
-						const bytes = params.value;
-						if (bytes === 0) return '0 Bytes';
-						const k = 1024;
-						const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-						const i = Math.floor(Math.log(bytes) / Math.log(k));
-						const size = i >= sizes.length ? sizes[sizes.length - 1] : sizes[i];
-						return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + size;
+						return params.value.toFixed(2) + ' Mbps';
 					}
 				},
 				{ field: 'interface_mbps', headerName: '인터페이스', sortable: false, filter: false, minWidth: 200, flex: 1,

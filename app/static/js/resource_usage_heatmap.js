@@ -62,6 +62,7 @@
                     disk: typeof row.disk === 'number' ? row.disk : null,
                     cc: typeof row.cc === 'number' ? row.cc : null,
                     cs: typeof row.cs === 'number' ? row.cs : null,
+                    blocked: typeof row.blocked === 'number' ? row.blocked : null,
                     httpd: typeof row.http === 'number' ? row.http : 0,
                     httpsd: typeof row.https === 'number' ? row.https : 0,
                     http2d: typeof row.http2 === 'number' ? row.http2 : 0,
@@ -262,7 +263,7 @@
                     (row.disk || 0).toFixed(1),
                     row.cc || 0,
                     row.cs || 0,
-                    (row.blocked || 0),
+                    (typeof row.blocked === 'number' ? row.blocked : 0),
                     (row.http || 0).toFixed(2),
                     (row.https || 0).toFixed(2),
                     (row.http2 || 0).toFixed(2)
