@@ -834,7 +834,7 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
                 "disk": metrics.get("disk"),
                 "interface_mbps": interface_mbps_json,
                 "community": payload.community,
-                "oids_raw": json_lib.dumps(payload.oids),
+                "oids_raw": json.dumps(payload.oids),
                 "collected_at": collected_at_ts,
                 "created_at": collected_at_ts,
                 "updated_at": collected_at_ts,

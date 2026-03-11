@@ -233,6 +233,7 @@ class BackgroundCollector:
                         "http": metrics.get("http"),
                         "https": metrics.get("https"),
                         "http2": metrics.get("http2"),
+                        "blocked": metrics.get("blocked"),
                         "disk": metrics.get("disk"),
                         "interface_mbps": interface_mbps_json,
                         "community": community,
