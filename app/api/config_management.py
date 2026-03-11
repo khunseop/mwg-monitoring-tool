@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 import json
 import io
 import re
@@ -17,12 +17,21 @@ except ImportError:
     xw = None
 
 from app.database.database import get_db
-# ... (rest of imports unchanged)
+from app.models.proxy import Proxy
+from app.models.proxy_group import ProxyGroup
+from app.models.resource_config import ResourceConfig
+from app.models.session_browser_config import SessionBrowserConfig
+from app.utils.crypto import encrypt_string, decrypt_string_if_encrypted
 
 router = APIRouter()
 
 def _apply_header_style(sheet):
-# ... (existing _apply_header_style)
+    header_fill = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid")
+    header_font = Font(bold=True)
+    for cell in sheet[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
 
 def _read_excel_via_xlwings(content: bytes) -> Dict[str, List[List[Any]]]:
     """DRM 등으로 openpyxl이 읽지 못하는 경우 xlwings(Excel 앱)를 통해 데이터를 읽습니다."""
@@ -34,6 +43,7 @@ def _read_excel_via_xlwings(content: bytes) -> Dict[str, List[List[Any]]]:
         tmp_path = tmp.name
     
     data_map = {}
+    # Excel 인스턴스 시작
     app = xw.App(visible=False)
     try:
         wb = app.books.open(tmp_path)
@@ -49,7 +59,97 @@ def _read_excel_via_xlwings(content: bytes) -> Dict[str, List[List[Any]]]:
     return data_map
 
 @router.get("/config/export")
-# ... (export_full_config_excel body)
+async def export_full_config_excel(db: Session = Depends(get_db)):
+    """시스템 전체 설정을 비개발자 친화적인 Excel 포맷으로 내보냅니다."""
+    wb = Workbook()
+    
+    # 1. 시트: Groups (그룹 관리)
+    ws_groups = wb.active
+    ws_groups.title = "1.Groups"
+    ws_groups.append(["GroupName", "Description"])
+    groups = db.query(ProxyGroup).all()
+    for g in groups:
+        ws_groups.append([g.name, g.description])
+    _apply_header_style(ws_groups)
+
+    # 2. 시트: Proxies (장비 기본 정보)
+    ws_proxies = wb.create_sheet("2.Proxies")
+    ws_proxies.append(["Host", "Username", "Password", "GroupName", "TrafficLogPath", "IsActive", "Description"])
+    proxies = db.query(Proxy).all()
+    for p in proxies:
+        group_name = p.group.name if p.group else ""
+        ws_proxies.append([
+            p.host, p.username, decrypt_string_if_encrypted(p.password), 
+            group_name, p.traffic_log_path, "TRUE" if p.is_active else "FALSE", p.description
+        ])
+    _apply_header_style(ws_proxies)
+
+    # 3. 시트: ProxyInterfaces (장비별 개별 인터페이스 OID)
+    ws_p_if = wb.create_sheet("3.ProxyInterfaces")
+    ws_p_if.append(["Host", "InterfaceName", "In_OID", "Out_OID"])
+    for p in proxies:
+        if p.oids_json:
+            try:
+                oids = json.loads(p.oids_json)
+                if_oids = oids.get("__interface_oids__", {})
+                for if_name, config in if_oids.items():
+                    in_oid = config.get("in_oid", "") if isinstance(config, dict) else config
+                    out_oid = config.get("out_oid", "") if isinstance(config, dict) else ""
+                    ws_p_if.append([p.host, if_name, in_oid, out_oid])
+            except: pass
+    _apply_header_style(ws_p_if)
+
+    # 4. 시트: SystemResourceOIDs (공통 자원 OID 및 임계치)
+    ws_res = wb.create_sheet("4.SystemResourceOIDs")
+    ws_res.append(["MetricName", "OID_or_Command", "Threshold", "Unit", "Description"])
+    res_cfg = db.query(ResourceConfig).first()
+    if res_cfg:
+        oids = json.loads(res_cfg.oids_json or "{}")
+        th = oids.get("__thresholds__", {})
+        metric_map = {
+            "cpu": ("CPU사용률", "%"), "mem": ("메모리사용률", "%"), "disk": ("디스크사용률", "%"),
+            "cc": ("Client Counts", "sess"), "cs": ("Connections (Cps)", "cps"),
+            "http": ("HTTP트래픽", "Mbps"), "https": ("HTTPS트래픽", "Mbps"), "http2": ("HTTP2트래픽", "Mbps")
+        }
+        for key, (label, unit) in metric_map.items():
+            ws_res.append([label, oids.get(key, ""), th.get(key, ""), unit, f"{key} 관련 설정"])
+    _apply_header_style(ws_res)
+
+    # 5. 시트: CommonInterfaces (공통 인터페이스 템플릿)
+    ws_c_if = wb.create_sheet("5.CommonInterfaces")
+    ws_c_if.append(["Name", "In_OID", "Out_OID", "Threshold_Mbps", "Bandwidth_Mbps"])
+    if res_cfg:
+        oids = json.loads(res_cfg.oids_json or "{}")
+        if_oids = oids.get("__interface_oids__", {})
+        if_th = oids.get("__interface_thresholds__", {})
+        if_bw = oids.get("__interface_bandwidths__", {})
+        for name, config in if_oids.items():
+            in_oid = config.get("in_oid", "") if isinstance(config, dict) else config
+            out_oid = config.get("out_oid", "") if isinstance(config, dict) else ""
+            ws_c_if.append([name, in_oid, out_oid, if_th.get(name, ""), if_bw.get(name, "")])
+    _apply_header_style(ws_c_if)
+
+    # 6. 시트: GlobalSettings (기타 시스템 설정)
+    ws_glob = wb.create_sheet("6.GlobalSettings")
+    ws_glob.append(["Category", "SettingName", "Value", "Description"])
+    if res_cfg:
+        ws_glob.append(["SNMP", "CommunityString", res_cfg.community, "SNMP 커뮤니티"])
+    sb_cfg = db.query(SessionBrowserConfig).first()
+    if sb_cfg:
+        ws_glob.append(["SSH", "Port", sb_cfg.ssh_port, "세션브라우저 포트"])
+        ws_glob.append(["SSH", "Timeout", sb_cfg.timeout_sec, "응답 대기시간(초)"])
+        ws_glob.append(["SSH", "HostKeyPolicy", sb_cfg.host_key_policy, "auto_add 또는 reject"])
+    _apply_header_style(ws_glob)
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    filename = f"PMT_Easy_Config_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 @router.post("/config/import")
 async def import_full_config_excel(file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -142,7 +242,7 @@ async def import_full_config_excel(file: UploadFile = File(...), db: Session = D
             rows = excel_data["4.SystemResourceOIDs"]
             metric_rev_map = {
                 "CPU사용률": "cpu", "메모리사용률": "mem", "디스크사용률": "disk",
-                "동시접속수(CC)": "cc", "초당접속수(CS)": "cs",
+                "Client Counts": "cc", "Connections (Cps)": "cs",
                 "HTTP트래픽": "http", "HTTPS트래픽": "https", "HTTP2트래픽": "http2"
             }
             for row in rows[1:]:
