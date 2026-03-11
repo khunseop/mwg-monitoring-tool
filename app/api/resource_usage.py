@@ -39,7 +39,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-SUPPORTED_KEYS = {"cpu", "mem", "cc", "cs", "http", "https", "http2", "disk"}
+SUPPORTED_KEYS = {"cpu", "mem", "cc", "cs", "http", "https", "http2", "blocked", "disk"}
 
 # Interface MBPS calculation constants
 IF_IN_OCTETS_OID = "1.3.6.1.2.1.2.2.1.10"  # ifInOctets
@@ -709,8 +709,8 @@ async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str,
                 result[key] = None
                 continue
             
-            # If it's a global traffic metric (http, https, http2), calculate delta (Mbps)
-            if key in ["http", "https", "http2"]:
+            # If it's a global traffic metric (http, https, http2, blocked), calculate delta (Mbps/Events)
+            if key in ["http", "https", "http2", "blocked"]:
                 try:
                     current_counter = int(value)
                     cache_key = (proxy.id, key)
@@ -720,18 +720,25 @@ async def _collect_for_proxy(proxy: Proxy, oids: Dict[str, str], community: str,
                         prev_counter, prev_time = cached
                         time_diff = current_time - prev_time
                         if time_diff >= 1.0:
-                            mbps = _calculate_mbps(current_counter, prev_counter, time_diff)
-                            result[key] = round(mbps, 3)
-                            # Update cache only after successful calculation with valid time diff
+                            if key == "blocked":
+                                # For blocked, we just return the raw delta (counter difference)
+                                # Handles counter wrap
+                                if current_counter >= prev_counter:
+                                    result[key] = float(current_counter - prev_counter)
+                                else:
+                                    # Counter wrap (very rare for counter64 but possible if reset)
+                                    result[key] = 0.0
+                            else:
+                                # For traffic (http*), convert to Mbps
+                                mbps = _calculate_mbps(current_counter, prev_counter, time_diff)
+                                result[key] = round(mbps, 3)
+                            
+                            # Update cache only after successful calculation
                             _GLOBAL_TRAFFIC_COUNTER_CACHE[cache_key] = (current_counter, current_time)
                         else:
-                            # Too soon to calculate new delta, keep previous result or return 0
-                            # To prevent "disappearing" data, we could potentially return the last known Mbps
-                            # but for simplicity we return 0.0 or previous known value if we had one.
-                            # For now, let's just not update the counter cache yet.
                             result[key] = 0.0
                     else:
-                        # First collection: initialize cache, return 0.0
+                        # First collection
                         result[key] = 0.0
                         _GLOBAL_TRAFFIC_COUNTER_CACHE[cache_key] = (current_counter, current_time)
                 except (ValueError, TypeError):
@@ -823,6 +830,7 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
                 "http": metrics.get("http"),
                 "https": metrics.get("https"),
                 "http2": metrics.get("http2"),
+                "blocked": metrics.get("blocked"),
                 "disk": metrics.get("disk"),
                 "interface_mbps": interface_mbps_json,
                 "community": payload.community,

@@ -55,7 +55,7 @@
                 
                 const intervalSec = parseInt($('#ruIntervalSec').val(), 10) || 60;
                 // 모든 기본 메트릭 (이미 백엔드에서 계산된 값들임)
-                ['cpu','mem','cc','cs','disk','http','https','http2'].forEach(k => {
+                ['cpu','mem','cc','cs','disk','http','https','http2','blocked'].forEach(k => {
                     const v = row[k];
                     if (typeof v === 'number') {
                         if (!ru.tsBuffer[proxyId][k]) ru.tsBuffer[proxyId][k] = [];
@@ -184,8 +184,8 @@
                     return true;
                 }
                 
-                const basicMetrics = ['cpu','mem','cc','cs','disk','http','https','http2'];
-                const basicTitles = { cpu: 'CPU', mem: 'MEM', cc: 'Client Count', cs: 'Connected Sockets', disk: 'DISK', http: 'HTTP', https: 'HTTPS', http2: 'HTTP2' };
+                const basicMetrics = ['cpu','mem','cc','cs','disk','http','https','http2','blocked'];
+                const basicTitles = { cpu: 'CPU', mem: 'MEM', cc: 'Client Count', cs: 'Connected Sockets', disk: 'DISK', http: 'HTTP', https: 'HTTPS', http2: 'HTTP2', blocked: 'Blocked' };
                 
                 // Get configured interfaces from config
                 const interfaceOids = (ru.cachedConfig && ru.cachedConfig.interface_oids) ? ru.cachedConfig.interface_oids : {};
@@ -357,7 +357,7 @@
             const interfaceOids = (ru.cachedConfig && ru.cachedConfig.interface_oids) ? ru.cachedConfig.interface_oids : {};
             const configuredInterfaceNames = Object.keys(interfaceOids);
             
-            const basicMetrics = ['cpu','mem','cc','cs','disk','http','https','http2'];
+            const basicMetrics = ['cpu','mem','cc','cs','disk','http','https','http2','blocked'];
             const interfaceMetrics = [];
             configuredInterfaceNames.forEach(ifName => {
                 interfaceMetrics.push(`if_${ifName}_in`);
@@ -692,7 +692,7 @@
          */
         openModal(metricKey) {
             const ru = window.ru;
-            const titles = { cpu: 'CPU', mem: 'MEM', cc: 'Client Count', cs: 'Connected Sockets', disk: 'DISK', http: 'HTTP', https: 'HTTPS', http2: 'HTTP2' };
+            const titles = { cpu: 'CPU', mem: 'MEM', cc: 'Client Count', cs: 'Connected Sockets', disk: 'DISK', http: 'HTTP', https: 'HTTPS', http2: 'HTTP2', blocked: 'Blocked' };
             if (metricKey.startsWith('if_')) {
                 const ifName = metricKey.replace(/^if_/, '').replace(/_in$|_out$/, '');
                 const direction = metricKey.endsWith('_in') ? 'IN' : (metricKey.endsWith('_out') ? 'OUT' : '');

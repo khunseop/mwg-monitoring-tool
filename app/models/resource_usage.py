@@ -21,6 +21,7 @@ class ResourceUsage(Base):
     http = Column(Float, nullable=True)
     https = Column(Float, nullable=True)
     http2 = Column(Float, nullable=True)
+    blocked = Column(Float, nullable=True)  # ConnectionsBlocked (delta)
     disk = Column(Float, nullable=True)  # Disk usage percentage
 
     # Interface MBPS: JSON string mapping interface index to {"in_mbps": float, "out_mbps": float}

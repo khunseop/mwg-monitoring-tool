@@ -109,7 +109,8 @@ async def export_full_config_excel(db: Session = Depends(get_db)):
         metric_map = {
             "cpu": ("CPU사용률", "%"), "mem": ("메모리사용률", "%"), "disk": ("디스크사용률", "%"),
             "cc": ("Client Count", "sess"), "cs": ("Connected Sockets", "sess"),
-            "http": ("HTTP트래픽", "Mbps"), "https": ("HTTPS트래픽", "Mbps"), "http2": ("HTTP2트래픽", "Mbps")
+            "http": ("HTTP트래픽", "Mbps"), "https": ("HTTPS트래픽", "Mbps"), "http2": ("HTTP2트래픽", "Mbps"),
+            "blocked": ("Connections Blocked", "count")
         }
         for key, (label, unit) in metric_map.items():
             ws_res.append([label, oids.get(key, ""), th.get(key, ""), unit, f"{key} 관련 설정"])
@@ -243,7 +244,8 @@ async def import_full_config_excel(file: UploadFile = File(...), db: Session = D
             metric_rev_map = {
                 "CPU사용률": "cpu", "메모리사용률": "mem", "디스크사용률": "disk",
                 "Client Count": "cc", "Connected Sockets": "cs",
-                "HTTP트래픽": "http", "HTTPS트래픽": "https", "HTTP2트래픽": "http2"
+                "HTTP트래픽": "http", "HTTPS트래픽": "https", "HTTP2트래픽": "http2",
+                "Connections Blocked": "blocked"
             }
             for row in rows[1:]:
                 if not row or len(row) < 1: continue

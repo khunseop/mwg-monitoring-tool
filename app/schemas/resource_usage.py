@@ -13,6 +13,7 @@ class ResourceUsageBase(BaseModel):
     http: Optional[float] = None
     https: Optional[float] = None
     http2: Optional[float] = None
+    blocked: Optional[float] = None
     disk: Optional[float] = None
     interface_mbps: Optional[Dict[str, Dict[str, Union[float, str]]]] = None
   # {interface_index: {"in_mbps": float, "out_mbps": float, "name": str}}
@@ -78,6 +79,7 @@ class SeriesPoint(BaseModel):
     http: Optional[float] = None
     https: Optional[float] = None
     http2: Optional[float] = None
+    blocked: Optional[float] = None
     disk: Optional[float] = None
 
 
