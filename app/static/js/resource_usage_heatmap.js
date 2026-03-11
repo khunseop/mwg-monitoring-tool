@@ -79,8 +79,8 @@
                 { key: 'cpu', title: 'CPU' },
                 { key: 'mem', title: 'MEM' },
                 { key: 'disk', title: 'DISK' },
-                { key: 'cc', title: 'Client Counts' },
-                { key: 'cs', title: 'Connections (Cps)' },
+                { key: 'cc', title: 'Client Count' },
+                { key: 'cs', title: 'Connected Sockets' },
                 { key: 'httpd', title: 'HTTP' },
                 { key: 'httpsd', title: 'HTTPS' },
                 { key: 'http2d', title: 'HTTP2' },
@@ -241,7 +241,7 @@
             const interfaceOids = (ru.cachedConfig && ru.cachedConfig.interface_oids) ? ru.cachedConfig.interface_oids : {};
             const configuredInterfaceNames = Object.keys(interfaceOids);
             
-            const headers = ['Proxy', 'CPU (%)', 'MEM (%)', 'DISK (%)', 'CC', 'CS', 'HTTP (Mbps)', 'HTTPS (Mbps)', 'HTTP2 (Mbps)'];
+            const headers = ['Proxy', 'CPU (%)', 'MEM (%)', 'DISK (%)', 'Client Count', 'Connected Sockets', 'HTTP (Mbps)', 'HTTPS (Mbps)', 'HTTP2 (Mbps)'];
             configuredInterfaceNames.forEach(name => {
                 headers.push(`${name} IN`);
                 headers.push(`${name} OUT`);

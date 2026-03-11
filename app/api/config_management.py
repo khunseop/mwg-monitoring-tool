@@ -108,7 +108,7 @@ async def export_full_config_excel(db: Session = Depends(get_db)):
         th = oids.get("__thresholds__", {})
         metric_map = {
             "cpu": ("CPU사용률", "%"), "mem": ("메모리사용률", "%"), "disk": ("디스크사용률", "%"),
-            "cc": ("Client Counts", "sess"), "cs": ("Connections (Cps)", "cps"),
+            "cc": ("Client Count", "sess"), "cs": ("Connected Sockets", "sess"),
             "http": ("HTTP트래픽", "Mbps"), "https": ("HTTPS트래픽", "Mbps"), "http2": ("HTTP2트래픽", "Mbps")
         }
         for key, (label, unit) in metric_map.items():
@@ -242,7 +242,7 @@ async def import_full_config_excel(file: UploadFile = File(...), db: Session = D
             rows = excel_data["4.SystemResourceOIDs"]
             metric_rev_map = {
                 "CPU사용률": "cpu", "메모리사용률": "mem", "디스크사용률": "disk",
-                "Client Counts": "cc", "Connections (Cps)": "cs",
+                "Client Count": "cc", "Connected Sockets": "cs",
                 "HTTP트래픽": "http", "HTTPS트래픽": "https", "HTTP2트래픽": "http2"
             }
             for row in rows[1:]:
