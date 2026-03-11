@@ -202,6 +202,14 @@
         // Ensure empty state is hidden when rendering results
         $('#tlEmptyState').hide();
         
+        const gridDiv = document.querySelector('#tlTableGrid');
+        if (!gridDiv) return;
+
+        // Check if the grid has been cleared or destroyed externally (e.g. by analyze script)
+        if (tlGridApi && gridDiv.innerHTML === "") {
+            tlGridApi = null;
+        }
+        
         if (!tlGridApi) {
             const gridOptions = {
                 columnDefs: window.AgGridConfig ? window.AgGridConfig.getTrafficLogColumns() : [],
@@ -209,13 +217,16 @@
                     resizable: true,
                     sortable: true,
                     filter: 'agTextColumnFilter',
-                    minWidth: 100
+                    minWidth: 100,
+                    flex: 1
                 },
                 rowData: records,
                 pagination: true,
                 paginationPageSize: 100,
                 rowHeight: 35,
-                headerHeight: 45, // Increase header height to prevent text clipping
+                headerHeight: 45,
+                animateRows: true,
+                ensureDomOrder: true,
                 onRowDoubleClicked: params => showDetail(params.data),
                 overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">로그가 비어있습니다.</div>'
             };
@@ -224,7 +235,10 @@
                 tlGridApi = window.agGrid.createGrid(gridDiv, gridOptions);
             }
         } else {
+            // Use setGridOption for rowData in newer AG Grid versions
             tlGridApi.setGridOption('rowData', records);
+            // Also ensure it scrolls to top on new search
+            tlGridApi.ensureIndexVisible(0);
         }
         $('#tlResultParsed').fadeIn();
     }
