@@ -311,6 +311,7 @@ $(document).ready(function() {
             disk: row.disk,
             cc: row.cc,
             cs: row.cs,
+            blocked: row.blocked,
             http: row.http,
             https: row.https,
             http2: row.http2,
