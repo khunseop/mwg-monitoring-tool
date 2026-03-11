@@ -81,10 +81,10 @@
                 { key: 'disk', title: 'DISK' },
                 { key: 'cc', title: 'Client Count' },
                 { key: 'cs', title: 'Connected Sockets' },
+                { key: 'blocked', title: 'Blocked' },
                 { key: 'httpd', title: 'HTTP' },
                 { key: 'httpsd', title: 'HTTPS' },
                 { key: 'http2d', title: 'HTTP2' },
-                { key: 'blocked', title: 'Blocked' },
             ];
             
             const interfaceMetrics = [];
@@ -242,7 +242,7 @@
             const interfaceOids = (ru.cachedConfig && ru.cachedConfig.interface_oids) ? ru.cachedConfig.interface_oids : {};
             const configuredInterfaceNames = Object.keys(interfaceOids);
             
-            const headers = ['Proxy', 'CPU (%)', 'MEM (%)', 'DISK (%)', 'Client Count', 'Connected Sockets', 'HTTP (Mbps)', 'HTTPS (Mbps)', 'HTTP2 (Mbps)', 'Blocked'];
+            const headers = ['Proxy', 'CPU (%)', 'MEM (%)', 'DISK (%)', 'Client Count', 'Connected Sockets', 'Blocked', 'HTTP (Mbps)', 'HTTPS (Mbps)', 'HTTP2 (Mbps)'];
             configuredInterfaceNames.forEach(name => {
                 headers.push(`${name} IN`);
                 headers.push(`${name} OUT`);
@@ -262,10 +262,10 @@
                     (row.disk || 0).toFixed(1),
                     row.cc || 0,
                     row.cs || 0,
+                    (row.blocked || 0),
                     (row.http || 0).toFixed(2),
                     (row.https || 0).toFixed(2),
-                    (row.http2 || 0).toFixed(2),
-                    (row.blocked || 0)
+                    (row.http2 || 0).toFixed(2)
                 ];
 
                 const if_mbps = row.interface_mbps ? (typeof row.interface_mbps === 'string' ? JSON.parse(row.interface_mbps) : row.interface_mbps) : {};

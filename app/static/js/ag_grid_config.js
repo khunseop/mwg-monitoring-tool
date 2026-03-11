@@ -101,6 +101,12 @@
 						return params.value.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,');
 					}
 				},
+				{ field: 'blocked', headerName: 'Blocked', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 100, width: 120, cellClass: 'num',
+					valueFormatter: function(params) {
+						if (params.value == null) return '-';
+						return params.value.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,');
+					}
+				},
 				{ field: 'http', headerName: 'HTTP (누적)', sortable: true, filter: 'agNumberColumnFilter', filterParams: { applyButton: true, clearButton: true }, minWidth: 120, width: 150, cellClass: 'num',
 					valueFormatter: function(params) {
 						if (params.value == null || params.value === undefined) return '-';
