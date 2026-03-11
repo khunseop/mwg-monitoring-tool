@@ -360,8 +360,14 @@ async def load_sessions(payload: CollectRequest, db: Session = Depends(get_db)):
 async def get_session_detail(record_id: str):
     """특정 세션의 상세 정보(원본 로그 포함)를 가져옵니다."""
     try:
-        # record_id format: {proxy_id}_{timestamp_iso}_{index}
-        # Example: 1_2026-03-10T14:38:00+09:00_0
+        # 1. Try numeric ID first (bit-packed format used by ag-grid)
+        if record_id.isdigit():
+            item = temp_store.read_item_by_id(int(record_id))
+            if not item:
+                raise HTTPException(status_code=404, detail="Record not found")
+            return jsonable_encoder(item)
+
+        # 2. Fallback to legacy string format: {proxy_id}_{timestamp_iso}_{index}
         first_underscore = record_id.find('_')
         last_underscore = record_id.rfind('_')
         
@@ -377,6 +383,8 @@ async def get_session_detail(record_id: str):
             raise HTTPException(status_code=404, detail="Record not found")
             
         return jsonable_encoder(batch[idx])
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"[session_browser] Detail fetch failed for {record_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -710,9 +718,13 @@ async def sessions_datatables(
         url_full = rec.get("url") or ""
         # Use stored '__line_index' if present; else 0
         pid = int(rec.get("proxy_id") or 0)
-        collected_iso = str(rec.get("collected_at") or "")
+        collected_iso = rec.get("collected_at")
+        if not collected_iso:
+            # Fallback if collected_at is somehow missing from record but present in batch
+            collected_iso = now_kst().isoformat()
+            
         line_index = int(rec.get("__line_index") or 0)
-        rid_val = temp_store.build_record_id(pid, collected_iso, line_index)
+        rid_val = temp_store.build_record_id(pid, str(collected_iso), line_index)
         # Ensure client_ip without port for display
         try:
             cip = rec.get("client_ip") or ""
