@@ -184,6 +184,16 @@
 							dropdownParent: $container[0], // body 대신 컨테이너에 직접 삽입
 							allowEmptyOption: false,
 							render: {
+								dropdown_header: function() {
+									return '<div class="ts-dropdown-header is-flex is-align-items-center is-justify-content-between" style="padding: 0.5rem; border-bottom: 1px solid var(--color-border);">' +
+										'<span class="is-size-7 has-text-weight-bold">프록시 선택</span>' +
+										'<div class="buttons">' +
+											'<button type="button" class="button is-ghost is-small p-0 h-auto ts-select-all" style="font-size: 0.7rem;">전체 선택</button>' +
+											'<span class="mx-1 has-text-grey-lighter">|</span>' +
+											'<button type="button" class="button is-ghost is-small p-0 h-auto ts-deselect-all" style="font-size: 0.7rem;">전체 해제</button>' +
+										'</div>' +
+										'</div>';
+								},
 								option: function(data, escape) { 
 									return '<div class="is-flex is-align-items-center" style="padding: 0.5rem;">' +
 										'<span style="white-space:nowrap;">' + (data.text || '') + '</span>' +
@@ -199,6 +209,19 @@
 								this.position = function() {
 									positionDropdown();
 								};
+
+								// 전체 선택/해제 버튼 이벤트 바인딩
+								$(this.dropdown).on('click', '.ts-select-all', function(e) {
+									e.preventDefault();
+									e.stopPropagation();
+									var allIds = Object.keys(self.options);
+									self.setValue(allIds);
+								});
+								$(this.dropdown).on('click', '.ts-deselect-all', function(e) {
+									e.preventDefault();
+									e.stopPropagation();
+									self.clear();
+								});
 							},
 							onChange: function() { 
 								try { 
