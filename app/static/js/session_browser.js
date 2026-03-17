@@ -1,12 +1,31 @@
 (function() {
     'use strict';
 
+    function switchSbTab(tabId) {
+        $('.sb-tab-content').hide();
+        $('.tabs li').removeClass('is-active');
+        
+        if (tabId === 'list') {
+            $('#sbListSection').show();
+            $('#sb-tab-list').addClass('is-active');
+        } else if (tabId === 'analyze') {
+            $('#sbAnalyzeSection').show();
+            $('#sb-tab-analyze').addClass('is-active');
+            // 분석 탭으로 전환 시 현재 데이터가 있으면 자동 분석 실행
+            if (sb.records && sb.records.length > 0) {
+                analyzeSessions(sb.records);
+            }
+        }
+    }
+    window.switchSbTab = switchSbTab;
+
     const sb = {
         groups: [],
         proxies: [],
         records: [],
         gridApi: null,
-        storageKey: 'sb_state_v1'
+        storageKey: 'sb_state_v1',
+        charts: {}
     };
 
     const COLS = [
@@ -19,6 +38,107 @@
         const $tag = $('#sbStatus');
         $tag.text(text);
         $tag.removeClass().addClass('tag').addClass(cls || 'is-primary is-light');
+    }
+
+    async function analyzeSessions(records) {
+        if (!records || records.length === 0) {
+            $('#sbaDashboard').hide();
+            $('#sbaEmptyState').show();
+            return;
+        }
+
+        $('#sbaEmptyState').hide();
+        $('#sbaDashboard').show();
+
+        const stats = {
+            total: records.length,
+            uniqueClients: new Set(),
+            uniqueServers: new Set(),
+            totalTraffic: 0,
+            proxyDist: {},
+            protocolDist: {},
+            clientCounts: {},
+            serverCounts: {}
+        };
+
+        records.forEach(rec => {
+            if (rec.client_ip) {
+                stats.uniqueClients.add(rec.client_ip);
+                stats.clientCounts[rec.client_ip] = (stats.clientCounts[rec.client_ip] || 0) + 1;
+            }
+            if (rec.server_ip) {
+                stats.uniqueServers.add(rec.server_ip);
+                stats.serverCounts[rec.server_ip] = (stats.serverCounts[rec.server_ip] || 0) + 1;
+            }
+            
+            // 전송량 합계 (cl_bytes_received + cl_bytes_sent)
+            const traffic = (rec.cl_bytes_received || 0) + (rec.cl_bytes_sent || 0);
+            stats.totalTraffic += traffic;
+
+            // 프록시 분포
+            const proxy = rec.host || 'Unknown';
+            stats.proxyDist[proxy] = (stats.proxyDist[proxy] || 0) + 1;
+
+            // 프로토콜 분포
+            const proto = rec.protocol || 'Unknown';
+            stats.protocolDist[proto] = (stats.protocolDist[proto] || 0) + 1;
+        });
+
+        // 1. 요약 카드 업데이트
+        $('#sb-stat-total').text(stats.total.toLocaleString());
+        $('#sb-stat-unique-clients').text(stats.uniqueClients.size.toLocaleString());
+        $('#sb-stat-unique-servers').text(stats.uniqueServers.size.toLocaleString());
+        $('#sb-stat-traffic').text((window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(stats.totalTraffic) : stats.totalTraffic);
+
+        // 2. 차트 렌더링
+        renderPieChart('sb-chart-proxy', stats.proxyDist, '프록시');
+        renderPieChart('sb-chart-protocol', stats.protocolDist, '프로토콜', true);
+        renderBarChart('sb-chart-top-clients', stats.clientCounts, '클라이언트');
+        renderBarChart('sb-chart-top-servers', stats.serverCounts, '서버');
+    }
+
+    function renderPieChart(elId, dataMap, label, isDonut = false) {
+        const labels = Object.keys(dataMap);
+        const series = Object.values(dataMap);
+
+        const options = {
+            chart: { type: isDonut ? 'donut' : 'pie', height: 300 },
+            labels: labels,
+            series: series,
+            legend: { position: 'bottom' },
+            dataLabels: { enabled: true, formatter: (val) => val.toFixed(1) + "%" }
+        };
+
+        if (sb.charts[elId]) {
+            sb.charts[elId].updateOptions(options);
+        } else {
+            sb.charts[elId] = new ApexCharts(document.getElementById(elId), options);
+            sb.charts[elId].render();
+        }
+    }
+
+    function renderBarChart(elId, dataMap, title, limit = 10) {
+        const sorted = Object.entries(dataMap)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, limit);
+
+        const categories = sorted.map(x => x[0]);
+        const data = sorted.map(x => x[1]);
+
+        const options = {
+            chart: { type: 'bar', height: 350, toolbar: { show: false } },
+            plotOptions: { bar: { horizontal: true } },
+            series: [{ name: '세션 수', data: data }],
+            xaxis: { categories: categories },
+            title: { text: `Top ${limit} ${title}`, align: 'center', style: { fontSize: '14px' } }
+        };
+
+        if (sb.charts[elId]) {
+            sb.charts[elId].updateOptions(options);
+        } else {
+            sb.charts[elId] = new ApexCharts(document.getElementById(elId), options);
+            sb.charts[elId].render();
+        }
     }
 
     async function showDetail(record) {
@@ -274,6 +394,7 @@
 
         // 버튼 이벤트 바인딩 (중복 바인딩 방지)
         $('#sbLoadBtn').off('click').on('click', loadSessions);
+        $('#sbAnalyzeBtn').off('click').on('click', () => switchSbTab('analyze'));
         
         $('#sbQuickFilter').off('input').on('input', function() {
             if (sb.gridApi) sb.gridApi.setGridOption('quickFilterText', $(this).val());

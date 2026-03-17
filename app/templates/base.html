@@ -52,9 +52,6 @@
                     <a class="navbar-item {% if request.url.path == '/traffic-logs' %}is-active{% endif %}" href="/traffic-logs">
                         로그조회
                     </a>
-                    <a class="navbar-item {% if request.url.path == '/traffic-logs/upload' %}is-active{% endif %}" href="/traffic-logs/upload">
-                        로그분석
-                    </a>
                     <a class="navbar-item {% if request.url.path.startswith('/proxy') %}is-active{% endif %}" href="/proxy">
                         프록시관리
                     </a>

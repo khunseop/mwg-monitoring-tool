@@ -153,6 +153,7 @@
                 const data = await window.AppDB.get(STORAGE_KEY + '_records');
                 if (data && data.records && data.records.length > 0) {
                     LOG_RECORDS = data.records;
+                    window.LOG_RECORDS = data.records; // 글로벌 업데이트 추가
                     renderTable(LOG_RECORDS);
                     setStatus(`${LOG_RECORDS.length}건 복원됨`, 'is-info is-light');
                 }
