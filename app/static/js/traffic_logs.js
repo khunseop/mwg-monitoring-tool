@@ -1,13 +1,37 @@
 (function(){
     'use strict';
     
+    function switchTlTab(tabId) {
+        $('.tl-tab-content').hide();
+        $('.tabs li').removeClass('is-active');
+        
+        if (tabId === 'remote') {
+            $('#tlRemoteSection').show();
+            $('#tab-remote').addClass('is-active');
+        } else if (tabId === 'analyze') {
+            $('#tlAnalyzeSection').show();
+            $('#tab-analyze').addClass('is-active');
+            // 분석 탭으로 전환 시 현재 데이터가 있으면 자동 분석 실행
+            if (window.LOG_RECORDS && window.LOG_RECORDS.length > 0) {
+                if (window.TrafficLogAnalysis && window.TrafficLogAnalysis.analyze) {
+                    window.TrafficLogAnalysis.analyze(window.LOG_RECORDS);
+                }
+            }
+        } else if (tabId === 'upload') {
+            $('#tlaUploadSection').show();
+            $('#tab-upload').addClass('is-active');
+        }
+    }
+    window.switchTlTab = switchTlTab;
+
     const API_BASE = '/api';
     let PROXIES = [];
-    window.PROXIES = PROXIES; // ag-grid 컬럼 포맷터에서 참조 가능하도록 노출
+    window.PROXIES = PROXIES; 
     const STORAGE_KEY = 'tl_state_v1';
     let IS_RESTORING = false;
     let tlGridApi = null;
     let LOG_RECORDS = [];
+    window.LOG_RECORDS = LOG_RECORDS; // 분석 모듈에서 접근 가능하도록 노출
 
     // Columns defined in AgGridConfig are used, but we keep this for reference and detail view
     const COLS = [
@@ -179,6 +203,7 @@
             const data = await res.json();
             const records = data.records || [];
             LOG_RECORDS = records;
+            window.LOG_RECORDS = records; // 글로벌 업데이트
 
             if (records.length === 0) {
                 $('#tlEmptyState').fadeIn();
@@ -266,6 +291,7 @@
         }
 
         $('#tlLoadBtn').off('click').on('click', loadLogs);
+        $('#tlAnalyzeBtn').off('click').on('click', () => switchTlTab('analyze'));
         
         $('#tlQuickFilter').off('input').on('input', function() {
             if (tlGridApi) tlGridApi.setGridOption('quickFilterText', $(this).val());

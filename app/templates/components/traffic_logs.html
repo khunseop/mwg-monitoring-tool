@@ -2,13 +2,32 @@
 
 {% block content %}
 {% set is_upload = request.url.path == '/traffic-logs/upload' %}
-<!-- 원격 조회 섹션 -->
-<div id="tlRemoteSection" {% if is_upload %}style="display:none;"{% endif %}>
-    <!-- 페이지 헤더 -->
-    <div class="is-flex is-align-items-center mb-5">
-        <h3 class="title is-4 mb-0">로그 원격 조회 (SSH)</h3>
-    </div>
 
+<div class="tabs is-boxed mb-5">
+    <ul>
+        <li id="tab-remote" class="{% if not is_upload %}is-active{% endif %}">
+            <a onclick="switchTlTab('remote')">
+                <span class="icon is-small"><i class="fas fa-search" aria-hidden="true"></i></span>
+                <span>로그 원격 조회</span>
+            </a>
+        </li>
+        <li id="tab-analyze">
+            <a onclick="switchTlTab('analyze')">
+                <span class="icon is-small"><i class="fas fa-chart-bar" aria-hidden="true"></i></span>
+                <span>결과 분석</span>
+            </a>
+        </li>
+        <li id="tab-upload" class="{% if is_upload %}is-active{% endif %}">
+            <a onclick="switchTlTab('upload')">
+                <span class="icon is-small"><i class="fas fa-file-upload" aria-hidden="true"></i></span>
+                <span>파일 업로드 분석</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+<!-- 원격 조회 섹션 -->
+<div id="tlRemoteSection" class="tl-tab-content" {% if is_upload %}style="display:none;"{% endif %}>
     <!-- 로그 조회 설정 바 (통합) -->
     <div class="settings-bar mb-5">
         <div class="is-flex is-align-items-center" style="gap: 1rem; flex: 1;">
@@ -25,13 +44,11 @@
                     <span id="tlSelectionCounter">프록시 선택</span>
                     <span class="is-size-7 ml-2">▼</span>
                 </button>
-                <!-- Hidden select for TomSelect -->
                 <div style="position: absolute; visibility: hidden; height: 0;">
                     <select id="tlProxySelect" multiple></select>
                 </div>
             </div>
             
-            <!-- 상태 인디케이터 -->
             <div class="is-flex is-align-items-center ml-2">
                 <span id="tlStatus" class="tag is-primary is-light is-small" style="font-weight: 700; border-radius: 4px;">준비</span>
             </div>
@@ -54,6 +71,7 @@
             </div>
             <button class="button is-primary is-small px-5" id="tlLoadBtn" style="font-weight: 600;">조회</button>
             <button class="button is-subtle is-small px-3" id="tlExportBtn">내보내기</button>
+            <button class="button is-link is-light is-small px-3" id="tlAnalyzeBtn" style="font-weight: 600;">분석하기</button>
         </div>
     </div>
     <p id="tlError" class="help is-danger mt-1 mb-4" style="display:none;"></p>
@@ -63,13 +81,6 @@
         <div class="has-text-centered py-6">
             <p class="has-text-grey-light is-size-5 mb-2" style="font-weight: 700;">NO LOGS</p>
             <p class="has-text-grey-light">상단에서 프록시를 선택하고 "조회"를 클릭하세요.</p>
-        </div>
-    </div>
-
-    <div id="tlResultRaw" class="mb-5" style="display:none;">
-        <h4 class="title is-6 mb-3 has-text-grey">원시 로그 (Raw)</h4>
-        <div class="box p-0" style="background: #1e1e1e; border-radius: var(--radius-md); overflow: hidden;">
-            <pre id="tlRawPre" style="background: transparent; color: #d4d4d4; font-family: var(--font-mono); font-size: 0.8rem; padding: 1.5rem; max-height: 400px; overflow-y: auto; white-space: pre-wrap;"></pre>
         </div>
     </div>
 
@@ -92,12 +103,75 @@
     </div>
 </div>
 
-<!-- 업로드 분석 섹션 -->
-<div id="tlaSection" {% if not is_upload %}style="display:none;"{% endif %}>
-    <div class="is-flex is-align-items-center mb-5">
-        <h3 class="title is-4 mb-0">로그 파일 분석 (Upload)</h3>
+<!-- 결과 분석 섹션 -->
+<div id="tlAnalyzeSection" class="tl-tab-content" style="display:none;">
+    <div id="tlaDashboard" style="display:none;">
+        <!-- 요약 카드 -->
+        <div class="columns is-multiline mb-5">
+            <div class="column is-3">
+                <div class="box has-text-centered py-4">
+                    <p class="is-size-7 has-text-grey mb-1">총 요청 수</p>
+                    <h4 class="title is-4 mb-0" id="stat-total-req">-</h4>
+                </div>
+            </div>
+            <div class="column is-3">
+                <div class="box has-text-centered py-4">
+                    <p class="is-size-7 has-text-grey mb-1">차단된 요청</p>
+                    <h4 class="title is-4 mb-0 has-text-danger" id="stat-blocked-req">-</h4>
+                </div>
+            </div>
+            <div class="column is-3">
+                <div class="box has-text-centered py-4">
+                    <p class="is-size-7 has-text-grey mb-1">고유 클라이언트</p>
+                    <h4 class="title is-4 mb-0" id="stat-unique-clients">-</h4>
+                </div>
+            </div>
+            <div class="column is-3">
+                <div class="box has-text-centered py-4">
+                    <p class="is-size-7 has-text-grey mb-1">고유 호스트</p>
+                    <h4 class="title is-4 mb-0" id="stat-unique-hosts">-</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="columns is-multiline">
+            <div class="column is-6">
+                <div class="box">
+                    <h5 class="title is-6 mb-4">프록시별 요청 분포</h5>
+                    <div id="chart-proxy-req" style="height: 300px;"></div>
+                </div>
+            </div>
+            <div class="column is-6">
+                <div class="box">
+                    <h5 class="title is-6 mb-4">상태 코드 분포</h5>
+                    <div id="chart-status-code" style="height: 300px;"></div>
+                </div>
+            </div>
+            <div class="column is-6">
+                <div class="box">
+                    <h5 class="title is-6 mb-4">Top 호스트 (요청 수)</h5>
+                    <div id="chart-top-hosts" style="height: 350px;"></div>
+                </div>
+            </div>
+            <div class="column is-6">
+                <div class="box">
+                    <h5 class="title is-6 mb-4">Top 클라이언트 (요청 수)</h5>
+                    <div id="chart-top-clients" style="height: 350px;"></div>
+                </div>
+            </div>
+        </div>
     </div>
     
+    <div id="tlaEmptyState" class="heatmap-container mb-5" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 3rem;">
+        <div class="has-text-centered py-6">
+            <p class="has-text-grey-light is-size-5 mb-2" style="font-weight: 700;">NO DATA</p>
+            <p class="has-text-grey-light">분석할 로그 데이터가 없습니다. 로그 원격 조회 후 "분석하기"를 클릭하세요.</p>
+        </div>
+    </div>
+</div>
+
+<!-- 업로드 분석 섹션 -->
+<div id="tlaUploadSection" class="tl-tab-content" {% if not is_upload %}style="display:none;"{% endif %}>
     <div class="settings-bar mb-5">
         <div class="field is-grouped mb-0" style="width: 100%;">
             <div class="file is-small is-subtle has-name is-fullwidth">
@@ -109,8 +183,12 @@
                     <span class="file-name" id="tlaFileName" style="border-color: #bfdbfe;">선택된 파일 없음</span>
                 </label>
             </div>
-            <button class="button is-primary is-small ml-2 px-5" id="tlaRunBtn" style="font-weight: 600;">분석 시작</button>
+            <button class="button is-primary is-small ml-2 px-5" id="tlaRunBtn" style="font-weight: 600;">업로드 및 분석 시작</button>
         </div>
+    </div>
+    
+    <div id="tlaUploadDashboard" style="display:none;">
+        <!-- 파일 업로드 전용 대시보드는 분석 탭과 동일한 구조를 공유하도록 js에서 처리 -->
     </div>
 </div>
 
