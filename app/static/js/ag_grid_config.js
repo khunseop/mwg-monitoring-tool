@@ -282,6 +282,20 @@
 	window.AgGridConfig = AgGridConfig;
 
 	/**
+	 * 시스템 설정 또는 로컬 스토리지에서 페이지 크기 설정을 가져옵니다.
+	 */
+	AgGridConfig.getPageSize = function() {
+		try {
+			// 1. 세션 브라우저 설정 API에서 가져온 값이 로컬 스토리지에 있는지 확인
+			const sbConfig = JSON.parse(localStorage.getItem('sb_config') || '{}');
+			if (sbConfig && sbConfig.default_grid_page_size) {
+				return parseInt(sbConfig.default_grid_page_size, 10);
+			}
+		} catch (e) {}
+		return 50; // 기본값
+	};
+
+	/**
 	 * CSV/Excel 내보내기 시 원본 데이터를 유지하기 위한 범용 프로세서
 	 */
 	AgGridConfig.processCellForExport = function(params) {

@@ -13,6 +13,7 @@ class SessionBrowserConfig(Base):
     timeout_sec = Column(Integer, nullable=False, default=10)
     host_key_policy = Column(String, nullable=False, default="auto_add")  # auto_add | reject
     max_workers = Column(Integer, nullable=False, default=4)
+    default_grid_page_size = Column(Integer, nullable=False, default=50)
 
     created_at = Column(DateTime(timezone=True), default=now_kst)
     updated_at = Column(DateTime(timezone=True), onupdate=now_kst, default=now_kst)

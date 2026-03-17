@@ -11,6 +11,7 @@ class SessionBrowserConfigBase(BaseModel):
     timeout_sec: conint(ge=1, le=120) = 10
     host_key_policy: str = "auto_add"  # auto_add | reject
     max_workers: conint(ge=1, le=64) = 4
+    default_grid_page_size: conint(ge=1, le=1000) = 50
 
 
 class SessionBrowserConfig(SessionBrowserConfigBase, TimestampModel):
@@ -25,4 +26,5 @@ class SessionBrowserConfigUpdateSafe(BaseModel):
     timeout_sec: conint(ge=1, le=120) = 10
     host_key_policy: str = "auto_add"
     max_workers: conint(ge=1, le=64) = 4
+    default_grid_page_size: conint(ge=1, le=1000) = 50
 

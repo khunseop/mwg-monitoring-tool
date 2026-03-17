@@ -30,6 +30,7 @@ def to_schema(cfg: SessionBrowserConfigModel) -> SessionBrowserConfigSchema:
         timeout_sec=cfg.timeout_sec,
         host_key_policy=cfg.host_key_policy,
         max_workers=cfg.max_workers,
+        default_grid_page_size=cfg.default_grid_page_size,
         created_at=cfg.created_at,
         updated_at=cfg.updated_at,
     )
@@ -43,3 +44,4 @@ def update_config_safe(
     cfg.timeout_sec = payload.timeout_sec
     cfg.host_key_policy = payload.host_key_policy
     cfg.max_workers = payload.max_workers
+    cfg.default_grid_page_size = payload.default_grid_page_size

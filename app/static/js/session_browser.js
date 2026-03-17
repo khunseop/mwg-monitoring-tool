@@ -349,7 +349,7 @@
             },
             rowData: [],
             pagination: true,
-            paginationPageSize: 100,
+            paginationPageSize: window.AgGridConfig ? window.AgGridConfig.getPageSize() : 50,
             rowHeight: 35,
             headerHeight: 40,
             animateRows: true,
@@ -372,6 +372,11 @@
     }
 
     function initSessionBrowser() {
+        // 설정 로드 및 캐싱 (페이지 크기 등)
+        $.get('/api/session-browser/config').done(cfg => {
+            localStorage.setItem('sb_config', JSON.stringify(cfg));
+        });
+
         const gridDiv = document.querySelector('#sbTableGrid');
         // If element exists but is empty, it means we need a new grid (PJAX transition)
         if (gridDiv && gridDiv.innerHTML === "") {

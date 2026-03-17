@@ -72,7 +72,8 @@ function checkForChanges() {
     const currentSessionData = {
         ssh_port: parseInt($('#sbCfgPort').val(), 10) || 22,
         timeout_sec: parseInt($('#sbCfgTimeout').val(), 10) || 10,
-        host_key_policy: ($('#sbCfgHostKeyPolicy').val() || 'auto_add').toString()
+        host_key_policy: ($('#sbCfgHostKeyPolicy').val() || 'auto_add').toString(),
+        default_grid_page_size: parseInt($('#sbCfgGridPageSize').val(), 10) || 50
     };
     
     const resourceChanged = compareConfigData(currentResourceData, initialConfigData.resource);
@@ -243,13 +244,15 @@ function loadSessionConfig() {
             $('#sbCfgPort').val(cfg.ssh_port || 22);
             $('#sbCfgTimeout').val(cfg.timeout_sec || 10);
             $('#sbCfgHostKeyPolicy').val(cfg.host_key_policy || 'auto_add');
+            $('#sbCfgGridPageSize').val(cfg.default_grid_page_size || 50);
             
             // 초기값 저장 (수정사항 감지용)
             initialConfigData = initialConfigData || {};
             initialConfigData.session = {
                 ssh_port: cfg.ssh_port || 22,
                 timeout_sec: cfg.timeout_sec || 10,
-                host_key_policy: cfg.host_key_policy || 'auto_add'
+                host_key_policy: cfg.host_key_policy || 'auto_add',
+                default_grid_page_size: cfg.default_grid_page_size || 50
             };
         })
         .fail(() => {
@@ -262,7 +265,8 @@ function saveSessionConfig() {
     const payload = {
         ssh_port: parseInt($('#sbCfgPort').val(), 10) || 22,
         timeout_sec: parseInt($('#sbCfgTimeout').val(), 10) || 10,
-        host_key_policy: ($('#sbCfgHostKeyPolicy').val() || 'auto_add').toString()
+        host_key_policy: ($('#sbCfgHostKeyPolicy').val() || 'auto_add').toString(),
+        default_grid_page_size: parseInt($('#sbCfgGridPageSize').val(), 10) || 50
     };
 
     $.ajax({
@@ -321,7 +325,8 @@ function saveAllConfig() {
         const payload = {
             ssh_port: parseInt($('#sbCfgPort').val(), 10) || 22,
             timeout_sec: parseInt($('#sbCfgTimeout').val(), 10) || 10,
-            host_key_policy: ($('#sbCfgHostKeyPolicy').val() || 'auto_add').toString()
+            host_key_policy: ($('#sbCfgHostKeyPolicy').val() || 'auto_add').toString(),
+            default_grid_page_size: parseInt($('#sbCfgGridPageSize').val(), 10) || 50
         };
 
         $.ajax({
@@ -342,7 +347,8 @@ function saveAllConfig() {
                 session: {
                     ssh_port: parseInt($('#sbCfgPort').val(), 10) || 22,
                     timeout_sec: parseInt($('#sbCfgTimeout').val(), 10) || 10,
-                    host_key_policy: ($('#sbCfgHostKeyPolicy').val() || 'auto_add').toString()
+                    host_key_policy: ($('#sbCfgHostKeyPolicy').val() || 'auto_add').toString(),
+                    default_grid_page_size: parseInt($('#sbCfgGridPageSize').val(), 10) || 50
                 }
             };
             hasChanges = false;
@@ -375,7 +381,7 @@ function initSettingsPage() {
         '#cfgOidHttp', '#cfgOidHttps', '#cfgOidHttp2', '#cfgOidBlocked',
         '#cfgThrCpu', '#cfgThrMem', '#cfgThrDisk', '#cfgThrCc', '#cfgThrCs',
         '#cfgThrHttp', '#cfgThrHttps', '#cfgThrHttp2', '#cfgThrBlocked',
-        '#sbCfgPort', '#sbCfgTimeout', '#sbCfgHostKeyPolicy'
+        '#sbCfgPort', '#sbCfgTimeout', '#sbCfgHostKeyPolicy', '#sbCfgGridPageSize'
     ];
     
     configInputs.forEach(selector => {

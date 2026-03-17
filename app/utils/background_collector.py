@@ -180,7 +180,7 @@ class BackgroundCollector:
     ) -> dict:
         """단일 수집 실행 (백그라운드에서 실행)"""
         # 순환 import 방지를 위해 여기서 import
-        from app.api.resource_usage import _collect_for_proxy, _enforce_resource_usage_retention, _get_interface_config_from_db
+        from app.services.resource_collector import collect_for_proxy, get_interface_config_from_db
         
         db = SessionLocal()
         try:
@@ -194,10 +194,10 @@ class BackgroundCollector:
             collected_data: list[dict] = []
             
             # Get interface_oids from config
-            interface_oids, _, _ = _get_interface_config_from_db(db)
+            interface_oids, _, _ = get_interface_config_from_db(db)
             
             # 비동기 수집 실행
-            tasks = [_collect_for_proxy(p, oids, community, db=db, interface_oids=interface_oids) for p in proxies]
+            tasks = [collect_for_proxy(p, oids, community, db=db, interface_oids=interface_oids) for p in proxies]
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
             import json as json_lib
@@ -242,12 +242,6 @@ class BackgroundCollector:
                         "created_at": collected_at_ts,
                         "updated_at": collected_at_ts,
                     })
-                    
-                    # 저장 전 데이터 확인 로그
-                    logger.debug(f"[BackgroundCollector] Preparing data for proxy_id={proxy_id}: "
-                               f"cpu={metrics.get('cpu')}, mem={metrics.get('mem')}, "
-                               f"http={metrics.get('http')}, https={metrics.get('https')}, http2={metrics.get('http2')}, "
-                               f"interface_mbps={'present' if interface_mbps_json else 'none'}")
                 except Exception as e:
                     errors[proxy.id] = str(e)
             
@@ -280,14 +274,10 @@ class BackgroundCollector:
                         except Exception as e2:
                             logger.error(f"[BackgroundCollector] Failed to insert record: {e2}")
                     db.commit()
-                    for model in collected_models:
-                        db.refresh(model)
             
             # 저장 완료 로그
             logger.info(f"[BackgroundCollector] Saved {len(collected_models)} records to database "
                        f"(requested={len(proxies)}, failed={len(errors)})")
-            
-            # 보존 정책은 별도 백그라운드 작업에서 처리 (매 수집마다 실행하지 않음)
             
             return {
                 "requested": len(proxies),
@@ -334,8 +324,8 @@ class BackgroundCollector:
     
     async def _periodic_retention(self):
         """주기적으로 보존 정책 실행"""
-        import time
-        from app.api.resource_usage import _enforce_resource_usage_retention
+        from app.services.resource_collector import enforce_resource_usage_retention
+        from app.database.database import SessionLocal
         
         try:
             while True:
@@ -344,7 +334,14 @@ class BackgroundCollector:
                 try:
                     logger.info("[BackgroundCollector] Running retention policy (90 days)")
                     # Run in thread pool to not block event loop
-                    await asyncio.to_thread(_enforce_resource_usage_retention, days=90)
+                    def run_retention():
+                        db = SessionLocal()
+                        try:
+                            enforce_resource_usage_retention(db, days=90)
+                        finally:
+                            db.close()
+                    
+                    await asyncio.to_thread(run_retention)
                     logger.info("[BackgroundCollector] Retention policy completed")
                 except Exception as e:
                     logger.error(f"[BackgroundCollector] Retention policy error: {e}", exc_info=True)

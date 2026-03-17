@@ -253,7 +253,7 @@
                 },
                 rowData: records,
                 pagination: true,
-                paginationPageSize: 100,
+                paginationPageSize: window.AgGridConfig ? window.AgGridConfig.getPageSize() : 50,
                 rowHeight: 35,
                 headerHeight: 45,
                 animateRows: true,
@@ -275,6 +275,11 @@
     }
 
     function initTrafficLogs() {
+        // 설정 로드 및 캐싱 (페이지 크기 등)
+        $.get('/api/session-browser/config').done(cfg => {
+            localStorage.setItem('sb_config', JSON.stringify(cfg));
+        });
+
         const gridDiv = document.querySelector('#tlTableGrid');
         if (gridDiv && gridDiv.innerHTML === "") {
             tlGridApi = null;
