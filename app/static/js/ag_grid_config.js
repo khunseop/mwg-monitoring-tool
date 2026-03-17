@@ -151,28 +151,38 @@
 		// 트래픽로그용 컬럼 정의
 		getTrafficLogColumns: function() {
 			var COLS = [
-				"datetime","username","client_ip","url_destination_ip","timeintransaction",
+				"proxy_id", "datetime","username","client_ip","url_destination_ip","timeintransaction",
 				"response_statuscode","cache_status","comm_name","url_protocol","url_host",
 				"url_path","url_parametersstring","url_port","url_categories","url_reputationstring",
 				"url_reputation","mediatype_header","recv_byte","sent_byte","user_agent","referer",
 				"url_geolocation","application_name","currentruleset","currentrule","action_names",
-				"block_id","proxy_id","ssl_certificate_cn","ssl_certificate_sigmethod",
+				"block_id","ssl_certificate_cn","ssl_certificate_sigmethod",
 				"web_socket","content_lenght"
 			];
 			
 			return COLS.map(function(col) {
 				var colDef = {
 					field: col,
-					headerName: col,
+					headerName: col === 'proxy_id' ? '프록시' : col,
 					sortable: true,
 					filter: 'agTextColumnFilter',
 					filterParams: { applyButton: true, clearButton: true },
-					minWidth: 140,
-					width: 180
+					minWidth: col === 'proxy_id' ? 120 : 140,
+					width: col === 'proxy_id' ? 140 : 180
 				};
 				
 				// 특정 컬럼에 대한 포맷터 설정
-				if (col === 'datetime' || col === 'collected_at') {
+				if (col === 'proxy_id') {
+					colDef.valueFormatter = function(params) {
+						if (!params.value) return '-';
+						// traffic_logs.js에서 전역 PROXIES 배열을 참고하여 호스트명 반환
+						if (window.PROXIES && Array.isArray(window.PROXIES)) {
+							var p = window.PROXIES.find(function(x) { return String(x.id) === String(params.value); });
+							if (p) return p.host;
+						}
+						return params.value;
+					};
+				} else if (col === 'datetime' || col === 'collected_at') {
 					colDef.valueFormatter = function(params) {
 						return (window.AppUtils && AppUtils.formatDateTime) ? AppUtils.formatDateTime(params.value) : params.value;
 					};

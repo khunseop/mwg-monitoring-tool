@@ -3,6 +3,7 @@
     
     const API_BASE = '/api';
     let PROXIES = [];
+    window.PROXIES = PROXIES; // ag-grid 컬럼 포맷터에서 참조 가능하도록 노출
     const STORAGE_KEY = 'tl_state_v1';
     let IS_RESTORING = false;
     let tlGridApi = null;
@@ -253,6 +254,7 @@
                 storageKey: STORAGE_KEY,
                 onData: (data) => {
                     PROXIES = data.proxies;
+                    window.PROXIES = PROXIES; // 글로벌 참조 업데이트
                     if (!IS_RESTORING) restoreState();
                 },
                 onGroupChange: (groupId) => {

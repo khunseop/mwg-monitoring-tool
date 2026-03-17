@@ -36,6 +36,7 @@ class TrafficLogRecord(BaseModel):
 	ssl_certificate_sigmethod: Optional[str] = None
 	web_socket: Optional[bool] = None
 	content_lenght: Optional[int] = None
+	_raw_line_: Optional[str] = None
 
 
 class TrafficLogResponse(BaseModel):
@@ -91,6 +92,7 @@ class TrafficLogDB(BaseModel):
 	ssl_certificate_sigmethod: Optional[str] = None
 	web_socket: Optional[bool] = None
 	content_lenght: Optional[int] = None
+	_raw_line_: Optional[str] = None
 
 	class Config:
 		from_attributes = True

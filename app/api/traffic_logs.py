@@ -79,6 +79,7 @@ def _fetch_and_parse_for_proxy(db_proxy: Proxy, q: Optional[str], limit: int, di
                 rec_dict = parse_log_line(ln)
                 # Ensure proxy_id is set in the record
                 rec_dict["proxy_id"] = str(db_proxy.id)
+                rec_dict["_raw_line_"] = ln  # 원본 로그 보관
                 records.append(TrafficLogRecord(**rec_dict))
                 row = {
                     "proxy_id": db_proxy.id,

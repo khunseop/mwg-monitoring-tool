@@ -44,4 +44,5 @@ class TrafficLog(Base):
     ssl_certificate_sigmethod = Column(String(128))
     web_socket = Column(Boolean)
     content_lenght = Column(Integer)
+    _raw_line_ = Column(String(8192))
 
