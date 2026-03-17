@@ -388,6 +388,7 @@
                 groupSelect: '#sbGroupSelect',
                 proxySelect: '#sbProxySelect',
                 proxyTrigger: '#sbProxyTrigger',
+                deselectBtn: '#sbDeselectAllBtn',
                 selectionCounter: '#sbSelectionCounter',
                 storageKey: sb.storageKey,
                 onData: (data) => {

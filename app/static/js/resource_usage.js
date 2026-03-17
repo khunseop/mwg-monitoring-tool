@@ -67,6 +67,7 @@
                 groupSelect: '#ruGroupSelect',
                 proxySelect: '#ruProxySelect',
                 proxyTrigger: '#ruProxyTrigger',
+                deselectBtn: '#ruDeselectAllBtn',
                 selectAll: '#ruSelectAll',
                 selectionCounter: '#ruSelectionCounter',
                 storageKey: 'ru_state', // ResourceUsageState에서 사용하는 키와 맞춤

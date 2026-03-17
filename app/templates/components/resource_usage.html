@@ -22,11 +22,12 @@
             
             <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
                 <span class="is-size-7 has-text-grey-light" style="white-space: nowrap; font-weight: 600;">프록시</span>
-                <div style="position: relative;">
+                <div style="position: relative; display: flex; align-items: center;">
                     <button id="ruProxyTrigger" class="button is-small is-subtle px-3" type="button" style="border: 1px solid var(--color-border); min-width: 120px; justify-content: space-between;">
                         <span id="ruSelectionCounter">0 / 0</span>
                         <span class="is-size-7 ml-2">▼</span>
                     </button>
+                    <button class="button is-ghost is-small p-0 ml-2" id="ruDeselectAllBtn" style="font-size: 0.7rem; color: var(--color-text-muted);">모두해제</button>
                     <div style="position: absolute; visibility: hidden; height: 0;">
                         <select id="ruProxySelect" multiple></select>
                     </div>
@@ -103,11 +104,12 @@
                 </div>
                 <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
                     <span class="is-size-7 has-text-grey-light" style="white-space: nowrap; font-weight: 600;">프록시</span>
-                    <div style="position: relative;">
+                    <div style="position: relative; display: flex; align-items: center;">
                         <button id="ruHistoryProxyTrigger" class="button is-small is-subtle px-3" type="button" style="border: 1px solid var(--color-border); min-width: 120px; justify-content: space-between;">
                             <span id="ruHistorySelectionCounter">0 / 0</span>
                             <span class="is-size-7 ml-2">▼</span>
                         </button>
+                        <button class="button is-ghost is-small p-0 ml-2" id="ruHistoryDeselectAllBtn" style="font-size: 0.7rem; color: var(--color-text-muted);">모두해제</button>
                         <div style="position: absolute; visibility: hidden; height: 0;">
                             <select id="ruHistoryProxySelect" multiple></select>
                         </div>

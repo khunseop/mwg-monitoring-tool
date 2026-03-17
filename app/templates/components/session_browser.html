@@ -33,11 +33,12 @@
         
         <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
             <span class="is-size-7 has-text-grey-light" style="white-space: nowrap; font-weight: 600;">프록시</span>
-            <div style="position: relative;">
+            <div style="position: relative; display: flex; align-items: center;">
                 <button id="sbProxyTrigger" class="button is-small is-subtle px-3" type="button" style="min-width: 120px; justify-content: space-between;">
                     <span id="sbSelectionCounter">0 / 0</span>
                     <span class="is-size-7 ml-2">▼</span>
                 </button>
+                <button class="button is-ghost is-small p-0 ml-2" id="sbDeselectAllBtn" style="font-size: 0.7rem; color: var(--color-text-muted);">모두해제</button>
 
                 <div style="position: absolute; visibility: hidden; height: 0;">
                     <select id="sbProxySelect" multiple></select>
@@ -54,7 +55,7 @@
     <div class="is-flex is-align-items-center" style="gap: 0.75rem; margin-left: auto;">
         <div class="field has-addons mb-0">
             <p class="control">
-                <input class="input is-small" id="sbQuery" type="text" placeholder="검색어 (grep -F)" style="width: 150px;">
+                <input class="input is-small" id="sbQuery" type="text" placeholder="검색어 (grep -F)" style="width: 250px;">
             </p>
         </div>
         <button class="button is-primary is-small px-5" id="sbLoadBtn" style="font-weight: 600;">세션 불러오기</button>

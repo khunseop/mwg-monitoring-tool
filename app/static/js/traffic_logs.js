@@ -285,6 +285,7 @@
                 groupSelect: '#tlGroupSelect',
                 proxySelect: '#tlProxySelect',
                 proxyTrigger: '#tlProxyTrigger',
+                deselectBtn: '#tlDeselectAllBtn',
                 selectionCounter: '#tlSelectionCounter',
                 storageKey: STORAGE_KEY,
                 onData: (data) => {

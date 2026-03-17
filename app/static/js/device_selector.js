@@ -14,6 +14,7 @@
 			var $proxy = $(options.proxySelect);
 			var $counter = options.selectionCounter ? $(options.selectionCounter) : $();
 			var $trigger = $(options.proxyTrigger || '#ruProxyTrigger'); 
+			var $deselectBtn = options.deselectBtn ? $(options.deselectBtn) : $();
 			var allowAllGroups = (options.allowAllGroups === undefined) ? true : !!options.allowAllGroups;
 			var labelForProxy = (typeof options.labelForProxy === 'function') ? options.labelForProxy : defaultLabelForProxy;
 			var apiGroups = options.apiGroups || '/api/proxy-groups';
@@ -290,6 +291,15 @@
 						}
 					}
 				});
+
+				if ($deselectBtn.length) {
+					$deselectBtn.off('click.devicesel').on('click.devicesel', function(e) {
+						e.preventDefault();
+						if (state.ts) {
+							state.ts.clear();
+						}
+					});
+				}
 			}
 
 			var p1 = $.getJSON(apiGroups).then(function(data) { 

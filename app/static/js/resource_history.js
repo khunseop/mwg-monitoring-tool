@@ -44,6 +44,7 @@ $(document).ready(function() {
             groupSelect: '#ruHistoryGroupSelect',
             proxySelect: '#ruHistoryProxySelect',
             proxyTrigger: '#ruHistoryProxyTrigger',
+            deselectBtn: '#ruHistoryDeselectAllBtn',
             selectionCounter: '#ruHistorySelectionCounter',
             storageKey: history.storageKey,
             onData: function(data) {
