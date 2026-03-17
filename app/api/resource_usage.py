@@ -242,7 +242,7 @@ async def get_active_interfaces(
     return result[:limit]
 
 
-@router.get("/resource-usage/history", response_model=List[ResourceUsageSchema])
+@router.get("/history", response_model=List[ResourceUsageSchema])
 async def get_resource_usage_history(
     db: Session = Depends(get_db),
     proxy_id: Optional[int] = Query(None),

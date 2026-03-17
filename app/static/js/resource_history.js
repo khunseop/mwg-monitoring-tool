@@ -35,7 +35,9 @@ $(document).ready(function() {
         totalCount: 0,
         hasMore: false,
         gridApi: null,
-        storageKey: 'ru_history_state'
+        storageKey: 'ru_history_state',
+        lastData: [],
+        charts: {}
     };
 
     // DeviceSelector 초기화
@@ -174,7 +176,7 @@ $(document).ready(function() {
         }
 
         $.ajax({
-            url: '/api/resource-usage/history',
+            url: '/api/history',
             method: 'GET',
             data: params
         }).then(data => {
@@ -189,6 +191,7 @@ $(document).ready(function() {
 
             history.totalCount = data.length;
             history.hasMore = data.length === params.limit;
+            history.lastData = data; // Store for charting
             displayHistoryResults(data, append);
         }).catch(err => {
             $('#ruHistoryLoading').hide();
@@ -584,6 +587,101 @@ $(document).ready(function() {
         $('#ruHistoryProxySelect').off('change').on('change', loadStatistics);
     }
 
+    /**
+     * 이력 데이터를 기반으로 그래프 렌더링
+     */
+    function renderHistoryCharts() {
+        const data = history.lastData;
+        if (!data || data.length === 0) {
+            $('#ruHistoryCharts').hide();
+            return;
+        }
+        $('#ruHistoryCharts').show();
+
+        // 1. 데이터 가공 (프록시별 그룹화 및 시간순 정렬)
+        const proxyMap = {};
+        (history.proxies || []).forEach(p => { proxyMap[p.id] = p.host; });
+
+        const sortedData = [...data].sort((a, b) => new Date(a.collected_at) - new Date(b.collected_at));
+        
+        // 프록시별로 시리즈 분리
+        const proxyGroups = {};
+        sortedData.forEach(row => {
+            const pid = row.proxy_id;
+            if (!proxyGroups[pid]) proxyGroups[pid] = [];
+            proxyGroups[pid].push(row);
+        });
+
+        // 헬퍼: 특정 필드 시리즈 생성
+        const getSeries = (field, labelSuffix = '') => {
+            return Object.keys(proxyGroups).map(pid => {
+                const host = proxyMap[pid] || `#${pid}`;
+                return {
+                    name: `${host}${labelSuffix}`,
+                    data: proxyGroups[pid].map(row => ({
+                        x: new Date(row.collected_at).getTime(),
+                        y: row[field]
+                    }))
+                };
+            });
+        };
+
+        // 2. 각 차트 렌더링
+        renderHistoryLineChart('hist-chart-basic', getSeries('cpu', ' (CPU)'), '%');
+        
+        renderHistoryLineChart('hist-chart-sessions', [
+            ...getSeries('cc', ' (CC)'),
+            ...getSeries('cs', ' (CS)')
+        ], 'sess');
+
+        renderHistoryLineChart('hist-chart-blocked', getSeries('blocked'), 'count');
+
+        renderHistoryLineChart('hist-chart-traffic', [
+            ...getSeries('http', ' (HTTP)'),
+            ...getSeries('https', ' (HTTPS)'),
+            ...getSeries('http2', ' (HTTP2)')
+        ], 'Mbps');
+    }
+
+    function renderHistoryLineChart(elId, series, unit) {
+        const options = {
+            chart: {
+                type: 'line',
+                height: 300,
+                toolbar: { show: true },
+                animations: { enabled: false },
+                zoom: { type: 'x', enabled: true, autoScaleYaxis: true }
+            },
+            stroke: { width: 2, curve: 'smooth' },
+            series: series,
+            xaxis: {
+                type: 'datetime',
+                labels: { datetimeUTC: false }
+            },
+            yaxis: {
+                title: { text: unit },
+                labels: { formatter: val => (val == null || isNaN(val)) ? '' : val.toFixed(1) }
+            },
+            tooltip: {
+                x: { format: 'yyyy-MM-dd HH:mm:ss' },
+                y: { formatter: val => `${(val != null && !isNaN(val)) ? val.toFixed(2) : '-'} ${unit}` }
+            },
+            legend: { position: 'top', horizontalAlign: 'left', fontSize: '11px' }
+        };
+
+        if (history.charts[elId]) {
+            history.charts[elId].updateOptions(options);
+        } else {
+            const el = document.getElementById(elId);
+            if (el) {
+                history.charts[elId] = new ApexCharts(el, options);
+                history.charts[elId].render();
+            }
+        }
+    }
+
+    window.renderHistoryCharts = renderHistoryCharts;
+
     // Initialize when page loads
     $(document).ready(() => {
         initResourceHistory();
@@ -596,45 +694,4 @@ $(document).ready(function() {
         }
     });
 });
-
-// 전역 함수: 자원이력에서 로그조회로 바로가기
-window.analyzeLogFromHistory = function(proxyId, collectedAt) {
-    if (!proxyId || !collectedAt) return;
-    
-    try {
-        // collectedAt format: ISO string (e.g., "2026-03-17T05:30:00Z" or "2026-03-17T14:30:00")
-        const date = new Date(collectedAt);
-        
-        // MWG 로그 시간 포맷으로 변환 (e.g., "17/Mar/2026:14:30")
-        const day = String(date.getDate()).padStart(2, '0');
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const month = months[date.getMonth()];
-        const year = date.getFullYear();
-        const hours = String(date.getHours()).padStart(2, '0');
-        const minutes = String(date.getMinutes()).padStart(2, '0');
-        
-        // 분 단위까지만 검색어로 사용하여 해당 시간대의 로그를 넓게 잡음
-        const searchTime = `${day}/${month}/${year}:${hours}:${minutes}`;
-        
-        // 로그조회 페이지로 리다이렉트 (파라미터 전달)
-        // limit을 5000으로 늘려 충분한 로그가 수집되도록 유도
-        const url = `/traffic-logs?proxy_id=${proxyId}&q=${encodeURIComponent(searchTime)}&limit=5000`;
-        
-        // PJAX 환경 호환성 검사 및 네비게이션
-        if (window.location.pathname !== '/traffic-logs') {
-            const $item = $(`.navbar-item[href="/traffic-logs"]`);
-            if ($item.length > 0) {
-                // pjax 네비게이션 트리거
-                $item.attr('href', url);
-                $item.click();
-                // 원래 url로 복구 (다음 클릭을 위해)
-                setTimeout(() => $item.attr('href', '/traffic-logs'), 100);
-            } else {
-                window.location.href = url;
-            }
-        }
-    } catch (e) {
-        console.error("Failed to parse date for log analysis:", e);
-    }
-};
 
