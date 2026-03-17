@@ -227,28 +227,33 @@
             paginationPageSize: 100,
             rowHeight: 35,
             headerHeight: 40,
-            animateRows: true, // 추가
+            animateRows: true,
             onRowDoubleClicked: params => showDetail(params.data),
             enableBrowserTooltips: true,
             overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted); font-size: 0.875rem;">조회된 세션 데이터가 없습니다. 상단에서 "세션 불러오기"를 클릭하세요.</div>',
             onGridReady: async (params) => {
                 sb.gridApi = params.api;
-                await restoreState();
+                // Wait a bit for other initialization to complete
+                setTimeout(() => restoreState(), 100);
             }
         };
 
         const gridDiv = document.querySelector('#sbTableGrid');
         if (gridDiv && window.agGrid) {
+            // Ensure container is empty before creating
+            gridDiv.innerHTML = '';
             sb.gridApi = window.agGrid.createGrid(gridDiv, gridOptions);
         }
     }
 
     function initSessionBrowser() {
-        // 그리드 초기화 (이미 있으면 무시)
-        if (!sb.gridApi) {
+        const gridDiv = document.querySelector('#sbTableGrid');
+        // If element exists but is empty, it means we need a new grid (PJAX transition)
+        if (gridDiv && gridDiv.innerHTML === "") {
+            sb.gridApi = null;
             initGrid();
-        } else {
-            // PJAX로 돌아온 경우 데이터 복원 재시도
+        } else if (sb.gridApi) {
+            // Already initialized, just restore state if needed
             restoreState();
         }
 

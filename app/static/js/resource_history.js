@@ -322,6 +322,11 @@ $(document).ready(function() {
         // ag-grid 초기화 또는 업데이트
         const gridDiv = document.querySelector('#ruHistoryTableGrid');
         if (gridDiv && window.agGrid) {
+            // PJAX 대응: 엘리먼트가 비어있으면 API 리셋
+            if (gridDiv.innerHTML === "") {
+                history.gridApi = null;
+            }
+
             if (!history.gridApi) {
                 // 초기화
                 const gridOptions = {

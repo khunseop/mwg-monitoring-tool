@@ -270,6 +270,11 @@
     }
 
     function initTrafficLogs() {
+        const gridDiv = document.querySelector('#tlTableGrid');
+        if (gridDiv && gridDiv.innerHTML === "") {
+            tlGridApi = null;
+        }
+
         if (window.DeviceSelector) {
             window.DeviceSelector.init({
                 groupSelect: '#tlGroupSelect',
