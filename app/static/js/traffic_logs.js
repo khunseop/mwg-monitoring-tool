@@ -8,6 +8,8 @@
         if (tabId === 'remote') {
             $('#tlRemoteSection').show();
             $('#tab-remote').addClass('is-active');
+            // 그리드 리사이즈 유도
+            setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
         } else if (tabId === 'analyze') {
             $('#tlAnalyzeSection').show();
             $('#tab-analyze').addClass('is-active');
@@ -17,6 +19,8 @@
                     window.TrafficLogAnalysis.analyze(window.LOG_RECORDS);
                 }
             }
+            // 차트 리사이즈 유도
+            setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
         } else if (tabId === 'upload') {
             $('#tlaUploadSection').show();
             $('#tab-upload').addClass('is-active');

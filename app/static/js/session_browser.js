@@ -8,6 +8,8 @@
         if (tabId === 'list') {
             $('#sbListSection').show();
             $('#sb-tab-list').addClass('is-active');
+            // 그리드 리사이즈 유도
+            setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
         } else if (tabId === 'analyze') {
             $('#sbAnalyzeSection').show();
             $('#sb-tab-analyze').addClass('is-active');
@@ -15,6 +17,8 @@
             if (sb.records && sb.records.length > 0) {
                 analyzeSessions(sb.records);
             }
+            // 차트 리사이즈 유도
+            setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
         }
     }
     window.switchSbTab = switchSbTab;

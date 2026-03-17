@@ -177,14 +177,6 @@
                     success: (res) => {
                         // 업로드된 데이터로 분석 실행
                         if (res.records) {
-                            // 대시보드 구조 복제 (만약 필요하다면)
-                            const $uploadDashboard = $('#tlaUploadDashboard');
-                            if ($uploadDashboard.is(':empty')) {
-                                $uploadDashboard.html($('#tlaDashboard').html());
-                                // ID 중복 방지를 위해 접미사 추가 가능하지만, 여기선 단순 구현을 위해
-                                // 분석 탭으로 전환하여 보여주는 방식으로 처리
-                            }
-                            
                             // 전역 레코드 업데이트 및 탭 전환
                             window.LOG_RECORDS = res.records;
                             switchTlTab('analyze');

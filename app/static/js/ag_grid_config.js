@@ -150,7 +150,6 @@
 						if (!params.data || !params.data.collected_at || !params.data.proxy_id) return '';
 						// button that calls window.analyzeLogFromHistory
 						return `<button class="button is-small is-link is-light is-outlined" style="height: 24px; padding: 0 8px; font-size: 0.75rem;" onclick="window.analyzeLogFromHistory(${params.data.proxy_id}, '${params.data.collected_at}')">
-									<span class="icon is-small"><i class="fas fa-search"></i></span>
 									<span>조회</span>
 								</button>`;
 					}
