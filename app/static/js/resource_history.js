@@ -305,6 +305,7 @@ $(document).ready(function() {
         // 데이터 변환 (ag-grid 형식으로)
         const rowData = data.map(row => ({
             collected_at: row.collected_at,
+            proxy_id: row.proxy_id,
             proxy_name: proxyMap[row.proxy_id] || `#${row.proxy_id}`,
             cpu: row.cpu,
             mem: row.mem,
@@ -589,3 +590,45 @@ $(document).ready(function() {
         }
     });
 });
+
+// 전역 함수: 자원이력에서 로그조회로 바로가기
+window.analyzeLogFromHistory = function(proxyId, collectedAt) {
+    if (!proxyId || !collectedAt) return;
+    
+    try {
+        // collectedAt format: ISO string (e.g., "2026-03-17T05:30:00Z" or "2026-03-17T14:30:00")
+        const date = new Date(collectedAt);
+        
+        // MWG 로그 시간 포맷으로 변환 (e.g., "17/Mar/2026:14:30")
+        const day = String(date.getDate()).padStart(2, '0');
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const month = months[date.getMonth()];
+        const year = date.getFullYear();
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        
+        // 분 단위까지만 검색어로 사용하여 해당 시간대의 로그를 넓게 잡음
+        const searchTime = `${day}/${month}/${year}:${hours}:${minutes}`;
+        
+        // 로그조회 페이지로 리다이렉트 (파라미터 전달)
+        // limit을 5000으로 늘려 충분한 로그가 수집되도록 유도
+        const url = `/traffic-logs?proxy_id=${proxyId}&q=${encodeURIComponent(searchTime)}&limit=5000`;
+        
+        // PJAX 환경 호환성 검사 및 네비게이션
+        if (window.location.pathname !== '/traffic-logs') {
+            const $item = $(`.navbar-item[href="/traffic-logs"]`);
+            if ($item.length > 0) {
+                // pjax 네비게이션 트리거
+                $item.attr('href', url);
+                $item.click();
+                // 원래 url로 복구 (다음 클릭을 위해)
+                setTimeout(() => $item.attr('href', '/traffic-logs'), 100);
+            } else {
+                window.location.href = url;
+            }
+        }
+    } catch (e) {
+        console.error("Failed to parse date for log analysis:", e);
+    }
+};
+

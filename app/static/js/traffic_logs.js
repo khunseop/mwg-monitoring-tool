@@ -280,7 +280,47 @@
                 onData: (data) => {
                     PROXIES = data.proxies;
                     window.PROXIES = PROXIES; // 글로벌 참조 업데이트
-                    if (!IS_RESTORING) restoreState();
+                    
+                    // URL 파라미터 확인 (자원이력 연동 등)
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const queryProxyId = urlParams.get('proxy_id');
+                    const queryQ = urlParams.get('q');
+                    const queryLimit = urlParams.get('limit');
+                    
+                    if (queryProxyId && queryQ) {
+                        IS_RESTORING = true;
+                        
+                        // Set Group to 'all' or default
+                        const $gs = $('#tlGroupSelect');
+                        if ($gs.length > 0) {
+                            $gs.val('');
+                        }
+                        
+                        // Set Proxy
+                        const $ps = $('#tlProxySelect');
+                        if ($ps[0] && $ps[0].tomselect) {
+                            $ps[0].tomselect.setValue([queryProxyId]);
+                        } else {
+                            $ps.val([queryProxyId]);
+                        }
+                        
+                        // Set Query and Limit
+                        $('#tlQuery').val(queryQ);
+                        if (queryLimit) $('#tlLimit').val(queryLimit);
+                        
+                        // Clear parameters from URL without reloading
+                        const newUrl = window.location.pathname;
+                        window.history.replaceState({}, document.title, newUrl);
+                        
+                        // Trigger search automatically
+                        setTimeout(() => {
+                            $('#tlLoadBtn').click();
+                            IS_RESTORING = false;
+                        }, 100);
+                        
+                    } else if (!IS_RESTORING) {
+                        restoreState();
+                    }
                 },
                 onGroupChange: (groupId) => {
                     // 그룹 변경 시 이전 결과와 에러 메시지 초기화
