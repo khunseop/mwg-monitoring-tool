@@ -33,8 +33,9 @@ def _validate_query(q: Optional[str]) -> Optional[str]:
 def _build_remote_command(log_path: str, q: Optional[str], limit: int, direction: str) -> str:
 	safe_path = shlex.quote(log_path)
 	limit_str = str(limit)
-	base_prefix = "timeout 5s nice -n 10 ionice -c2 -n7 "
-	clean_filter = " | sed -e 's/[^[:print:]\t]//g' | head -c 1048576 | cat"
+	base_prefix = "timeout 15s nice -n 10 ionice -c2 -n7 "
+	# Increased buffer from 1MB to 10MB to accommodate up to 10,000 lines (avg line length ~1KB)
+	clean_filter = " | sed -e 's/[^[:print:]\\t]//g' | head -c 10485760 | cat"
 	if q:
 		safe_q = shlex.quote(q)
 		grep_cmd = f"grep -F -- {safe_q} {safe_path}"
@@ -112,7 +113,7 @@ def get_multi_proxy_traffic_logs(
     proxy_ids: str = Query(..., description="Comma-separated list of proxy IDs"),
     db: Session = Depends(get_db),
     q: Optional[str] = Query(default=None, max_length=256, description="Fixed-string search (grep -F)"),
-    limit: int = Query(default=200, ge=1, le=1000),
+    limit: int = Query(default=200, ge=1, le=10000),
     direction: str = Query(default="tail", pattern=r"^(head|tail)$"),
 ):
     """여러 프록시의 로그를 동시에 조회합니다."""
@@ -186,7 +187,7 @@ def get_proxy_traffic_logs(
 	proxy_id: int,
 	db: Session = Depends(get_db),
 	q: Optional[str] = Query(default=None, max_length=256, description="Fixed-string search (grep -F)"),
-	limit: int = Query(default=200, ge=1, le=1000),
+	limit: int = Query(default=200, ge=1, le=10000),
 	direction: str = Query(default="tail", pattern=r"^(head|tail)$"),
 	parsed: bool = Query(default=False),
 ):

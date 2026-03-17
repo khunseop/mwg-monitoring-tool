@@ -43,7 +43,7 @@
                     <input class="input is-small" id="tlQuery" type="text" placeholder="검색어 (grep -F)" style="width: 150px;">
                 </p>
                 <p class="control">
-                    <input class="input is-small has-text-centered" id="tlLimit" type="number" min="1" max="1000" value="200" style="width: 60px;">
+                    <input class="input is-small has-text-centered" id="tlLimit" type="number" min="1" max="10000" value="200" style="width: 70px;">
                 </p>
                 <div class="select is-small">
                     <select id="tlDirection">
@@ -81,6 +81,12 @@
                     </p>
                     <p class="control">
                         <button class="button is-small is-subtle px-3" id="tlClearFiltersBtn">필터 초기화</button>
+                    </p>
+                    <p class="control">
+                        <button class="button is-small is-link is-light px-3" id="tlExportBtn">
+                            <span class="icon is-small"><i class="fas fa-download"></i></span>
+                            <span>내보내기</span>
+                        </button>
                     </p>
                 </div>
             </div>

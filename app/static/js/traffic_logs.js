@@ -277,6 +277,18 @@
             }
         });
 
+        $('#tlExportBtn').off('click').on('click', () => {
+            if (tlGridApi) {
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                tlGridApi.exportDataAsCsv({ 
+                    fileName: `traffic_logs_${timestamp}.csv`,
+                    allColumns: true
+                });
+            } else {
+                alert('내보낼 데이터가 없습니다.');
+            }
+        });
+
         $('#tlDetailModal .delete, #tlDetailModal .button, #tlDetailModal .modal-background').off('click').on('click', () => {
             $('#tlDetailModal').removeClass('is-active');
         });
