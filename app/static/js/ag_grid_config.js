@@ -282,4 +282,22 @@
 
 	window.AgGridConfig = AgGridConfig;
 
+	/**
+	 * CSV/Excel 내보내기 시 원본 데이터를 유지하기 위한 범용 프로세서
+	 */
+	AgGridConfig.processCellForExport = function(params) {
+		// 숫자형 컬럼이면서 valueFormatter가 적용된 경우 원본 값(params.value) 반환
+		const colId = params.column.getColId();
+		const numCols = [
+			'cl_bytes_received', 'cl_bytes_sent', 'age_seconds', 
+			'recv_byte', 'sent_byte', 'content_lenght', 'timeintransaction',
+			'cpu', 'mem', 'disk', 'cc', 'cs', 'http', 'https', 'http2', 'blocked'
+		];
+		
+		if (numCols.includes(colId)) {
+			return params.value;
+		}
+		return params.value;
+	};
+
 })(window);

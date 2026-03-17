@@ -318,6 +318,7 @@
                 const data = await window.AppDB.get(sb.storageKey + '_records');
                 if (data && data.records && data.records.length > 0) {
                     sb.records = data.records;
+                    window.LOG_RECORDS = data.records; // 분석 연동용 전역 변수 업데이트
                     if (sb.gridApi) {
                         sb.gridApi.setGridOption('rowData', sb.records);
                         setStatus(`데이터 복원됨 (${sb.records.length}건)`, 'is-info is-light');
@@ -417,7 +418,8 @@
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
                 sb.gridApi.exportDataAsCsv({ 
                     fileName: `sessions_export_${timestamp}.csv`,
-                    allColumns: true
+                    allColumns: true,
+                    processCellCallback: window.AgGridConfig ? window.AgGridConfig.processCellForExport : null
                 });
             }
         });

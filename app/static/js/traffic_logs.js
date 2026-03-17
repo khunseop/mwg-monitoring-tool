@@ -356,7 +356,8 @@
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
                 tlGridApi.exportDataAsCsv({ 
                     fileName: `traffic_logs_${timestamp}.csv`,
-                    allColumns: true
+                    allColumns: true,
+                    processCellCallback: window.AgGridConfig ? window.AgGridConfig.processCellForExport : null
                 });
             } else {
                 alert('내보낼 데이터가 없습니다.');
