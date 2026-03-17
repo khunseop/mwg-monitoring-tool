@@ -12,9 +12,11 @@ from app.models.traffic_log import TrafficLog as TrafficLogModel
 from app.utils.traffic_log_parser import parse_log_line
 from app.utils.crypto import decrypt_string_if_encrypted
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import logging
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _validate_query(q: Optional[str]) -> Optional[str]:
