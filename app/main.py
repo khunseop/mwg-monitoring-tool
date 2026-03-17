@@ -95,15 +95,20 @@ async def read_root(request: Request):
 async def read_resource(request: Request):
     return templates.TemplateResponse("components/resource_usage.html", {"request": request})
 
-@app.get("/resource/history")
+@app.get("/history")
 async def read_resource_history(request: Request):
     return templates.TemplateResponse("components/resource_usage.html", {"request": request})
+
+@app.get("/resource/history")
+async def read_resource_history_redirect(request: Request):
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/history", status_code=301)
 
 @app.get("/resource-history")
 async def read_resource_history_legacy(request: Request):
     # 레거시 URL 리다이렉트
     from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/resource/history", status_code=301)
+    return RedirectResponse(url="/history", status_code=301)
 
 @app.get("/proxy")
 async def read_proxy_management(request: Request):

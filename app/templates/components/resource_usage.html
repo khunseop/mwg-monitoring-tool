@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-{% set is_history = request.url.path == '/resource/history' %}
+{% set is_history = request.url.path == '/history' %}
 
 <div class="tabs is-boxed mb-5">
     <ul>
@@ -318,7 +318,7 @@ function switchRuTab(tabId) {
 
 $(document).ready(function() {
     const path = window.location.pathname;
-    if (path === '/resource/history') {
+    if (path === '/history') {
         switchRuTab('history');
     } else {
         switchRuTab('realtime');

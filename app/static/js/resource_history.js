@@ -689,7 +689,7 @@ $(document).ready(function() {
 
     // PJAX 페이지 전환 대응
     $(document).off('pjax:complete.rh').on('pjax:complete.rh', function(e, url) {
-        if (url.includes('/resource/history')) {
+        if (url.includes('/history')) {
             initResourceHistory();
         }
     });
