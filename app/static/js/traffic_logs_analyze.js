@@ -34,8 +34,11 @@
             };
 
             records.forEach(rec => {
-                // 차단 여부 (action_names가 block이거나 block_id가 있는 경우)
-                const isBlocked = (rec.action_names && rec.action_names.toLowerCase().includes('block')) || rec.block_id;
+                // 차단 여부: action_names에 'Block'이 포함되어 있거나 block_id가 있는 경우
+                const action = String(rec.action_names || '');
+                const blockId = String(rec.block_id || '');
+                const isBlocked = action.toLowerCase().includes('block') || (blockId !== '' && blockId !== '0');
+                
                 if (isBlocked) stats.blocked++;
 
                 // 고유 클라이언트 및 호스트
