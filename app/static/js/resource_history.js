@@ -346,6 +346,7 @@ $(document).ready(function() {
                     rowModelType: 'clientSide',
                     pagination: true,
                     paginationPageSize: history.pageSize,
+                    domLayout: 'autoHeight',
                     suppressPaginationPanel: true, // 커스텀 페이지네이션 사용
                     enableFilter: true,
                     enableSorting: true,
