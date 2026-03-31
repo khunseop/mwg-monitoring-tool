@@ -43,9 +43,6 @@
                     <a class="navbar-item {% if request.url.path == '/' or request.url.path == '/resource' %}is-active{% endif %}" href="/resource">
                         실시간 모니터링
                     </a>
-                    <a class="navbar-item {% if request.url.path == '/history' %}is-active{% endif %}" href="/history">
-                        자원이력
-                    </a>
                     <a class="navbar-item {% if request.url.path.startswith('/session') %}is-active{% endif %}" href="/session">
                         세션브라우저
                     </a>
