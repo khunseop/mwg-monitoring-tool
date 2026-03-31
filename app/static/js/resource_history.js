@@ -584,6 +584,33 @@ $(document).ready(function() {
             }
         });
         
+        // 시간 범위 프리셋 핸들러
+        $('.ru-history-preset').off('click').on('click', function() {
+            const range = $(this).data('range');
+            const now = new Date();
+            let start = new Date();
+
+            switch(range) {
+                case '1h': start.setHours(now.getHours() - 1); break;
+                case '6h': start.setHours(now.getHours() - 6); break;
+                case '12h': start.setHours(now.getHours() - 12); break;
+                case '1d': start.setDate(now.getDate() - 1); break;
+                case '7d': start.setDate(now.getDate() - 7); break;
+            }
+
+            // datetime-local 포맷으로 변환 (YYYY-MM-DDTHH:mm)
+            const formatDate = (date) => {
+                const pad = (n) => String(n).padStart(2, '0');
+                return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+            };
+
+            $('#ruHistoryStartTime').val(formatDate(start));
+            $('#ruHistoryEndTime').val(formatDate(now));
+            
+            // 프리셋 선택 후 즉시 조회
+            searchHistory();
+        });
+
         // Load statistics when proxy selection changes
         $('#ruHistoryProxySelect').off('change').on('change', loadStatistics);
     }
@@ -627,6 +654,37 @@ $(document).ready(function() {
             });
         };
 
+        // 헬퍼: 인터페이스 트래픽 시리즈 생성
+        const getInterfaceSeries = () => {
+            const ifSeries = [];
+            Object.keys(proxyGroups).forEach(pid => {
+                const host = proxyMap[pid] || `#${pid}`;
+                // 해당 프록시의 모든 인터페이스 이름 추출
+                const ifNames = new Set();
+                proxyGroups[pid].forEach(row => {
+                    const ifData = row.interface_mbps ? (typeof row.interface_mbps === 'string' ? JSON.parse(row.interface_mbps) : row.interface_mbps) : {};
+                    Object.keys(ifData).forEach(name => ifNames.add(name));
+                });
+
+                ifNames.forEach(ifName => {
+                    const inData = [];
+                    const outData = [];
+                    proxyGroups[pid].forEach(row => {
+                        const ifData = row.interface_mbps ? (typeof row.interface_mbps === 'string' ? JSON.parse(row.interface_mbps) : row.interface_mbps) : {};
+                        const info = ifData[ifName];
+                        const ts = new Date(row.collected_at).getTime();
+                        if (info) {
+                            inData.push({ x: ts, y: info.in_mbps || 0 });
+                            outData.push({ x: ts, y: info.out_mbps || 0 });
+                        }
+                    });
+                    if (inData.length > 0) ifSeries.push({ name: `${host}:${ifName} IN`, data: inData });
+                    if (outData.length > 0) ifSeries.push({ name: `${host}:${ifName} OUT`, data: outData });
+                });
+            });
+            return ifSeries;
+        };
+
         // 2. 각 차트 렌더링
         renderHistoryLineChart('hist-chart-basic', getSeries('cpu', ' (CPU)'), '%');
         
@@ -642,6 +700,9 @@ $(document).ready(function() {
             ...getSeries('https', ' (HTTPS)'),
             ...getSeries('http2', ' (HTTP2)')
         ], 'Mbps');
+
+        // 인터페이스 그래프 추가
+        renderHistoryLineChart('hist-chart-interfaces', getInterfaceSeries(), 'Mbps');
     }
 
     function renderHistoryLineChart(elId, series, unit) {

@@ -134,6 +134,13 @@
             </div>
 
             <div class="is-flex is-align-items-center" style="gap: 0.5rem;">
+                <div class="buttons has-addons mb-0 mr-2">
+                    <button class="button is-small is-subtle px-2 ru-history-preset" data-range="1h">1h</button>
+                    <button class="button is-small is-subtle px-2 ru-history-preset" data-range="6h">6h</button>
+                    <button class="button is-small is-subtle px-2 ru-history-preset" data-range="12h">12h</button>
+                    <button class="button is-small is-subtle px-2 ru-history-preset" data-range="1d">1d</button>
+                    <button class="button is-small is-subtle px-2 ru-history-preset" data-range="7d">7d</button>
+                </div>
                 <input class="input is-small" id="ruHistoryStartTime" type="datetime-local" style="width: 190px;">
                 <span class="has-text-grey">~</span>
                 <input class="input is-small" id="ruHistoryEndTime" type="datetime-local" style="width: 190px;">
@@ -286,6 +293,12 @@
             <div class="box">
                 <h5 class="title is-6 mb-4">Traffic (HTTP/HTTPS/HTTP2 Mbps)</h5>
                 <div id="hist-chart-traffic" style="height: 300px;"></div>
+            </div>
+        </div>
+        <div class="column is-12">
+            <div class="box">
+                <h5 class="title is-6 mb-4">Interface Throughput (Mbps)</h5>
+                <div id="hist-chart-interfaces" style="height: 400px;"></div>
             </div>
         </div>
     </div>
