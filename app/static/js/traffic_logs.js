@@ -214,6 +214,7 @@
                 $('#tlEmptyState').fadeIn();
                 setStatus('결과 없음', 'is-light');
             } else {
+                $('#tlResultParsed').show(); // 결과 영역 표시 추가
                 renderTable(records);
                 let statusText = `${records.length}건 조회됨`;
                 if (data.failed > 0) {

@@ -262,6 +262,11 @@
             const data = await res.json();
             sb.records = data.sessions || [];
             
+            // 데이터가 있으면 목록 섹션 표시
+            if (sb.records.length > 0) {
+                $('#sbListSection').show();
+            }
+
             if (sb.gridApi) {
                 sb.gridApi.setGridOption('rowData', sb.records);
             }
