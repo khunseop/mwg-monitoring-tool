@@ -161,13 +161,15 @@
                 $('#ruEmptyState').hide(); $('#ruHeatmapWrap').show();
             }
 
-            // 외부 프레임 높이 조절
-            const containerHeight = parseInt($('#ruHeatmapHeightSlider').val(), 10) || 600;
-            $('#ruHeatmapWrap').css('height', containerHeight + 'px');
+            // 내부 차트 조밀하게 (프록시 개수에 따라 자동 조절)
+            const rowHeight = 30; // 행당 높이
+            const chartHeight = rows.length * rowHeight + 120; // 패딩 및 헤더 공간 포함
 
-            // 내부 차트 조밀하게 (셀 높이 축소)
-            const rowHeight = 24; 
-            const chartHeight = Math.max(400, rows.length * rowHeight + 100);
+            // 외부 프레임 높이 자동 조절 (최소 400, 최대 1200 후 스크롤)
+            $('#ruHeatmapWrap').css({
+                'height': 'auto',
+                'max-height': '1200px'
+            });
 
             // 셀 너비 축소
             const minColWidth = 50; 
