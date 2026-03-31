@@ -616,15 +616,18 @@ $(document).ready(function() {
     }
 
     /**
-     * 이력 데이터를 기반으로 그래프 렌더링
+     * 이력 데이터를 기반으로 그래프 렌더링 (지표별/회선별 분리)
      */
     function renderHistoryCharts() {
         const data = history.lastData;
+        const $container = $('#ruHistoryCharts');
+        
         if (!data || data.length === 0) {
-            $('#ruHistoryCharts').hide();
+            $container.hide();
             return;
         }
-        $('#ruHistoryCharts').show();
+        $container.show();
+        $container.empty(); // 기존 차트 제거 및 컨테이너 초기화
 
         // 1. 데이터 가공 (프록시별 그룹화 및 시간순 정렬)
         const proxyMap = {};
@@ -632,20 +635,25 @@ $(document).ready(function() {
 
         const sortedData = [...data].sort((a, b) => new Date(a.collected_at) - new Date(b.collected_at));
         
-        // 프록시별로 시리즈 분리
         const proxyGroups = {};
+        const allInterfaceNames = new Set();
+
         sortedData.forEach(row => {
             const pid = row.proxy_id;
             if (!proxyGroups[pid]) proxyGroups[pid] = [];
             proxyGroups[pid].push(row);
+
+            // 인터페이스 이름 수집
+            const ifData = row.interface_mbps ? (typeof row.interface_mbps === 'string' ? JSON.parse(row.interface_mbps) : row.interface_mbps) : {};
+            Object.keys(ifData).forEach(name => allInterfaceNames.add(name));
         });
 
         // 헬퍼: 특정 필드 시리즈 생성
-        const getSeries = (field, labelSuffix = '') => {
+        const getSeries = (field) => {
             return Object.keys(proxyGroups).map(pid => {
                 const host = proxyMap[pid] || `#${pid}`;
                 return {
-                    name: `${host}${labelSuffix}`,
+                    name: host,
                     data: proxyGroups[pid].map(row => ({
                         x: new Date(row.collected_at).getTime(),
                         y: row[field]
@@ -654,55 +662,70 @@ $(document).ready(function() {
             });
         };
 
-        // 헬퍼: 인터페이스 트래픽 시리즈 생성
-        const getInterfaceSeries = () => {
-            const ifSeries = [];
-            Object.keys(proxyGroups).forEach(pid => {
-                const host = proxyMap[pid] || `#${pid}`;
-                // 해당 프록시의 모든 인터페이스 이름 추출
-                const ifNames = new Set();
-                proxyGroups[pid].forEach(row => {
-                    const ifData = row.interface_mbps ? (typeof row.interface_mbps === 'string' ? JSON.parse(row.interface_mbps) : row.interface_mbps) : {};
-                    Object.keys(ifData).forEach(name => ifNames.add(name));
-                });
-
-                ifNames.forEach(ifName => {
-                    const inData = [];
-                    const outData = [];
-                    proxyGroups[pid].forEach(row => {
-                        const ifData = row.interface_mbps ? (typeof row.interface_mbps === 'string' ? JSON.parse(row.interface_mbps) : row.interface_mbps) : {};
-                        const info = ifData[ifName];
-                        const ts = new Date(row.collected_at).getTime();
-                        if (info) {
-                            inData.push({ x: ts, y: info.in_mbps || 0 });
-                            outData.push({ x: ts, y: info.out_mbps || 0 });
-                        }
-                    });
-                    if (inData.length > 0) ifSeries.push({ name: `${host}:${ifName} IN`, data: inData });
-                    if (outData.length > 0) ifSeries.push({ name: `${host}:${ifName} OUT`, data: outData });
-                });
-            });
-            return ifSeries;
+        // 헬퍼: 차트 박스 HTML 생성 및 추가
+        const createChartBox = (id, title, fullWidth = false) => {
+            const colClass = fullWidth ? 'is-12' : 'is-6';
+            const html = `
+                <div class="column ${colClass}">
+                    <div class="box">
+                        <h5 class="title is-6 mb-4">${title}</h5>
+                        <div id="${id}" style="height: 300px;"></div>
+                    </div>
+                </div>
+            `;
+            $container.append(html);
         };
 
-        // 2. 각 차트 렌더링
-        renderHistoryLineChart('hist-chart-basic', getSeries('cpu', ' (CPU)'), '%');
-        
-        renderHistoryLineChart('hist-chart-sessions', [
-            ...getSeries('cc', ' (CC)'),
-            ...getSeries('cs', ' (CS)')
-        ], 'sess');
+        // 2. 기본 지표별 그래프 생성
+        const basicMetrics = [
+            { key: 'cpu', title: 'CPU Usage (%)', unit: '%' },
+            { key: 'mem', title: 'Memory Usage (%)', unit: '%' },
+            { key: 'disk', title: 'Disk Usage (%)', unit: '%' },
+            { key: 'cc', title: 'Client Count', unit: 'sess' },
+            { key: 'cs', title: 'Connected Sockets', unit: 'sess' },
+            { key: 'blocked', title: 'Connections Blocked', unit: 'count' },
+            { key: 'http', title: 'HTTP Throughput (Mbps)', unit: 'Mbps' },
+            { key: 'https', title: 'HTTPS Throughput (Mbps)', unit: 'Mbps' },
+            { key: 'http2', title: 'HTTP2 Throughput (Mbps)', unit: 'Mbps' }
+        ];
 
-        renderHistoryLineChart('hist-chart-blocked', getSeries('blocked'), 'count');
+        // 차트 객체 초기화 (동적 생성 시 기존 참조는 의미 없음)
+        history.charts = {};
 
-        renderHistoryLineChart('hist-chart-traffic', [
-            ...getSeries('http', ' (HTTP)'),
-            ...getSeries('https', ' (HTTPS)'),
-            ...getSeries('http2', ' (HTTP2)')
-        ], 'Mbps');
+        basicMetrics.forEach(m => {
+            const chartId = `hist-chart-${m.key}`;
+            createChartBox(chartId, m.title);
+            renderHistoryLineChart(chartId, getSeries(m.key), m.unit);
+        });
 
-        // 인터페이스 그래프 추가
-        renderHistoryLineChart('hist-chart-interfaces', getInterfaceSeries(), 'Mbps');
+        // 3. 인터페이스별 그래프 생성
+        Array.from(allInterfaceNames).sort().forEach(ifName => {
+            const chartId = `hist-chart-if-${ifName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            createChartBox(chartId, `Interface: ${ifName} (Mbps)`, true); // 인터페이스는 가로로 길게 표시
+
+            const ifSeries = Object.keys(proxyGroups).map(pid => {
+                const host = proxyMap[pid] || `#${pid}`;
+                const inData = [];
+                const outData = [];
+                
+                proxyGroups[pid].forEach(row => {
+                    const ifData = row.interface_mbps ? (typeof row.interface_mbps === 'string' ? JSON.parse(row.interface_mbps) : row.interface_mbps) : {};
+                    const info = ifData[ifName];
+                    const ts = new Date(row.collected_at).getTime();
+                    if (info) {
+                        inData.push({ x: ts, y: info.in_mbps || 0 });
+                        outData.push({ x: ts, y: info.out_mbps || 0 });
+                    }
+                });
+
+                return [
+                    { name: `${host} IN`, data: inData },
+                    { name: `${host} OUT`, data: outData }
+                ];
+            }).flat();
+
+            renderHistoryLineChart(chartId, ifSeries, 'Mbps');
+        });
     }
 
     function renderHistoryLineChart(elId, series, unit) {
@@ -731,14 +754,10 @@ $(document).ready(function() {
             legend: { position: 'top', horizontalAlign: 'left', fontSize: '11px' }
         };
 
-        if (history.charts[elId]) {
-            history.charts[elId].updateOptions(options);
-        } else {
-            const el = document.getElementById(elId);
-            if (el) {
-                history.charts[elId] = new ApexCharts(el, options);
-                history.charts[elId].render();
-            }
+        const el = document.getElementById(elId);
+        if (el) {
+            history.charts[elId] = new ApexCharts(el, options);
+            history.charts[elId].render();
         }
     }
 
