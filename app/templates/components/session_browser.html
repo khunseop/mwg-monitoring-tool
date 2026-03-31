@@ -149,11 +149,9 @@
         </div>
     </div>
     
-    <div id="sbaEmptyState" class="heatmap-container mb-5" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 3rem;">
-        <div class="has-text-centered py-6">
-            <p class="has-text-grey-light is-size-5 mb-2" style="font-weight: 700;">NO DATA</p>
-            <p class="has-text-grey-light">분석할 세션 데이터가 없습니다. 상단에서 세션 불러오기 후 "분석하기"를 클릭하세요.</p>
-        </div>
+    <div id="sbaEmptyState" class="empty-state mb-5" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
+        <p class="title is-5 mb-2">NO DATA</p>
+        <p class="subtitle is-6">분석할 세션 데이터가 없습니다. 상단에서 세션 불러오기 후 "분석하기"를 클릭하세요.</p>
     </div>
 </div>
 
@@ -167,7 +165,7 @@
         </header>
         <section class="modal-card-body p-0">
             <div class="table-container">
-                <table class="table is-fullwidth is-striped is-hoverable mb-0" style="font-size: 0.875rem;">
+                <table class="table is-fullwidth is-striped is-hoverable is-detail mb-0">
                     <tbody id="sbDetailBody"></tbody>
                 </table>
             </div>

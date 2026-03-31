@@ -79,11 +79,9 @@
     <p id="tlError" class="help is-danger mt-1 mb-4" style="display:none;"></p>
 
     <!-- 결과 영역 -->
-    <div id="tlEmptyState" class="heatmap-container mb-5" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 3rem;">
-        <div class="has-text-centered py-6">
-            <p class="has-text-grey-light is-size-5 mb-2" style="font-weight: 700;">NO LOGS</p>
-            <p class="has-text-grey-light">상단에서 프록시를 선택하고 "조회"를 클릭하세요.</p>
-        </div>
+    <div id="tlEmptyState" class="empty-state mb-5" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
+        <p class="title is-5 mb-2">NO LOGS</p>
+        <p class="subtitle is-6">상단에서 프록시를 선택하고 "조회"를 클릭하여 원격 로그를 수집하세요.</p>
     </div>
 
     <div id="tlResultParsed" style="display:none;">
@@ -164,11 +162,9 @@
         </div>
     </div>
     
-    <div id="tlaEmptyState" class="heatmap-container mb-5" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 3rem;">
-        <div class="has-text-centered py-6">
-            <p class="has-text-grey-light is-size-5 mb-2" style="font-weight: 700;">NO DATA</p>
-            <p class="has-text-grey-light">분석할 로그 데이터가 없습니다. 로그 원격 조회 후 "분석하기"를 클릭하세요.</p>
-        </div>
+    <div id="tlaEmptyState" class="empty-state mb-5" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
+        <p class="title is-5 mb-2">NO DATA</p>
+        <p class="subtitle is-6">분석할 로그 데이터가 없습니다. 로그 원격 조회 후 "분석하기"를 클릭하세요.</p>
     </div>
 </div>
 
@@ -202,15 +198,15 @@
             <p class="modal-card-title is-size-5 has-text-weight-bold">로그 상세 분석</p>
             <button class="delete" aria-label="close" onclick="$('#tlDetailModal').removeClass('is-active');"></button>
         </header>
-        <section class="modal-card-body p-5">
-            <div class="mb-4">
-                <h6 class="is-size-7 has-text-grey-light mb-1">원문 (Raw Log)</h6>
-                <div style="background: #f8fafc; padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--color-border); font-family: var(--font-mono); font-size: 0.75rem; word-break: break-all;">
+        <section class="modal-card-body p-0">
+            <div class="mb-0">
+                <div style="background: #f8fafc; padding: 1rem; border-bottom: 1px solid var(--color-border); font-family: var(--font-mono); font-size: 0.75rem; word-break: break-all;">
+                    <h6 class="is-size-7 has-text-grey-light mb-1 uppercase has-text-weight-bold">RAW LOG</h6>
                     <span id="tlDetailRaw"></span>
                 </div>
             </div>
             <div class="table-container">
-                <table class="table is-fullwidth is-striped is-hoverable is-narrow mb-0" style="font-size: 0.8rem;">
+                <table class="table is-fullwidth is-striped is-hoverable is-detail mb-0">
                     <tbody id="tlDetailBody"></tbody>
                 </table>
             </div>

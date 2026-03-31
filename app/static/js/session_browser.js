@@ -41,7 +41,14 @@
     function setStatus(text, cls) {
         const $tag = $('#sbStatus');
         $tag.text(text);
-        $tag.removeClass().addClass('tag').addClass(cls || 'is-primary is-light');
+        $tag.removeClass().addClass('tag');
+        
+        // Apply standardized classes
+        if (cls && cls.includes('primary')) $tag.addClass('is-success is-light');
+        else if (cls && cls.includes('warning')) $tag.addClass('is-collecting');
+        else if (cls && cls.includes('danger')) $tag.addClass('is-danger is-light');
+        else if (cls && cls.includes('info')) $tag.addClass('is-info is-light');
+        else $tag.addClass('is-ready');
     }
 
     async function analyzeSessions(records) {
