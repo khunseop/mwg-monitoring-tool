@@ -431,7 +431,8 @@ function applyPreset(type) {
         
         // 기본 인터페이스 예시 추가 (필요시)
         if ($('#cfgInterfaceList tr').length === 0) {
-            addInterfaceRow('eth0', { in_oid: '1.3.6.1.2.1.2.2.1.10.1', out_oid: '1.3.6.1.2.1.2.2.1.16.1' }, 800, 1000);
+            // High Capacity (64-bit) OIDs for eth0: in=1.3.6.1.2.1.31.1.1.1.6.1, out=1.3.6.1.2.1.31.1.1.1.10.1
+            addInterfaceRow('eth0', { in_oid: '1.3.6.1.2.1.31.1.1.1.6.1', out_oid: '1.3.6.1.2.1.31.1.1.1.10.1' }, 800, 1000);
         }
     } else if (type === 'linux') {
         $('#cfgOidCpu').val('1.3.6.1.4.1.2021.11.11.0');

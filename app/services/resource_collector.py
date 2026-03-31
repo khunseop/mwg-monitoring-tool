@@ -107,10 +107,19 @@ async def snmp_walk_string(host: str, port: int, community: str, oid: str, timeo
 def calculate_mbps(current: int, previous: int, time_diff_sec: float) -> float:
     if time_diff_sec <= 0:
         return 0.0
+    
     if current < previous:
-        diff = (COUNTER32_MAX + 1 - previous) + current
+        # Wrap-around occurred
+        # If previous value is large (near 32-bit max), assume 32-bit counter wrap
+        if previous > (COUNTER32_MAX * 0.7):
+            diff = (COUNTER32_MAX + 1 - previous) + current
+        else:
+            # Likely a counter reset or 64-bit wrap (very rare)
+            # In case of reset, we can't calculate accurate delta for this interval
+            return 0.0
     else:
         diff = current - previous
+        
     mbps = (diff * 8.0) / (time_diff_sec * 1_000_000.0)
     return max(0.0, mbps)
 
