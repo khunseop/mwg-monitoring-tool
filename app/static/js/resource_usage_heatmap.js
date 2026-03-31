@@ -165,10 +165,10 @@
             const rowHeight = 30; // 행당 높이
             const chartHeight = rows.length * rowHeight + 120; // 패딩 및 헤더 공간 포함
 
-            // 외부 프레임 높이 자동 조절 (최소 400, 최대 1200 후 스크롤)
+            // 외부 프레임 높이 자동 조절 (내부 스크롤 제거)
             $('#ruHeatmapWrap').css({
                 'height': 'auto',
-                'max-height': '1200px'
+                'max-height': 'none'
             });
 
             // 셀 너비 축소
