@@ -71,17 +71,17 @@
                     </select>
                 </div>
             </div>
-            <button class="button is-primary is-small px-5" id="tlLoadBtn" style="font-weight: 600;">조회</button>
+            <button class="button is-primary is-small px-5" id="tlLoadBtn" style="font-weight: 600;">수집/조회</button>
+            <button class="button is-subtle is-small px-3" id="tlRefreshBtn" title="DB의 현재 로그 다시 불러오기">새로고침</button>
             <button class="button is-subtle is-small px-3" id="tlExportBtn">내보내기</button>
             <button class="button is-link is-light is-small px-3" id="tlAnalyzeBtn" style="font-weight: 600;">분석하기</button>
         </div>
     </div>
     <p id="tlError" class="help is-danger mt-1 mb-4" style="display:none;"></p>
 
-    <!-- 결과 영역 -->
     <div id="tlEmptyState" class="empty-state mb-5" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
         <p class="title is-5 mb-2">NO LOGS</p>
-        <p class="subtitle is-6">상단에서 프록시를 선택하고 "조회"를 클릭하여 원격 로그를 수집하세요.</p>
+        <p class="subtitle is-6">상단에서 프록시를 선택하고 "수집/조회"를 클릭하여 원격 로그를 수집하거나 "새로고침"을 누르세요.</p>
     </div>
 
     <div id="tlResultParsed" style="display:none;">

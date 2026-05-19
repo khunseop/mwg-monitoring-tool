@@ -32,13 +32,19 @@ engine = create_engine(
     **engine_kwargs,
 )
 
-# For SQLite, disable WAL/Journal if desired to reduce pmt.db-wal/.db-shm creation.
+# For SQLite, enable WAL mode and set synchronous to NORMAL to improve concurrency.
 if is_sqlite:
     try:
-        with engine.connect() as conn:
-            # JOURNAL_MODE=DELETE turns off WAL
-            conn.execute("PRAGMA journal_mode=DELETE")
-            conn.execute("PRAGMA synchronous=NORMAL")
+        from sqlalchemy import event
+        @event.listens_for(engine, "connect")
+        def set_sqlite_pragma(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA cache_size=-64000")  # 64MB cache
+            cursor.execute("PRAGMA temp_store=MEMORY")
+            cursor.execute("PRAGMA busy_timeout=30000") # 30s timeout
+            cursor.close()
     except Exception:
         # Non-fatal: proceed with defaults
         pass

@@ -176,7 +176,7 @@
         }
     }
 
-    async function loadLogs(){
+    async function collectLogs(){
         let proxyIds = [];
         const $ps = $('#tlProxySelect');
         if ($ps[0] && $ps[0].tomselect) {
@@ -186,55 +186,96 @@
         }
 
         if (!proxyIds || proxyIds.length === 0) {
-            showError('조회할 프록시를 적어도 하나 선택하세요.');
+            showError('수집할 프록시를 적어도 하나 선택하세요.');
             return;
         }
         
         clearError();
-        setStatus('로그 조회 중...', 'is-warning is-light');
-        
-        $('#tlEmptyState').hide();
-        $('#tlResultParsed').hide();
-        $('#tlResultRaw').hide();
+        setStatus('로그 수집 시작 중...', 'is-warning is-light');
         $('#tlLoadBtn').addClass('is-loading');
         
         try {
             const query = $('#tlQuery').val() || '';
-            const limit = $('#tlLimit').val() || 200;
+            const limit = $('#tlLimit').val() || 10000;
             const direction = $('#tlDirection').val() || 'tail';
-            
-            // 다중 프록시 조회를 위해 쉼표로 구분된 ID 전달
             const pIdsParam = Array.isArray(proxyIds) ? proxyIds.join(',') : proxyIds;
-            const res = await fetch(`${API_BASE}/traffic-logs?proxy_ids=${pIdsParam}&q=${encodeURIComponent(query)}&limit=${limit}&direction=${direction}`);
+            
+            const res = await fetch(`${API_BASE}/traffic-logs/collect?proxy_ids=${pIdsParam}&q=${encodeURIComponent(query)}&limit=${limit}&direction=${direction}`, {
+                method: 'POST'
+            });
             
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.detail || '로그를 가져오지 못했습니다. SSH 연결 상태를 확인하세요.');
+                throw new Error(errData.detail || '수집 요청에 실패했습니다.');
             }
             
-            const data = await res.json();
-            const records = data.records || [];
-            LOG_RECORDS = records;
-            window.LOG_RECORDS = records; // 글로벌 업데이트
-
-            if (records.length === 0) {
-                $('#tlEmptyState').fadeIn();
-                setStatus('결과 없음', 'is-light');
-            } else {
-                $('#tlResultParsed').show(); // 결과 영역 표시 추가
-                renderTable(records);
-                let statusText = `${records.length}건 조회됨`;
-                if (data.failed > 0) {
-                    statusText += ` (성공:${data.succeeded}, 실패:${data.failed})`;
-                }
-                setStatus(statusText, 'is-primary is-light');
-            }
-            await saveState(records);
+            setStatus('백그라운드 수집 중... 잠시 후 새로고침하세요.', 'is-info is-light');
+            // 수집 시작 후 그리드 새로고침
+            if (tlGridApi) tlGridApi.refreshInfiniteCache();
+            
         } catch(err) {
             showError(err.message);
         } finally {
             $('#tlLoadBtn').removeClass('is-loading');
         }
+    }
+
+    function getDataSource() {
+        return {
+            getRows: async (params) => {
+                let proxyIds = [];
+                const $ps = $('#tlProxySelect');
+                if ($ps[0] && $ps[0].tomselect) {
+                    proxyIds = $ps[0].tomselect.getValue();
+                } else {
+                    proxyIds = $ps.val() || [];
+                }
+
+                if (!proxyIds || proxyIds.length === 0) {
+                    params.successCallback([], 0);
+                    return;
+                }
+
+                const pIdsParam = Array.isArray(proxyIds) ? proxyIds.join(',') : proxyIds;
+                const offset = params.startRow;
+                const limit = params.endRow - params.startRow;
+                
+                // Sorting
+                let sortCol = 'id';
+                let sortDir = 'desc';
+                if (params.sortModel && params.sortModel.length > 0) {
+                    sortCol = params.sortModel[0].colId;
+                    sortDir = params.sortModel[0].sort;
+                }
+
+                // Filtering (Simple implementation)
+                let filterCol = '';
+                let filterVal = '';
+                const filterModel = params.filterModel;
+                if (filterModel && Object.keys(filterModel).length > 0) {
+                    filterCol = Object.keys(filterModel)[0];
+                    filterVal = filterModel[filterCol].filter;
+                }
+
+                try {
+                    const url = `${API_BASE}/traffic-logs?proxy_ids=${pIdsParam}&offset=${offset}&limit=${limit}&sort_col=${sortCol}&sort_dir=${sortDir}&filter_col=${filterCol}&filter_val=${encodeURIComponent(filterVal)}`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    
+                    params.successCallback(data.records, data.total_count);
+                    
+                    if (data.total_count === 0) {
+                        $('#tlEmptyState').show();
+                    } else {
+                        $('#tlEmptyState').hide();
+                        setStatus(`${data.total_count}건 중 ${params.startRow}~${params.endRow} 표시 중`, 'is-primary is-light');
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch rows', e);
+                    params.failCallback();
+                }
+            }
+        };
     }
 
     function renderTable(records){
@@ -244,7 +285,6 @@
         const gridDiv = document.querySelector('#tlTableGrid');
         if (!gridDiv) return;
 
-        // Check if the grid has been cleared or destroyed externally (e.g. by analyze script)
         if (tlGridApi && gridDiv.innerHTML === "") {
             tlGridApi = null;
         }
@@ -252,33 +292,23 @@
         if (!tlGridApi) {
             const gridOptions = {
                 columnDefs: window.AgGridConfig ? window.AgGridConfig.getTrafficLogColumns() : [],
-                defaultColDef: {
-                    resizable: true,
-                    sortable: true,
-                    filter: 'agTextColumnFilter',
-                    minWidth: 100,
-                    flex: 1
-                },
-                rowData: records,
+                rowModelType: 'infinite',
+                datasource: getDataSource(),
+                cacheBlockSize: 100,
+                maxBlocksInCache: 10,
+                infiniteInitialRowCount: 100,
                 pagination: true,
-                paginationPageSize: window.AgGridConfig ? window.AgGridConfig.getPageSize() : 50,
-                domLayout: 'autoHeight',
+                paginationPageSize: 100,
                 rowHeight: 35,
                 headerHeight: 45,
-                animateRows: true,
-                ensureDomOrder: true,
                 onRowDoubleClicked: params => showDetail(params.data),
-                overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">로그가 비어있습니다.</div>'
+                overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">로그가 비어있습니다. [수집/조회] 버튼을 눌러보세요.</div>'
             };
-            const gridDiv = document.querySelector('#tlTableGrid');
             if (gridDiv && window.agGrid) {
                 tlGridApi = window.agGrid.createGrid(gridDiv, gridOptions);
             }
         } else {
-            // Use setGridOption for rowData in newer AG Grid versions
-            tlGridApi.setGridOption('rowData', records);
-            // Also ensure it scrolls to top on new search
-            tlGridApi.ensureIndexVisible(0);
+            tlGridApi.refreshInfiniteCache();
         }
         $('#tlResultParsed').fadeIn();
     }
@@ -355,7 +385,19 @@
             });
         }
 
-        $('#tlLoadBtn').off('click').on('click', loadLogs);
+        $('#tlLoadBtn').off('click').on('click', () => {
+            if (!tlGridApi) {
+                renderTable([]);
+            } else {
+                collectLogs();
+            }
+        });
+        
+        // 새로고침 버튼 기능 (데이터 수집 없이 DB의 현재 데이터만 다시 조회)
+        $('#tlRefreshBtn').off('click').on('click', () => {
+            if (tlGridApi) tlGridApi.refreshInfiniteCache();
+            else renderTable([]);
+        });
         $('#tlAnalyzeBtn').off('click').on('click', () => switchTlTab('analyze'));
         
         $('#tlQuickFilter').off('input').on('input', function() {

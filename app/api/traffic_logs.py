@@ -111,77 +111,110 @@ def _fetch_and_parse_for_proxy(db_proxy: Proxy, q: Optional[str], limit: int, di
         return [], str(e)
 
 
+from fastapi import BackgroundTasks
+
+@router.post("/traffic-logs/collect")
+def collect_traffic_logs_task(
+    proxy_ids: str = Query(..., description="Comma-separated list of proxy IDs"),
+    background_tasks: BackgroundTasks = None,
+    db: Session = Depends(get_db),
+    q: Optional[str] = Query(default=None, max_length=256),
+    limit: int = Query(default=5000, ge=1, le=50000),
+    direction: str = Query(default="tail", pattern=r"^(head|tail)$"),
+):
+    """프록시에서 로그를 읽어와 DB에 저장하는 작업을 백그라운드에서 실행합니다."""
+    try:
+        p_ids = [int(x.strip()) for x in proxy_ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid proxy_ids format")
+
+    proxies = db.query(Proxy).filter(Proxy.id.in_(p_ids)).filter(Proxy.is_active == True).all()
+    if not proxies:
+        raise HTTPException(status_code=404, detail="No active proxies found")
+
+    q_valid = _validate_query(q)
+
+    def background_collect():
+        # 각 프록시별로 독립적으로 세션을 열어 작업
+        from app.database.database import SessionLocal
+        for p in proxies:
+            local_db = SessionLocal()
+            try:
+                logger.info(f"[traffic_logs] Starting background collection for proxy {p.id}")
+                _fetch_and_parse_for_proxy(p, q_valid, limit, direction, local_db)
+                logger.info(f"[traffic_logs] Finished background collection for proxy {p.id}")
+            except Exception as e:
+                logger.error(f"[traffic_logs] Background collection failed for proxy {p.id}: {e}")
+            finally:
+                local_db.close()
+
+    if background_tasks:
+        background_tasks.add_task(background_collect)
+    
+    return {"message": "Collection started in background", "proxies": [p.id for p in proxies]}
+
+
 @router.get("/traffic-logs", response_model=MultiTrafficLogResponse)
 def get_multi_proxy_traffic_logs(
     proxy_ids: str = Query(..., description="Comma-separated list of proxy IDs"),
     db: Session = Depends(get_db),
-    q: Optional[str] = Query(default=None, max_length=256, description="Fixed-string search (grep -F)"),
-    limit: int = Query(default=200, ge=1, le=10000),
-    direction: str = Query(default="tail", pattern=r"^(head|tail)$"),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=1000),
+    sort_col: Optional[str] = Query(default="id"),
+    sort_dir: str = Query(default="desc", pattern=r"^(asc|desc)$"),
+    filter_col: Optional[str] = Query(default=None),
+    filter_val: Optional[str] = Query(default=None),
 ):
-    """여러 프록시의 로그를 동시에 조회합니다."""
+    """DB에 저장된 로그를 페이징/정렬하여 조회합니다."""
     try:
         p_ids = [int(x.strip()) for x in proxy_ids.split(",") if x.strip()]
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid proxy_ids format")
 
     if not p_ids:
-        raise HTTPException(status_code=400, detail="No proxy IDs provided")
+        return MultiTrafficLogResponse(requested=0, succeeded=0, failed=0, records=[], count=0, total_count=0)
 
-    proxies = db.query(Proxy).filter(Proxy.id.in_(p_ids)).filter(Proxy.is_active == True).all()
-    if not proxies:
-        return MultiTrafficLogResponse(requested=len(p_ids), succeeded=0, failed=len(p_ids), records=[], count=0)
+    query = db.query(TrafficLogModel).filter(TrafficLogModel.proxy_id.in_(p_ids))
 
-    q_valid = _validate_query(q)
+    # 필터 적용
+    if filter_col and filter_val:
+        col_attr = getattr(TrafficLogModel, filter_col, None)
+        if col_attr:
+            query = query.filter(col_attr.contains(filter_val))
+
+    # 전체 카운트 (페이징 전)
+    total_count = query.count()
+
+    # 정렬 적용
+    if sort_col:
+        col_attr = getattr(TrafficLogModel, sort_col, None)
+        if col_attr:
+            if sort_dir == "desc":
+                query = query.order_by(col_attr.desc())
+            else:
+                query = query.order_by(col_attr.asc())
+    else:
+        query = query.order_by(TrafficLogModel.id.desc())
+
+    # 페이징 적용
+    rows = query.offset(offset).limit(limit).all()
     
-    all_records: List[TrafficLogRecord] = []
-    errors: Dict[int, str] = {}
-    succeeded = 0
-    
-    # Use ThreadPoolExecutor for parallel SSH
-    from app.database.database import SessionLocal
-    
-    with ThreadPoolExecutor(max_workers=min(10, len(proxies))) as executor:
-        # Each thread gets its own DB session
-        def task(p):
-            local_db = SessionLocal()
-            try:
-                return _fetch_and_parse_for_proxy(p, q_valid, limit, direction, local_db)
-            finally:
-                local_db.close()
-                
-        future_to_proxy = {executor.submit(task, p): p for p in proxies}
-        
-        for future in as_completed(future_to_proxy):
-            proxy = future_to_proxy[future]
-            try:
-                records, err = future.result()
-                if err:
-                    errors[proxy.id] = err
-                else:
-                    all_records.extend(records)
-                    succeeded += 1
-            except Exception as e:
-                errors[proxy.id] = str(e)
-
-    # Sort all records by datetime if possible (most recent first)
-    # Note: datetime format is "dd/MMM/yyyy:HH:mm:ss Z" or similar
-    def parse_ts(r):
-        if not r.datetime: return 0
-        try:
-            s = r.datetime.strip("[]")
-            return datetime.strptime(s, "%d/%b/%Y:%H:%M:%S %z").timestamp()
-        except: return 0
-
-    all_records.sort(key=parse_ts, reverse=True)
+    # ORM 객체를 TrafficLogRecord 스키마로 변환
+    records = []
+    for row in rows:
+        # dict 변환 시 _sa_instance_state 제외
+        d = {c.name: getattr(row, c.name) for c in row.__table__.columns}
+        records.append(TrafficLogRecord(**d))
 
     return MultiTrafficLogResponse(
         requested=len(p_ids),
-        succeeded=succeeded,
-        failed=len(p_ids) - succeeded,
-        errors=errors,
-        records=all_records,
-        count=len(all_records)
+        succeeded=len(p_ids), # DB 조회이므로 성공으로 간주
+        failed=0,
+        records=records,
+        count=len(records),
+        total_count=total_count,
+        offset=offset,
+        limit=limit
     )
 
 

@@ -54,6 +54,9 @@ class MultiTrafficLogResponse(BaseModel):
 	errors: Dict[int, str] = Field(default_factory=dict)
 	records: List[TrafficLogRecord]
 	count: int
+	total_count: int = 0
+	offset: int = 0
+	limit: int = 100
 
 
 class TrafficLogDB(BaseModel):
