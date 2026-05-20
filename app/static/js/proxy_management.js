@@ -321,7 +321,7 @@ function closeBulkProxyModal() {
 
 function downloadProxySampleCsv() {
     const header = "host,user,pass,group,log_path,active,desc,oids_json\n";
-    const sample = '10.10.10.1,admin,mypassword123,서울센터,/var/log/mwg/traffic.log,true,Primary MWG,"{\"__interface_oids__\":{\"eth0\":{\"in_oid\":\"1.3.6.1.2.1.2.2.1.10.1\",\"out_oid\":\"1.3.6.1.2.1.2.2.1.16.1\"}}}"\n';
+    const sample = '10.10.10.1,admin,mypassword123,서울센터,/var/log/mwg/traffic.log,true,Primary MWG,"{\"__interface_oids__\":{\"eth0\":{\"in_oid\":\"1.3.6.1.2.1.31.1.1.1.6.1\",\"out_oid\":\"1.3.6.1.2.1.31.1.1.1.10.1\"},\"bond0\":{\"in_oid\":\"\",\"out_oid\":\"\"},\"bond1\":{\"in_oid\":\"\",\"out_oid\":\"\"}}}"\n';
     const blob = new Blob(["\ufeff" + header + sample], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);

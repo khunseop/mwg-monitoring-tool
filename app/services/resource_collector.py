@@ -127,12 +127,16 @@ def calculate_mbps(current: int, previous: int, time_diff_sec: float) -> float:
 def is_system_interface(if_name: str) -> bool:
     if not if_name:
         return False
+    
     if_name_lower = if_name.lower()
-    if if_name_lower.startswith('lo') or if_name_lower.startswith('loopback'):
-        return True
-    if any(prefix in if_name_lower for prefix in ['veth', 'docker', 'br-', 'virbr']):
-        return True
-    return False
+    
+    # Only allow eth0, bond0, bond1 for collection/display
+    allowed_interfaces = ['eth0', 'bond0', 'bond1']
+    if any(if_name_lower == allowed for allowed in allowed_interfaces):
+        return False
+        
+    # All other interfaces (lo, veth, docker, eth4-7, etc.) are treated as system interfaces
+    return True
 
 
 def ssh_exec_and_parse_mem(host: str, port: int, username: str, password: str | None, command: str, timeout_sec: int) -> float | None:

@@ -26,7 +26,7 @@ except Exception:
 
 
 def ensure_default_env() -> None:
-    os.environ.setdefault("HOST", "127.0.0.1")
+    os.environ.setdefault("HOST", "0.0.0.0")
     os.environ.setdefault("PORT", "8712")
     # In frozen (PyInstaller) builds, disable docs by default to avoid missing asset errors
     if getattr(sys, "frozen", False):
