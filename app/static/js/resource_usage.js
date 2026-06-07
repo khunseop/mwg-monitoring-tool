@@ -45,14 +45,16 @@
         
         $('#ruGroupSelect').off('change').on('change', function() {
             ru.lastCumulativeByProxy = {};
-            ru.heatmapMaxByMetric = {}; // 그룹 변경 시 히트맵 스케일 리셋
-            $('#ruTableBody').empty();
+            ru.heatmapMaxByMetric = {};
+            ru.lastData = [];
             state.saveState(undefined);
+            // 그룹 변경 후 DeviceSelector가 프록시 목록을 갱신하면 skeleton 표시
+            setTimeout(() => heatmap.showSkeleton(), 150);
         });
-        
-        $('#ruProxySelect').off('change').on('change', function() { 
-            // 프록시 선택 변경 시에는 스케일 유지 (같은 그룹 내에서 프록시만 변경)
-            state.saveState(undefined); 
+
+        $('#ruProxySelect').off('change').on('change', function() {
+            state.saveState(undefined);
+            heatmap.showSkeleton();
         });
 
         $('#ruHeatmapHeightSlider').off('input').on('input', function() {

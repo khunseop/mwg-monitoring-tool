@@ -377,6 +377,204 @@
     margin-bottom: 0;
 }
 
+/* ── Resource Usage Heatmap Table ──────────────────────────── */
+
+#ruHeatmapWrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 72vh;
+}
+
+.ru-hm-table {
+    border-collapse: separate;
+    border-spacing: 3px;
+    width: max-content;
+    min-width: 100%;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+}
+
+.ru-hm-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: var(--color-surface);
+    padding: 5px 4px 8px;
+    text-align: center;
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    min-width: 54px;
+    border-bottom: 2px solid var(--color-border);
+    cursor: default;
+}
+
+.ru-hm-table thead th.ru-hm-proxy-col {
+    left: 0;
+    z-index: 4;
+    text-align: left;
+    min-width: 150px;
+    max-width: 220px;
+    padding-left: 6px;
+}
+
+.ru-hm-table tbody td.ru-hm-proxy-col {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--color-surface);
+    font-weight: 600;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+    padding: 0 10px 0 6px;
+    border-right: 2px solid var(--color-border);
+    color: var(--color-text);
+    height: 30px;
+    vertical-align: middle;
+    cursor: default;
+}
+
+.ru-hm-table tbody tr:hover td.ru-hm-proxy-col {
+    background: #f8fafc;
+}
+
+.ru-hm-cell {
+    text-align: center;
+    padding: 0 2px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    height: 30px;
+    vertical-align: middle;
+    cursor: default;
+    transition: filter 0.12s ease;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.ru-hm-cell:hover {
+    filter: brightness(0.88);
+    position: relative;
+    z-index: 2;
+}
+
+/* Skeleton shimmer */
+@keyframes ru-hm-shimmer {
+    0%   { background-position: -500px 0; }
+    100% { background-position:  500px 0; }
+}
+
+.ru-hm-skeleton {
+    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%) !important;
+    background-size: 1000px 100% !important;
+    animation: ru-hm-shimmer 1.6s infinite linear;
+    color: transparent !important;
+    border-radius: 5px;
+}
+
+/* Tooltip */
+.ru-hm-tooltip {
+    position: fixed;
+    z-index: 9999;
+    background: #0f172a;
+    color: #f1f5f9;
+    border-radius: 10px;
+    padding: 10px 13px;
+    font-size: 12px;
+    pointer-events: none;
+    min-width: 170px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+    display: none;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.ru-hm-tt-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.ru-hm-tt-proxy {
+    font-weight: 700;
+    font-size: 11px;
+    color: #cbd5e1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 130px;
+}
+
+.ru-hm-tt-metric {
+    font-size: 10px;
+    color: #64748b;
+    font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.ru-hm-tt-value {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin-bottom: 7px;
+    line-height: 1;
+}
+
+.ru-hm-tt-bar-track {
+    height: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+    margin-bottom: 5px;
+    overflow: hidden;
+}
+
+.ru-hm-tt-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    max-width: 100%;
+    transition: width 0.08s linear;
+}
+
+.ru-hm-tt-pct {
+    font-size: 10px;
+    color: #64748b;
+}
+
+/* Legend */
+.ru-hm-legend {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.ru-hm-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--color-text-muted);
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.ru-hm-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+/* ── Proxy management panel ─────────────────────────────────── */
 .panel-content {
     border: 1px solid var(--color-border);
     border-top: none;
