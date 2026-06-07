@@ -135,9 +135,9 @@ def collect_traffic_logs_task(
     q_valid = _validate_query(q)
 
     def background_collect():
-        # 각 프록시별로 독립적으로 세션을 열어 작업
         from app.database.database import SessionLocal
-        for p in proxies:
+
+        def collect_one(p):
             local_db = SessionLocal()
             try:
                 logger.info(f"[traffic_logs] Starting background collection for proxy {p.id}")
@@ -147,6 +147,14 @@ def collect_traffic_logs_task(
                 logger.error(f"[traffic_logs] Background collection failed for proxy {p.id}: {e}")
             finally:
                 local_db.close()
+
+        with ThreadPoolExecutor(max_workers=min(len(proxies), 4)) as executor:
+            futures = [executor.submit(collect_one, p) for p in proxies]
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception:
+                    pass
 
     if background_tasks:
         background_tasks.add_task(background_collect)
@@ -230,19 +238,19 @@ def get_proxy_traffic_logs(
 	db_proxy = db.query(Proxy).filter(Proxy.id == proxy_id).first()
 	if not db_proxy:
 		raise HTTPException(status_code=404, detail="Proxy not found")
-	
-    # Single proxy fetch using the helper
-	records, err = _fetch_and_parse_for_proxy(db_proxy, _validate_query(q), limit, direction, db)
-	if err:
-		raise HTTPException(status_code=502, detail=err)
-        
+
+	q_valid = _validate_query(q)
+
 	if not parsed:
-		# Compatibility: return lines if requested (raw)
-		command = _build_remote_command(db_proxy.traffic_log_path, q, limit, direction)
+		# Raw mode: fetch once via SSH and return lines without parsing or DB insert
+		command = _build_remote_command(db_proxy.traffic_log_path, q_valid, limit, direction)
 		raw = _ssh_exec(db_proxy.host, db_proxy.port or 22, db_proxy.username, decrypt_string_if_encrypted(db_proxy.password), command)
 		lines = [ln for ln in raw.split("\n") if ln]
 		return TrafficLogResponse(proxy_id=proxy_id, lines=lines, records=None, truncated=len(lines) == limit, count=len(lines))
 
+	records, err = _fetch_and_parse_for_proxy(db_proxy, q_valid, limit, direction, db)
+	if err:
+		raise HTTPException(status_code=502, detail=err)
 	return TrafficLogResponse(proxy_id=proxy_id, lines=None, records=records, truncated=len(records) == limit, count=len(records))
 
 

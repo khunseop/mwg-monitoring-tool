@@ -8,6 +8,7 @@ from datetime import datetime
 from app.utils.time import now_kst, KST_TZ
 import re
 import os
+import threading
 import warnings
 import time
 import logging
@@ -449,24 +450,28 @@ class SimpleSessionCache:
     def __init__(self, ttl_sec: int = 300):
         self._cache: Dict[int, Tuple[List[Dict[str, Any]], float]] = {}
         self._ttl = ttl_sec
+        self._lock = threading.Lock()
 
     def get(self, proxy_id: int) -> Optional[List[Dict[str, Any]]]:
-        if proxy_id not in self._cache:
-            return None
-        data, ts = self._cache[proxy_id]
-        if time.perf_counter() - ts > self._ttl:
-            del self._cache[proxy_id]
-            return None
-        return data
+        with self._lock:
+            if proxy_id not in self._cache:
+                return None
+            data, ts = self._cache[proxy_id]
+            if time.perf_counter() - ts > self._ttl:
+                del self._cache[proxy_id]
+                return None
+            return data
 
     def set(self, proxy_id: int, data: List[Dict[str, Any]]):
-        self._cache[proxy_id] = (data, time.perf_counter())
+        with self._lock:
+            self._cache[proxy_id] = (data, time.perf_counter())
 
     def invalidate(self, proxy_id: Optional[int] = None):
-        if proxy_id is None:
-            self._cache.clear()
-        elif proxy_id in self._cache:
-            del self._cache[proxy_id]
+        with self._lock:
+            if proxy_id is None:
+                self._cache.clear()
+            elif proxy_id in self._cache:
+                del self._cache[proxy_id]
 
 _session_cache = SimpleSessionCache(ttl_sec=float(os.getenv("SESSION_CACHE_TTL", "300")))
 
@@ -722,16 +727,11 @@ async def sessions_datatables(
         if not collected_iso:
             # Fallback if collected_at is somehow missing from record but present in batch
             collected_iso = now_kst().isoformat()
-            
+
         line_index = int(rec.get("__line_index") or 0)
         rid_val = temp_store.build_record_id(pid, str(collected_iso), line_index)
-        # Ensure client_ip without port for display
-        try:
-            cip = rec.get("client_ip") or ""
-            if isinstance(cip, str) and re.match(r"^\d+\.\d+\.\d+\.\d+:\d+$", cip.strip()):
-                cip = cip.strip().rsplit(":", 1)[0]
-        except Exception:
-            cip = rec.get("client_ip") or ""
+        # client_ip is already normalized in _load_latest_rows_for_proxies
+        cip = rec.get("client_ip") or ""
         
         row_data.append({
             "host": host,

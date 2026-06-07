@@ -110,19 +110,19 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
         try:
             db.bulk_insert_mappings(ResourceUsageModel, collected_data)
             db.commit()
-            # Refresh models to get IDs (for response)
-            # Note: bulk_insert_mappings doesn't return IDs, so we query them back
-            for data in collected_data:
-                model = db.query(ResourceUsageModel).filter(
-                    ResourceUsageModel.proxy_id == data["proxy_id"],
-                    ResourceUsageModel.collected_at == data["collected_at"]
-                ).order_by(ResourceUsageModel.id.desc()).first()
-                if model:
-                    collected_models.append(model)
+            # Single query for all inserted records instead of N individual queries
+            inserted_proxy_ids = [d["proxy_id"] for d in collected_data]
+            collected_models = (
+                db.query(ResourceUsageModel)
+                .filter(
+                    ResourceUsageModel.collected_at == collected_at_ts,
+                    ResourceUsageModel.proxy_id.in_(inserted_proxy_ids),
+                )
+                .all()
+            )
         except Exception as e:
             logger.error(f"[resource_usage] Bulk insert failed, falling back to individual inserts: {e}")
             db.rollback()
-            # Fallback to individual inserts
             for data in collected_data:
                 try:
                     model = ResourceUsageModel(**data)
@@ -131,9 +131,6 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
                 except Exception as e2:
                     logger.error(f"[resource_usage] Failed to insert record: {e2}")
             db.commit()
-
-    # Enforce 90-day retention in the background
-    asyncio.create_task(asyncio.to_thread(enforce_resource_usage_retention_wrapper))
 
     logger.info(f"[resource_usage] Collect completed requested={len(proxies)} succeeded={len(collected_data)} failed={len(errors)}")
     if errors:
@@ -146,15 +143,6 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
         errors=errors,
         items=collected_models,
     )
-
-
-def enforce_resource_usage_retention_wrapper(days: int = 90) -> None:
-    from app.database.database import SessionLocal
-    db = SessionLocal()
-    try:
-        enforce_resource_usage_retention(db, days)
-    finally:
-        db.close()
 
 
 @router.get("/resource-usage", response_model=List[ResourceUsageSchema])
@@ -205,24 +193,30 @@ async def get_active_interfaces(
     """
     cutoff_time = now_kst() - timedelta(hours=24)
     query = db.query(ResourceUsageModel).filter(ResourceUsageModel.collected_at >= cutoff_time)
-    
+
     if proxy_id:
         query = query.filter(ResourceUsageModel.proxy_id == proxy_id)
     elif group_id:
         query = query.join(Proxy).filter(Proxy.group_id == group_id)
-    
+
     recent_records = query.order_by(ResourceUsageModel.collected_at.desc()).limit(limit * 10).all()
-    
+
+    # Pre-load all required proxies in one query to avoid N+1 per record
+    unique_proxy_ids = {r.proxy_id for r in recent_records if r.interface_mbps}
+    proxy_map: Dict[int, str] = {
+        p.id: p.host
+        for p in db.query(Proxy).filter(Proxy.id.in_(unique_proxy_ids)).all()
+    }
+
     interface_map: Dict[Tuple[int, str], Dict[str, Any]] = {}
     for record in recent_records:
         if not record.interface_mbps: continue
         try:
             interface_data = json.loads(record.interface_mbps) if isinstance(record.interface_mbps, str) else record.interface_mbps
             if not isinstance(interface_data, dict): continue
-            
-            proxy = db.query(Proxy).filter(Proxy.id == record.proxy_id).first()
-            proxy_host = proxy.host if proxy else f"proxy_{record.proxy_id}"
-            
+
+            proxy_host = proxy_map.get(record.proxy_id, f"proxy_{record.proxy_id}")
+
             for if_index, if_info in interface_data.items():
                 if not isinstance(if_info, dict): continue
                 if_name = if_info.get("name", f"IF{if_index}")

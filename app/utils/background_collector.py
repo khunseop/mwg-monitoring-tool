@@ -251,21 +251,21 @@ class BackgroundCollector:
                 try:
                     db.bulk_insert_mappings(ResourceUsageModel, collected_data)
                     db.commit()
-                    # Refresh models to get IDs (for response)
-                    # Note: bulk_insert_mappings doesn't return IDs, so we query them back
-                    for data in collected_data:
-                        model = db.query(ResourceUsageModel).filter(
-                            ResourceUsageModel.proxy_id == data["proxy_id"],
-                            ResourceUsageModel.collected_at == data["collected_at"]
-                        ).order_by(ResourceUsageModel.id.desc()).first()
-                        if model:
-                            collected_models.append(model)
+                    # Single query for all inserted records instead of N individual queries
+                    inserted_proxy_ids = [d["proxy_id"] for d in collected_data]
+                    collected_models = (
+                        db.query(ResourceUsageModel)
+                        .filter(
+                            ResourceUsageModel.collected_at == collected_at_ts,
+                            ResourceUsageModel.proxy_id.in_(inserted_proxy_ids),
+                        )
+                        .all()
+                    )
                     logger.info(f"[BackgroundCollector] Bulk inserted {len(collected_data)} records to database "
                              f"(requested={len(proxies)}, failed={len(errors)})")
                 except Exception as e:
                     logger.error(f"[BackgroundCollector] Bulk insert failed, falling back to individual inserts: {e}")
                     db.rollback()
-                    # Fallback to individual inserts
                     for data in collected_data:
                         try:
                             model = ResourceUsageModel(**data)

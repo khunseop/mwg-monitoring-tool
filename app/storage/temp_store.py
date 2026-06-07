@@ -7,7 +7,16 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from app.utils.time import KST_TZ
 
-_io_lock = threading.Lock()
+# Per-proxy locks instead of a single global lock to allow concurrent writes across proxies
+_proxy_locks: Dict[int, threading.Lock] = {}
+_proxy_locks_meta = threading.Lock()
+
+
+def _get_proxy_lock(proxy_id: int) -> threading.Lock:
+    with _proxy_locks_meta:
+        if proxy_id not in _proxy_locks:
+            _proxy_locks[proxy_id] = threading.Lock()
+        return _proxy_locks[proxy_id]
 
 # Bit layout for synthetic numeric record IDs
 # [ proxy_id (20 bits) | collected_at_unix_sec (32 bits) | line_index (12 bits) ]
@@ -36,30 +45,26 @@ def cleanup_old_batches(retain_per_proxy: int = 3, max_age_seconds: Optional[int
     Keep only the latest N batches per proxy and optionally remove batches older than max_age_seconds.
     """
     try:
-        for pid, _ in list_batches():
-            # Gather and sort batches for this proxy
-            batches = [p for p_pid, p in list_batches(pid) if p_pid == pid]
-            batches.sort(key=lambda p: os.path.basename(p), reverse=True)
-            # Drop beyond retain_per_proxy
-            to_delete = batches[retain_per_proxy:]
-            # Age filter
+        # Call list_batches once and group by proxy_id (avoids O(n²) repeated filesystem scans)
+        by_proxy: Dict[int, List[str]] = {}
+        for pid, path in list_batches():
+            by_proxy.setdefault(pid, []).append(path)
+
+        for pid, batches in by_proxy.items():
+            # list_batches already returns newest-first; drop beyond retain_per_proxy
+            to_delete: List[str] = list(batches[retain_per_proxy:])
             if max_age_seconds is not None:
                 now_ts = int(datetime.now(tz=KST_TZ).timestamp())
-                to_delete_age_filtered: List[str] = []
                 for path in batches:
-                    # infer timestamp from filename
                     try:
                         base = os.path.basename(path)
                         ts_str = base.replace("batch_", "").replace(".jsonl", "")
                         dt = datetime.strptime(ts_str, "%Y%m%dT%H%M%S").replace(tzinfo=KST_TZ)
                         if (now_ts - int(dt.timestamp())) > max_age_seconds:
-                            to_delete_age_filtered.append(path)
+                            to_delete.append(path)
                     except Exception:
                         pass
-                # merge
-                path_set = set(to_delete)
-                path_set.update(to_delete_age_filtered)
-                to_delete = list(path_set)
+                to_delete = list(set(to_delete))
             for path in to_delete:
                 try:
                     os.remove(path)
@@ -93,19 +98,20 @@ def write_batch(proxy_id: int, collected_at: datetime, records: List[Dict[str, A
         if isinstance(ct, datetime):
             item["creation_time"] = ct.astimezone(KST_TZ).isoformat()
         payload.append(item)
-    with _io_lock:
+    # Use per-proxy lock so writes for different proxies don't serialize each other
+    lock = _get_proxy_lock(proxy_id)
+    with lock:
         with open(path, "w", encoding="utf-8") as f:
             for row in payload:
                 f.write(json.dumps(row, ensure_ascii=False))
                 f.write("\n")
-    # Also update a latest pointer for quick reads
-    latest_link = os.path.join(directory, "latest")
-    try:
-        with _io_lock:
+        # Update latest pointer under the same lock to keep them consistent
+        latest_link = os.path.join(directory, "latest")
+        try:
             with open(latest_link, "w", encoding="utf-8") as f:
                 f.write(os.path.basename(path))
-    except Exception:
-        pass
+        except Exception:
+            pass
     return path
 
 
