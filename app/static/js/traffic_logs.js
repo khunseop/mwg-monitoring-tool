@@ -13,12 +13,6 @@
         } else if (tabId === 'analyze') {
             $('#tlAnalyzeSection').show();
             $('#tab-analyze').addClass('is-active');
-            // 분석 탭으로 전환 시 현재 데이터가 있으면 자동 분석 실행
-            if (window.LOG_RECORDS && window.LOG_RECORDS.length > 0) {
-                if (window.TrafficLogAnalysis && window.TrafficLogAnalysis.analyze) {
-                    window.TrafficLogAnalysis.analyze(window.LOG_RECORDS);
-                }
-            }
             // 차트 리사이즈 유도
             setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
         } else if (tabId === 'upload') {

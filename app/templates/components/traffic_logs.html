@@ -108,36 +108,60 @@
 
 <!-- 결과 분석 섹션 -->
 <div id="tlAnalyzeSection" class="tl-tab-content" style="display:none;">
+    <!-- 분석 실행 바 -->
+    <div class="settings-bar mb-5">
+        <div class="is-flex is-align-items-center" style="gap: 0.75rem;">
+            <span class="is-size-7 has-text-grey">선택된 프록시의 DB 저장 로그 전체를 분석합니다.</span>
+            <span id="tlaAnalyzeStatus" class="tag is-info is-light is-small" style="display:none;"></span>
+        </div>
+        <div style="margin-left: auto;">
+            <button class="button is-primary is-small px-5" id="tlaRunAnalysisBtn" style="font-weight: 600;">분석 실행</button>
+        </div>
+    </div>
+
     <div id="tlaDashboard" style="display:none;">
         <!-- 요약 카드 -->
         <div class="columns is-multiline mb-5">
-            <div class="column is-3">
+            <div class="column is-2">
                 <div class="box has-text-centered py-4">
                     <p class="is-size-7 has-text-grey mb-1">총 요청 수</p>
                     <h4 class="title is-4 mb-0" id="stat-total-req">-</h4>
                 </div>
             </div>
-            <div class="column is-3">
+            <div class="column is-2">
                 <div class="box has-text-centered py-4">
                     <p class="is-size-7 has-text-grey mb-1">차단된 요청</p>
                     <h4 class="title is-4 mb-0 has-text-danger" id="stat-blocked-req">-</h4>
                 </div>
             </div>
-            <div class="column is-3">
+            <div class="column is-2">
                 <div class="box has-text-centered py-4">
                     <p class="is-size-7 has-text-grey mb-1">고유 클라이언트</p>
                     <h4 class="title is-4 mb-0" id="stat-unique-clients">-</h4>
                 </div>
             </div>
-            <div class="column is-3">
+            <div class="column is-2">
                 <div class="box has-text-centered py-4">
                     <p class="is-size-7 has-text-grey mb-1">고유 호스트</p>
                     <h4 class="title is-4 mb-0" id="stat-unique-hosts">-</h4>
                 </div>
             </div>
+            <div class="column is-2">
+                <div class="box has-text-centered py-4">
+                    <p class="is-size-7 has-text-grey mb-1">총 수신량</p>
+                    <h4 class="title is-5 mb-0" id="stat-total-recv">-</h4>
+                </div>
+            </div>
+            <div class="column is-2">
+                <div class="box has-text-centered py-4">
+                    <p class="is-size-7 has-text-grey mb-1">총 송신량</p>
+                    <h4 class="title is-5 mb-0" id="stat-total-sent">-</h4>
+                </div>
+            </div>
         </div>
 
-        <div class="columns is-multiline">
+        <!-- 차트 -->
+        <div class="columns is-multiline mb-5">
             <div class="column is-6">
                 <div class="box">
                     <h5 class="title is-6 mb-4">프록시별 요청 분포</h5>
@@ -152,22 +176,68 @@
             </div>
             <div class="column is-6">
                 <div class="box">
-                    <h5 class="title is-6 mb-4">Top 호스트 (요청 수)</h5>
-                    <div id="chart-top-hosts" style="height: 350px;"></div>
+                    <h5 class="title is-6 mb-4">Top 20 호스트 (요청 수)</h5>
+                    <div id="chart-top-hosts" style="height: 400px;"></div>
                 </div>
             </div>
             <div class="column is-6">
                 <div class="box">
-                    <h5 class="title is-6 mb-4">Top 클라이언트 (요청 수)</h5>
-                    <div id="chart-top-clients" style="height: 350px;"></div>
+                    <h5 class="title is-6 mb-4">Top 20 클라이언트 (요청 수)</h5>
+                    <div id="chart-top-clients" style="height: 400px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 전체 통계 테이블 -->
+        <div class="columns is-multiline">
+            <div class="column is-6">
+                <div class="box">
+                    <div class="is-flex is-align-items-center is-justify-content-space-between mb-3">
+                        <h5 class="title is-6 mb-0">호스트별 전체 통계 <span class="tag is-light is-small ml-2" id="tla-hosts-count"></span></h5>
+                        <button class="button is-small is-ghost" id="tlaExportHostsBtn" style="color: var(--color-text-muted);">CSV 내보내기</button>
+                    </div>
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        <table class="table is-fullwidth is-striped is-hoverable is-narrow" style="font-size: 0.78rem;">
+                            <thead style="position: sticky; top: 0; background: var(--color-surface); z-index: 1;">
+                                <tr>
+                                    <th>호스트</th>
+                                    <th class="has-text-right">요청 수</th>
+                                    <th class="has-text-right">수신</th>
+                                    <th class="has-text-right">송신</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tla-hosts-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="column is-6">
+                <div class="box">
+                    <div class="is-flex is-align-items-center is-justify-content-space-between mb-3">
+                        <h5 class="title is-6 mb-0">클라이언트별 전체 통계 <span class="tag is-light is-small ml-2" id="tla-clients-count"></span></h5>
+                        <button class="button is-small is-ghost" id="tlaExportClientsBtn" style="color: var(--color-text-muted);">CSV 내보내기</button>
+                    </div>
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        <table class="table is-fullwidth is-striped is-hoverable is-narrow" style="font-size: 0.78rem;">
+                            <thead style="position: sticky; top: 0; background: var(--color-surface); z-index: 1;">
+                                <tr>
+                                    <th>클라이언트 IP</th>
+                                    <th class="has-text-right">요청 수</th>
+                                    <th class="has-text-right">수신</th>
+                                    <th class="has-text-right">송신</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tla-clients-tbody"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <div id="tlaEmptyState" class="empty-state mb-5" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
         <p class="title is-5 mb-2">NO DATA</p>
-        <p class="subtitle is-6">분석할 로그 데이터가 없습니다. 로그 원격 조회 후 "분석하기"를 클릭하세요.</p>
+        <p class="subtitle is-6" id="tlaEmptyStateMsg">분석할 로그 데이터가 없습니다. 프록시를 선택하고 "분석 실행"을 클릭하세요.</p>
     </div>
 </div>
 

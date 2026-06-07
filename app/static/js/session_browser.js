@@ -51,7 +51,7 @@
         else $tag.addClass('is-ready');
     }
 
-    async function analyzeSessions(records) {
+    function analyzeSessions(records) {
         if (!records || records.length === 0) {
             $('#sbaDashboard').hide();
             $('#sbaEmptyState').show();
@@ -61,6 +61,8 @@
         $('#sbaEmptyState').hide();
         $('#sbaDashboard').show();
 
+        const fmt = (v) => (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(v) : String(v || 0);
+
         const stats = {
             total: records.length,
             uniqueClients: new Set(),
@@ -69,6 +71,8 @@
             proxyDist: {},
             protocolDist: {},
             clientCounts: {},
+            clientRecv: {},
+            clientSent: {},
             serverCounts: {}
         };
 
@@ -76,41 +80,96 @@
             if (rec.client_ip) {
                 stats.uniqueClients.add(rec.client_ip);
                 stats.clientCounts[rec.client_ip] = (stats.clientCounts[rec.client_ip] || 0) + 1;
+                stats.clientRecv[rec.client_ip] = (stats.clientRecv[rec.client_ip] || 0) + (rec.cl_bytes_received || 0);
+                stats.clientSent[rec.client_ip] = (stats.clientSent[rec.client_ip] || 0) + (rec.cl_bytes_sent || 0);
             }
             if (rec.server_ip) {
                 stats.uniqueServers.add(rec.server_ip);
                 stats.serverCounts[rec.server_ip] = (stats.serverCounts[rec.server_ip] || 0) + 1;
             }
-            
-            // 전송량 합계 (cl_bytes_received + cl_bytes_sent)
+
             const traffic = (rec.cl_bytes_received || 0) + (rec.cl_bytes_sent || 0);
             stats.totalTraffic += traffic;
 
-            // 프록시 분포
             const proxy = rec.host || 'Unknown';
             stats.proxyDist[proxy] = (stats.proxyDist[proxy] || 0) + 1;
 
-            // 프로토콜 분포
             const proto = rec.protocol || 'Unknown';
             stats.protocolDist[proto] = (stats.protocolDist[proto] || 0) + 1;
         });
 
-        // 1. 요약 카드 업데이트
+        // 요약 카드
         $('#sb-stat-total').text(stats.total.toLocaleString());
         $('#sb-stat-unique-clients').text(stats.uniqueClients.size.toLocaleString());
         $('#sb-stat-unique-servers').text(stats.uniqueServers.size.toLocaleString());
-        $('#sb-stat-traffic').text((window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(stats.totalTraffic) : stats.totalTraffic);
+        $('#sb-stat-traffic').text(fmt(stats.totalTraffic));
 
-        // 2. 차트 렌더링
+        // 차트 (Top 20)
         renderPieChart('sb-chart-proxy', stats.proxyDist, '프록시');
         renderPieChart('sb-chart-protocol', stats.protocolDist, '프로토콜', true);
-        renderBarChart('sb-chart-top-clients', stats.clientCounts, '클라이언트');
-        renderBarChart('sb-chart-top-servers', stats.serverCounts, '서버');
+        renderBarChart('sb-chart-top-clients', stats.clientCounts, '클라이언트 (Top 20)', 20);
+        renderBarChart('sb-chart-top-servers', stats.serverCounts, '서버 IP (Top 20)', 20);
+
+        // 전체 통계 테이블 - 클라이언트
+        const sortedClients = Object.entries(stats.clientCounts).sort((a, b) => b[1] - a[1]);
+        const $ctbody = $('#sb-stats-clients-tbody');
+        $ctbody.empty();
+        sortedClients.forEach(([ip, cnt]) => {
+            $ctbody.append(
+                `<tr><td>${ip}</td><td class="has-text-right">${cnt.toLocaleString()}</td>` +
+                `<td class="has-text-right">${fmt(stats.clientRecv[ip] || 0)}</td>` +
+                `<td class="has-text-right">${fmt(stats.clientSent[ip] || 0)}</td></tr>`
+            );
+        });
+        $('#sb-clients-count').text(`${sortedClients.length.toLocaleString()}개`);
+
+        // 전체 통계 테이블 - 서버 IP
+        const sortedServers = Object.entries(stats.serverCounts).sort((a, b) => b[1] - a[1]);
+        const $stbody = $('#sb-stats-servers-tbody');
+        $stbody.empty();
+        sortedServers.forEach(([ip, cnt]) => {
+            $stbody.append(`<tr><td>${ip}</td><td class="has-text-right">${cnt.toLocaleString()}</td></tr>`);
+        });
+        $('#sb-servers-count').text(`${sortedServers.length.toLocaleString()}개`);
+
+        // CSV 내보내기 핸들러 저장
+        sb._lastAnalysisStats = { sortedClients, sortedServers, stats };
+    }
+
+    function exportClientsCsv() {
+        const d = sb._lastAnalysisStats;
+        if (!d) { alert('먼저 분석을 실행하세요.'); return; }
+        const fmt = (v) => String(v || 0);
+        const headers = ['클라이언트 IP', '세션 수', '수신(CL Bytes)', '송신(CL Bytes)'];
+        const rows = d.sortedClients.map(([ip, cnt]) => [ip, cnt, d.stats.clientRecv[ip] || 0, d.stats.clientSent[ip] || 0]);
+        downloadCsv(headers, rows, 'sb_clients_stats.csv');
+    }
+
+    function exportServersCsv() {
+        const d = sb._lastAnalysisStats;
+        if (!d) { alert('먼저 분석을 실행하세요.'); return; }
+        const headers = ['서버 IP', '세션 수'];
+        const rows = d.sortedServers.map(([ip, cnt]) => [ip, cnt]);
+        downloadCsv(headers, rows, 'sb_servers_stats.csv');
+    }
+
+    function downloadCsv(headers, rows, filename) {
+        const bom = '﻿';
+        const lines = [headers.map(h => `"${h}"`).join(',')];
+        rows.forEach(row => {
+            lines.push(row.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(','));
+        });
+        const blob = new Blob([bom + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
     }
 
     function renderPieChart(elId, dataMap, label, isDonut = false) {
         const labels = Object.keys(dataMap);
         const series = Object.values(dataMap);
+        if (!labels.length) return;
 
         const options = {
             chart: { type: isDonut ? 'donut' : 'pie', height: 300 },
@@ -123,31 +182,36 @@
         if (sb.charts[elId]) {
             sb.charts[elId].updateOptions(options);
         } else {
-            sb.charts[elId] = new ApexCharts(document.getElementById(elId), options);
+            const el = document.getElementById(elId);
+            if (!el) return;
+            sb.charts[elId] = new ApexCharts(el, options);
             sb.charts[elId].render();
         }
     }
 
-    function renderBarChart(elId, dataMap, title, limit = 10) {
+    function renderBarChart(elId, dataMap, title, limit = 20) {
         const sorted = Object.entries(dataMap)
             .sort((a, b) => b[1] - a[1])
             .slice(0, limit);
 
         const categories = sorted.map(x => x[0]);
         const data = sorted.map(x => x[1]);
+        if (!categories.length) return;
 
         const options = {
-            chart: { type: 'bar', height: 350, toolbar: { show: false } },
+            chart: { type: 'bar', height: Math.max(300, Math.min(limit * 22, 500)), toolbar: { show: false } },
             plotOptions: { bar: { horizontal: true } },
             series: [{ name: '세션 수', data: data }],
             xaxis: { categories: categories },
-            title: { text: `Top ${limit} ${title}`, align: 'center', style: { fontSize: '14px' } }
+            title: { text: title, align: 'center', style: { fontSize: '14px' } }
         };
 
         if (sb.charts[elId]) {
             sb.charts[elId].updateOptions(options);
         } else {
-            sb.charts[elId] = new ApexCharts(document.getElementById(elId), options);
+            const el = document.getElementById(elId);
+            if (!el) return;
+            sb.charts[elId] = new ApexCharts(el, options);
             sb.charts[elId].render();
         }
     }
@@ -446,6 +510,9 @@
                 });
             }
         });
+
+        $('#sbExportClientsBtn').off('click').on('click', exportClientsCsv);
+        $('#sbExportServersBtn').off('click').on('click', exportServersCsv);
 
         // Modal closing handlers
         $('#sbDetailModal .delete, #sbDetailModal .button, #sbDetailModal .modal-background').off('click').on('click', () => {

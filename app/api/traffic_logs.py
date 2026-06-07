@@ -226,6 +226,98 @@ def get_multi_proxy_traffic_logs(
     )
 
 
+@router.get("/traffic-logs/analyze")
+def analyze_db_traffic_logs(
+    proxy_ids: str = Query(..., description="Comma-separated proxy IDs"),
+    db: Session = Depends(get_db),
+):
+    """DB에 저장된 전체 트래픽 로그를 분석합니다 (Top N 제한 없음)."""
+    try:
+        p_ids = [int(x.strip()) for x in proxy_ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid proxy_ids format")
+
+    if not p_ids:
+        raise HTTPException(status_code=400, detail="proxy_ids required")
+
+    from collections import Counter, defaultdict
+
+    rows = db.query(TrafficLogModel).filter(TrafficLogModel.proxy_id.in_(p_ids)).all()
+
+    host_counter: Counter = Counter()
+    client_req_counter: Counter = Counter()
+    status_counter: Counter = Counter()
+    proxy_counter: Counter = Counter()
+    client_recv: defaultdict = defaultdict(int)
+    client_sent: defaultdict = defaultdict(int)
+    host_recv: defaultdict = defaultdict(int)
+    host_sent: defaultdict = defaultdict(int)
+
+    blocked = 0
+    total_recv = 0
+    total_sent = 0
+    unique_clients: set = set()
+    unique_hosts: set = set()
+
+    proxy_map: Dict[int, str] = {}
+    for p in db.query(Proxy).filter(Proxy.id.in_(p_ids)).all():
+        proxy_map[p.id] = p.host
+
+    for row in rows:
+        client_ip = str(row.client_ip or "")
+        url_host = str(row.url_host or "")
+        status = str(row.response_statuscode or "Unknown")
+        recv_b = int(row.recv_byte or 0)
+        sent_b = int(row.sent_byte or 0)
+        action = str(row.action_names or "")
+        proxy_label = proxy_map.get(row.proxy_id, f"#{row.proxy_id}")
+
+        if client_ip:
+            client_req_counter[client_ip] += 1
+            unique_clients.add(client_ip)
+            client_recv[client_ip] += max(0, recv_b)
+            client_sent[client_ip] += max(0, sent_b)
+        if url_host:
+            host_counter[url_host] += 1
+            unique_hosts.add(url_host)
+            host_recv[url_host] += max(0, recv_b)
+            host_sent[url_host] += max(0, sent_b)
+
+        status_counter[status] += 1
+        proxy_counter[proxy_label] += 1
+
+        if action.strip().lower() == "block":
+            blocked += 1
+        total_recv += max(0, recv_b)
+        total_sent += max(0, sent_b)
+
+    hosts = [
+        {"host": h, "requests": c, "recv_bytes": host_recv[h], "sent_bytes": host_sent[h]}
+        for h, c in host_counter.most_common()
+    ]
+    clients = [
+        {"client_ip": ip, "requests": c, "recv_bytes": client_recv[ip], "sent_bytes": client_sent[ip]}
+        for ip, c in client_req_counter.most_common()
+    ]
+    statuses = [{"status": s, "count": c} for s, c in status_counter.most_common()]
+    proxies_dist = [{"proxy": p, "count": c} for p, c in proxy_counter.most_common()]
+
+    return {
+        "summary": {
+            "total": len(rows),
+            "blocked": blocked,
+            "unique_clients": len(unique_clients),
+            "unique_hosts": len(unique_hosts),
+            "total_recv_bytes": total_recv,
+            "total_sent_bytes": total_sent,
+        },
+        "hosts": hosts,
+        "clients": clients,
+        "statuses": statuses,
+        "proxies": proxies_dist,
+    }
+
+
 @router.get("/traffic-logs/{proxy_id}", response_model=TrafficLogResponse)
 def get_proxy_traffic_logs(
 	proxy_id: int,

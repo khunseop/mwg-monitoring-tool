@@ -1,0 +1,103 @@
+- generic [active] [ref=e1]:
+  - navigation "main navigation" [ref=e2]:
+    - generic [ref=e3]:
+      - link "PMT" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e7]:
+        - link "실시간 모니터링" [ref=e8] [cursor=pointer]:
+          - /url: /resource
+        - link "세션브라우저" [ref=e9] [cursor=pointer]:
+          - /url: /session
+        - link "로그조회" [ref=e10] [cursor=pointer]:
+          - /url: /traffic-logs
+        - link "프록시관리" [ref=e11] [cursor=pointer]:
+          - /url: /proxy
+        - link "설정" [ref=e12] [cursor=pointer]:
+          - /url: /settings
+  - generic [ref=e16]:
+    - generic [ref=e18]:
+      - heading "세션 브라우저" [level=3] [ref=e19]
+      - paragraph [ref=e20]: 프록시 서버의 현재 활성 세션을 조회하고 분석합니다.
+    - list [ref=e22]:
+      - listitem [ref=e23]:
+        - generic [ref=e25] [cursor=pointer]: 세션 목록
+      - listitem [ref=e26]:
+        - generic [ref=e28] [cursor=pointer]: 결과 분석
+    - generic [ref=e29]:
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - generic [ref=e32]: 그룹
+          - combobox [ref=e34] [cursor=pointer]:
+            - option "전체" [selected]
+            - option "Office"
+            - option "OTC"
+        - generic [ref=e35]:
+          - generic [ref=e36]: 프록시
+          - generic [ref=e37]:
+            - button "2 / 2" [ref=e38] [cursor=pointer]:
+              - generic [ref=e39]: 2 / 2
+            - button "모두해제" [ref=e40] [cursor=pointer]
+            - option "1.1.1.1 (Office)" [selected]
+            - option "2.2.2.2 (OTC)" [selected]
+        - generic [ref=e42]: 준비
+      - generic [ref=e43]:
+        - paragraph [ref=e45]:
+          - textbox "검색어 (grep -F)" [ref=e46]
+        - button "세션 불러오기" [ref=e47] [cursor=pointer]
+        - button "내보내기" [ref=e49] [cursor=pointer]
+        - button "분석하기" [ref=e50] [cursor=pointer]
+    - generic [ref=e51]:
+      - generic [ref=e54]:
+        - paragraph [ref=e55]:
+          - textbox "결과 내 검색..." [ref=e56]
+        - paragraph [ref=e57]:
+          - button "필터 초기화" [ref=e58] [cursor=pointer]:
+            - generic [ref=e59]: 필터 초기화
+      - generic [ref=e62]:
+        - grid [ref=e64]:
+          - rowgroup [ref=e65]:
+            - row "프록시 생성시각 프로토콜 상태 사용자 클라이언트 IP 서버 IP 수신 송신 Age(s) URL" [ref=e66]:
+              - columnheader "프록시" [ref=e67]:
+                - generic [ref=e70] [cursor=pointer]: 프록시
+              - columnheader "생성시각" [ref=e71]:
+                - generic [ref=e74] [cursor=pointer]: 생성시각
+              - columnheader "프로토콜" [ref=e75]:
+                - generic [ref=e78] [cursor=pointer]: 프로토콜
+              - columnheader "상태" [ref=e79]:
+                - generic [ref=e82] [cursor=pointer]: 상태
+              - columnheader "사용자" [ref=e83]:
+                - generic [ref=e86] [cursor=pointer]: 사용자
+              - columnheader "클라이언트 IP" [ref=e87]:
+                - generic [ref=e90] [cursor=pointer]: 클라이언트 IP
+              - columnheader "서버 IP" [ref=e91]:
+                - generic [ref=e94] [cursor=pointer]: 서버 IP
+              - columnheader "수신" [ref=e95]:
+                - generic [ref=e98] [cursor=pointer]: 수신
+              - columnheader "송신" [ref=e99]:
+                - generic [ref=e102] [cursor=pointer]: 송신
+              - columnheader "Age(s)" [ref=e103]:
+                - generic [ref=e106] [cursor=pointer]: Age(s)
+              - columnheader "URL" [ref=e107]:
+                - generic [ref=e110] [cursor=pointer]: URL
+          - rowgroup [ref=e111]
+          - rowgroup
+          - rowgroup
+          - rowgroup
+          - generic: 조회된 세션 데이터가 없습니다. 상단에서 "세션 불러오기"를 클릭하세요.
+        - generic [ref=e112]:
+          - generic [ref=e113]:
+            - generic [ref=e114]: "Page Size:"
+            - combobox "Page Size" [ref=e115]:
+              - generic [ref=e116]: "50"
+          - generic [ref=e118]: 0 to 0 of 0
+          - button "First Page" [disabled] [ref=e119]
+          - button "Previous Page" [disabled] [ref=e120]
+          - generic [ref=e121]: Page 0 of 0
+          - button "Next Page" [disabled] [ref=e122]
+          - button "Last Page" [disabled] [ref=e123]
+  - contentinfo [ref=e124]:
+    - paragraph [ref=e126]:
+      - strong [ref=e127]: PMT
+      - text: v2026.03.09 · Made by hunseop.kim ·
+      - link "GitHub" [ref=e128] [cursor=pointer]:
+        - /url: https://github.com/khunseop/mwg-monitoring-tool
