@@ -46,6 +46,38 @@
             $('#tlaEmptyState').show();
         },
 
+        renderAnomalies(anomalies) {
+            const $section = $('#tla-anomaly-section');
+            const $list = $('#tla-anomaly-list');
+            $list.empty();
+
+            if (!anomalies || anomalies.length === 0) {
+                $section.hide();
+                return;
+            }
+
+            const hasCritical = anomalies.some(a => a.severity === 'critical');
+            const borderColor = hasCritical ? '#dc2626' : '#d97706';
+            const dotColor = hasCritical ? '#dc2626' : '#d97706';
+            $section.css('border-left', `4px solid ${borderColor}`);
+            $('#tla-anomaly-severity-dot').css('background', dotColor);
+            $('#tla-anomaly-count').text(`${anomalies.length}건`).removeClass('is-danger is-warning').addClass(hasCritical ? 'is-danger' : 'is-warning');
+
+            anomalies.forEach((a, i) => {
+                const isCrit = a.severity === 'critical';
+                const tagClass = isCrit ? 'is-danger' : 'is-warning';
+                const isLast = i === anomalies.length - 1;
+                $list.append(`
+                    <div class="is-flex is-align-items-center py-2" style="${isLast ? '' : 'border-bottom: 1px solid var(--color-border);'} gap: 0.65rem;">
+                        <span class="tag ${tagClass} is-small" style="min-width: 60px; justify-content: center; flex-shrink: 0;">${this.esc(a.label)}</span>
+                        <code class="is-size-7" style="min-width: 105px; flex-shrink: 0;">${this.esc(a.subject)}</code>
+                        <span class="is-size-7 has-text-grey">${this.esc(a.detail)}</span>
+                    </div>`);
+            });
+
+            $section.show();
+        },
+
         renderFromServerData(data) {
             if (!data || !data.summary) {
                 this.showEmpty('분석 데이터가 없습니다.');
@@ -90,6 +122,9 @@
                 data.clients || [],
                 (row) => `<td>${this.esc(row.client_ip)}</td><td class="has-text-right">${(row.requests || 0).toLocaleString()}</td><td class="has-text-right">${fmt(row.recv_bytes)}</td><td class="has-text-right">${fmt(row.sent_bytes)}</td>`
             );
+
+            // 이상 징후
+            this.renderAnomalies(data.anomalies || []);
 
             // 행 수 표시
             $('#tla-hosts-count').text(`${(data.hosts || []).length.toLocaleString()}개`);

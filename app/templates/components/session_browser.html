@@ -95,6 +95,19 @@
 <!-- 세션 결과 분석 섹션 -->
 <div id="sbAnalyzeSection" class="sb-tab-content" style="display:none;">
     <div id="sbaDashboard" style="display:none;">
+        <!-- 이상 징후 탐지 패널 -->
+        <div id="sba-anomaly-section" class="mb-5" style="display:none; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden;">
+            <div class="is-flex is-align-items-center px-4 py-3" id="sba-anomaly-header" style="border-bottom: 1px solid var(--color-border); cursor: pointer;" onclick="$('#sba-anomaly-body').slideToggle(150);">
+                <span id="sba-anomaly-severity-dot" style="width: 10px; height: 10px; border-radius: 50%; background: #dc2626; display: inline-block; margin-right: 0.6rem; flex-shrink: 0;"></span>
+                <span class="is-size-7 has-text-weight-bold mr-2">이상 징후 탐지</span>
+                <span class="tag is-danger is-small is-rounded mr-auto" id="sba-anomaly-count"></span>
+                <span class="is-size-7 has-text-grey" style="user-select:none;">▾</span>
+            </div>
+            <div id="sba-anomaly-body" class="px-4 py-2">
+                <div id="sba-anomaly-list"></div>
+            </div>
+        </div>
+
         <!-- 요약 카드 -->
         <div class="columns is-multiline mb-5">
             <div class="column is-3">

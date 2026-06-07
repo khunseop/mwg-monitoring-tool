@@ -120,6 +120,19 @@
     </div>
 
     <div id="tlaDashboard" style="display:none;">
+        <!-- 이상 징후 탐지 패널 -->
+        <div id="tla-anomaly-section" class="mb-5" style="display:none; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden;">
+            <div class="is-flex is-align-items-center px-4 py-3" id="tla-anomaly-header" style="border-bottom: 1px solid var(--color-border); cursor: pointer;" onclick="$('#tla-anomaly-body').slideToggle(150);">
+                <span id="tla-anomaly-severity-dot" style="width: 10px; height: 10px; border-radius: 50%; background: #dc2626; display: inline-block; margin-right: 0.6rem; flex-shrink: 0;"></span>
+                <span class="is-size-7 has-text-weight-bold mr-2">이상 징후 탐지</span>
+                <span class="tag is-danger is-small is-rounded mr-auto" id="tla-anomaly-count"></span>
+                <span class="is-size-7 has-text-grey" style="user-select:none;">▾</span>
+            </div>
+            <div id="tla-anomaly-body" class="px-4 py-2">
+                <div id="tla-anomaly-list"></div>
+            </div>
+        </div>
+
         <!-- 요약 카드 -->
         <div class="columns is-multiline mb-5">
             <div class="column is-2">

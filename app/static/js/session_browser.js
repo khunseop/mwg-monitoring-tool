@@ -51,6 +51,122 @@
         else $tag.addClass('is-ready');
     }
 
+    function detectSessionAnomalies(records) {
+        const anomalies = [];
+        if (!records || records.length === 0) return anomalies;
+
+        const fmt = (v) => (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(v) : `${v}B`;
+        const fmtAge = (s) => s >= 3600 ? `${(s / 3600).toFixed(1)}시간` : `${Math.floor(s / 60)}분 ${s % 60}초`;
+
+        function sigma(values) {
+            if (!values.length) return { mean: 0, std: 0 };
+            const mean = values.reduce((a, b) => a + b, 0) / values.length;
+            const std = Math.sqrt(values.reduce((s, v) => s + (v - mean) ** 2, 0) / values.length);
+            return { mean, std };
+        }
+
+        const clientStats = {};
+        const longSessions = [];
+
+        records.forEach(rec => {
+            const ip = rec.client_ip;
+            if (ip) {
+                if (!clientStats[ip]) clientStats[ip] = { sessions: 0, recv: 0, sent: 0 };
+                clientStats[ip].sessions++;
+                clientStats[ip].recv += (rec.cl_bytes_received || 0);
+                clientStats[ip].sent += (rec.cl_bytes_sent || 0);
+            }
+            const age = rec.age_seconds;
+            if (age && age > 3600) longSessions.push(rec);
+        });
+
+        const clientList = Object.entries(clientStats);
+        const sessStat = sigma(clientList.map(([, c]) => c.sessions));
+        const trafficStat = sigma(clientList.map(([, c]) => c.recv + c.sent));
+
+        // 장기 세션
+        longSessions.sort((a, b) => (b.age_seconds || 0) - (a.age_seconds || 0));
+        longSessions.slice(0, 5).forEach(rec => {
+            const age = rec.age_seconds;
+            anomalies.push({
+                severity: age > 7200 ? 'critical' : 'warning',
+                label: '장기 세션',
+                subject: rec.client_ip || '-',
+                detail: `${fmtAge(age)} 유지 · ${rec.url ? rec.url.substring(0, 60) : '-'}`,
+                _sv: age,
+            });
+        });
+
+        // 세션 수 과다 (> 평균+2σ)
+        clientList.forEach(([ip, stat]) => {
+            if (sessStat.std > 0) {
+                const z = (stat.sessions - sessStat.mean) / sessStat.std;
+                if (z > 2) {
+                    anomalies.push({
+                        severity: z > 3 ? 'critical' : 'warning',
+                        label: '세션 과다',
+                        subject: ip,
+                        detail: `${stat.sessions.toLocaleString()}개 세션 (평균 대비 ${z.toFixed(1)}σ)`,
+                        _sv: z,
+                    });
+                }
+            }
+        });
+
+        // 트래픽 과다 (> 평균+2σ)
+        clientList.forEach(([ip, stat]) => {
+            const traffic = stat.recv + stat.sent;
+            if (trafficStat.std > 0) {
+                const z = (traffic - trafficStat.mean) / trafficStat.std;
+                if (z > 2) {
+                    anomalies.push({
+                        severity: z > 3 ? 'critical' : 'warning',
+                        label: '트래픽 과다',
+                        subject: ip,
+                        detail: `수신+송신 ${fmt(traffic)} (평균 대비 ${z.toFixed(1)}σ)`,
+                        _sv: z,
+                    });
+                }
+            }
+        });
+
+        anomalies.sort((a, b) => (a.severity === 'critical' ? 0 : 1) - (b.severity === 'critical' ? 0 : 1) || (b._sv || 0) - (a._sv || 0));
+        anomalies.forEach(a => delete a._sv);
+        return anomalies;
+    }
+
+    function renderAnomalies(anomalies, sectionId, listId, countId, dotId) {
+        const $section = $(`#${sectionId}`);
+        const $list = $(`#${listId}`);
+        $list.empty();
+
+        if (!anomalies || anomalies.length === 0) {
+            $section.hide();
+            return;
+        }
+
+        const hasCritical = anomalies.some(a => a.severity === 'critical');
+        const borderColor = hasCritical ? '#dc2626' : '#d97706';
+        $section.css('border-left', `4px solid ${borderColor}`);
+        $(`#${dotId}`).css('background', borderColor);
+        $(`#${countId}`).text(`${anomalies.length}건`).removeClass('is-danger is-warning').addClass(hasCritical ? 'is-danger' : 'is-warning');
+
+        anomalies.forEach((a, i) => {
+            const tagCls = a.severity === 'critical' ? 'is-danger' : 'is-warning';
+            const isLast = i === anomalies.length - 1;
+            const subj = String(a.subject || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const detail = String(a.detail || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            $list.append(`
+                <div class="is-flex is-align-items-center py-2" style="${isLast ? '' : 'border-bottom: 1px solid var(--color-border);'} gap: 0.65rem;">
+                    <span class="tag ${tagCls} is-small" style="min-width: 60px; justify-content: center; flex-shrink: 0;">${a.label}</span>
+                    <code class="is-size-7" style="min-width: 105px; flex-shrink: 0;">${subj}</code>
+                    <span class="is-size-7 has-text-grey">${detail}</span>
+                </div>`);
+        });
+
+        $section.show();
+    }
+
     function analyzeSessions(records) {
         if (!records || records.length === 0) {
             $('#sbaDashboard').hide();
@@ -97,6 +213,10 @@
             const proto = rec.protocol || 'Unknown';
             stats.protocolDist[proto] = (stats.protocolDist[proto] || 0) + 1;
         });
+
+        // 이상 징후 탐지
+        const anomalies = detectSessionAnomalies(records);
+        renderAnomalies(anomalies, 'sba-anomaly-section', 'sba-anomaly-list', 'sba-anomaly-count', 'sba-anomaly-severity-dot');
 
         // 요약 카드
         $('#sb-stat-total').text(stats.total.toLocaleString());

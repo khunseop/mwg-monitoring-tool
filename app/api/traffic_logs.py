@@ -226,6 +226,102 @@ def get_multi_proxy_traffic_logs(
     )
 
 
+def _human_bytes(n: int) -> str:
+    n = int(n or 0)
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
+        if n < 1024:
+            return f"{n:.1f}{unit}"
+        n //= 1024
+    return f"{n:.1f}PB"
+
+
+def _detect_traffic_anomalies(
+    clients: List[Dict[str, Any]],
+    client_blocked: Any,
+    client_errors: Any,
+) -> List[Dict[str, Any]]:
+    import math
+
+    if not clients:
+        return []
+
+    def _sigma(values: List[float]):
+        if not values:
+            return 0.0, 0.0
+        mean = sum(values) / len(values)
+        variance = sum((v - mean) ** 2 for v in values) / len(values)
+        return mean, math.sqrt(variance)
+
+    req_mean, req_std = _sigma([float(c["requests"]) for c in clients])
+    recv_mean, recv_std = _sigma([float(c["recv_bytes"]) for c in clients])
+
+    anomalies: List[Dict[str, Any]] = []
+
+    for c in clients:
+        ip = c["client_ip"]
+        reqs = c["requests"]
+        recv = c["recv_bytes"]
+        blocked_n = client_blocked.get(ip, 0)
+        errors_n = client_errors.get(ip, 0)
+
+        # 차단율 이상
+        if reqs >= 5 and blocked_n > 0:
+            rate = blocked_n / reqs
+            if rate >= 0.3:
+                anomalies.append({
+                    "type": "block_heavy",
+                    "severity": "critical" if rate >= 0.6 else "warning",
+                    "label": "차단 과다",
+                    "subject": ip,
+                    "detail": f"{rate:.0%} 차단율 ({blocked_n:,}/{reqs:,}건)",
+                    "_sv": rate,
+                })
+
+        # HTTP 오류율 이상 (4xx/5xx)
+        if reqs >= 5 and errors_n > 0:
+            rate = errors_n / reqs
+            if rate >= 0.3:
+                anomalies.append({
+                    "type": "error_heavy",
+                    "severity": "critical" if rate >= 0.6 else "warning",
+                    "label": "오류 집중",
+                    "subject": ip,
+                    "detail": f"{rate:.0%} 오류율 ({errors_n:,}/{reqs:,}건, 4xx/5xx)",
+                    "_sv": rate,
+                })
+
+        # 요청 수 통계적 이상 (> 평균+2σ)
+        if req_std > 0:
+            z = (reqs - req_mean) / req_std
+            if z > 2.0:
+                anomalies.append({
+                    "type": "request_heavy",
+                    "severity": "critical" if z > 3.0 else "warning",
+                    "label": "요청 과다",
+                    "subject": ip,
+                    "detail": f"{reqs:,}건 요청 (평균 대비 {z:.1f}σ)",
+                    "_sv": z,
+                })
+
+        # 수신 트래픽 통계적 이상 (> 평균+2σ)
+        if recv_std > 0:
+            z = (recv - recv_mean) / recv_std
+            if z > 2.0:
+                anomalies.append({
+                    "type": "traffic_heavy",
+                    "severity": "critical" if z > 3.0 else "warning",
+                    "label": "트래픽 과다",
+                    "subject": ip,
+                    "detail": f"수신 {_human_bytes(recv)} (평균 대비 {z:.1f}σ)",
+                    "_sv": z,
+                })
+
+    anomalies.sort(key=lambda x: (0 if x["severity"] == "critical" else 1, -x.get("_sv", 0)))
+    for a in anomalies:
+        a.pop("_sv", None)
+    return anomalies
+
+
 @router.get("/traffic-logs/analyze")
 def analyze_db_traffic_logs(
     proxy_ids: str = Query(..., description="Comma-separated proxy IDs"),
@@ -250,6 +346,8 @@ def analyze_db_traffic_logs(
     proxy_counter: Counter = Counter()
     client_recv: defaultdict = defaultdict(int)
     client_sent: defaultdict = defaultdict(int)
+    client_blocked: defaultdict = defaultdict(int)
+    client_errors: defaultdict = defaultdict(int)
     host_recv: defaultdict = defaultdict(int)
     host_sent: defaultdict = defaultdict(int)
 
@@ -277,6 +375,14 @@ def analyze_db_traffic_logs(
             unique_clients.add(client_ip)
             client_recv[client_ip] += max(0, recv_b)
             client_sent[client_ip] += max(0, sent_b)
+            if action.strip().lower() == "block":
+                client_blocked[client_ip] += 1
+            try:
+                sc = int(row.response_statuscode or 0)
+                if 400 <= sc < 600:
+                    client_errors[client_ip] += 1
+            except Exception:
+                pass
         if url_host:
             host_counter[url_host] += 1
             unique_hosts.add(url_host)
@@ -301,6 +407,7 @@ def analyze_db_traffic_logs(
     ]
     statuses = [{"status": s, "count": c} for s, c in status_counter.most_common()]
     proxies_dist = [{"proxy": p, "count": c} for p, c in proxy_counter.most_common()]
+    anomalies = _detect_traffic_anomalies(clients, client_blocked, client_errors)
 
     return {
         "summary": {
@@ -315,6 +422,7 @@ def analyze_db_traffic_logs(
         "clients": clients,
         "statuses": statuses,
         "proxies": proxies_dist,
+        "anomalies": anomalies,
     }
 
 
