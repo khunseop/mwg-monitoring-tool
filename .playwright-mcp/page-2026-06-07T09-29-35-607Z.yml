@@ -1,0 +1,82 @@
+- generic [active] [ref=e1]:
+  - navigation "main navigation" [ref=e2]:
+    - generic [ref=e3]:
+      - link "PMT" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e7]:
+        - link "실시간 모니터링" [ref=e8] [cursor=pointer]:
+          - /url: /resource
+        - link "세션브라우저" [ref=e9] [cursor=pointer]:
+          - /url: /session
+        - link "로그조회" [ref=e10] [cursor=pointer]:
+          - /url: /traffic-logs
+        - link "프록시관리" [ref=e11] [cursor=pointer]:
+          - /url: /proxy
+        - link "설정" [ref=e12] [cursor=pointer]:
+          - /url: /settings
+  - generic [ref=e16]:
+    - generic [ref=e18]:
+      - heading "프록시 관리" [level=3] [ref=e19]
+      - paragraph [ref=e20]: 모니터링 대상 프록시 서버와 그룹을 등록하고 관리합니다.
+    - list [ref=e22]:
+      - listitem [ref=e23]:
+        - generic [ref=e24] [cursor=pointer]: 프록시 목록
+      - listitem [ref=e25]:
+        - generic [ref=e26] [cursor=pointer]: 프록시 그룹 관리
+    - generic [ref=e27]:
+      - generic [ref=e28]:
+        - generic [ref=e29]:
+          - button "프록시 추가" [ref=e30] [cursor=pointer]:
+            - generic [ref=e31]: 프록시 추가
+          - button "일괄 등록" [ref=e32] [cursor=pointer]:
+            - generic [ref=e33]: 일괄 등록
+        - generic [ref=e34]:
+          - button "내보내기" [ref=e35] [cursor=pointer]:
+            - generic [ref=e36]: 내보내기
+          - button "샘플 CSV" [ref=e37] [cursor=pointer]:
+            - generic [ref=e38]: 샘플 CSV
+      - table [ref=e40]:
+        - rowgroup [ref=e41]:
+          - row "호스트(IP) 그룹 상태 설명 작업" [ref=e42]:
+            - columnheader "호스트(IP)" [ref=e43]
+            - columnheader "그룹" [ref=e44]
+            - columnheader "상태" [ref=e45]
+            - columnheader "설명" [ref=e46]
+            - columnheader "작업" [ref=e47]
+        - rowgroup [ref=e48]:
+          - row "1.1.1.1 개별 OID Office 활성 수정 복제 삭제" [ref=e49]:
+            - cell "1.1.1.1 개별 OID" [ref=e50]:
+              - text: 1.1.1.1
+              - generic [ref=e51]: 개별 OID
+            - cell "Office" [ref=e52]
+            - cell "활성" [ref=e53]:
+              - generic [ref=e54]: 활성
+            - cell [ref=e55]
+            - cell "수정 복제 삭제" [ref=e56]:
+              - generic [ref=e57]:
+                - button "수정" [ref=e58] [cursor=pointer]:
+                  - generic [ref=e59]: 수정
+                - button "복제" [ref=e60] [cursor=pointer]:
+                  - generic [ref=e61]: 복제
+                - button "삭제" [ref=e62] [cursor=pointer]:
+                  - generic [ref=e63]: 삭제
+          - row "2.2.2.2 OTC 활성 수정 복제 삭제" [ref=e64]:
+            - cell "2.2.2.2" [ref=e65]
+            - cell "OTC" [ref=e66]
+            - cell "활성" [ref=e67]:
+              - generic [ref=e68]: 활성
+            - cell [ref=e69]
+            - cell "수정 복제 삭제" [ref=e70]:
+              - generic [ref=e71]:
+                - button "수정" [ref=e72] [cursor=pointer]:
+                  - generic [ref=e73]: 수정
+                - button "복제" [ref=e74] [cursor=pointer]:
+                  - generic [ref=e75]: 복제
+                - button "삭제" [ref=e76] [cursor=pointer]:
+                  - generic [ref=e77]: 삭제
+  - contentinfo [ref=e78]:
+    - paragraph [ref=e80]:
+      - strong [ref=e81]: PMT
+      - text: v2026.03.09 · Made by hunseop.kim ·
+      - link "GitHub" [ref=e82] [cursor=pointer]:
+        - /url: https://github.com/khunseop/mwg-monitoring-tool

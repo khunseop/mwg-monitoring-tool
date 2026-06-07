@@ -1,0 +1,213 @@
+- generic [active] [ref=e1]:
+  - navigation "main navigation" [ref=e2]:
+    - generic [ref=e3]:
+      - link "PMT" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e7]:
+        - link "실시간 모니터링" [ref=e8] [cursor=pointer]:
+          - /url: /resource
+        - link "세션브라우저" [ref=e9] [cursor=pointer]:
+          - /url: /session
+        - link "로그조회" [ref=e10] [cursor=pointer]:
+          - /url: /traffic-logs
+        - link "프록시관리" [ref=e11] [cursor=pointer]:
+          - /url: /proxy
+        - link "설정" [ref=e12] [cursor=pointer]:
+          - /url: /settings
+  - generic [ref=e16]:
+    - generic [ref=e17]:
+      - generic [ref=e18]:
+        - heading "시스템 설정" [level=3] [ref=e19]
+        - paragraph [ref=e20]: 모니터링 장비 수집 OID 및 시스템 전역 설정을 관리합니다.
+      - generic [ref=e21]:
+        - generic [ref=e22]: 불러옴
+        - button "설정 저장" [ref=e23] [cursor=pointer]
+    - generic [ref=e24]:
+      - generic [ref=e26]:
+        - heading "기본 시스템 설정 (SNMP 및 SSH)" [level=4] [ref=e28]
+        - generic [ref=e30]:
+          - generic [ref=e32]:
+            - generic [ref=e33]: SNMP Community
+            - textbox "public" [ref=e35]
+            - paragraph [ref=e36]: SNMP v2c 통신용 커뮤니티 문자열
+          - generic [ref=e37]:
+            - generic [ref=e38]:
+              - generic [ref=e40]:
+                - generic [ref=e41]: SSH 포트
+                - spinbutton [ref=e43]: "22"
+              - generic [ref=e45]:
+                - generic [ref=e46]: SSH 타임아웃(초)
+                - spinbutton [ref=e48]: "10"
+              - generic [ref=e50]:
+                - generic [ref=e51]: 호스트키 정책
+                - combobox [ref=e54] [cursor=pointer]:
+                  - option "auto_add (자동 수락)" [selected]
+                  - option "reject (엄격한 검증)"
+            - paragraph [ref=e55]: 세션브라우저(SSH) 접근 시 사용할 기본 설정
+      - generic [ref=e57]:
+        - heading "UI 및 그리드 설정" [level=4] [ref=e59]
+        - generic [ref=e63]:
+          - generic [ref=e64]: 페이지당 기본 표시 행 수
+          - combobox [ref=e67] [cursor=pointer]:
+            - option "20행"
+            - option "50행 (권장)" [selected]
+            - option "100행"
+            - option "200행"
+          - paragraph [ref=e68]: 세션브라우저 및 로그조회 그리드의 기본 페이징 크기
+      - generic [ref=e70]:
+        - generic [ref=e71]:
+          - heading "자원 수집 및 OID 설정 (고급)" [level=4] [ref=e72]
+          - generic [ref=e73]:
+            - button "MWG 프리셋" [ref=e74] [cursor=pointer]
+            - button "Linux 프리셋" [ref=e75] [cursor=pointer]
+        - generic [ref=e76]:
+          - paragraph [ref=e77]: 각 항목의 수집 OID와 시각화를 위한 경고 임계치를 설정합니다. (비워두면 자동 스케일링)
+          - table [ref=e79]:
+            - rowgroup [ref=e80]:
+              - row "항목 수집 OID (또는 SSH 명령어) 임계치" [ref=e81]:
+                - columnheader "항목" [ref=e82]
+                - columnheader "수집 OID (또는 SSH 명령어)" [ref=e83]
+                - columnheader "임계치" [ref=e84]
+            - rowgroup [ref=e85]:
+              - row "CPU 사용률 %" [ref=e86]:
+                - cell "CPU 사용률" [ref=e87]
+                - cell [ref=e88]:
+                  - textbox "1.3.6.1.x" [ref=e89]
+                - cell "%" [ref=e90]:
+                  - generic [ref=e91]:
+                    - paragraph [ref=e92]:
+                      - spinbutton [ref=e93]
+                    - paragraph [ref=e94]:
+                      - generic: "%"
+              - row "메모리 사용률 %" [ref=e95]:
+                - cell "메모리 사용률" [ref=e96]
+                - cell [ref=e97]:
+                  - textbox "1.3.6.1.x 또는 ssh" [ref=e98]
+                - cell "%" [ref=e99]:
+                  - generic [ref=e100]:
+                    - paragraph [ref=e101]:
+                      - spinbutton [ref=e102]
+                    - paragraph [ref=e103]:
+                      - generic: "%"
+              - row "디스크 사용률 %" [ref=e104]:
+                - cell "디스크 사용률" [ref=e105]
+                - cell [ref=e106]:
+                  - textbox "1.3.6.1.x 또는 ssh" [ref=e107]
+                - cell "%" [ref=e108]:
+                  - generic [ref=e109]:
+                    - paragraph [ref=e110]:
+                      - spinbutton [ref=e111]
+                    - paragraph [ref=e112]:
+                      - generic: "%"
+              - row "Client Count sess" [ref=e113]:
+                - cell "Client Count" [ref=e114]
+                - cell [ref=e115]:
+                  - textbox "1.3.6.1.x" [ref=e116]
+                - cell "sess" [ref=e117]:
+                  - generic [ref=e118]:
+                    - paragraph [ref=e119]:
+                      - spinbutton [ref=e120]
+                    - paragraph [ref=e121]:
+                      - generic: sess
+              - row "Connected Sockets sess" [ref=e122]:
+                - cell "Connected Sockets" [ref=e123]
+                - cell [ref=e124]:
+                  - textbox "1.3.6.1.x" [ref=e125]
+                - cell "sess" [ref=e126]:
+                  - generic [ref=e127]:
+                    - paragraph [ref=e128]:
+                      - spinbutton [ref=e129]
+                    - paragraph [ref=e130]:
+                      - generic: sess
+              - row "HTTP (누적) Mbps" [ref=e131]:
+                - cell "HTTP (누적)" [ref=e132]
+                - cell [ref=e133]:
+                  - textbox "1.3.6.1.x" [ref=e134]
+                - cell "Mbps" [ref=e135]:
+                  - generic [ref=e136]:
+                    - paragraph [ref=e137]:
+                      - spinbutton [ref=e138]
+                    - paragraph [ref=e139]:
+                      - generic: Mbps
+              - row "HTTPS (누적) Mbps" [ref=e140]:
+                - cell "HTTPS (누적)" [ref=e141]
+                - cell [ref=e142]:
+                  - textbox "1.3.6.1.x" [ref=e143]
+                - cell "Mbps" [ref=e144]:
+                  - generic [ref=e145]:
+                    - paragraph [ref=e146]:
+                      - spinbutton [ref=e147]
+                    - paragraph [ref=e148]:
+                      - generic: Mbps
+              - row "HTTP2 (누적) Mbps" [ref=e149]:
+                - cell "HTTP2 (누적)" [ref=e150]
+                - cell [ref=e151]:
+                  - textbox "1.3.6.1.x" [ref=e152]
+                - cell "Mbps" [ref=e153]:
+                  - generic [ref=e154]:
+                    - paragraph [ref=e155]:
+                      - spinbutton [ref=e156]
+                    - paragraph [ref=e157]:
+                      - generic: Mbps
+              - row "Connections Blocked count" [ref=e158]:
+                - cell "Connections Blocked" [ref=e159]
+                - cell [ref=e160]:
+                  - textbox "1.3.6.1.x" [ref=e161]
+                - cell "count" [ref=e162]:
+                  - generic [ref=e163]:
+                    - paragraph [ref=e164]:
+                      - spinbutton [ref=e165]
+                    - paragraph [ref=e166]:
+                      - generic: count
+          - generic [ref=e167]:
+            - generic [ref=e168]:
+              - heading "공통 인터페이스 설정" [level=5] [ref=e169]
+              - paragraph [ref=e170]:
+                - text: 모든 장비에 공통으로 적용할 인터페이스 OID를 설정합니다. 장비별 개별 OID가 필요한 경우
+                - link "프록시 관리" [ref=e171] [cursor=pointer]:
+                  - /url: /proxy
+                - text: 에서 각 장비에 설정하세요.
+            - button "+ 인터페이스 추가" [ref=e172] [cursor=pointer]:
+              - generic [ref=e173]: + 인터페이스 추가
+          - table [ref=e175]:
+            - rowgroup [ref=e176]:
+              - row "이름 IN OID OUT OID 임계치 (Mbps) 대역폭 (Mbps)" [ref=e177]:
+                - columnheader "이름" [ref=e178]
+                - columnheader "IN OID" [ref=e179]
+                - columnheader "OUT OID" [ref=e180]
+                - columnheader "임계치 (Mbps)" [ref=e181]
+                - columnheader "대역폭 (Mbps)" [ref=e182]
+                - columnheader [ref=e183]
+            - rowgroup
+      - generic [ref=e185]:
+        - heading "설정 백업 및 복구" [level=4] [ref=e187]
+        - generic [ref=e188]:
+          - generic [ref=e189]:
+            - generic [ref=e191]:
+              - generic [ref=e192]:
+                - paragraph [ref=e193]: 설정 내보내기
+                - paragraph [ref=e194]: 현재 모든 설정을 Excel 파일로 저장
+              - button "내보내기" [ref=e195] [cursor=pointer]:
+                - generic [ref=e196]: 내보내기
+            - generic [ref=e198]:
+              - generic [ref=e199]:
+                - paragraph [ref=e200]: 설정 복구
+                - paragraph [ref=e201]: 파일 불러오기
+              - generic [ref=e203] [cursor=pointer]:
+                - button "파일 선택 선택된 파일 없음" [ref=e204]
+                - generic [ref=e206]: 파일 선택
+                - generic [ref=e207]: 선택된 파일 없음
+              - button "복구 실행" [ref=e208] [cursor=pointer]:
+                - generic [ref=e209]: 복구 실행
+          - generic [ref=e210]:
+            - generic [ref=e211]:
+              - paragraph [ref=e212]: 시스템 초기화
+              - paragraph [ref=e213]: 모든 설정과 프록시, 수집 데이터를 초기화합니다. 되돌릴 수 없습니다.
+            - button "초기화" [ref=e214] [cursor=pointer]:
+              - generic [ref=e215]: 초기화
+  - contentinfo [ref=e216]:
+    - paragraph [ref=e218]:
+      - strong [ref=e219]: PMT
+      - text: v2026.03.09 · Made by hunseop.kim ·
+      - link "GitHub" [ref=e220] [cursor=pointer]:
+        - /url: https://github.com/khunseop/mwg-monitoring-tool

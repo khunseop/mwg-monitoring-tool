@@ -158,6 +158,13 @@
     line-height: 1.5;
 }
 
+/* settings-bar 전용 레이블: 작고 흐리게 */
+.settings-bar .filter-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #94a3b8;
+}
+
 .filter-control {
     flex: 1;
     min-width: 0;

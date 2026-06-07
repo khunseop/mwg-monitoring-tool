@@ -27,11 +27,11 @@ body {
     padding: 1.5rem 0; /* 상하 여백만 유지 */
 }
 
-.container { 
-    max-width: 100% !important; /* 너비 제한 해제 */
+.container {
+    max-width: 1800px !important;
     width: 100%;
-    padding: 0 2rem; /* 네비바와 일치하는 최소 여백 */
-    margin: 0;
+    padding: 0 2rem;
+    margin: 0 auto;
 }
 
 /* Utility classes */

@@ -606,7 +606,16 @@ $(document).ready(function() {
 
             $('#ruHistoryStartTime').val(formatDate(start));
             $('#ruHistoryEndTime').val(formatDate(now));
-            
+
+            // 선택 상태 시각 피드백
+            $('.ru-history-preset').removeClass('is-active-preset');
+            $(this).addClass('is-active-preset');
+
+            // 날짜 입력 변경 시 프리셋 선택 해제
+            $('#ruHistoryStartTime, #ruHistoryEndTime').off('change.preset').on('change.preset', function() {
+                $('.ru-history-preset').removeClass('is-active-preset');
+            });
+
             // 프리셋 선택 후 즉시 조회
             searchHistory();
         });

@@ -1,12 +1,14 @@
 {% extends "base.html" %}
 
 {% block content %}
-<!-- 페이지 헤더 -->
-<div class="is-flex is-align-items-center is-justify-content-between mb-5">
-    <h3 class="title is-4 mb-0">세션 브라우저</h3>
+<div class="page-header mb-5">
+    <div>
+        <h3 class="title is-4 page-header-title">세션 브라우저</h3>
+        <p class="page-header-subtitle">프록시 서버의 현재 활성 세션을 조회하고 분석합니다.</p>
+    </div>
 </div>
 
-<div class="tabs is-boxed mb-5">
+<div class="tabs mb-5">
     <ul>
         <li id="sb-tab-list" class="is-active">
             <a onclick="switchSbTab('list')">
@@ -25,18 +27,17 @@
 <div class="settings-bar mb-5">
     <div class="is-flex is-align-items-center" style="gap: 1rem;">
         <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
-            <span class="is-size-7 has-text-grey-light" style="white-space: nowrap; font-weight: 600;">그룹</span>
+            <span class="filter-label">그룹</span>
             <div class="select is-small">
                 <select id="sbGroupSelect"></select>
             </div>
         </div>
-        
+
         <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
-            <span class="is-size-7 has-text-grey-light" style="white-space: nowrap; font-weight: 600;">프록시</span>
+            <span class="filter-label">프록시</span>
             <div style="position: relative; display: flex; align-items: center;">
-                <button id="sbProxyTrigger" class="button is-small is-subtle px-3" type="button" style="min-width: 120px; justify-content: space-between;">
+                <button id="sbProxyTrigger" class="button is-small is-subtle has-chevron px-3" type="button" style="min-width: 120px; justify-content: space-between;">
                     <span id="sbSelectionCounter">0 / 0</span>
-                    <span class="is-size-7 ml-2">▼</span>
                 </button>
                 <button class="button is-ghost is-small p-0 ml-2" id="sbDeselectAllBtn" style="font-size: 0.7rem; color: var(--color-text-muted);">모두해제</button>
 
@@ -59,8 +60,9 @@
             </p>
         </div>
         <button class="button is-primary is-small px-5" id="sbLoadBtn" style="font-weight: 600;">세션 불러오기</button>
-        <button class="button is-subtle is-small px-3" id="sbExportBtn">내보내기</button>
-        <button class="button is-link is-light is-small px-3" id="sbAnalyzeBtn" style="font-weight: 600;">분석하기</button>
+        <span class="settings-bar-separator"></span>
+        <button class="button is-ghost is-small px-3" id="sbExportBtn" style="color: var(--color-text-muted);">내보내기</button>
+        <button class="button is-subtle is-small px-3" id="sbAnalyzeBtn" style="font-weight: 600;">분석하기</button>
     </div>
 </div>
 
@@ -157,7 +159,7 @@
 
 <!-- 상세 모달 -->
 <div class="modal" id="sbDetailModal">
-    <div class="modal-background" style="background: rgba(15, 23, 42, 0.1);"></div>
+    <div class="modal-background"></div>
     <div class="modal-card" style="width: 800px; max-width: 95vw;">
         <header class="modal-card-head py-4 px-5">
             <p class="modal-card-title is-size-5 has-text-weight-bold">세션 상세 정보</p>

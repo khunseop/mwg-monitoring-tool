@@ -1,0 +1,118 @@
+- generic [ref=e1]:
+  - navigation "main navigation" [ref=e2]:
+    - generic [ref=e3]:
+      - link "PMT" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e7]:
+        - link "실시간 모니터링" [ref=e8] [cursor=pointer]:
+          - /url: /resource
+        - link "세션브라우저" [ref=e9] [cursor=pointer]:
+          - /url: /session
+        - link "로그조회" [ref=e10] [cursor=pointer]:
+          - /url: /traffic-logs
+        - link "프록시관리" [ref=e11] [cursor=pointer]:
+          - /url: /proxy
+        - link "설정" [ref=e12] [cursor=pointer]:
+          - /url: /settings
+  - generic [ref=e16]:
+    - generic [ref=e18]:
+      - heading "프록시 관리" [level=3] [ref=e19]
+      - paragraph [ref=e20]: 모니터링 대상 프록시 서버와 그룹을 등록하고 관리합니다.
+    - list [ref=e22]:
+      - listitem [ref=e23]:
+        - generic [ref=e24] [cursor=pointer]: 프록시 목록
+      - listitem [ref=e25]:
+        - generic [ref=e26] [cursor=pointer]: 프록시 그룹 관리
+    - generic [ref=e27]:
+      - generic [ref=e28]:
+        - generic [ref=e29]:
+          - button "프록시 추가" [active] [ref=e30] [cursor=pointer]:
+            - generic [ref=e31]: 프록시 추가
+          - button "일괄 등록" [ref=e32] [cursor=pointer]:
+            - generic [ref=e33]: 일괄 등록
+        - generic [ref=e34]:
+          - button "내보내기" [ref=e35] [cursor=pointer]:
+            - generic [ref=e36]: 내보내기
+          - button "샘플 CSV" [ref=e37] [cursor=pointer]:
+            - generic [ref=e38]: 샘플 CSV
+      - table [ref=e40]:
+        - rowgroup [ref=e41]:
+          - row "호스트(IP) 그룹 상태 설명 작업" [ref=e42]:
+            - columnheader "호스트(IP)" [ref=e43]
+            - columnheader "그룹" [ref=e44]
+            - columnheader "상태" [ref=e45]
+            - columnheader "설명" [ref=e46]
+            - columnheader "작업" [ref=e47]
+        - rowgroup [ref=e53]:
+          - row "1.1.1.1 개별 OID Office 활성 수정 복제 삭제" [ref=e54]:
+            - cell "1.1.1.1 개별 OID" [ref=e55]:
+              - text: 1.1.1.1
+              - generic [ref=e56]: 개별 OID
+            - cell "Office" [ref=e57]
+            - cell "활성" [ref=e58]:
+              - generic [ref=e59]: 활성
+            - cell [ref=e60]
+            - cell "수정 복제 삭제" [ref=e61]:
+              - generic [ref=e62]:
+                - button "수정" [ref=e63] [cursor=pointer]:
+                  - generic [ref=e64]: 수정
+                - button "복제" [ref=e65] [cursor=pointer]:
+                  - generic [ref=e66]: 복제
+                - button "삭제" [ref=e67] [cursor=pointer]:
+                  - generic [ref=e68]: 삭제
+          - row "2.2.2.2 OTC 활성 수정 복제 삭제" [ref=e69]:
+            - cell "2.2.2.2" [ref=e70]
+            - cell "OTC" [ref=e71]
+            - cell "활성" [ref=e72]:
+              - generic [ref=e73]: 활성
+            - cell [ref=e74]
+            - cell "수정 복제 삭제" [ref=e75]:
+              - generic [ref=e76]:
+                - button "수정" [ref=e77] [cursor=pointer]:
+                  - generic [ref=e78]: 수정
+                - button "복제" [ref=e79] [cursor=pointer]:
+                  - generic [ref=e80]: 복제
+                - button "삭제" [ref=e81] [cursor=pointer]:
+                  - generic [ref=e82]: 삭제
+    - generic [ref=e85]:
+      - banner [ref=e86]:
+        - paragraph [ref=e87]: 프록시 정보
+        - button "close" [ref=e88] [cursor=pointer]
+      - generic [ref=e91]:
+        - generic [ref=e93]:
+          - generic [ref=e94]: 호스트 (IP/Domain)
+          - textbox "1.1.1.1" [ref=e96]
+        - generic [ref=e98]:
+          - generic [ref=e99]: 그룹
+          - combobox [ref=e102] [cursor=pointer]:
+            - option "그룹 선택..." [selected]
+            - option "Office"
+            - option "OTC"
+        - generic [ref=e104]:
+          - generic [ref=e105]: SSH 사용자명
+          - textbox "admin" [ref=e107]
+        - generic [ref=e109]:
+          - generic [ref=e110]: SSH 비밀번호
+          - textbox "비밀번호" [ref=e112]
+          - paragraph [ref=e113]: 수정 시 입력하지 않으면 기존 비밀번호 유지
+        - generic [ref=e115]:
+          - generic [ref=e116]: 트래픽 로그 경로 (Remote)
+          - textbox "/opt/mwg/log/gw/access.log" [ref=e118]
+        - generic [ref=e120]:
+          - generic [ref=e121]: 설명
+          - textbox "상세 위치 또는 용도" [ref=e123]
+        - generic [ref=e127] [cursor=pointer]:
+          - checkbox "활성 (모니터링 대상 포함)" [checked] [ref=e128]
+          - text: 활성 (모니터링 대상 포함)
+        - generic [ref=e132] [cursor=pointer]:
+          - checkbox "인터페이스 OID 개별 설정 (설정 페이지 공통값 대신 이 장비에만 적용)" [ref=e133]
+          - text: 인터페이스 OID 개별 설정 (설정 페이지 공통값 대신 이 장비에만 적용)
+      - contentinfo [ref=e134]:
+        - button "취소" [ref=e135] [cursor=pointer]
+        - button "저장" [ref=e136] [cursor=pointer]
+  - contentinfo [ref=e48]:
+    - paragraph [ref=e50]:
+      - strong [ref=e51]: PMT
+      - text: v2026.03.09 · Made by hunseop.kim ·
+      - link "GitHub" [ref=e52] [cursor=pointer]:
+        - /url: https://github.com/khunseop/mwg-monitoring-tool
