@@ -417,8 +417,8 @@
     left: 0;
     z-index: 4;
     text-align: left;
-    min-width: 150px;
-    max-width: 220px;
+    min-width: 100px;
+    max-width: 160px;
     padding-left: 6px;
 }
 
@@ -432,7 +432,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 220px;
+    max-width: 160px;
     padding: 0 10px 0 6px;
     border-right: 2px solid var(--color-border);
     color: var(--color-text);
