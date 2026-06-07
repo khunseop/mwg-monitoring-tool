@@ -144,7 +144,7 @@ async def collect_resource_usage(payload: CollectRequest, db: Session = Depends(
         succeeded=len(collected_data),
         failed=len(errors),
         errors=errors,
-        items=collected_data,
+        items=collected_models,
     )
 
 

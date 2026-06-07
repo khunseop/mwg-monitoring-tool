@@ -191,7 +191,7 @@ $(document).ready(function() {
 
             history.totalCount = data.length;
             history.hasMore = data.length === params.limit;
-            history.lastData = data; // Store for charting
+            history.lastData = append ? [...history.lastData, ...data] : data;
             displayHistoryResults(data, append);
         }).catch(err => {
             $('#ruHistoryLoading').hide();
@@ -205,7 +205,7 @@ $(document).ready(function() {
     // Load next page
     function loadNextPage() {
         history.currentPage++;
-        const proxyId = $('#ruHistoryProxySelect').val();
+        const proxyIds = getSelectedProxyIds();
         const startTime = $('#ruHistoryStartTime').val();
         const endTime = $('#ruHistoryEndTime').val();
         const limit = history.pageSize;
@@ -222,19 +222,19 @@ $(document).ready(function() {
         if (endTime) {
             params.end_time = convertKSTToUTC(endTime);
         }
-        if (proxyId) {
-            params.proxy_id = parseInt(proxyId, 10);
+        if (proxyIds.length > 0) {
+            params.proxy_ids = proxyIds.join(',');
         }
 
-        loadHistoryData(params, false);
+        loadHistoryData(params, true);
     }
-    
+
     // Load previous page
     function loadPrevPage() {
         if (history.currentPage <= 1) return;
-        
+
         history.currentPage--;
-        const proxyId = $('#ruHistoryProxySelect').val();
+        const proxyIds = getSelectedProxyIds();
         const startTime = $('#ruHistoryStartTime').val();
         const endTime = $('#ruHistoryEndTime').val();
         const limit = history.pageSize;
@@ -251,11 +251,11 @@ $(document).ready(function() {
         if (endTime) {
             params.end_time = convertKSTToUTC(endTime);
         }
-        if (proxyId) {
-            params.proxy_id = parseInt(proxyId, 10);
+        if (proxyIds.length > 0) {
+            params.proxy_ids = proxyIds.join(',');
         }
 
-        loadHistoryData(params, false);
+        loadHistoryData(params, true);
     }
 
     function updateFilterCount() {
@@ -643,9 +643,9 @@ $(document).ready(function() {
             if (!proxyGroups[pid]) proxyGroups[pid] = [];
             proxyGroups[pid].push(row);
 
-            // 인터페이스 이름 수집
+            // 인터페이스 이름 수집 (key는 인덱스, 실제 이름은 .name 필드)
             const ifData = row.interface_mbps ? (typeof row.interface_mbps === 'string' ? JSON.parse(row.interface_mbps) : row.interface_mbps) : {};
-            Object.keys(ifData).forEach(name => allInterfaceNames.add(name));
+            Object.values(ifData).forEach(info => { if (info && info.name) allInterfaceNames.add(info.name); });
         });
 
         // 헬퍼: 특정 필드 시리즈 생성
@@ -698,19 +698,20 @@ $(document).ready(function() {
             renderHistoryLineChart(chartId, getSeries(m.key), m.unit);
         });
 
-        // 3. 인터페이스별 그래프 생성
+        // 3. 인터페이스별 그래프 생성 (ifName은 실제 인터페이스 이름, e.g. "eth0")
         Array.from(allInterfaceNames).sort().forEach(ifName => {
             const chartId = `hist-chart-if-${ifName.replace(/[^a-zA-Z0-9]/g, '_')}`;
-            createChartBox(chartId, `Interface: ${ifName} (Mbps)`, true); // 인터페이스는 가로로 길게 표시
+            createChartBox(chartId, `Interface: ${ifName} (Mbps)`, true);
 
             const ifSeries = Object.keys(proxyGroups).map(pid => {
                 const host = proxyMap[pid] || `#${pid}`;
                 const inData = [];
                 const outData = [];
-                
+
                 proxyGroups[pid].forEach(row => {
                     const ifData = row.interface_mbps ? (typeof row.interface_mbps === 'string' ? JSON.parse(row.interface_mbps) : row.interface_mbps) : {};
-                    const info = ifData[ifName];
+                    // ifData key는 인덱스이므로 .name으로 매칭
+                    const info = Object.values(ifData).find(v => v && v.name === ifName);
                     const ts = new Date(row.collected_at).getTime();
                     if (info) {
                         inData.push({ x: ts, y: info.in_mbps || 0 });
