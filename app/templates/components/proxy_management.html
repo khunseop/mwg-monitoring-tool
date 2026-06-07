@@ -1,14 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="is-flex is-align-items-center is-justify-content-between mb-5">
-    <h3 class="title is-4 mb-0">프록시 관리</h3>
-    <div class="buttons">
-        <button class="button is-info is-small px-4" id="btnSyncGroupOids" title="특정 장비의 OID 설정을 해당 그룹 내 모든 장비에 동일하게 적용합니다.">
-            <span style="font-weight: 600;">그룹 내 OID 동기화</span>
-        </button>
-    </div>
-</div>
+<h3 class="title is-4 mb-5">프록시 관리</h3>
 
 <!-- 페이지 내부 탭 -->
 <div class="tabs is-boxed mb-0">
@@ -166,7 +159,7 @@
                         <div class="field">
                             <div class="control">
                                 <label class="checkbox is-size-7 has-text-weight-bold">
-                                    <input type="checkbox" id="use_custom_oids" onchange="toggleCustomOids()"> 이 장비에만 개별 OID 설정 사용
+                                    <input type="checkbox" id="use_custom_oids" onchange="toggleCustomOids()"> 인터페이스 OID 개별 설정 <span class="has-text-weight-normal has-text-grey">(설정 페이지 공통값 대신 이 장비에만 적용)</span>
                                 </label>
                             </div>
                         </div>

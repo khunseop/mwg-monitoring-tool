@@ -8,7 +8,6 @@
     </div>
     <div class="buttons mb-0">
         <span id="cfgStatus" class="tag is-light mr-3">준비됨</span>
-        <button class="button is-subtle-danger is-small px-4 mr-2" onclick="resetConfig()">시스템 초기화</button>
         <button class="button is-primary is-small px-5" onclick="saveAllConfig()">설정 저장</button>
     </div>
 </div>
@@ -221,7 +220,7 @@
                 <div class="is-flex is-align-items-center is-justify-content-end mb-3 mt-6">
                     <div class="is-flex-grow-1">
                         <h5 class="title is-6 mb-1">공통 인터페이스 설정</h5>
-                        <p class="is-size-7 has-text-grey-light">모니터링할 전체 인터페이스 정보를 설정합니다. 장비별 개별 설정이 있는 경우 해당 설정이 우선 적용됩니다.</p>
+                        <p class="is-size-7 has-text-grey-light">모든 장비에 공통으로 적용할 인터페이스 OID를 설정합니다. 장비별 개별 OID가 필요한 경우 <a href="/proxy" style="color: inherit; text-decoration: underline;">프록시 관리</a>에서 각 장비에 설정하세요.</p>
                     </div>
                     <button class="button is-subtle is-small px-4" id="cfgAddInterface" type="button">
                         <span>+ 인터페이스 추가</span>
@@ -250,7 +249,7 @@
         </div>
     </div>
 
-    <!-- 3. 백업 및 복구 -->
+    <!-- 4. 백업 및 복구 -->
     <div class="column is-12">
         <div class="box p-0 is-shadowless" style="border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden;">
             <div class="p-4" style="background: #f8fafc; border-bottom: 1px solid var(--color-border);">
@@ -289,6 +288,16 @@
                             </button>
                         </div>
                     </div>
+                </div>
+
+                <div class="is-flex is-align-items-center p-4 mt-4" style="border: 1px dashed #fca5a5; border-radius: var(--radius-sm); background: #fff5f5; gap: 1.5rem;">
+                    <div class="is-flex-grow-1">
+                        <p class="is-size-7 has-text-weight-bold has-text-danger mb-1">시스템 초기화</p>
+                        <p class="is-size-7 has-text-grey">모든 설정과 프록시, 수집 데이터를 초기화합니다. 되돌릴 수 없습니다.</p>
+                    </div>
+                    <button class="button is-danger is-small px-4" type="button" onclick="resetConfig()">
+                        <span>초기화</span>
+                    </button>
                 </div>
             </div>
         </div>

@@ -126,13 +126,19 @@ function loadProxies() {
             tbody.empty();
             
             proxies.forEach(proxy => {
-                const statusTag = proxy.is_active 
-                    ? '<span class="tag is-success is-light" style="font-weight:600;">활성</span>' 
+                const statusTag = proxy.is_active
+                    ? '<span class="tag is-success is-light" style="font-weight:600;">활성</span>'
                     : '<span class="tag is-danger is-light" style="font-weight:600;">비활성</span>';
-                
+
+                const hasCustomOid = (() => {
+                    if (!proxy.oids_json) return false;
+                    try { return !!JSON.parse(proxy.oids_json).__interface_oids__; } catch(e) { return false; }
+                })();
+                const oidBadge = hasCustomOid ? '<span class="tag is-warning is-light ml-2" style="font-size:0.65rem; vertical-align: middle;">개별 OID</span>' : '';
+
                 tbody.append(`
                     <tr>
-                        <td class="px-5 py-3 has-text-weight-semibold">${proxy.host}</td>
+                        <td class="px-5 py-3 has-text-weight-semibold">${proxy.host}${oidBadge}</td>
                         <td class="py-3">${proxy.group_name || '<span class="has-text-grey-light">없음</span>'}</td>
                         <td class="has-text-centered py-3">${statusTag}</td>
                         <td class="py-3 is-size-7 has-text-grey">${proxy.description || ''}</td>
@@ -537,79 +543,9 @@ function cloneProxy(id) {
         .fail(() => (window.AppUtils && AppUtils.showError('데이터를 불러오는데 실패했습니다.')));
 }
 
-async function syncGroupOids() {
-    const proxies = await $.get('/api/proxies');
-    if (!proxies || proxies.length === 0) return;
-
-    // 커스텀 OID가 설정된 프록시 목록 추출
-    const sourceProxies = proxies.filter(p => {
-        if (!p.oids_json) return false;
-        try {
-            const oids = JSON.parse(p.oids_json);
-            return oids && oids.__interface_oids__ && Object.keys(oids.__interface_oids__).length > 0;
-        } catch(e) { return false; }
-    });
-
-    if (sourceProxies.length === 0) {
-        alert('그룹에 적용할 커스텀 OID 설정이 있는 프록시가 없습니다.\n먼저 하나의 프록시에 대해 OID 개별 설정을 완료하세요.');
-        return;
-    }
-
-    // 소스 선택 팝업 (간단하게 prompt/confirm 조합으로 구현하거나 전용 모달 필요하지만, 여기선 confirm 활용)
-    let msg = "OID 설정을 복사할 소스 장비를 선택하세요 (번호 입력):\n\n";
-    sourceProxies.forEach((p, i) => {
-        msg += `${i+1}. ${p.host} (${p.group_name || '그룹없음'})\n`;
-    });
-
-    const choice = prompt(msg);
-    if (!choice) return;
-    
-    const idx = parseInt(choice, 10) - 1;
-    if (isNaN(idx) || !sourceProxies[idx]) {
-        alert('잘못된 선택입니다.');
-        return;
-    }
-
-    const source = sourceProxies[idx];
-    const targetGroup = source.group_id;
-    const targets = proxies.filter(p => p.group_id === targetGroup && p.id !== source.id);
-
-    if (targets.length === 0) {
-        alert(`'${source.group_name}' 그룹에 다른 장비가 없습니다.`);
-        return;
-    }
-
-    if (!confirm(`${source.host}의 OID 설정을 '${source.group_name}' 그룹 내 다른 ${targets.length}개 장비에 모두 동일하게 적용하시겠습니까?`)) {
-        return;
-    }
-
-    let successCount = 0;
-    for (const target of targets) {
-        try {
-            const updateData = {
-                oids_json: source.oids_json
-            };
-            await $.ajax({
-                url: `/api/proxies/${target.id}`,
-                method: 'PUT',
-                contentType: 'application/json',
-                data: JSON.stringify(updateData)
-            });
-            successCount++;
-        } catch (e) {
-            console.error(`Failed to sync for ${target.host}:`, e);
-        }
-    }
-
-    alert(`${successCount}개 장비의 OID 설정 동기화 완료`);
-    loadProxies();
-}
-
 // 초기화
 $(document).ready(() => {
     initProxyPage();
-    
-    $('#btnSyncGroupOids').off('click').on('click', syncGroupOids);
 });
 
 // PJAX 지원: 페이지 전환 후 초기화 재실행 (네임스페이스 사용하여 중복 등록 방지)
@@ -621,7 +557,6 @@ $(document).off('pjax:complete.proxy').on('pjax:complete.proxy', function(e, url
 
 // expose for inline handlers
 window.cloneProxy = cloneProxy;
-window.syncGroupOids = syncGroupOids;
 window.switchProxySection = switchProxySection;
 window.openBulkProxyModal = openBulkProxyModal;
 window.closeBulkProxyModal = closeBulkProxyModal;
