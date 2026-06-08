@@ -50,22 +50,40 @@ def _recover_sqlite_db(db_url: str) -> None:
     if not m:
         return
     db_path = m.group(1)
+
+    _startup_logger.info("[DB] 경로: %s", os.path.abspath(db_path))
+
+    # 0단계: WAL/SHM 파일 선제 정리
+    # DELETE 모드로 전환 시 WAL 파일이 불완전하면 malformed가 발생하므로
+    # integrity_check 전에 먼저 제거한다.
+    for ext in ("-wal", "-shm"):
+        wal_path = db_path + ext
+        if os.path.exists(wal_path):
+            try:
+                os.remove(wal_path)
+                _startup_logger.info("[DB] 잔여 %s 파일 제거: %s", ext, wal_path)
+            except Exception as e:
+                _startup_logger.warning("[DB] %s 파일 제거 실패: %s", ext, e)
+
     if not os.path.exists(db_path):
         return  # 신규 파일이면 복구 불필요
 
-    # 1단계: 무결성 확인
+    # 1단계: 무결성 확인 + DELETE 모드 전환 테스트
     try:
         conn = sqlite3.connect(db_path, timeout=5)
-        # WAL 체크포인트 시도 (이전 WAL 잔재 처리)
-        try:
-            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        except Exception:
-            pass
         result = conn.execute("PRAGMA integrity_check").fetchone()
-        conn.close()
         if result and result[0] == "ok":
-            return  # 정상
-        _startup_logger.error("[DB] integrity_check 실패: %s — 복구를 시도합니다.", result)
+            # integrity는 OK이지만 모드 전환도 검증
+            try:
+                conn.execute("PRAGMA journal_mode=DELETE")
+                conn.close()
+                return  # 완전 정상
+            except Exception as e:
+                conn.close()
+                _startup_logger.error("[DB] journal_mode 전환 실패: %s — 복구를 시도합니다.", e)
+        else:
+            conn.close()
+            _startup_logger.error("[DB] integrity_check 실패: %s — 복구를 시도합니다.", result)
     except Exception as e:
         _startup_logger.error("[DB] DB 열기 실패: %s — 복구를 시도합니다.", e)
 
@@ -108,6 +126,12 @@ def _recover_sqlite_db(db_url: str) -> None:
             os.remove(recovered_path)
         except OSError:
             pass
+        # WAL/SHM도 정리 (새 DB 생성 전 잔재 제거)
+        for ext in ("-wal", "-shm"):
+            try:
+                os.remove(db_path + ext)
+            except OSError:
+                pass
 
 
 _recover_sqlite_db(os.getenv("DATABASE_URL", "sqlite:///./pmt.db"))
