@@ -265,9 +265,9 @@ table.dataTable thead tr.cc-filters .select.is-small select {
     width: 100%; 
 }
 
-#ruHeatmapEl { 
-    width: 100%; 
-    height: 460px; 
+#ruHeatmapEl {
+    width: 100%;
+    height: auto;
 }
 
 /* Raw pre formatting */
