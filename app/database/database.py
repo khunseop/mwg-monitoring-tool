@@ -32,21 +32,22 @@ engine = create_engine(
     **engine_kwargs,
 )
 
-# For SQLite, enable WAL mode and set synchronous to NORMAL to improve concurrency.
+# For SQLite, use DELETE journal mode (no auxiliary -wal/-shm files) with tuned settings.
+# WAL mode is avoided because deployments that clean up extra files can corrupt the DB
+# by deleting -wal/-shm before a proper checkpoint.
 if is_sqlite:
     try:
         from sqlalchemy import event
         @event.listens_for(engine, "connect")
         def set_sqlite_pragma(dbapi_connection, connection_record):
             cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA journal_mode=DELETE")
             cursor.execute("PRAGMA synchronous=NORMAL")
             cursor.execute("PRAGMA cache_size=-64000")  # 64MB cache
             cursor.execute("PRAGMA temp_store=MEMORY")
-            cursor.execute("PRAGMA busy_timeout=30000") # 30s timeout
+            cursor.execute("PRAGMA busy_timeout=30000")  # 30s timeout
             cursor.close()
     except Exception:
-        # Non-fatal: proceed with defaults
         pass
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

@@ -37,6 +37,81 @@ load_dotenv(override=False)
 # 로깅 초기화 (환경변수 로드 후 가장 먼저 실행)
 setup_logging()
 
+import logging as _logging
+_startup_logger = _logging.getLogger(__name__)
+
+
+def _recover_sqlite_db(db_url: str) -> None:
+    """SQLite DB가 손상된 경우 자동 복구를 시도합니다."""
+    import sqlite3, shutil, re
+
+    # sqlite:///./path.db 또는 sqlite:////abs/path.db 형태에서 파일 경로 추출
+    m = re.match(r"sqlite:///(.+)", db_url)
+    if not m:
+        return
+    db_path = m.group(1)
+    if not os.path.exists(db_path):
+        return  # 신규 파일이면 복구 불필요
+
+    # 1단계: 무결성 확인
+    try:
+        conn = sqlite3.connect(db_path, timeout=5)
+        # WAL 체크포인트 시도 (이전 WAL 잔재 처리)
+        try:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        except Exception:
+            pass
+        result = conn.execute("PRAGMA integrity_check").fetchone()
+        conn.close()
+        if result and result[0] == "ok":
+            return  # 정상
+        _startup_logger.error("[DB] integrity_check 실패: %s — 복구를 시도합니다.", result)
+    except Exception as e:
+        _startup_logger.error("[DB] DB 열기 실패: %s — 복구를 시도합니다.", e)
+
+    # 2단계: iterdump()로 데이터 추출 후 새 DB 재생성
+    recovered_path = db_path + ".recovered"
+    try:
+        src = sqlite3.connect(db_path, timeout=5)
+        dst = sqlite3.connect(recovered_path, timeout=5)
+        try:
+            for line in src.iterdump():
+                try:
+                    dst.execute(line)
+                except Exception:
+                    pass  # 손상 행 스킵
+            dst.commit()
+        finally:
+            src.close()
+            dst.close()
+
+        corrupt_path = db_path + ".corrupt"
+        shutil.move(db_path, corrupt_path)
+        shutil.move(recovered_path, db_path)
+        # 남은 WAL/SHM 정리
+        for ext in ("-wal", "-shm"):
+            try:
+                os.remove(db_path + ext)
+            except OSError:
+                pass
+        _startup_logger.warning(
+            "[DB] DB 복구 완료. 손상 파일: %s → 복구 파일: %s", corrupt_path, db_path
+        )
+    except Exception as e:
+        # 3단계: 복구 불가 → 백업 후 빈 DB로 시작
+        _startup_logger.critical("[DB] iterdump 복구 실패: %s — 빈 DB로 새로 시작합니다.", e)
+        try:
+            shutil.move(db_path, db_path + ".unrecoverable")
+        except Exception:
+            pass
+        try:
+            os.remove(recovered_path)
+        except OSError:
+            pass
+
+
+_recover_sqlite_db(os.getenv("DATABASE_URL", "sqlite:///./pmt.db"))
+
 proxy.Base.metadata.create_all(bind=engine)
 resource_usage_model.Base.metadata.create_all(bind=engine)
 resource_config_model.Base.metadata.create_all(bind=engine)
