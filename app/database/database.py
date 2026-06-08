@@ -2,28 +2,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
-from pathlib import Path
 
-
-def _resolve_db_url() -> str:
-    url = os.getenv("DATABASE_URL", "sqlite:///./pmt.db")
-    # SQLite 경로에서 디렉토리가 없으면 자동 생성
-    if url.startswith("sqlite:///"):
-        raw = url[len("sqlite:///"):]
-        if raw and raw not in (":memory:", ""):
-            p = Path(raw)
-            if not p.is_absolute():
-                # PyInstaller frozen 환경에서는 실행 파일 기준 경로 사용
-                import sys
-                base = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path.cwd()
-                p = base / p
-            p.parent.mkdir(parents=True, exist_ok=True)
-            # 절대 경로로 URL 재구성 (슬래시 통일)
-            url = "sqlite:///" + p.as_posix()
-    return url
-
-
-SQLALCHEMY_DATABASE_URL = _resolve_db_url()
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./pmt.db")
 POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "5"))
 MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "10"))
 POOL_TIMEOUT = int(os.getenv("DB_POOL_TIMEOUT", "30"))
