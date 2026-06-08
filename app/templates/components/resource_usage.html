@@ -300,22 +300,32 @@
     <div id="analysisError" class="notification is-danger is-light is-size-7 mb-4" style="display:none;"></div>
 
     <div id="analysisResults" style="display:none;">
-        <!-- 1. 백분위수 분석 -->
-        <div class="box mb-4">
-            <h5 class="title is-6 mb-1">백분위수 분석 (전체 지표)</h5>
-            <p class="is-size-7 has-text-grey mb-3">업무시간 필터 적용 기준 | p50 / p95 / p99</p>
-            <div class="table-container" style="overflow-x: auto;">
-                <table class="table is-fullwidth is-hoverable is-size-7" id="analysisPercentilesTable">
+        <!-- 장비 필터 + 요약 카드 -->
+        <div class="is-flex is-align-items-center is-flex-wrap-wrap mb-4"
+             style="gap:0.75rem; padding:0.6rem 1rem; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md);">
+            <span class="filter-label">장비 필터</span>
+            <div id="analysisProxyFilter" class="buttons has-addons mb-0"></div>
+            <div id="analysisSummaryCards" class="is-flex is-flex-wrap-wrap ml-auto" style="gap:0.5rem;"></div>
+        </div>
+
+        <!-- 부하 패턴 분석 -->
+        <p class="is-size-7 mb-3" style="font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-text-muted,#94a3b8);">부하 패턴 분석</p>
+
+        <div class="box mb-3 p-4">
+            <h5 class="title is-6 mb-3">백분위수 분석
+                <span class="is-size-7 has-text-grey" style="font-weight:400;"> — p50 / p95 / p99, 전체 지표</span>
+            </h5>
+            <div class="table-container" style="overflow-x:auto;">
+                <table class="table is-fullwidth is-hoverable is-size-7">
                     <thead>
                         <tr>
-                            <th>프록시</th>
-                            <th>지표</th>
+                            <th>프록시</th><th>지표</th>
                             <th class="has-text-right">샘플</th>
                             <th class="has-text-right">평균</th>
                             <th class="has-text-right">최대</th>
                             <th class="has-text-right">p50</th>
-                            <th class="has-text-right" style="color: #b45309;">p95</th>
-                            <th class="has-text-right" style="color: #dc2626;">p99</th>
+                            <th class="has-text-right" style="color:#b45309;">p95</th>
+                            <th class="has-text-right" style="color:#dc2626;">p99</th>
                         </tr>
                     </thead>
                     <tbody id="analysisPercentilesBody"></tbody>
@@ -323,39 +333,47 @@
             </div>
         </div>
 
-        <!-- 2. Time-in-Band -->
-        <div class="box mb-4">
-            <h5 class="title is-6 mb-1">구간별 점유 시간 (Time-in-Band)</h5>
-            <p class="is-size-7 has-text-grey mb-4">선택 지표(<span id="analysisTimeBandMetric" style="font-weight:600;"></span>)의 수치가 각 구간에 머무른 시간 비율 (30초 단위 수집 기준)</p>
-            <div id="analysisTimeBandContent"></div>
+        <div class="columns mb-3">
+            <div class="column is-5">
+                <div class="box p-4" style="height:100%;">
+                    <h5 class="title is-6 mb-1">Time-in-Band</h5>
+                    <p class="is-size-7 has-text-grey mb-3">지표(<span id="analysisTimeBandMetric" style="font-weight:600;"></span>) 구간별 점유 시간</p>
+                    <div id="analysisTimeBandContent"></div>
+                </div>
+            </div>
+            <div class="column is-7">
+                <div class="box p-4" style="height:100%;">
+                    <h5 class="title is-6 mb-1">요일×시간대 히트맵</h5>
+                    <p class="is-size-7 has-text-grey mb-3">지표(<span id="analysisHeatmapMetricLabel" style="font-weight:600;"></span>) 시간대별 평균</p>
+                    <div id="analysisHeatmapContent"></div>
+                </div>
+            </div>
         </div>
 
-        <!-- 3. 임계치 초과 에피소드 -->
-        <div class="box mb-4">
+        <!-- 위험도 분석 -->
+        <p class="is-size-7 mb-3 mt-5" style="font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-text-muted,#94a3b8);">위험도 분석</p>
+
+        <div class="columns mb-3">
+            <div class="column is-4">
+                <div class="box p-4" style="height:100%;">
+                    <h5 class="title is-6 mb-1">p95 장비 순위</h5>
+                    <p class="is-size-7 has-text-grey mb-3">지표(<span id="analysisTopNMetricLabel" style="font-weight:600;"></span>) p95 기준</p>
+                    <div id="analysisTopNContent"></div>
+                </div>
+            </div>
+            <div class="column is-8">
+                <div class="box p-4" style="height:100%;">
+                    <h5 class="title is-6 mb-1">이동 평균 트렌드</h5>
+                    <p class="is-size-7 has-text-grey mb-3">지표(<span id="analysisSmoothedMetricLabel" style="font-weight:600;"></span>) · <span id="analysisSmoothedWindowLabel" style="font-weight:600;"></span>분 이동평균</p>
+                    <div id="analysisSmoothedChart" style="height:260px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="box p-4 mb-4">
             <h5 class="title is-6 mb-1">임계치 연속 초과 이력</h5>
-            <p class="is-size-7 has-text-grey mb-3">선택 지표(<span id="analysisThresholdMetricLabel" style="font-weight:600;"></span>)가 <span id="analysisThresholdValueLabel" style="font-weight:600;"></span> 이상을 연속으로 유지한 구간</p>
+            <p class="is-size-7 has-text-grey mb-3">지표(<span id="analysisThresholdMetricLabel" style="font-weight:600;"></span>)가 <span id="analysisThresholdValueLabel" style="font-weight:600;"></span> 이상을 연속으로 유지한 구간</p>
             <div id="analysisThresholdContent"></div>
-        </div>
-
-        <!-- 4. 요일×시간대 히트맵 -->
-        <div class="box mb-4">
-            <h5 class="title is-6 mb-1">요일×시간대 평균 히트맵</h5>
-            <p class="is-size-7 has-text-grey mb-4">선택 지표(<span id="analysisHeatmapMetricLabel" style="font-weight:600;"></span>)의 수집 기간 내 요일·시간대별 평균</p>
-            <div id="analysisHeatmapContent"></div>
-        </div>
-
-        <!-- 5. Top-N 장비 -->
-        <div class="box mb-4">
-            <h5 class="title is-6 mb-1">p95 기준 장비 순위</h5>
-            <p class="is-size-7 has-text-grey mb-3">선택 지표(<span id="analysisTopNMetricLabel" style="font-weight:600;"></span>) p95 기준 상위 장비</p>
-            <div id="analysisTopNContent"></div>
-        </div>
-
-        <!-- 6. 이동 평균 트렌드 -->
-        <div class="box mb-4">
-            <h5 class="title is-6 mb-1">이동 평균 트렌드</h5>
-            <p class="is-size-7 has-text-grey mb-3">선택 지표(<span id="analysisSmoothedMetricLabel" style="font-weight:600;"></span>)의 <span id="analysisSmoothedWindowLabel" style="font-weight:600;"></span>분 이동 평균</p>
-            <div id="analysisSmoothedChart" style="height: 380px;"></div>
         </div>
     </div>
 </div>

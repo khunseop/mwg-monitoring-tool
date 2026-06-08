@@ -1,0 +1,69 @@
+- generic [active] [ref=e1]:
+  - navigation "main navigation" [ref=e2]:
+    - generic [ref=e3]:
+      - link "PMT" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e7]:
+        - link "실시간 모니터링" [ref=e8] [cursor=pointer]:
+          - /url: /resource
+        - link "세션브라우저" [ref=e9] [cursor=pointer]:
+          - /url: /session
+        - link "로그조회" [ref=e10] [cursor=pointer]:
+          - /url: /traffic-logs
+        - link "프록시관리" [ref=e11] [cursor=pointer]:
+          - /url: /proxy
+        - link "설정" [ref=e12] [cursor=pointer]:
+          - /url: /settings
+  - generic [ref=e16]:
+    - generic [ref=e18]:
+      - heading "자원 모니터링" [level=3] [ref=e19]
+      - paragraph [ref=e20]: 프록시 서버의 CPU, 메모리, 트래픽을 실시간으로 수집합니다.
+    - list [ref=e22]:
+      - listitem [ref=e23]:
+        - generic [ref=e25] [cursor=pointer]: 실시간 모니터링
+      - listitem [ref=e26]:
+        - generic [ref=e28] [cursor=pointer]: 자원사용률 이력
+      - listitem [ref=e29]:
+        - generic [ref=e31] [cursor=pointer]: 이력 그래프 분석
+      - listitem [ref=e32]:
+        - generic [ref=e34] [cursor=pointer]: 부하 분석
+    - generic [ref=e78]:
+      - generic [ref=e79]:
+        - generic [ref=e80]: 프록시
+        - generic [ref=e81]: 2개 선택됨
+      - generic [ref=e82] [cursor=pointer]:
+        - checkbox "업무시간만 (월~금 09~18시)" [ref=e83]
+        - generic [ref=e84]: 업무시간만
+        - generic [ref=e85]: (월~금 09~18시)
+      - generic [ref=e86]:
+        - button "1주" [ref=e87] [cursor=pointer]
+        - button "2주" [ref=e88] [cursor=pointer]
+        - button "1달" [ref=e89] [cursor=pointer]
+        - button "3달" [ref=e90] [cursor=pointer]
+      - textbox [ref=e91]: 2026-05-08T21:50
+      - generic [ref=e92]: ~
+      - textbox [ref=e93]: 2026-06-08T21:50
+      - combobox [ref=e95] [cursor=pointer]:
+        - option "CPU (%)" [selected]
+        - option "MEM (%)"
+        - option "Disk (%)"
+        - option "Client Count"
+        - option "Connected Sockets"
+        - option "HTTP (Mbps)"
+        - option "HTTPS (Mbps)"
+        - option "HTTP2 (Mbps)"
+        - option "Blocked"
+      - generic [ref=e96]:
+        - generic [ref=e97]: 임계치
+        - spinbutton [ref=e98]: "80"
+      - generic [ref=e99]:
+        - generic [ref=e100]: 이동평균
+        - spinbutton [ref=e101]: "5"
+        - generic [ref=e102]: 분
+      - button "분석 실행" [ref=e103] [cursor=pointer]
+  - contentinfo [ref=e72]:
+    - paragraph [ref=e74]:
+      - strong [ref=e75]: PMT
+      - text: v2026.06.07 · Made by hunseop.kim ·
+      - link "GitHub" [ref=e76] [cursor=pointer]:
+        - /url: https://github.com/khunseop/mwg-monitoring-tool
