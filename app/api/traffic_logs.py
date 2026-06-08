@@ -111,18 +111,15 @@ def _fetch_and_parse_for_proxy(db_proxy: Proxy, q: Optional[str], limit: int, di
         return [], str(e)
 
 
-from fastapi import BackgroundTasks
-
 @router.post("/traffic-logs/collect")
 def collect_traffic_logs_task(
     proxy_ids: str = Query(..., description="Comma-separated list of proxy IDs"),
-    background_tasks: BackgroundTasks = None,
     db: Session = Depends(get_db),
     q: Optional[str] = Query(default=None, max_length=256),
     limit: int = Query(default=5000, ge=1, le=50000),
     direction: str = Query(default="tail", pattern=r"^(head|tail)$"),
 ):
-    """프록시에서 로그를 읽어와 DB에 저장하는 작업을 백그라운드에서 실행합니다."""
+    """프록시에서 로그를 읽어와 DB에 저장합니다 (완료 후 응답)."""
     try:
         p_ids = [int(x.strip()) for x in proxy_ids.split(",") if x.strip()]
     except ValueError:
@@ -134,32 +131,37 @@ def collect_traffic_logs_task(
 
     q_valid = _validate_query(q)
 
-    def background_collect():
-        from app.database.database import SessionLocal
+    from app.database.database import SessionLocal
 
-        def collect_one(p):
-            local_db = SessionLocal()
+    errors: Dict[str, str] = {}
+
+    def collect_one(p):
+        local_db = SessionLocal()
+        try:
+            logger.info(f"[traffic_logs] Collecting for proxy {p.id}")
+            _fetch_and_parse_for_proxy(p, q_valid, limit, direction, local_db)
+            logger.info(f"[traffic_logs] Done collecting for proxy {p.id}")
+        except Exception as e:
+            logger.error(f"[traffic_logs] Collection failed for proxy {p.id}: {e}")
+            errors[str(p.id)] = str(e)
+        finally:
+            local_db.close()
+
+    with ThreadPoolExecutor(max_workers=min(len(proxies), 4)) as executor:
+        futures = [executor.submit(collect_one, p) for p in proxies]
+        for future in as_completed(futures):
             try:
-                logger.info(f"[traffic_logs] Starting background collection for proxy {p.id}")
-                _fetch_and_parse_for_proxy(p, q_valid, limit, direction, local_db)
-                logger.info(f"[traffic_logs] Finished background collection for proxy {p.id}")
-            except Exception as e:
-                logger.error(f"[traffic_logs] Background collection failed for proxy {p.id}: {e}")
-            finally:
-                local_db.close()
+                future.result()
+            except Exception:
+                pass
 
-        with ThreadPoolExecutor(max_workers=min(len(proxies), 4)) as executor:
-            futures = [executor.submit(collect_one, p) for p in proxies]
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                except Exception:
-                    pass
-
-    if background_tasks:
-        background_tasks.add_task(background_collect)
-    
-    return {"message": "Collection started in background", "proxies": [p.id for p in proxies]}
+    return {
+        "message": "Collection complete",
+        "proxies": [p.id for p in proxies],
+        "succeeded": len(proxies) - len(errors),
+        "failed": len(errors),
+        "errors": errors,
+    }
 
 
 @router.get("/traffic-logs", response_model=MultiTrafficLogResponse)

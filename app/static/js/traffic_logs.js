@@ -183,30 +183,33 @@
             showError('수집할 프록시를 적어도 하나 선택하세요.');
             return;
         }
-        
+
         clearError();
-        setStatus('로그 수집 시작 중...', 'is-warning is-light');
+        setStatus('로그 수집 중...', 'is-warning is-light');
         $('#tlLoadBtn').addClass('is-loading');
-        
+
         try {
             const query = $('#tlQuery').val() || '';
             const limit = $('#tlLimit').val() || 10000;
             const direction = $('#tlDirection').val() || 'tail';
             const pIdsParam = Array.isArray(proxyIds) ? proxyIds.join(',') : proxyIds;
-            
+
             const res = await fetch(`${API_BASE}/traffic-logs/collect?proxy_ids=${pIdsParam}&q=${encodeURIComponent(query)}&limit=${limit}&direction=${direction}`, {
                 method: 'POST'
             });
-            
+
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
                 throw new Error(errData.detail || '수집 요청에 실패했습니다.');
             }
-            
-            setStatus('백그라운드 수집 중... 잠시 후 새로고침하세요.', 'is-info is-light');
-            // 수집 시작 후 그리드 새로고침
+
+            const data = await res.json();
+            const failMsg = data.failed > 0 ? ` (${data.failed}개 실패)` : '';
+            setStatus(`수집 완료 (${data.succeeded}개 성공${failMsg})`, 'is-primary is-light');
+
+            // 수집 완료 후 그리드 새로고침
             if (tlGridApi) tlGridApi.refreshInfiniteCache();
-            
+
         } catch(err) {
             showError(err.message);
         } finally {
@@ -380,11 +383,8 @@
         }
 
         $('#tlLoadBtn').off('click').on('click', () => {
-            if (!tlGridApi) {
-                renderTable([]);
-            } else {
-                collectLogs();
-            }
+            if (!tlGridApi) renderTable([]);
+            collectLogs();
         });
         
         // 새로고침 버튼 기능 (데이터 수집 없이 DB의 현재 데이터만 다시 조회)

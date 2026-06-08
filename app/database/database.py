@@ -32,16 +32,16 @@ engine = create_engine(
     **engine_kwargs,
 )
 
-# For SQLite, use DELETE journal mode (no auxiliary -wal/-shm files) with tuned settings.
-# WAL mode is avoided because deployments that clean up extra files can corrupt the DB
-# by deleting -wal/-shm before a proper checkpoint.
+# WAL mode: readers don't block writers, writers don't block readers — reduces lock
+# contention when resource collector and traffic log collector write concurrently.
+# WAL/SHM file cleanup is handled at startup (see DB recovery logic).
 if is_sqlite:
     try:
         from sqlalchemy import event
         @event.listens_for(engine, "connect")
         def set_sqlite_pragma(dbapi_connection, connection_record):
             cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA journal_mode=DELETE")
+            cursor.execute("PRAGMA journal_mode=WAL")
             cursor.execute("PRAGMA synchronous=NORMAL")
             cursor.execute("PRAGMA cache_size=-64000")  # 64MB cache
             cursor.execute("PRAGMA temp_store=MEMORY")
