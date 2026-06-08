@@ -16,6 +16,7 @@ from app.api import resource_config as resource_config_api
 from app.api import session_browser as session_browser_api
 from app.api import session_browser_config as session_browser_config_api
 from app.api import traffic_logs as traffic_logs_api
+from app.api import resource_analysis as resource_analysis_api
 from fastapi_standalone_docs import StandaloneDocs
 import warnings
 from sqlalchemy import text, inspect
@@ -183,6 +184,7 @@ app.include_router(session_browser_api.router, prefix="/api", tags=["session-bro
 app.include_router(session_browser_config_api.router, prefix="/api", tags=["session-browser-config"])
 app.include_router(traffic_logs_api.router, prefix="/api", tags=["traffic-logs"])
 app.include_router(config_management.router, prefix="/api", tags=["config"])
+app.include_router(resource_analysis_api.router, prefix="/api", tags=["resource-analysis"])
 
 # 페이지 라우터
 @app.get("/")

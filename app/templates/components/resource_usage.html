@@ -27,6 +27,11 @@
                 <span>이력 그래프 분석</span>
             </a>
         </li>
+        <li id="tab-analysis">
+            <a onclick="switchRuTab('analysis')">
+                <span>부하 분석</span>
+            </a>
+        </li>
     </ul>
 </div>
 
@@ -242,6 +247,119 @@
     </div>
 </div>
 
+<!-- 부하 분석 섹션 -->
+<div id="analysis-tab" class="tab-content ru-tab-content" style="display:none;">
+    <div class="settings-bar mb-4" style="padding: 0.75rem 1.25rem; flex-wrap: wrap; gap: 0.75rem 1.25rem; align-items: center;">
+        <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+            <span class="filter-label">프록시</span>
+            <span class="tag is-info is-light is-small" id="analysisProxyInfo">이력 조회 탭 기준</span>
+        </div>
+        <label class="is-flex is-align-items-center is-size-7" style="gap: 0.35rem; cursor: pointer;">
+            <input type="checkbox" id="analysisBusinessHours">
+            <span>업무시간만</span>
+            <span class="has-text-grey">(월~금 09~18시)</span>
+        </label>
+        <div class="buttons has-addons mb-0">
+            <button class="button is-small is-subtle px-2 analysis-preset" data-range="1w">1주</button>
+            <button class="button is-small is-subtle px-2 analysis-preset" data-range="2w">2주</button>
+            <button class="button is-small is-subtle px-2 analysis-preset" data-range="1m">1달</button>
+            <button class="button is-small is-subtle px-2 analysis-preset" data-range="3m">3달</button>
+        </div>
+        <input class="input is-small" id="analysisStartTime" type="datetime-local" style="width: 190px;">
+        <span class="has-text-grey">~</span>
+        <input class="input is-small" id="analysisEndTime" type="datetime-local" style="width: 190px;">
+        <div class="select is-small">
+            <select id="analysisPrimaryMetric">
+                <option value="cpu">CPU (%)</option>
+                <option value="mem">MEM (%)</option>
+                <option value="disk">Disk (%)</option>
+                <option value="cc">Client Count</option>
+                <option value="cs">Connected Sockets</option>
+                <option value="http">HTTP (Mbps)</option>
+                <option value="https">HTTPS (Mbps)</option>
+                <option value="http2">HTTP2 (Mbps)</option>
+                <option value="blocked">Blocked</option>
+            </select>
+        </div>
+        <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+            <span class="filter-label">임계치</span>
+            <input class="input is-small has-text-centered" id="analysisThreshold" type="number" value="80" min="0" style="width: 64px;">
+        </div>
+        <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+            <span class="filter-label">이동평균</span>
+            <input class="input is-small has-text-centered" id="analysisWindowMin" type="number" value="5" min="1" max="60" style="width: 52px;">
+            <span class="filter-label">분</span>
+        </div>
+        <button class="button is-primary is-small px-5 ml-auto" id="runAnalysisBtn" style="font-weight: 600;">분석 실행</button>
+    </div>
+
+    <div id="analysisLoading" class="has-text-centered p-6" style="display:none;">
+        <span class="loader" style="display: inline-block; width: 2rem; height: 2rem;"></span>
+        <p class="mt-3 has-text-grey is-size-7">분석 중...</p>
+    </div>
+    <div id="analysisError" class="notification is-danger is-light is-size-7 mb-4" style="display:none;"></div>
+
+    <div id="analysisResults" style="display:none;">
+        <!-- 1. 백분위수 분석 -->
+        <div class="box mb-4">
+            <h5 class="title is-6 mb-1">백분위수 분석 (전체 지표)</h5>
+            <p class="is-size-7 has-text-grey mb-3">업무시간 필터 적용 기준 | p50 / p95 / p99</p>
+            <div class="table-container" style="overflow-x: auto;">
+                <table class="table is-fullwidth is-hoverable is-size-7" id="analysisPercentilesTable">
+                    <thead>
+                        <tr>
+                            <th>프록시</th>
+                            <th>지표</th>
+                            <th class="has-text-right">샘플</th>
+                            <th class="has-text-right">평균</th>
+                            <th class="has-text-right">최대</th>
+                            <th class="has-text-right">p50</th>
+                            <th class="has-text-right" style="color: #b45309;">p95</th>
+                            <th class="has-text-right" style="color: #dc2626;">p99</th>
+                        </tr>
+                    </thead>
+                    <tbody id="analysisPercentilesBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 2. Time-in-Band -->
+        <div class="box mb-4">
+            <h5 class="title is-6 mb-1">구간별 점유 시간 (Time-in-Band)</h5>
+            <p class="is-size-7 has-text-grey mb-4">선택 지표(<span id="analysisTimeBandMetric" style="font-weight:600;"></span>)의 수치가 각 구간에 머무른 시간 비율 (30초 단위 수집 기준)</p>
+            <div id="analysisTimeBandContent"></div>
+        </div>
+
+        <!-- 3. 임계치 초과 에피소드 -->
+        <div class="box mb-4">
+            <h5 class="title is-6 mb-1">임계치 연속 초과 이력</h5>
+            <p class="is-size-7 has-text-grey mb-3">선택 지표(<span id="analysisThresholdMetricLabel" style="font-weight:600;"></span>)가 <span id="analysisThresholdValueLabel" style="font-weight:600;"></span> 이상을 연속으로 유지한 구간</p>
+            <div id="analysisThresholdContent"></div>
+        </div>
+
+        <!-- 4. 요일×시간대 히트맵 -->
+        <div class="box mb-4">
+            <h5 class="title is-6 mb-1">요일×시간대 평균 히트맵</h5>
+            <p class="is-size-7 has-text-grey mb-4">선택 지표(<span id="analysisHeatmapMetricLabel" style="font-weight:600;"></span>)의 수집 기간 내 요일·시간대별 평균</p>
+            <div id="analysisHeatmapContent"></div>
+        </div>
+
+        <!-- 5. Top-N 장비 -->
+        <div class="box mb-4">
+            <h5 class="title is-6 mb-1">p95 기준 장비 순위</h5>
+            <p class="is-size-7 has-text-grey mb-3">선택 지표(<span id="analysisTopNMetricLabel" style="font-weight:600;"></span>) p95 기준 상위 장비</p>
+            <div id="analysisTopNContent"></div>
+        </div>
+
+        <!-- 6. 이동 평균 트렌드 -->
+        <div class="box mb-4">
+            <h5 class="title is-6 mb-1">이동 평균 트렌드</h5>
+            <p class="is-size-7 has-text-grey mb-3">선택 지표(<span id="analysisSmoothedMetricLabel" style="font-weight:600;"></span>)의 <span id="analysisSmoothedWindowLabel" style="font-weight:600;"></span>분 이동 평균</p>
+            <div id="analysisSmoothedChart" style="height: 380px;"></div>
+        </div>
+    </div>
+</div>
+
 <!-- 이력 그래프 분석 섹션 -->
 <div id="history-graph-tab" class="tab-content ru-tab-content" style="display:none;">
     <!-- 그래프 설정 바 (이력 조회와 검색 조건 공유 가능하도록 js에서 처리) -->
@@ -263,7 +381,7 @@
 function switchRuTab(tabId) {
     $('.ru-tab-content').hide();
     $('.tabs li').removeClass('is-active');
-    
+
     if (tabId === 'realtime') {
         $('#realtime-tab').show();
         $('#tab-realtime').addClass('is-active');
@@ -275,6 +393,10 @@ function switchRuTab(tabId) {
         $('#tab-history-graph').addClass('is-active');
         // 그래프 탭 진입 시 데이터가 있으면 자동 렌더링
         if (window.renderHistoryCharts) renderHistoryCharts();
+    } else if (tabId === 'analysis') {
+        $('#analysis-tab').show();
+        $('#tab-analysis').addClass('is-active');
+        if (window.HistoryAnalysis) window.HistoryAnalysis.onTabEnter();
     }
     // 리사이즈 트리거
     setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
@@ -300,4 +422,5 @@ $(document).ready(function() {
 <script src="/static/js/resource_usage_polling.js"></script>
 <script src="/static/js/resource_usage.js"></script>
 <script src="/static/js/resource_history.js"></script>
+<script src="/static/js/resource_history_analysis.js"></script>
 {% endblock %}
