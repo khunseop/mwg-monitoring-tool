@@ -1,0 +1,438 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e5]:
+      - generic [ref=e6]: FAT
+      - navigation [ref=e7]:
+        - link "Dashboard" [ref=e8] [cursor=pointer]:
+          - /url: /
+        - link "Devices" [ref=e9] [cursor=pointer]:
+          - /url: /devices
+        - link "Policies" [ref=e10] [cursor=pointer]:
+          - /url: /policies
+        - link "Objects" [ref=e11] [cursor=pointer]:
+          - /url: /objects
+        - link "Analysis" [ref=e12] [cursor=pointer]:
+          - /url: /analysis
+        - link "Policy Diff" [ref=e13] [cursor=pointer]:
+          - /url: /policy-diff
+        - link "Schedules" [ref=e14] [cursor=pointer]:
+          - /url: /schedules
+      - generic [ref=e15]:
+        - link "Notifications" [ref=e17] [cursor=pointer]:
+          - /url: /notifications
+        - link "Settings" [ref=e18] [cursor=pointer]:
+          - /url: /settings
+        - button "Logout" [ref=e20] [cursor=pointer]
+    - main [ref=e21]:
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - heading "Dashboard" [level=1] [ref=e25]
+          - button "갱신" [ref=e26] [cursor=pointer]:
+            - img [ref=e27]
+            - text: 갱신
+        - generic [ref=e32]:
+          - generic [ref=e33]:
+            - paragraph [ref=e34]: 장비
+            - paragraph [ref=e35]: "174"
+            - generic [ref=e39]: 100%
+            - paragraph [ref=e40]: 174대 동기화 완료
+          - generic [ref=e41]:
+            - paragraph [ref=e42]: 정책
+            - paragraph [ref=e43]: 487,026
+            - generic [ref=e47]: 75%
+            - paragraph [ref=e48]: 364,878개 활성
+          - generic [ref=e49]:
+            - paragraph [ref=e50]: 네트워크 객체
+            - paragraph [ref=e51]: 2,958
+          - generic [ref=e52]:
+            - paragraph [ref=e53]: 네트워크 그룹
+            - paragraph [ref=e54]: 1,392
+          - generic [ref=e55]:
+            - paragraph [ref=e56]: 서비스
+            - paragraph [ref=e57]: 1,218
+          - generic [ref=e58]:
+            - paragraph [ref=e59]: 서비스 그룹
+            - paragraph [ref=e60]: "696"
+        - generic [ref=e61]:
+          - generic [ref=e62]:
+            - generic [ref=e63]:
+              - generic [ref=e64]: 장비 현황
+              - generic [ref=e65]: 174대
+            - generic [ref=e67]:
+              - img [ref=e68]
+              - textbox "장비명, IP 검색" [ref=e71]
+          - generic [ref=e73]:
+            - treegrid [ref=e75]:
+              - rowgroup [ref=e76]:
+                - row "장비명 벤더 전체 정책 활성 정책 비활성 정책 네트워크 객체 네트워크 그룹 서비스 서비스 그룹 마지막 동기화" [ref=e77]:
+                  - columnheader "장비명" [ref=e78]:
+                    - text: 
+                    - generic [ref=e80] [cursor=pointer]: 
+                    - generic [ref=e81] [cursor=pointer]: 장비명
+                    - generic:    
+                  - columnheader "벤더" [ref=e82]:
+                    - text: 
+                    - generic [ref=e84] [cursor=pointer]: 
+                    - generic [ref=e85] [cursor=pointer]: 벤더
+                    - generic:    
+                  - columnheader "전체 정책" [ref=e86]:
+                    - text: 
+                    - generic [ref=e88] [cursor=pointer]: 
+                    - generic [ref=e89] [cursor=pointer]: 전체 정책
+                    - generic:    
+                  - columnheader "활성 정책" [ref=e90]:
+                    - text: 
+                    - generic [ref=e92] [cursor=pointer]: 
+                    - generic [ref=e93] [cursor=pointer]: 활성 정책
+                    - generic:    
+                  - columnheader "비활성 정책" [ref=e94]:
+                    - text: 
+                    - generic [ref=e96] [cursor=pointer]: 
+                    - generic [ref=e97] [cursor=pointer]: 비활성 정책
+                    - generic:    
+                  - columnheader "네트워크 객체" [ref=e98]:
+                    - text: 
+                    - generic [ref=e100] [cursor=pointer]: 
+                    - generic [ref=e101] [cursor=pointer]: 네트워크 객체
+                    - generic:    
+                  - columnheader "네트워크 그룹" [ref=e102]:
+                    - text: 
+                    - generic [ref=e104] [cursor=pointer]: 
+                    - generic [ref=e105] [cursor=pointer]: 네트워크 그룹
+                    - generic:    
+                  - columnheader "서비스" [ref=e106]:
+                    - text: 
+                    - generic [ref=e108] [cursor=pointer]: 
+                    - generic [ref=e109] [cursor=pointer]: 서비스
+                    - generic:    
+                  - columnheader "서비스 그룹" [ref=e110]:
+                    - text: 
+                    - generic [ref=e112] [cursor=pointer]: 
+                    - generic [ref=e113] [cursor=pointer]: 서비스 그룹
+                    - generic:    
+                  - columnheader "마지막 동기화" [ref=e114]:
+                    - text: 
+                    - generic [ref=e116] [cursor=pointer]: 마지막 동기화
+                    - text: 
+                    - generic:    
+              - rowgroup [ref=e117]:
+                - row "테스트장비 1.1.1.1 Mock 2,799 2,097 702 17 8 7 4 16분 전" [ref=e118]:
+                  - gridcell "테스트장비 1.1.1.1" [ref=e119]:
+                    - generic [ref=e120]:
+                      - generic [ref=e121]: 테스트장비
+                      - generic [ref=e122]: 1.1.1.1
+                  - gridcell "Mock" [ref=e123]:
+                    - generic [ref=e124]: Mock
+                  - gridcell "2,799" [ref=e125]
+                  - gridcell "2,097" [ref=e126]
+                  - gridcell "702" [ref=e127]
+                  - gridcell "17" [ref=e128]
+                  - gridcell "8" [ref=e129]
+                  - gridcell "7" [ref=e130]
+                  - gridcell "4" [ref=e131]
+                  - gridcell "16분 전" [ref=e132]
+                - row "테스트장비2 2.2.2.2 Mock 2,799 2,097 702 17 8 7 4 16분 전" [ref=e133]:
+                  - gridcell "테스트장비2 2.2.2.2" [ref=e134]:
+                    - generic [ref=e135]:
+                      - generic [ref=e136]: 테스트장비2
+                      - generic [ref=e137]: 2.2.2.2
+                  - gridcell "Mock" [ref=e138]:
+                    - generic [ref=e139]: Mock
+                  - gridcell "2,799" [ref=e140]
+                  - gridcell "2,097" [ref=e141]
+                  - gridcell "702" [ref=e142]
+                  - gridcell "17" [ref=e143]
+                  - gridcell "8" [ref=e144]
+                  - gridcell "7" [ref=e145]
+                  - gridcell "4" [ref=e146]
+                  - gridcell "16분 전" [ref=e147]
+                - row "테스트장비3 3.3.3.3 Mock 2,799 2,097 702 17 8 7 4 16분 전" [ref=e148]:
+                  - gridcell "테스트장비3 3.3.3.3" [ref=e149]:
+                    - generic [ref=e150]:
+                      - generic [ref=e151]: 테스트장비3
+                      - generic [ref=e152]: 3.3.3.3
+                  - gridcell "Mock" [ref=e153]:
+                    - generic [ref=e154]: Mock
+                  - gridcell "2,799" [ref=e155]
+                  - gridcell "2,097" [ref=e156]
+                  - gridcell "702" [ref=e157]
+                  - gridcell "17" [ref=e158]
+                  - gridcell "8" [ref=e159]
+                  - gridcell "7" [ref=e160]
+                  - gridcell "4" [ref=e161]
+                  - gridcell "16분 전" [ref=e162]
+                - row "PaloAlto-FW-01 192.168.1.1 Mock 2,799 2,097 702 17 8 7 4 16분 전" [ref=e163]:
+                  - gridcell "PaloAlto-FW-01 192.168.1.1" [ref=e164]:
+                    - generic [ref=e165]:
+                      - generic [ref=e166]: PaloAlto-FW-01
+                      - generic [ref=e167]: 192.168.1.1
+                  - gridcell "Mock" [ref=e168]:
+                    - generic [ref=e169]: Mock
+                  - gridcell "2,799" [ref=e170]
+                  - gridcell "2,097" [ref=e171]
+                  - gridcell "702" [ref=e172]
+                  - gridcell "17" [ref=e173]
+                  - gridcell "8" [ref=e174]
+                  - gridcell "7" [ref=e175]
+                  - gridcell "4" [ref=e176]
+                  - gridcell "16분 전" [ref=e177]
+                - row "NGF-FW-01 192.168.2.1 Mock 2,799 2,097 702 17 8 7 4 16분 전" [ref=e178]:
+                  - gridcell "NGF-FW-01 192.168.2.1" [ref=e179]:
+                    - generic [ref=e180]:
+                      - generic [ref=e181]: NGF-FW-01
+                      - generic [ref=e182]: 192.168.2.1
+                  - gridcell "Mock" [ref=e183]:
+                    - generic [ref=e184]: Mock
+                  - gridcell "2,799" [ref=e185]
+                  - gridcell "2,097" [ref=e186]
+                  - gridcell "702" [ref=e187]
+                  - gridcell "17" [ref=e188]
+                  - gridcell "8" [ref=e189]
+                  - gridcell "7" [ref=e190]
+                  - gridcell "4" [ref=e191]
+                  - gridcell "16분 전" [ref=e192]
+                - row "Firewall_01 192.168.3.1 Mock 2,799 2,097 702 17 8 7 4 10일 전" [ref=e193]:
+                  - gridcell "Firewall_01 192.168.3.1" [ref=e194]:
+                    - generic [ref=e195]:
+                      - generic [ref=e196]: Firewall_01
+                      - generic [ref=e197]: 192.168.3.1
+                  - gridcell "Mock" [ref=e198]:
+                    - generic [ref=e199]: Mock
+                  - gridcell "2,799" [ref=e200]
+                  - gridcell "2,097" [ref=e201]
+                  - gridcell "702" [ref=e202]
+                  - gridcell "17" [ref=e203]
+                  - gridcell "8" [ref=e204]
+                  - gridcell "7" [ref=e205]
+                  - gridcell "4" [ref=e206]
+                  - gridcell "10일 전" [ref=e207]
+                - row "Firewall_02 192.168.3.2 Mock 2,799 2,097 702 17 8 7 4 10일 전" [ref=e208]:
+                  - gridcell "Firewall_02 192.168.3.2" [ref=e209]:
+                    - generic [ref=e210]:
+                      - generic [ref=e211]: Firewall_02
+                      - generic [ref=e212]: 192.168.3.2
+                  - gridcell "Mock" [ref=e213]:
+                    - generic [ref=e214]: Mock
+                  - gridcell "2,799" [ref=e215]
+                  - gridcell "2,097" [ref=e216]
+                  - gridcell "702" [ref=e217]
+                  - gridcell "17" [ref=e218]
+                  - gridcell "8" [ref=e219]
+                  - gridcell "7" [ref=e220]
+                  - gridcell "4" [ref=e221]
+                  - gridcell "10일 전" [ref=e222]
+                - row "Firewall_03 192.168.3.3 Mock 2,799 2,097 702 17 8 7 4 10일 전" [ref=e223]:
+                  - gridcell "Firewall_03 192.168.3.3" [ref=e224]:
+                    - generic [ref=e225]:
+                      - generic [ref=e226]: Firewall_03
+                      - generic [ref=e227]: 192.168.3.3
+                  - gridcell "Mock" [ref=e228]:
+                    - generic [ref=e229]: Mock
+                  - gridcell "2,799" [ref=e230]
+                  - gridcell "2,097" [ref=e231]
+                  - gridcell "702" [ref=e232]
+                  - gridcell "17" [ref=e233]
+                  - gridcell "8" [ref=e234]
+                  - gridcell "7" [ref=e235]
+                  - gridcell "4" [ref=e236]
+                  - gridcell "10일 전" [ref=e237]
+                - row "Firewall_04 192.168.3.4 Mock 2,799 2,097 702 17 8 7 4 10일 전" [ref=e238]:
+                  - gridcell "Firewall_04 192.168.3.4" [ref=e239]:
+                    - generic [ref=e240]:
+                      - generic [ref=e241]: Firewall_04
+                      - generic [ref=e242]: 192.168.3.4
+                  - gridcell "Mock" [ref=e243]:
+                    - generic [ref=e244]: Mock
+                  - gridcell "2,799" [ref=e245]
+                  - gridcell "2,097" [ref=e246]
+                  - gridcell "702" [ref=e247]
+                  - gridcell "17" [ref=e248]
+                  - gridcell "8" [ref=e249]
+                  - gridcell "7" [ref=e250]
+                  - gridcell "4" [ref=e251]
+                  - gridcell "10일 전" [ref=e252]
+                - row "Firewall_05 192.168.3.5 Mock 2,799 2,097 702 17 8 7 4 10일 전" [ref=e253]:
+                  - gridcell "Firewall_05 192.168.3.5" [ref=e254]:
+                    - generic [ref=e255]:
+                      - generic [ref=e256]: Firewall_05
+                      - generic [ref=e257]: 192.168.3.5
+                  - gridcell "Mock" [ref=e258]:
+                    - generic [ref=e259]: Mock
+                  - gridcell "2,799" [ref=e260]
+                  - gridcell "2,097" [ref=e261]
+                  - gridcell "702" [ref=e262]
+                  - gridcell "17" [ref=e263]
+                  - gridcell "8" [ref=e264]
+                  - gridcell "7" [ref=e265]
+                  - gridcell "4" [ref=e266]
+                  - gridcell "10일 전" [ref=e267]
+                - row "Firewall_06 192.168.3.6 Mock 2,799 2,097 702 17 8 7 4 1개월 전" [ref=e268]:
+                  - gridcell "Firewall_06 192.168.3.6" [ref=e269]:
+                    - generic [ref=e270]:
+                      - generic [ref=e271]: Firewall_06
+                      - generic [ref=e272]: 192.168.3.6
+                  - gridcell "Mock" [ref=e273]:
+                    - generic [ref=e274]: Mock
+                  - gridcell "2,799" [ref=e275]
+                  - gridcell "2,097" [ref=e276]
+                  - gridcell "702" [ref=e277]
+                  - gridcell "17" [ref=e278]
+                  - gridcell "8" [ref=e279]
+                  - gridcell "7" [ref=e280]
+                  - gridcell "4" [ref=e281]
+                  - gridcell "1개월 전" [ref=e282]
+                - row "Firewall_07 192.168.3.7 Mock 2,799 2,097 702 17 8 7 4 1개월 전" [ref=e283]:
+                  - gridcell "Firewall_07 192.168.3.7" [ref=e284]:
+                    - generic [ref=e285]:
+                      - generic [ref=e286]: Firewall_07
+                      - generic [ref=e287]: 192.168.3.7
+                  - gridcell "Mock" [ref=e288]:
+                    - generic [ref=e289]: Mock
+                  - gridcell "2,799" [ref=e290]
+                  - gridcell "2,097" [ref=e291]
+                  - gridcell "702" [ref=e292]
+                  - gridcell "17" [ref=e293]
+                  - gridcell "8" [ref=e294]
+                  - gridcell "7" [ref=e295]
+                  - gridcell "4" [ref=e296]
+                  - gridcell "1개월 전" [ref=e297]
+                - row "Firewall_08 192.168.3.8 Mock 2,799 2,097 702 17 8 7 4 1개월 전" [ref=e298]:
+                  - gridcell "Firewall_08 192.168.3.8" [ref=e299]:
+                    - generic [ref=e300]:
+                      - generic [ref=e301]: Firewall_08
+                      - generic [ref=e302]: 192.168.3.8
+                  - gridcell "Mock" [ref=e303]:
+                    - generic [ref=e304]: Mock
+                  - gridcell "2,799" [ref=e305]
+                  - gridcell "2,097" [ref=e306]
+                  - gridcell "702" [ref=e307]
+                  - gridcell "17" [ref=e308]
+                  - gridcell "8" [ref=e309]
+                  - gridcell "7" [ref=e310]
+                  - gridcell "4" [ref=e311]
+                  - gridcell "1개월 전" [ref=e312]
+                - row "Firewall_09 192.168.3.9 Mock 2,799 2,097 702 17 8 7 4 1개월 전" [ref=e313]:
+                  - gridcell "Firewall_09 192.168.3.9" [ref=e314]:
+                    - generic [ref=e315]:
+                      - generic [ref=e316]: Firewall_09
+                      - generic [ref=e317]: 192.168.3.9
+                  - gridcell "Mock" [ref=e318]:
+                    - generic [ref=e319]: Mock
+                  - gridcell "2,799" [ref=e320]
+                  - gridcell "2,097" [ref=e321]
+                  - gridcell "702" [ref=e322]
+                  - gridcell "17" [ref=e323]
+                  - gridcell "8" [ref=e324]
+                  - gridcell "7" [ref=e325]
+                  - gridcell "4" [ref=e326]
+                  - gridcell "1개월 전" [ref=e327]
+                - row "Firewall_10 192.168.3.10 Mock 2,799 2,097 702 17 8 7 4 1개월 전" [ref=e328]:
+                  - gridcell "Firewall_10 192.168.3.10" [ref=e329]:
+                    - generic [ref=e330]:
+                      - generic [ref=e331]: Firewall_10
+                      - generic [ref=e332]: 192.168.3.10
+                  - gridcell "Mock" [ref=e333]:
+                    - generic [ref=e334]: Mock
+                  - gridcell "2,799" [ref=e335]
+                  - gridcell "2,097" [ref=e336]
+                  - gridcell "702" [ref=e337]
+                  - gridcell "17" [ref=e338]
+                  - gridcell "8" [ref=e339]
+                  - gridcell "7" [ref=e340]
+                  - gridcell "4" [ref=e341]
+                  - gridcell "1개월 전" [ref=e342]
+                - row "Firewall_11 192.168.3.11 Mock 2,799 2,097 702 17 8 7 4 1개월 전" [ref=e343]:
+                  - gridcell "Firewall_11 192.168.3.11" [ref=e344]:
+                    - generic [ref=e345]:
+                      - generic [ref=e346]: Firewall_11
+                      - generic [ref=e347]: 192.168.3.11
+                  - gridcell "Mock" [ref=e348]:
+                    - generic [ref=e349]: Mock
+                  - gridcell "2,799" [ref=e350]
+                  - gridcell "2,097" [ref=e351]
+                  - gridcell "702" [ref=e352]
+                  - gridcell "17" [ref=e353]
+                  - gridcell "8" [ref=e354]
+                  - gridcell "7" [ref=e355]
+                  - gridcell "4" [ref=e356]
+                  - gridcell "1개월 전" [ref=e357]
+                - row "Firewall_12 192.168.3.12 Mock 2,799 2,097 702 17 8 7 4 1개월 전" [ref=e358]:
+                  - gridcell "Firewall_12 192.168.3.12" [ref=e359]:
+                    - generic [ref=e360]:
+                      - generic [ref=e361]: Firewall_12
+                      - generic [ref=e362]: 192.168.3.12
+                  - gridcell "Mock" [ref=e363]:
+                    - generic [ref=e364]: Mock
+                  - gridcell "2,799" [ref=e365]
+                  - gridcell "2,097" [ref=e366]
+                  - gridcell "702" [ref=e367]
+                  - gridcell "17" [ref=e368]
+                  - gridcell "8" [ref=e369]
+                  - gridcell "7" [ref=e370]
+                  - gridcell "4" [ref=e371]
+                  - gridcell "1개월 전" [ref=e372]
+                - row "Firewall_13 192.168.3.13 Mock 2,799 2,097 702 17 8 7 4 1개월 전" [ref=e373]:
+                  - gridcell "Firewall_13 192.168.3.13" [ref=e374]:
+                    - generic [ref=e375]:
+                      - generic [ref=e376]: Firewall_13
+                      - generic [ref=e377]: 192.168.3.13
+                  - gridcell "Mock" [ref=e378]:
+                    - generic [ref=e379]: Mock
+                  - gridcell "2,799" [ref=e380]
+                  - gridcell "2,097" [ref=e381]
+                  - gridcell "702" [ref=e382]
+                  - gridcell "17" [ref=e383]
+                  - gridcell "8" [ref=e384]
+                  - gridcell "7" [ref=e385]
+                  - gridcell "4" [ref=e386]
+                  - gridcell "1개월 전" [ref=e387]
+                - row "Firewall_14 192.168.3.14 Mock 2,799 2,097 702 17 8 7 4 1개월 전" [ref=e388]:
+                  - gridcell "Firewall_14 192.168.3.14" [ref=e389]:
+                    - generic [ref=e390]:
+                      - generic [ref=e391]: Firewall_14
+                      - generic [ref=e392]: 192.168.3.14
+                  - gridcell "Mock" [ref=e393]:
+                    - generic [ref=e394]: Mock
+                  - gridcell "2,799" [ref=e395]
+                  - gridcell "2,097" [ref=e396]
+                  - gridcell "702" [ref=e397]
+                  - gridcell "17" [ref=e398]
+                  - gridcell "8" [ref=e399]
+                  - gridcell "7" [ref=e400]
+                  - gridcell "4" [ref=e401]
+                  - gridcell "1개월 전" [ref=e402]
+                - row "Firewall_15 192.168.3.15 Mock 2,799 2,097 702 17 8 7 4 1개월 전" [ref=e403]:
+                  - gridcell "Firewall_15 192.168.3.15" [ref=e404]:
+                    - generic [ref=e405]:
+                      - generic [ref=e406]: Firewall_15
+                      - generic [ref=e407]: 192.168.3.15
+                  - gridcell "Mock" [ref=e408]:
+                    - generic [ref=e409]: Mock
+                  - gridcell "2,799" [ref=e410]
+                  - gridcell "2,097" [ref=e411]
+                  - gridcell "702" [ref=e412]
+                  - gridcell "17" [ref=e413]
+                  - gridcell "8" [ref=e414]
+                  - gridcell "7" [ref=e415]
+                  - gridcell "4" [ref=e416]
+                  - gridcell "1개월 전" [ref=e417]
+                - row "Firewall_16 192.168.3.16 Mock 2,799 2,097 702 17 8 7 4 1개월 전" [ref=e418]:
+                  - gridcell "Firewall_16 192.168.3.16" [ref=e419]:
+                    - generic [ref=e420]:
+                      - generic [ref=e421]: Firewall_16
+                      - generic [ref=e422]: 192.168.3.16
+                  - gridcell "Mock" [ref=e423]:
+                    - generic [ref=e424]: Mock
+                  - gridcell "2,799" [ref=e425]
+                  - gridcell "2,097" [ref=e426]
+                  - gridcell "702" [ref=e427]
+                  - gridcell "17" [ref=e428]
+                  - gridcell "8" [ref=e429]
+                  - gridcell "7" [ref=e430]
+                  - gridcell "4" [ref=e431]
+                  - gridcell "1개월 전" [ref=e432]
+              - rowgroup
+              - rowgroup [ref=e433]
+              - rowgroup
+            - text:    
+  - region "Notifications alt+T"

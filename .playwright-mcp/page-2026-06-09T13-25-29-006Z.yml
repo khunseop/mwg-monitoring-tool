@@ -1,0 +1,16 @@
+- generic [ref=e2]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: FAT
+      - paragraph [ref=e7]: Firewall Analysis Tool
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - text: 아이디
+        - textbox "아이디" [active] [ref=e11]:
+          - /placeholder: 아이디를 입력하세요
+      - generic [ref=e12]:
+        - text: 비밀번호
+        - textbox "비밀번호" [ref=e13]:
+          - /placeholder: 비밀번호를 입력하세요
+      - button "로그인" [ref=e14] [cursor=pointer]
+  - region "Notifications alt+T"
