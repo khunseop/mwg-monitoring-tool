@@ -275,38 +275,59 @@
         };
     }
 
+    function destroyTlGrid() {
+        const api = tlGridApi || window.__tlGridApi;
+        if (api) {
+            try { api.destroy(); } catch(e) {}
+        }
+        tlGridApi = null;
+        window.__tlGridApi = null;
+        const gridDiv = document.querySelector('#tlTableGrid');
+        if (gridDiv) gridDiv.innerHTML = '';
+    }
+
     function renderTable(records){
         // Ensure empty state is hidden when rendering results
         $('#tlEmptyState').hide();
-        
-        const gridDiv = document.querySelector('#tlTableGrid');
-        if (!gridDiv) return;
 
-        if (tlGridApi && gridDiv.innerHTML === "") {
-            tlGridApi = null;
+        const gridDiv = document.querySelector('#tlTableGrid');
+        if (!gridDiv || !window.agGrid) return;
+
+        // PJAX 재실행으로 클로저가 리셋된 경우 window 레벨 참조로 복구
+        if (!tlGridApi && window.__tlGridApi) {
+            tlGridApi = window.__tlGridApi;
         }
-        
-        if (!tlGridApi) {
-            const gridOptions = {
-                columnDefs: window.AgGridConfig ? window.AgGridConfig.getTrafficLogColumns() : [],
-                rowModelType: 'infinite',
-                datasource: getDataSource(),
-                cacheBlockSize: 100,
-                maxBlocksInCache: 10,
-                infiniteInitialRowCount: 100,
-                pagination: true,
-                paginationPageSize: 100,
-                rowHeight: 35,
-                headerHeight: 45,
-                onRowDoubleClicked: params => showDetail(params.data),
-                overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">로그가 비어있습니다. [수집/조회] 버튼을 눌러보세요.</div>'
-            };
-            if (gridDiv && window.agGrid) {
-                tlGridApi = window.agGrid.createGrid(gridDiv, gridOptions);
-            }
-        } else {
-            tlGridApi.refreshInfiniteCache();
+
+        const hasGridDom = !!gridDiv.querySelector('.ag-root-wrapper');
+
+        if (tlGridApi && hasGridDom) {
+            // 그리드 이미 존재 → 데이터만 갱신
+            tlGridApi.setGridOption('datasource', getDataSource());
+            $('#tlResultParsed').fadeIn();
+            return;
         }
+
+        // 기존 그리드 완전히 제거 후 재생성
+        destroyTlGrid();
+
+        const gridOptions = {
+            columnDefs: window.AgGridConfig ? window.AgGridConfig.getTrafficLogColumns() : [],
+            rowModelType: 'infinite',
+            datasource: getDataSource(),
+            cacheBlockSize: 100,
+            maxBlocksInCache: 10,
+            infiniteInitialRowCount: 100,
+            pagination: true,
+            paginationPageSize: 100,
+            rowHeight: 35,
+            headerHeight: 45,
+            onRowDoubleClicked: params => showDetail(params.data),
+            overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">로그가 비어있습니다. [수집/조회] 버튼을 눌러보세요.</div>'
+        };
+
+        tlGridApi = window.agGrid.createGrid(gridDiv, gridOptions);
+        window.__tlGridApi = tlGridApi;
+
         $('#tlResultParsed').fadeIn();
     }
 
@@ -316,9 +337,14 @@
             localStorage.setItem('sb_config', JSON.stringify(cfg));
         });
 
+        // PJAX 재실행으로 클로저가 리셋된 경우 window 레벨 참조로 복구
+        if (!tlGridApi && window.__tlGridApi) {
+            tlGridApi = window.__tlGridApi;
+        }
+
         const gridDiv = document.querySelector('#tlTableGrid');
-        if (gridDiv && gridDiv.innerHTML === "") {
-            tlGridApi = null;
+        if (gridDiv && !gridDiv.querySelector('.ag-root-wrapper')) {
+            destroyTlGrid();
         }
 
         if (window.DeviceSelector) {

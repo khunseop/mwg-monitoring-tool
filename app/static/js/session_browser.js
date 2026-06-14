@@ -536,6 +536,18 @@
     }
 
     function initGrid() {
+        // PJAX 재실행으로 클로저가 리셋된 경우 window 레벨 참조로 복구 후 destroy
+        if (window.__sbGridApi) {
+            try { window.__sbGridApi.destroy(); } catch(e) {}
+            window.__sbGridApi = null;
+        }
+        sb.gridApi = null;
+
+        const gridDiv = document.querySelector('#sbTableGrid');
+        if (!gridDiv || !window.agGrid) return;
+
+        gridDiv.innerHTML = '';
+
         const gridOptions = {
             columnDefs: window.AgGridConfig ? window.AgGridConfig.getSessionBrowserColumns() : [],
             defaultColDef: {
@@ -557,17 +569,13 @@
             overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted); font-size: 0.875rem;">조회된 세션 데이터가 없습니다. 상단에서 "세션 불러오기"를 클릭하세요.</div>',
             onGridReady: async (params) => {
                 sb.gridApi = params.api;
-                // Wait a bit for other initialization to complete
+                window.__sbGridApi = params.api;
                 setTimeout(() => restoreState(), 100);
             }
         };
 
-        const gridDiv = document.querySelector('#sbTableGrid');
-        if (gridDiv && window.agGrid) {
-            // Ensure container is empty before creating
-            gridDiv.innerHTML = '';
-            sb.gridApi = window.agGrid.createGrid(gridDiv, gridOptions);
-        }
+        sb.gridApi = window.agGrid.createGrid(gridDiv, gridOptions);
+        window.__sbGridApi = sb.gridApi;
     }
 
     function initSessionBrowser() {
@@ -576,14 +584,25 @@
             localStorage.setItem('sb_config', JSON.stringify(cfg));
         });
 
+        // PJAX 재실행으로 클로저가 리셋된 경우 window 레벨 참조로 복구
+        if (!sb.gridApi && window.__sbGridApi) {
+            sb.gridApi = window.__sbGridApi;
+        }
+
         const gridDiv = document.querySelector('#sbTableGrid');
-        // If element exists but is empty, it means we need a new grid (PJAX transition)
-        if (gridDiv && gridDiv.innerHTML === "") {
-            sb.gridApi = null;
+        if (!gridDiv) return;
+
+        const hasGridDom = !!gridDiv.querySelector('.ag-root-wrapper');
+
+        if (!hasGridDom) {
+            // 그리드 DOM 없음 → 새로 생성
             initGrid();
         } else if (sb.gridApi) {
-            // Already initialized, just restore state if needed
+            // 그리드 DOM 있고 API 참조도 있음 → 상태 복원만
             restoreState();
+        } else {
+            // 그리드 DOM은 있지만 API 참조 분실 → 재생성
+            initGrid();
         }
 
         // DeviceSelector 초기화
