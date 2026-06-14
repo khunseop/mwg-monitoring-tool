@@ -69,7 +69,7 @@
 
         <div class="is-flex is-align-items-center" style="gap: 1rem; margin-left: auto;">
             <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
-                <span class="filter-label">주기</span>
+                <span class="filter-label">수집 주기</span>
                 <input class="input is-small has-text-centered" id="ruIntervalSec" type="number" min="5" value="60" style="width: 56px; border-radius: var(--radius-sm);">
                 <span class="filter-label">초</span>
             </div>
@@ -78,14 +78,22 @@
             <button class="button is-ghost is-small px-3" id="ruCopyBtn" title="현재 표시된 모든 수집값을 클립보드에 복사합니다." style="color: var(--color-text-muted);">
                 <span>현재값 복사</span>
             </button>
-            <button class="button is-primary is-small px-5" id="ruToggleBtn" style="font-weight: 600;">시작</button>
+            <button class="button is-primary is-small px-5" id="ruToggleBtn" style="font-weight: 600;">모니터링 시작</button>
         </div>
     </div>
 
     <!-- 히트맵 섹션 -->
     <div class="heatmap-container" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1.5rem;">
         <div class="mb-1">
-            <h4 class="title is-6 mb-2 has-text-grey">자원 사용률 히트맵</h4>
+            <div class="is-flex is-align-items-center is-justify-content-space-between mb-2">
+                <div class="is-flex is-align-items-center">
+                    <h4 class="title is-6 mb-0 has-text-grey">자원 사용률 히트맵</h4>
+                    <span id="ruSelectionSummary" class="is-size-7 has-text-grey-light ml-3" style="display:none;"></span>
+                </div>
+                <span id="ruLastUpdated" class="is-size-7 has-text-grey-light" style="display:none;">
+                    마지막 갱신: <span id="ruLastUpdatedTime">-</span>
+                </span>
+            </div>
             <div id="ruHeatmapLegend" class="is-size-7 mb-3"></div>
         </div>
         <div id="ruHeatmapWrap" style="overflow-x: auto; overflow-y: auto;">
@@ -204,16 +212,21 @@
                         <input type="radio" name="deleteOption" value="range">
                         기간 지정 삭제
                     </label>
-                    <label class="radio is-size-7">
+                    <label class="radio is-size-7 has-text-danger" style="font-weight: 600;">
                         <input type="radio" name="deleteOption" value="all">
-                        전체 삭제 (위험)
+                        ⚠ 전체 삭제 (복구 불가)
                     </label>
                 </div>
             </div>
             <div id="ruDeleteOlderThan" class="field">
                 <label class="label is-small">삭제할 기간 (일)</label>
-                <div class="control">
-                    <input class="input is-small" type="number" id="ruDeleteOlderDays" min="1" value="90">
+                <div class="control is-flex is-align-items-center" style="gap: 0.5rem;">
+                    <input class="input is-small" type="number" id="ruDeleteOlderDays" min="1" value="90" style="width: 80px;">
+                    <div class="buttons has-addons mb-0">
+                        <button type="button" class="button is-small is-subtle px-2 ru-delete-days-preset" data-days="30">30일</button>
+                        <button type="button" class="button is-small is-subtle px-2 ru-delete-days-preset" data-days="90">90일</button>
+                        <button type="button" class="button is-small is-subtle px-2 ru-delete-days-preset" data-days="180">180일</button>
+                    </div>
                 </div>
             </div>
             <div id="ruDeleteRange" class="field" style="display:none;">
@@ -427,7 +440,23 @@ $(document).ready(function() {
     } else {
         switchRuTab('realtime');
     }
+
+    // 삭제 기간 프리셋 버튼
+    $(document).on('click', '.ru-delete-days-preset', function() {
+        $('#ruDeleteOlderDays').val($(this).data('days'));
+    });
 });
+
+function updateRuSelectionSummary() {
+    const ru = window.ru;
+    if (!ru) return;
+    const groupName = $('#ruGroupSelect option:selected').text();
+    const selected = $('#ruProxySelect').val() || [];
+    if (!selected.length) { $('#ruSelectionSummary').hide(); return; }
+    const hosts = selected.map(id => (ru.proxies || []).find(p => p.id == id)?.host).filter(Boolean);
+    const label = hosts.length <= 3 ? hosts.join(', ') : `${hosts.slice(0, 3).join(', ')} 외 ${hosts.length - 3}개`;
+    $('#ruSelectionSummary').text(`${groupName} · ${label}`).show();
+}
 </script>
 
 <!-- Vendor & Apps Scripts -->

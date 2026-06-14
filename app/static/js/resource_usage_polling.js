@@ -172,10 +172,10 @@
             const state = window.ResourceUsageState;
             const $toggleBtn = $('#ruToggleBtn');
             if (running) {
-                $toggleBtn.removeClass('is-primary').addClass('is-danger').text('중지');
+                $toggleBtn.removeClass('is-primary').addClass('is-danger').text('수집 중지');
                 $('#ruIntervalSec').attr('disabled', true);
             } else {
-                $toggleBtn.removeClass('is-danger').addClass('is-primary').text('시작');
+                $toggleBtn.removeClass('is-danger').addClass('is-primary').text('모니터링 시작');
                 $('#ruIntervalSec').attr('disabled', false);
             }
             state.saveRunningState(running);

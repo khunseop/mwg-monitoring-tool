@@ -339,6 +339,14 @@
             attachTableEvents(el);
             renderLegend();
 
+            // 마지막 갱신 시각 업데이트
+            const now = new Date();
+            const timeStr = now.toTimeString().slice(0, 8);
+            const lastUpdatedEl = document.getElementById('ruLastUpdated');
+            const lastUpdatedTimeEl = document.getElementById('ruLastUpdatedTime');
+            if (lastUpdatedEl) lastUpdatedEl.style.display = '';
+            if (lastUpdatedTimeEl) lastUpdatedTimeEl.textContent = timeStr;
+
             if (state && state.saveHeatmapState) state.saveHeatmapState();
         },
 

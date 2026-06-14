@@ -49,12 +49,13 @@
             ru.lastData = [];
             state.saveState(undefined);
             // 그룹 변경 후 DeviceSelector가 프록시 목록을 갱신하면 skeleton 표시
-            setTimeout(() => heatmap.showSkeleton(), 150);
+            setTimeout(() => { heatmap.showSkeleton(); if (window.updateRuSelectionSummary) updateRuSelectionSummary(); }, 150);
         });
 
         $('#ruProxySelect').off('change').on('change', function() {
             state.saveState(undefined);
             heatmap.showSkeleton();
+            if (window.updateRuSelectionSummary) updateRuSelectionSummary();
         });
 
         $('#ruHeatmapHeightSlider').off('input').on('input', function() {
@@ -89,6 +90,8 @@
                     heatmap.updateTable(restoredHeatmapData);
                 });
             }
+            // 선택 필터 요약 초기 표시
+            if (window.updateRuSelectionSummary) updateRuSelectionSummary();
             
             // 복원 후 실행 상태 확인 및 처리
             try {
