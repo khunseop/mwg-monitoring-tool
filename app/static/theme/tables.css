@@ -168,9 +168,9 @@ table.dataTable thead tr.cc-filters .select.is-small select {
 /* ag-grid customization */
 .ag-theme-quartz {
     --ag-font-family: inherit;
-    --ag-font-size: 0.95rem;
-    --ag-header-height: 50px;
-    --ag-row-height: 36px;
+    --ag-font-size: 0.875rem;
+    --ag-header-height: 40px;
+    --ag-row-height: 35px;
     --ag-border-color: var(--color-border);
     --ag-header-background-color: #f9fafb;
     --ag-odd-row-background-color: transparent;
@@ -191,9 +191,9 @@ table.dataTable thead tr.cc-filters .select.is-small select {
 .ag-theme-quartz .ag-header-cell-label {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     height: 100%;
-    text-align: center;
+    text-align: left;
 }
 
 .ag-theme-quartz .ag-cell {

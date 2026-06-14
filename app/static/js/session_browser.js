@@ -463,6 +463,7 @@
             }
             
             setStatus(`성공 (${sb.records.length}건)`, 'is-primary is-light');
+            $('#sbRowCount').text(`${sb.records.length.toLocaleString()}건 조회됨`).show();
             await persistState();
         } catch (err) {
             console.error('[SessionBrowser] Load failed:', err);
@@ -522,6 +523,7 @@
                     if (sb.gridApi) {
                         sb.gridApi.setGridOption('rowData', sb.records);
                         setStatus(`데이터 복원됨 (${sb.records.length}건)`, 'is-info is-light');
+                        $('#sbRowCount').text(`${sb.records.length.toLocaleString()}건 조회됨`).show();
                         // 데이터가 있으면 목록 섹션이 보여야 함
                         $('#sbListSection').show();
                     }

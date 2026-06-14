@@ -49,17 +49,18 @@
 
         <!-- 상태 인디케이터 (설정바로 이동) -->
         <div class="is-flex is-align-items-center ml-2">
-            <span id="sbStatus" class="tag is-primary is-light is-small" style="font-weight: 700; border-radius: 4px;">준비</span>
+            <span id="sbStatus" class="tag is-ready" style="font-weight: 600; font-size: 0.8rem;">준비</span>
         </div>
     </div>
 
     <div class="is-flex is-align-items-center" style="gap: 0.75rem; margin-left: auto;">
-        <div class="field has-addons mb-0">
-            <p class="control">
-                <input class="input is-small" id="sbQuery" type="text" placeholder="검색어 (grep -F)" style="width: 250px;">
-            </p>
-        </div>
+        <input class="input is-small" id="sbQuery" type="text" placeholder="검색어 (grep -F)" style="width: 200px;">
         <button class="button is-primary is-small px-5" id="sbLoadBtn" style="font-weight: 600;">세션 불러오기</button>
+        <span class="settings-bar-separator"></span>
+        <input class="input is-small" type="text" id="sbQuickFilter" placeholder="결과 내 검색..." style="width: 160px;">
+        <button class="button is-small is-subtle px-3" id="sbClearFilters">
+            <span class="is-size-7">필터 초기화</span>
+        </button>
         <span class="settings-bar-separator"></span>
         <button class="button is-ghost is-small px-3" id="sbExportBtn" style="color: var(--color-text-muted);">내보내기</button>
         <button class="button is-subtle is-small px-3" id="sbAnalyzeBtn" style="font-weight: 600;">분석하기</button>
@@ -68,19 +69,8 @@
 
 <!-- 세션 목록 영역 -->
 <div id="sbListSection" class="sb-tab-content">
-    <div class="is-flex is-align-items-center is-justify-content-end mb-4">
-        <div class="is-flex is-align-items-center" style="gap: 0.5rem;">
-            <div class="field has-addons mb-0">
-                <p class="control">
-                    <input class="input is-small" type="text" id="sbQuickFilter" placeholder="결과 내 검색..." style="width: 200px;">
-                </p>
-                <p class="control">
-                    <button class="button is-small is-subtle px-3" id="sbClearFilters">
-                        <span class="is-size-7">필터 초기화</span>
-                    </button>
-                </p>
-            </div>
-        </div>
+    <div class="is-flex is-align-items-center is-justify-content-flex-end mb-3" style="min-height: 24px;">
+        <span id="sbRowCount" class="is-size-7 has-text-grey-light" style="display:none;"></span>
     </div>
 
     <div class="grid-container" style="position: relative; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden;">
