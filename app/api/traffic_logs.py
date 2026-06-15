@@ -84,10 +84,12 @@ def _fetch_and_parse_for_proxy(db_proxy: Proxy, q: Optional[str], limit: int, di
                 rec_dict["_raw_line_"] = ln  # 원본 로그 보관
                 records.append(TrafficLogRecord(**rec_dict))
                 row = {
-                    "proxy_id": db_proxy.id,
+                    "proxy_id": db_proxy.id,       # int (DB 컬럼 타입)
                     "collected_at": collected_ts,
+                    "_raw_line_": ln,
                 }
-                row.update(rec_dict)
+                # proxy_id/_raw_line_ 제외한 파싱 필드만 업데이트
+                row.update({k: v for k, v in rec_dict.items() if k not in ("proxy_id", "_raw_line_")})
                 to_insert.append(row)
             except Exception:
                 # Add unparseable line as url_path for some visibility
@@ -189,8 +191,16 @@ def get_multi_proxy_traffic_logs(
     # 필터 적용
     if filter_col and filter_val:
         col_attr = getattr(TrafficLogModel, filter_col, None)
-        if col_attr:
-            query = query.filter(col_attr.contains(filter_val))
+        if col_attr is not None:
+            col_type = col_attr.property.columns[0].type.__class__.__name__
+            if col_type in ("Integer", "Float"):
+                try:
+                    numeric_val = float(filter_val)
+                    query = query.filter(col_attr == numeric_val)
+                except ValueError:
+                    pass
+            else:
+                query = query.filter(col_attr.contains(filter_val))
 
     # 전체 카운트 (페이징 전)
     total_count = query.count()
