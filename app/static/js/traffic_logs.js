@@ -207,13 +207,9 @@
             const failMsg = data.failed > 0 ? ` (${data.failed}개 실패)` : '';
             setStatus(`수집 완료 (${data.succeeded}개 성공${failMsg})`, 'is-primary is-light');
 
-            // 수집 완료 후 그리드 갱신: datasource 교체로 캐시 완전 초기화
-            const gridApi = tlGridApi || window.__tlGridApi;
-            if (gridApi) {
-                gridApi.setGridOption('datasource', getDataSource());
-            } else {
-                renderTable([]);
-            }
+            // 수집 완료 후 그리드 완전 재생성 (누적 방지)
+            destroyTlGrid();
+            renderTable([]);
 
         } catch(err) {
             showError(err.message);
