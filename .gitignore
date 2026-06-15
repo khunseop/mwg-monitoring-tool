@@ -81,8 +81,14 @@ node_modules/
 
 # Task files
 # tasks.json
-# tasks/ 
+# tasks/
 
 .secret/
 *.ico
 *.spec
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# Corrupted database files
+*.db.corrupt
