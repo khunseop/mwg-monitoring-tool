@@ -214,6 +214,9 @@ def get_multi_proxy_traffic_logs(
     for row in rows:
         # dict 변환 시 _sa_instance_state 제외
         d = {c.name: getattr(row, c.name) for c in row.__table__.columns}
+        # proxy_id는 DB에서 int로 오지만 스키마는 Optional[str]이므로 변환
+        if d.get('proxy_id') is not None:
+            d['proxy_id'] = str(d['proxy_id'])
         records.append(TrafficLogRecord(**d))
 
     return MultiTrafficLogResponse(

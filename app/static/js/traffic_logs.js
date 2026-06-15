@@ -257,8 +257,12 @@
                 try {
                     const url = `${API_BASE}/traffic-logs?proxy_ids=${pIdsParam}&offset=${offset}&limit=${limit}&sort_col=${sortCol}&sort_dir=${sortDir}&filter_col=${filterCol}&filter_val=${encodeURIComponent(filterVal)}`;
                     const res = await fetch(url);
+                    if (!res.ok) {
+                        const errText = await res.text().catch(() => '');
+                        throw new Error(`서버 오류 (${res.status}): ${errText.slice(0, 200)}`);
+                    }
                     const data = await res.json();
-                    
+
                     params.successCallback(data.records, data.total_count);
                     
                     if (data.total_count === 0) {
