@@ -267,14 +267,15 @@
                     params.successCallback(data.records, data.total_count);
 
                     if (data.total_count === 0) {
-                        // 그리드가 이미 표시 중이면 AG Grid 자체 "no rows" 오버레이 사용
-                        // (#tlEmptyState를 show하면 그리드 위에 끼워지는 버그 발생)
                         if ($('#tlResultParsed').is(':hidden')) {
                             $('#tlEmptyState').show();
                         }
                     } else {
                         $('#tlEmptyState').hide();
-                        setStatus(`${data.total_count}건 중 ${params.startRow}~${params.endRow} 표시 중`, 'is-primary is-light');
+                        // 첫 번째 블록 요청(startRow===0)에서만 총 건수 표시
+                        if (params.startRow === 0) {
+                            setStatus(`총 ${data.total_count.toLocaleString()}건 조회됨`, 'is-primary is-light');
+                        }
                     }
                 } catch (e) {
                     console.error('Failed to fetch rows', e);
@@ -331,7 +332,16 @@
             rowHeight: 35,
             headerHeight: 45,
             onRowDoubleClicked: params => showDetail(params.data),
-            overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">로그가 비어있습니다. [수집/조회] 버튼을 눌러보세요.</div>'
+            overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">로그가 비어있습니다. [수집/조회] 버튼을 눌러보세요.</div>',
+            // quickFilterText는 infinite 모델 미지원 → 외부 필터로 대체
+            isExternalFilterPresent: () => !!$('#tlQuickFilter').val(),
+            doesExternalFilterPass: (node) => {
+                const q = ($('#tlQuickFilter').val() || '').toLowerCase();
+                if (!q || !node.data) return true;
+                return Object.values(node.data).some(v =>
+                    v !== null && v !== undefined && String(v).toLowerCase().includes(q)
+                );
+            }
         };
 
         tlGridApi = window.agGrid.createGrid(gridDiv, gridOptions);
@@ -430,14 +440,14 @@
         $('#tlAnalyzeBtn').off('click').on('click', () => switchTlTab('analyze'));
         
         $('#tlQuickFilter').off('input').on('input', function() {
-            if (tlGridApi) tlGridApi.setGridOption('quickFilterText', $(this).val());
+            if (tlGridApi) tlGridApi.onFilterChanged();
         });
 
         $('#tlClearFiltersBtn').off('click').on('click', () => {
             $('#tlQuickFilter').val('');
             if (tlGridApi) {
-                tlGridApi.setGridOption('quickFilterText', '');
                 tlGridApi.setFilterModel(null);
+                tlGridApi.onFilterChanged();
             }
         });
 
