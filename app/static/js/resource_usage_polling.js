@@ -124,10 +124,8 @@
         async resyncDataOnPageReturn() {
             const ru = window.ru;
             const state = window.ResourceUsageState;
-            const charts = window.ResourceUsageCharts;
-            const heatmap = window.ResourceUsageHeatmap;
-            
-            // If collection is running, fetch latest data and resync
+            if (!ru || !state) return;
+
             if (ru.taskId && ru.intervalId === 'background') {
                 const proxyIds = state.getSelectedProxyIds();
                 if (proxyIds.length > 0) {
@@ -135,11 +133,9 @@
                         const latestRows = await this.fetchLatestForProxies(proxyIds);
                         const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
                         if (valid.length > 0) {
-                            // Reset cache before updating to prevent wrong deltas
                             ru.lastCumulativeByProxy = {};
-                            // Update heatmap with fresh data
                             requestAnimationFrame(() => {
-                                heatmap.updateTable(valid);
+                                if (window.ResourceUsageHeatmap) window.ResourceUsageHeatmap.updateTable(valid);
                             });
                         }
                     } catch (e) {
@@ -195,18 +191,22 @@
             // 웹소켓을 통해 수집 완료 시 데이터 갱신 핸들러 등록
             const self = this;
             window.ResourceUsagePolling.onCollectionComplete = function(taskId, data) {
-                if (taskId === ru.taskId) {
-                    const currentProxyIds = state.getSelectedProxyIds();
-                    self.fetchLatestForProxies(currentProxyIds).then(latestRows => {
-                        const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
-                        if (valid.length > 0) {
-                            // 히트맵 업데이트 (백엔드에서 계산된 Mbps 사용)
-                            requestAnimationFrame(() => {
-                                heatmap.updateTable(valid);
-                            });
-                        }
-                    }).catch(() => {});
-                }
+                // 콜백 실행 시점에 현재 window 참조로 재조회 (클로저 캡처값이 stale해질 수 있음)
+                const currentRu = window.ru;
+                const currentState = window.ResourceUsageState;
+                const currentHeatmap = window.ResourceUsageHeatmap;
+                if (!currentRu || !currentState || !currentHeatmap) return;
+                if (taskId !== currentRu.taskId) return;
+
+                const currentProxyIds = currentState.getSelectedProxyIds();
+                self.fetchLatestForProxies(currentProxyIds).then(latestRows => {
+                    const valid = (latestRows || []).filter(r => r && r.proxy_id && r.collected_at);
+                    if (valid.length > 0) {
+                        requestAnimationFrame(() => {
+                            if (window.ResourceUsageHeatmap) window.ResourceUsageHeatmap.updateTable(valid);
+                        });
+                    }
+                }).catch(() => {});
             };
         }
     };
