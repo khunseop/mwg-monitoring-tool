@@ -36,6 +36,9 @@
                 polling.stopPolling();
             } else {
                 polling.startPolling();
+                // 수집 시작 시 차트 섹션 표시
+                $('#ruChartsSectionWrap').show();
+                charts.ensureApexChartsDom(false, null, 300);
             }
         });
 
@@ -101,6 +104,9 @@
                     ru.taskId = window.ResourceUsageCollector.taskId;
                     polling.setRunning(true);
                     ru.intervalId = 'background';
+                    // 실행 중이면 차트 섹션 표시
+                    $('#ruChartsSectionWrap').show();
+                    charts.ensureApexChartsDom(false, null, 300);
                     // 페이지별 콜백 등록
                     polling.registerPageCallback();
                     // 페이지 로드 시 수집이 실행 중이면 데이터 재동기화

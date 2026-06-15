@@ -89,6 +89,7 @@
                 <div class="is-flex is-align-items-center">
                     <h4 class="title is-6 mb-0 has-text-grey">자원 사용률 히트맵</h4>
                     <span id="ruSelectionSummary" class="is-size-7 has-text-grey-light ml-3" style="display:none;"></span>
+                    <span class="is-size-7 has-text-grey-light ml-3" style="opacity:0.6;">프록시 이름 클릭 시 상세보기</span>
                 </div>
                 <span id="ruLastUpdated" class="is-size-7 has-text-grey-light" style="display:none;">
                     마지막 갱신: <span id="ruLastUpdatedTime">-</span>
@@ -96,12 +97,28 @@
             </div>
             <div id="ruHeatmapLegend" class="is-size-7 mb-3"></div>
         </div>
-        <div id="ruHeatmapWrap" style="overflow-x: auto; overflow-y: auto;">
+        <div id="ruHeatmapWrap" class="ru-heatmap-scroll-wrap">
             <div id="ruHeatmapEl" style="width: 100%; min-width: 1000px;"></div>
         </div>
         <div id="ruEmptyState" class="empty-state">
             <p class="empty-state-title">데이터 없음</p>
             <p class="empty-state-body">위에서 그룹과 프록시를 선택한 뒤 "시작" 버튼을 눌러 실시간 수집을 시작하세요.</p>
+        </div>
+    </div>
+
+    <!-- 실시간 차트 섹션 -->
+    <div class="mt-4" id="ruChartsSectionWrap" style="display:none;">
+        <div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1.25rem;">
+            <div class="is-flex is-align-items-center is-justify-content-space-between mb-3" style="cursor: pointer;" id="ruChartsToggleHeader">
+                <div class="is-flex is-align-items-center" style="gap: 0.5rem;">
+                    <h4 class="title is-6 mb-0 has-text-grey">실시간 차트</h4>
+                    <span class="is-size-7 has-text-grey-light">수집 데이터 기반 시계열 그래프</span>
+                </div>
+                <span class="button is-ghost is-small" id="ruChartsToggleBtn" style="font-size: 0.75rem;">▼ 펼치기</span>
+            </div>
+            <div id="ruChartsContentWrap" style="display: none;">
+                <div class="columns is-multiline" id="ruChartsWrap"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -189,6 +206,40 @@
                 <div id="ruHistoryPaginationInfo" class="is-size-7 has-text-grey mx-3" style="display: flex; align-items: center;"></div>
             </nav>
         </div>
+    </div>
+</div>
+
+<!-- 프록시 상세 모달 -->
+<div class="modal" id="ruProxyDetailModal">
+    <div class="modal-background" style="background: rgba(15, 23, 42, 0.25);" id="ruDetailModalBg"></div>
+    <div class="modal-card ru-detail-modal-card">
+        <header class="modal-card-head py-3 px-5">
+            <div>
+                <p class="modal-card-title is-size-5 mb-0" id="ruDetailProxyName">Proxy</p>
+                <p class="is-size-7 has-text-grey mt-1" id="ruDetailCollectedAt"></p>
+            </div>
+            <button class="delete" aria-label="close" id="ruDetailClose"></button>
+        </header>
+        <section class="modal-card-body p-4" style="overflow-y: auto; max-height: calc(90vh - 100px);">
+            <p class="is-size-7 has-text-grey mb-3" style="font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">현재 수집값</p>
+            <div id="ruDetailTiles" class="ru-detail-tiles mb-4"></div>
+            <p class="is-size-7 has-text-grey mb-2 mt-4" style="font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">시계열 추이 (최근 60회)</p>
+            <div id="ruDetailSparklines"></div>
+        </section>
+    </div>
+</div>
+
+<!-- 차트 확대 모달 -->
+<div class="modal" id="ruChartModal">
+    <div class="modal-background" style="background: rgba(15, 23, 42, 0.25);"></div>
+    <div class="modal-card" style="width: 95vw; max-width: 1200px;">
+        <header class="modal-card-head py-3 px-5">
+            <p class="modal-card-title is-size-5" id="ruModalTitle">Chart</p>
+            <button class="delete" aria-label="close" id="ruChartModalClose"></button>
+        </header>
+        <section class="modal-card-body p-4">
+            <div id="ruModalChart"></div>
+        </section>
     </div>
 </div>
 
@@ -444,6 +495,60 @@ $(document).ready(function() {
     // 삭제 기간 프리셋 버튼
     $(document).on('click', '.ru-delete-days-preset', function() {
         $('#ruDeleteOlderDays').val($(this).data('days'));
+    });
+
+    // 프록시 상세 모달 닫기
+    $(document).on('click', '#ruDetailClose, #ruDetailModalBg', function() {
+        if (window.ResourceUsageHeatmap) window.ResourceUsageHeatmap.closeProxyDetail();
+    });
+
+    // 차트 확대 모달 닫기
+    $(document).on('click', '#ruChartModalClose, #ruChartModal .modal-background', function() {
+        if (window.ResourceUsageCharts) window.ResourceUsageCharts.closeModal();
+    });
+
+    // 실시간 차트 섹션 토글
+    $(document).on('click', '#ruChartsToggleHeader', function() {
+        const $content = $('#ruChartsContentWrap');
+        const $btn     = $('#ruChartsToggleBtn');
+        const isHidden = !$content.is(':visible');
+        if (isHidden) {
+            $content.slideDown(200, function() {
+                if (window.ResourceUsageCharts) window.ResourceUsageCharts.renderAllCharts();
+            });
+            $btn.text('▲ 접기');
+        } else {
+            $content.slideUp(200);
+            $btn.text('▼ 펼치기');
+        }
+    });
+
+    // 차트 접기/펼치기 토글
+    $(document).on('click', '.ru-chart-toggle-btn', function() {
+        const metric = $(this).data('metric');
+        if (metric && window.ResourceUsageCharts) window.ResourceUsageCharts.toggleChart(metric);
+    });
+
+    // 차트 제목 클릭으로도 토글
+    $(document).on('click', '#ruChartsWrap h5[data-metric]', function() {
+        const metric = $(this).data('metric');
+        if (metric && window.ResourceUsageCharts) window.ResourceUsageCharts.toggleChart(metric);
+    });
+
+    // 차트 확대 버튼
+    $(document).on('click', '.ru-chart-zoom-btn', function() {
+        const metric = $(this).data('metric');
+        if (metric && window.ResourceUsageCharts) window.ResourceUsageCharts.openModal(metric);
+    });
+
+    // 전체 차트 펼치기/접기
+    $(document).on('click', '#ruToggleAllCharts', function() {
+        if (window.ResourceUsageCharts) window.ResourceUsageCharts.toggleAllCharts();
+    });
+
+    // 차트 높이 슬라이더
+    $(document).on('input', '#ruChartHeightSlider', function() {
+        if (window.ResourceUsageCharts) window.ResourceUsageCharts.updateChartHeight(parseInt(this.value, 10));
     });
 });
 

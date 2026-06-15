@@ -574,6 +574,93 @@
     flex-shrink: 0;
 }
 
+/* ── 히트맵 스크롤 컨테이너 (50개 프록시 대응) ─────────────── */
+.ru-heatmap-scroll-wrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(100vh - 310px);
+    min-height: 120px;
+}
+
+/* 프록시 컬럼 클릭 가능 스타일 */
+.ru-hm-proxy-clickable {
+    cursor: pointer !important;
+}
+
+.ru-hm-proxy-clickable:hover {
+    color: var(--color-primary, #3b82f6) !important;
+    text-decoration: underline;
+}
+
+/* ── 프록시 상세 모달 ────────────────────────────────────────── */
+.ru-detail-modal-card {
+    width: 880px;
+    max-width: 95vw;
+    max-height: 92vh;
+}
+
+.ru-detail-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 6px;
+}
+
+.ru-detail-tile {
+    border-radius: 8px;
+    padding: 10px 8px 8px;
+    text-align: center;
+    transition: filter 0.1s ease;
+}
+
+.ru-detail-tile:hover {
+    filter: brightness(0.93);
+}
+
+.ru-detail-tile-value {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+}
+
+.ru-detail-tile-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.75;
+    margin-top: 4px;
+}
+
+.ru-detail-tile-pct {
+    font-size: 9px;
+    opacity: 0.6;
+    margin-top: 2px;
+}
+
+/* 스파크라인 그리드 */
+.ru-detail-sparklines {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 10px;
+}
+
+.ru-detail-sparkline-item {
+    background: var(--color-bg, #f8fafc);
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: 8px;
+    padding: 8px 10px 4px;
+}
+
+.ru-detail-sparkline-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--color-text-muted, #64748b);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
 /* ── Proxy management panel ─────────────────────────────────── */
 .panel-content {
     border: 1px solid var(--color-border);

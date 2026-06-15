@@ -204,6 +204,11 @@
                     if (valid.length > 0) {
                         requestAnimationFrame(() => {
                             if (window.ResourceUsageHeatmap) window.ResourceUsageHeatmap.updateTable(valid);
+                            // 타임시리즈 버퍼 갱신 후 열려있는 차트 즉시 업데이트
+                            if (window.ResourceUsageCharts) {
+                                window.ResourceUsageCharts.bufferAppendBatch(valid);
+                                window.ResourceUsageCharts.renderAllCharts();
+                            }
                         });
                     }
                 }).catch(() => {});
