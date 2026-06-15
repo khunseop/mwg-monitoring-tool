@@ -269,7 +269,8 @@
                 }
 
                 try {
-                    const url = `${API_BASE}/traffic-logs?proxy_ids=${pIdsParam}&offset=${offset}&limit=${limit}&sort_col=${sortCol}&sort_dir=${sortDir}&filter_col=${filterCol}&filter_val=${encodeURIComponent(filterVal)}`;
+                    const searchVal = encodeURIComponent($('#tlQuickFilter').val() || '');
+                    const url = `${API_BASE}/traffic-logs?proxy_ids=${pIdsParam}&offset=${offset}&limit=${limit}&sort_col=${sortCol}&sort_dir=${sortDir}&filter_col=${filterCol}&filter_val=${encodeURIComponent(filterVal)}&search=${searchVal}`;
                     const res = await fetch(url);
                     if (!res.ok) {
                         const errText = await res.text().catch(() => '');
@@ -346,15 +347,6 @@
             headerHeight: 45,
             onRowDoubleClicked: params => showDetail(params.data),
             overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">로그가 비어있습니다. [수집/조회] 버튼을 눌러보세요.</div>',
-            // quickFilterText는 infinite 모델 미지원 → 외부 필터로 대체
-            isExternalFilterPresent: () => !!$('#tlQuickFilter').val(),
-            doesExternalFilterPass: (node) => {
-                const q = ($('#tlQuickFilter').val() || '').toLowerCase();
-                if (!q || !node.data) return true;
-                return Object.values(node.data).some(v =>
-                    v !== null && v !== undefined && String(v).toLowerCase().includes(q)
-                );
-            }
         };
 
         tlGridApi = window.agGrid.createGrid(gridDiv, gridOptions);
@@ -453,14 +445,14 @@
         $('#tlAnalyzeBtn').off('click').on('click', () => switchTlTab('analyze'));
         
         $('#tlQuickFilter').off('input').on('input', function() {
-            if (tlGridApi) tlGridApi.onFilterChanged();
+            if (tlGridApi) tlGridApi.setGridOption('datasource', getDataSource());
         });
 
         $('#tlClearFiltersBtn').off('click').on('click', () => {
             $('#tlQuickFilter').val('');
             if (tlGridApi) {
                 tlGridApi.setFilterModel(null);
-                tlGridApi.onFilterChanged();
+                tlGridApi.setGridOption('datasource', getDataSource());
             }
         });
 

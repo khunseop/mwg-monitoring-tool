@@ -172,8 +172,11 @@ def get_multi_proxy_traffic_logs(
     sort_dir: str = Query(default="desc", pattern=r"^(asc|desc)$"),
     filter_col: Optional[str] = Query(default=None),
     filter_val: Optional[str] = Query(default=None),
+    search: Optional[str] = Query(default=None, max_length=256),
 ):
     """DB에 저장된 로그를 페이징/정렬하여 조회합니다."""
+    from sqlalchemy import or_
+
     try:
         p_ids = [int(x.strip()) for x in proxy_ids.split(",") if x.strip()]
     except ValueError:
@@ -184,7 +187,20 @@ def get_multi_proxy_traffic_logs(
 
     query = db.query(TrafficLogModel).filter(TrafficLogModel.proxy_id.in_(p_ids))
 
-    # 필터 적용
+    # 전체 텍스트 검색 (결과 내 검색)
+    if search and search.strip():
+        s = search.strip()
+        query = query.filter(or_(
+            TrafficLogModel.url_host.contains(s),
+            TrafficLogModel.client_ip.contains(s),
+            TrafficLogModel.url_path.contains(s),
+            TrafficLogModel.username.contains(s),
+            TrafficLogModel.action_names.contains(s),
+            TrafficLogModel.url_categories.contains(s),
+            TrafficLogModel.comm_name.contains(s),
+        ))
+
+    # 컬럼 필터 적용
     if filter_col and filter_val:
         col_attr = getattr(TrafficLogModel, filter_col, None)
         if col_attr is not None:
