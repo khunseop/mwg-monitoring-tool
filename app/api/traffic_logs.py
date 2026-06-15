@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
+from sqlalchemy import insert as sa_insert
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime
 import shlex
@@ -81,14 +82,10 @@ def _fetch_and_parse_for_proxy(db_proxy: Proxy, q: Optional[str], limit: int, di
                 rec_dict = parse_log_line(ln)
                 # Ensure proxy_id is set in the record
                 rec_dict["proxy_id"] = str(db_proxy.id)
-                rec_dict["_raw_line_"] = ln  # 원본 로그 보관
+                rec_dict["_raw_line_"] = ln
                 records.append(TrafficLogRecord(**rec_dict))
-                row = {
-                    "proxy_id": db_proxy.id,       # int (DB 컬럼 타입)
-                    "collected_at": collected_ts,
-                    "_raw_line_": ln,
-                }
-                # proxy_id/_raw_line_ 제외한 파싱 필드만 업데이트
+                # SQLAlchemy 2.0: proxy_id는 int, _raw_line_은 별도 지정 (언더스코어 속성 충돌 방지)
+                row = {"proxy_id": db_proxy.id, "collected_at": collected_ts}
                 row.update({k: v for k, v in rec_dict.items() if k not in ("proxy_id", "_raw_line_")})
                 to_insert.append(row)
             except Exception:
@@ -100,9 +97,8 @@ def _fetch_and_parse_for_proxy(db_proxy: Proxy, q: Optional[str], limit: int, di
             # But we must be careful with session thread-safety. 
             # In get_multi_proxy_traffic_logs, we'll give each call its own session or a lock.
             try:
-                # Delete old snapshot for this proxy
                 db.query(TrafficLogModel).filter(TrafficLogModel.proxy_id == db_proxy.id).delete(synchronize_session=False)
-                db.bulk_insert_mappings(TrafficLogModel, to_insert)
+                db.execute(sa_insert(TrafficLogModel), to_insert)
                 db.commit()
             except Exception as e:
                 db.rollback()

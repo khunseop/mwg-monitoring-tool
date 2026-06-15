@@ -207,9 +207,13 @@
             const failMsg = data.failed > 0 ? ` (${data.failed}개 실패)` : '';
             setStatus(`수집 완료 (${data.succeeded}개 성공${failMsg})`, 'is-primary is-light');
 
-            // 수집 완료 후 그리드 새로고침 (window 참조로도 시도)
+            // 수집 완료 후 그리드 갱신: datasource 교체로 캐시 완전 초기화
             const gridApi = tlGridApi || window.__tlGridApi;
-            if (gridApi) gridApi.refreshInfiniteCache();
+            if (gridApi) {
+                gridApi.setGridOption('datasource', getDataSource());
+            } else {
+                renderTable([]);
+            }
 
         } catch(err) {
             showError(err.message);
@@ -246,13 +250,26 @@
                     sortDir = params.sortModel[0].sort;
                 }
 
-                // Filtering (Simple implementation)
+                // 컬럼 필터 추출 (AG Grid v33 호환)
                 let filterCol = '';
                 let filterVal = '';
                 const filterModel = params.filterModel;
                 if (filterModel && Object.keys(filterModel).length > 0) {
                     filterCol = Object.keys(filterModel)[0];
-                    filterVal = filterModel[filterCol].filter;
+                    const fm = filterModel[filterCol];
+                    // AG Grid v33: conditions 배열 형식 또는 단순 filter 형식 모두 처리
+                    if (fm.conditions && fm.conditions.length > 0) {
+                        filterVal = fm.conditions[0].filter;
+                    } else {
+                        filterVal = fm.filter;
+                    }
+                    // 유효하지 않은 값 방어
+                    if (filterVal === undefined || filterVal === null) {
+                        filterCol = '';
+                        filterVal = '';
+                    } else {
+                        filterVal = String(filterVal);
+                    }
                 }
 
                 try {
