@@ -207,8 +207,9 @@
             const failMsg = data.failed > 0 ? ` (${data.failed}개 실패)` : '';
             setStatus(`수집 완료 (${data.succeeded}개 성공${failMsg})`, 'is-primary is-light');
 
-            // 수집 완료 후 그리드 새로고침
-            if (tlGridApi) tlGridApi.refreshInfiniteCache();
+            // 수집 완료 후 그리드 새로고침 (window 참조로도 시도)
+            const gridApi = tlGridApi || window.__tlGridApi;
+            if (gridApi) gridApi.refreshInfiniteCache();
 
         } catch(err) {
             showError(err.message);
@@ -264,9 +265,13 @@
                     const data = await res.json();
 
                     params.successCallback(data.records, data.total_count);
-                    
+
                     if (data.total_count === 0) {
-                        $('#tlEmptyState').show();
+                        // 그리드가 이미 표시 중이면 AG Grid 자체 "no rows" 오버레이 사용
+                        // (#tlEmptyState를 show하면 그리드 위에 끼워지는 버그 발생)
+                        if ($('#tlResultParsed').is(':hidden')) {
+                            $('#tlEmptyState').show();
+                        }
                     } else {
                         $('#tlEmptyState').hide();
                         setStatus(`${data.total_count}건 중 ${params.startRow}~${params.endRow} 표시 중`, 'is-primary is-light');
