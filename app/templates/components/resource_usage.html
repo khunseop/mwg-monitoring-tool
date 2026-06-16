@@ -106,19 +106,14 @@
         </div>
     </div>
 
-    <!-- 실시간 차트 섹션 -->
-    <div class="mt-4" id="ruChartsSectionWrap" style="display:none;">
-        <div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1.25rem;">
-            <div class="is-flex is-align-items-center is-justify-content-space-between mb-3" style="cursor: pointer;" id="ruChartsToggleHeader">
-                <div class="is-flex is-align-items-center" style="gap: 0.5rem;">
-                    <h4 class="title is-6 mb-0 has-text-grey">실시간 차트</h4>
-                    <span class="is-size-7 has-text-grey-light">수집 데이터 기반 시계열 그래프</span>
-                </div>
-                <span class="button is-ghost is-small" id="ruChartsToggleBtn" style="font-size: 0.75rem;">▼ 펼치기</span>
+    <!-- 이상징후 패널 -->
+    <div class="mt-4" id="ruAnomalyPanel" style="display:none;">
+        <div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem 1.25rem;">
+            <div class="is-flex is-align-items-center is-justify-content-space-between mb-2">
+                <h4 class="title is-6 mb-0 has-text-grey">추세 모니터링</h4>
+                <span id="ruAnomalyStatus" class="is-size-7 has-text-grey-light"></span>
             </div>
-            <div id="ruChartsContentWrap" style="display: none;">
-                <div class="columns is-multiline" id="ruChartsWrap"></div>
-            </div>
+            <div id="ruAnomalyContent"></div>
         </div>
     </div>
 </div>

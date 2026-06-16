@@ -80,6 +80,22 @@
         return { raw, scaled };
     }
 
+    // ── 추세 계산 ────────────────────────────────────────────────
+    function getTrend(proxyId, metricKey) {
+        const bufferKey = metricKey === 'httpd'  ? 'http'  :
+                          metricKey === 'httpsd' ? 'https' :
+                          metricKey === 'http2d' ? 'http2' : metricKey;
+        const arr = ((window.ru.tsBuffer || {})[proxyId] || {})[bufferKey] || [];
+        if (arr.length < 2) return '';
+        const last = arr[arr.length - 1].y;
+        const prev = arr[arr.length - 2].y;
+        if (typeof last !== 'number' || typeof prev !== 'number') return '';
+        const delta = last - prev;
+        const threshold = Math.max(Math.abs(prev) * 0.02, 0.5);
+        if (Math.abs(delta) < threshold) return '→';
+        return delta > 0 ? '↑' : '↓';
+    }
+
     // ── 툴팁 ─────────────────────────────────────────────────────
     function ensureTooltip() {
         if (tooltipEl) return;
@@ -251,12 +267,14 @@
                 const { raw, scaled } = getCellData(row, m, thr, ifThr, maxByMetric);
                 const { bg, color }   = getHeatmapCellStyle(scaled);
                 const display         = raw !== null ? formatCellValue(raw, m.key) : '';
+                const trend           = raw !== null ? getTrend(row.proxy_id, m.key) : '';
+                const inner           = display + (trend ? `<span class="ru-trend">${trend}</span>` : '');
                 parts.push(
                     `<td id="ru-cell-${row.proxy_id}-${m.key}" class="ru-hm-cell" style="background:${bg};color:${color}"` +
-                    ` data-proxy="${row._fullHost}"` +
+                    ` data-proxy="${row._fullHost}" data-proxy-id="${row.proxy_id}"` +
                     ` data-mk="${m.key}" data-mt="${m.title}"` +
                     ` data-raw="${raw !== null ? raw : ''}"` +
-                    ` data-scaled="${scaled !== null ? scaled : ''}">${display}</td>`
+                    ` data-scaled="${scaled !== null ? scaled : ''}">${inner}</td>`
                 );
             });
             parts.push('</tr>');
@@ -278,7 +296,9 @@
                 const { bg, color }   = getHeatmapCellStyle(scaled);
                 cellEl.style.background = bg;
                 cellEl.style.color      = color;
-                cellEl.textContent      = raw !== null ? formatCellValue(raw, m.key) : '';
+                const display = raw !== null ? formatCellValue(raw, m.key) : '';
+                const trend   = raw !== null ? getTrend(row.proxy_id, m.key) : '';
+                cellEl.innerHTML        = display + (trend ? `<span class="ru-trend">${trend}</span>` : '');
                 cellEl.dataset.raw      = raw    !== null ? String(raw)    : '';
                 cellEl.dataset.scaled   = scaled !== null ? String(scaled) : '';
             });
