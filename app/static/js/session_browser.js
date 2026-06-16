@@ -560,7 +560,6 @@
             rowData: [],
             pagination: true,
             paginationPageSize: window.AgGridConfig ? window.AgGridConfig.getPageSize() : 50,
-            domLayout: 'autoHeight',
             rowHeight: 35,
             headerHeight: 40,
             animateRows: true,

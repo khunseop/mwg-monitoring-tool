@@ -239,7 +239,6 @@
 				enableSorting: true,
 				animateRows: false,
 				suppressRowClickSelection: false,
-				domLayout: 'autoHeight',
 				defaultColDef: {
 					sortable: true,
 					filter: true,
@@ -258,7 +257,6 @@
 				enableSorting: true,
 				animateRows: false,
 				suppressRowClickSelection: false,
-				domLayout: 'autoHeight',
 				defaultColDef: {
 					sortable: true,
 					filter: 'agTextColumnFilter',

@@ -325,8 +325,9 @@
         const hasGridDom = !!gridDiv.querySelector('.ag-root-wrapper');
 
         if (tlGridApi && hasGridDom) {
-            // 그리드 이미 존재 → 데이터만 갱신
+            // 그리드 이미 존재 → 캐시 초기화 후 데이터 갱신 (누적 방지)
             tlGridApi.setGridOption('datasource', getDataSource());
+            tlGridApi.purgeInfiniteCache();
             $('#tlResultParsed').fadeIn();
             return;
         }
@@ -456,16 +457,60 @@
             }
         });
 
-        $('#tlExportBtn').off('click').on('click', () => {
-            if (tlGridApi) {
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                tlGridApi.exportDataAsCsv({ 
-                    fileName: `traffic_logs_${timestamp}.csv`,
-                    allColumns: true,
-                    processCellCallback: window.AgGridConfig ? window.AgGridConfig.processCellForExport : null
-                });
-            } else {
+        $('#tlExportBtn').off('click').on('click', async () => {
+            if (!tlGridApi) {
                 alert('내보낼 데이터가 없습니다.');
+                return;
+            }
+
+            let proxyIds = [];
+            const $ps = $('#tlProxySelect');
+            if ($ps[0] && $ps[0].tomselect) {
+                proxyIds = $ps[0].tomselect.getValue();
+            } else {
+                proxyIds = $ps.val() || [];
+            }
+            if (!proxyIds || proxyIds.length === 0) {
+                alert('프록시를 선택해주세요.');
+                return;
+            }
+
+            // 현재 필터/정렬 상태 수집
+            const pIdsParam = Array.isArray(proxyIds) ? proxyIds.join(',') : proxyIds;
+            const searchVal = encodeURIComponent($('#tlQuickFilter').val() || '');
+            let sortCol = 'id', sortDir = 'desc';
+            const sortState = tlGridApi.getColumnState().filter(c => c.sort);
+            if (sortState.length > 0) {
+                sortCol = sortState[0].colId;
+                sortDir = sortState[0].sort;
+            }
+            let filterCol = '', filterVal = '';
+            const filterModel = tlGridApi.getFilterModel();
+            if (filterModel && Object.keys(filterModel).length > 0) {
+                filterCol = Object.keys(filterModel)[0];
+                const fm = filterModel[filterCol];
+                filterVal = (fm.conditions && fm.conditions.length > 0) ? fm.conditions[0].filter : fm.filter;
+                if (filterVal === undefined || filterVal === null) { filterCol = ''; filterVal = ''; }
+                else { filterVal = encodeURIComponent(String(filterVal)); }
+            }
+
+            const url = `${API_BASE}/traffic-logs/export?proxy_ids=${pIdsParam}&sort_col=${sortCol}&sort_dir=${sortDir}&filter_col=${filterCol}&filter_val=${filterVal}&search=${searchVal}`;
+            const $btn = $('#tlExportBtn');
+            $btn.addClass('is-loading');
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
+                const blob = await res.blob();
+                const filename = `traffic_logs_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.csv`;
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(a.href);
+            } catch(err) {
+                alert('내보내기 실패: ' + err.message);
+            } finally {
+                $btn.removeClass('is-loading');
             }
         });
 

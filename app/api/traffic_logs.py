@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import insert as sa_insert
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime
+import csv
+import io
 import shlex
 from app.utils.ssh import ssh_exec
 
@@ -250,6 +253,84 @@ def get_multi_proxy_traffic_logs(
         total_count=total_count,
         offset=offset,
         limit=limit
+    )
+
+
+@router.get("/traffic-logs/export")
+def export_traffic_logs(
+    proxy_ids: str = Query(..., description="Comma-separated list of proxy IDs"),
+    db: Session = Depends(get_db),
+    sort_col: Optional[str] = Query(default="id"),
+    sort_dir: str = Query(default="desc", pattern=r"^(asc|desc)$"),
+    filter_col: Optional[str] = Query(default=None),
+    filter_val: Optional[str] = Query(default=None),
+    search: Optional[str] = Query(default=None, max_length=256),
+):
+    """필터/정렬 상태 그대로 전체 데이터를 CSV로 내보냅니다."""
+    from sqlalchemy import or_
+
+    try:
+        p_ids = [int(x.strip()) for x in proxy_ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid proxy_ids format")
+
+    if not p_ids:
+        raise HTTPException(status_code=400, detail="proxy_ids is required")
+
+    query = db.query(TrafficLogModel).filter(TrafficLogModel.proxy_id.in_(p_ids))
+
+    if search and search.strip():
+        s = search.strip()
+        query = query.filter(or_(
+            TrafficLogModel.url_host.contains(s),
+            TrafficLogModel.client_ip.contains(s),
+            TrafficLogModel.url_path.contains(s),
+            TrafficLogModel.username.contains(s),
+            TrafficLogModel.action_names.contains(s),
+            TrafficLogModel.url_categories.contains(s),
+            TrafficLogModel.comm_name.contains(s),
+        ))
+
+    if filter_col and filter_val:
+        col_attr = getattr(TrafficLogModel, filter_col, None)
+        if col_attr is not None:
+            col_type = col_attr.property.columns[0].type.__class__.__name__
+            if col_type in ("Integer", "Float"):
+                try:
+                    numeric_val = float(filter_val)
+                    query = query.filter(col_attr == numeric_val)
+                except ValueError:
+                    pass
+            else:
+                query = query.filter(col_attr.contains(filter_val))
+
+    if sort_col:
+        col_attr = getattr(TrafficLogModel, sort_col, None)
+        if col_attr:
+            query = query.order_by(col_attr.desc() if sort_dir == "desc" else col_attr.asc())
+    else:
+        query = query.order_by(TrafficLogModel.id.desc())
+
+    columns = [c.name for c in TrafficLogModel.__table__.columns]
+
+    def generate_csv():
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(columns)
+        yield buf.getvalue()
+
+        for row in query.yield_per(500):
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            writer.writerow([getattr(row, c) for c in columns])
+            yield buf.getvalue()
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"traffic_logs_{timestamp}.csv"
+    return StreamingResponse(
+        generate_csv(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 
