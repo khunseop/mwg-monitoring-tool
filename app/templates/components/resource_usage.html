@@ -88,6 +88,19 @@
         </div>
     </div>
 
+    <!-- 추세 그래프 섹션 -->
+    <div class="mt-4" id="ruChartsSectionWrap">
+        <div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
+            <div class="is-flex is-align-items-center is-justify-content-space-between p-3" id="ruChartsToggleHeader" style="cursor: pointer; user-select: none;">
+                <h4 class="title is-6 mb-0 has-text-grey">추세 그래프</h4>
+                <button class="button is-ghost is-small" id="ruChartsToggleBtn">▼ 펼치기</button>
+            </div>
+            <div id="ruChartsContentWrap" style="display: none; padding: 0.75rem 1rem;">
+                <div id="ruChartsWrap" class="columns is-multiline"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- 이상징후 패널 -->
     <div class="mt-4" id="ruAnomalyPanel" style="display:none;">
         <div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem 1.25rem;">
@@ -548,6 +561,7 @@ function updateRuSelectionSummary() {
 <script src="/static/js/resource_usage_utils.js"></script>
 <script src="/static/js/resource_usage_state.js"></script>
 <script src="/static/js/resource_usage_heatmap.js"></script>
+<script src="/static/js/resource_usage_charts.js"></script>
 <script src="/static/js/resource_usage_polling.js"></script>
 <script src="/static/js/resource_usage.js"></script>
 <script src="/static/js/resource_history.js"></script>
