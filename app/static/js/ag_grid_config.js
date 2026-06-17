@@ -232,9 +232,9 @@
 			return {
 				rowModelType: 'serverSide',
 				serverSideInfiniteScroll: true,
-				cacheBlockSize: 25,
+				cacheBlockSize: 50,
 				pagination: true,
-				paginationPageSize: 25,
+				paginationPageSize: 50,
 				enableFilter: true,
 				enableSorting: true,
 				animateRows: false,
@@ -252,7 +252,7 @@
 			return {
 				rowModelType: 'clientSide',
 				pagination: true,
-				paginationPageSize: 25,
+				paginationPageSize: 50,
 				enableFilter: true,
 				enableSorting: true,
 				animateRows: false,
@@ -262,7 +262,7 @@
 					filter: 'agTextColumnFilter',
 					filterParams: { applyButton: true, clearButton: true },
 					resizable: true,
-					minWidth: 100
+					minWidth: 80
 				}
 			};
 		}

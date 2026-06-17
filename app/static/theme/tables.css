@@ -168,9 +168,9 @@ table.dataTable thead tr.cc-filters .select.is-small select {
 /* ag-grid customization */
 .ag-theme-quartz {
     --ag-font-family: inherit;
-    --ag-font-size: 0.875rem;
-    --ag-header-height: 40px;
-    --ag-row-height: 35px;
+    --ag-font-size: 0.8rem;
+    --ag-header-height: 32px;
+    --ag-row-height: 28px;
     --ag-border-color: var(--color-border);
     --ag-header-background-color: #f9fafb;
     --ag-odd-row-background-color: transparent;
@@ -182,10 +182,9 @@ table.dataTable thead tr.cc-filters .select.is-small select {
 .ag-theme-quartz .ag-header-cell {
     font-weight: 600;
     color: var(--color-text);
-    white-space: normal;
-    word-wrap: break-word;
-    line-height: 1.4;
-    padding: 8px 12px;
+    white-space: nowrap;
+    line-height: 1.3;
+    padding: 5px 8px;
 }
 
 .ag-theme-quartz .ag-header-cell-label {
@@ -198,6 +197,12 @@ table.dataTable thead tr.cc-filters .select.is-small select {
 
 .ag-theme-quartz .ag-cell {
     color: var(--bulma-text);
+    padding: 0 8px;
+    line-height: 28px;
+}
+
+.ag-theme-quartz .ag-row {
+    border-bottom: 1px solid var(--color-border);
 }
 
 .ag-theme-quartz .ag-cell.mono {
@@ -211,8 +216,9 @@ table.dataTable thead tr.cc-filters .select.is-small select {
 /* ag-grid pagination styling */
 .ag-theme-quartz .ag-paging-panel {
     border-top: 1px solid var(--color-border);
-    padding: 0.75rem 0;
+    padding: 0.4rem 0;
     color: var(--color-text-muted);
+    font-size: 0.78rem;
 }
 
 .ag-theme-quartz .ag-paging-button {

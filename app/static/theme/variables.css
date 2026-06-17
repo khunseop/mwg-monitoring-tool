@@ -38,8 +38,8 @@
 
     /* Typography */
     --font-sans: "Inter Var", "Pretendard Var", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Helvetica Neue", Arial, sans-serif;
-    --font-size-base: 15px;
-    --line-height-base: 1.55;
+    --font-size-base: 14px;
+    --line-height-base: 1.45;
 
     /* Bulma overrides */
     --bulma-scheme-brightness: light;
