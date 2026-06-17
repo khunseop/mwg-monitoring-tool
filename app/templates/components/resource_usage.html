@@ -1,32 +1,21 @@
 {% extends "base.html" %}
 
+{% block subnav %}
+{% set is_history = request.url.path == '/history' %}
+<div class="subnav">
+    <div class="container">
+        <div class="subnav-tabs">
+            <a id="tab-realtime" class="subnav-tab {% if not is_history %}is-active{% endif %}" onclick="switchRuTab('realtime')">실시간 모니터링</a>
+            <a id="tab-history" class="subnav-tab {% if is_history %}is-active{% endif %}" onclick="switchRuTab('history')">자원사용률 이력</a>
+            <a id="tab-history-graph" class="subnav-tab" onclick="switchRuTab('graph')">이력 그래프 분석</a>
+            <a id="tab-analysis" class="subnav-tab" onclick="switchRuTab('analysis')">부하 분석</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
 {% block content %}
 {% set is_history = request.url.path == '/history' %}
-
-<div class="tabs mb-3">
-    <ul>
-        <li id="tab-realtime" class="{% if not is_history %}is-active{% endif %}">
-            <a onclick="switchRuTab('realtime')">
-                <span>실시간 모니터링</span>
-            </a>
-        </li>
-        <li id="tab-history" class="{% if is_history %}is-active{% endif %}">
-            <a onclick="switchRuTab('history')">
-                <span>자원사용률 이력</span>
-            </a>
-        </li>
-        <li id="tab-history-graph">
-            <a onclick="switchRuTab('graph')">
-                <span>이력 그래프 분석</span>
-            </a>
-        </li>
-        <li id="tab-analysis">
-            <a onclick="switchRuTab('analysis')">
-                <span>부하 분석</span>
-            </a>
-        </li>
-    </ul>
-</div>
 
 <!-- 실시간 모니터링 섹션 -->
 <div id="realtime-tab" class="tab-content ru-tab-content" {% if is_history %}style="display:none;"{% endif %}>
@@ -450,7 +439,7 @@
 <script>
 function switchRuTab(tabId) {
     $('.ru-tab-content').hide();
-    $('.tabs li').removeClass('is-active');
+    $('.subnav-tab').removeClass('is-active');
 
     if (tabId === 'realtime') {
         $('#realtime-tab').show();

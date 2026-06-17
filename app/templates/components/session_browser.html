@@ -1,20 +1,17 @@
 {% extends "base.html" %}
 
-{% block content %}
-<div class="tabs mb-3">
-    <ul>
-        <li id="sb-tab-list" class="is-active">
-            <a onclick="switchSbTab('list')">
-                <span>세션 목록</span>
-            </a>
-        </li>
-        <li id="sb-tab-analyze">
-            <a onclick="switchSbTab('analyze')">
-                <span>결과 분석</span>
-            </a>
-        </li>
-    </ul>
+{% block subnav %}
+<div class="subnav">
+    <div class="container">
+        <div class="subnav-tabs">
+            <a id="sb-tab-list" class="subnav-tab is-active" onclick="switchSbTab('list')">세션 목록</a>
+            <a id="sb-tab-analyze" class="subnav-tab" onclick="switchSbTab('analyze')">결과 분석</a>
+        </div>
+    </div>
 </div>
+{% endblock %}
+
+{% block content %}
 
 <!-- 세션 조회 설정 바 (통합) -->
 <div class="settings-bar mb-2">

@@ -1,27 +1,20 @@
 {% extends "base.html" %}
 
+{% block subnav %}
+{% set is_upload = request.url.path == '/traffic-logs/upload' %}
+<div class="subnav">
+    <div class="container">
+        <div class="subnav-tabs">
+            <a id="tab-remote" class="subnav-tab {% if not is_upload %}is-active{% endif %}" onclick="switchTlTab('remote')">로그 원격 조회</a>
+            <a id="tab-analyze" class="subnav-tab" onclick="switchTlTab('analyze')">결과 분석</a>
+            <a id="tab-upload" class="subnav-tab {% if is_upload %}is-active{% endif %}" onclick="switchTlTab('upload')">파일 업로드 분석</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
 {% block content %}
 {% set is_upload = request.url.path == '/traffic-logs/upload' %}
-
-<div class="tabs mb-3">
-    <ul>
-        <li id="tab-remote" class="{% if not is_upload %}is-active{% endif %}">
-            <a onclick="switchTlTab('remote')">
-                <span>로그 원격 조회</span>
-            </a>
-        </li>
-        <li id="tab-analyze">
-            <a onclick="switchTlTab('analyze')">
-                <span>결과 분석</span>
-            </a>
-        </li>
-        <li id="tab-upload" class="{% if is_upload %}is-active{% endif %}">
-            <a onclick="switchTlTab('upload')">
-                <span>파일 업로드 분석</span>
-            </a>
-        </li>
-    </ul>
-</div>
 
 <!-- 원격 조회 섹션 -->
 <div id="tlRemoteSection" class="tl-tab-content" {% if is_upload %}style="display:none;"{% endif %}>

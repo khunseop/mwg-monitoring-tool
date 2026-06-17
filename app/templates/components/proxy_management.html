@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 
-{% block content %}
-<!-- 페이지 내부 탭 -->
-<div class="tabs panel-tabs mb-0">
-    <ul>
-        <li id="proxy-list-tab" class="is-active">
-            <a onclick="switchProxySection('list')">프록시 목록</a>
-        </li>
-        <li id="proxy-groups-tab">
-            <a onclick="switchProxySection('groups')">프록시 그룹 관리</a>
-        </li>
-    </ul>
+{% block subnav %}
+<div class="subnav">
+    <div class="container">
+        <div class="subnav-tabs">
+            <a id="proxy-list-tab" class="subnav-tab is-active" onclick="switchProxySection('list')">프록시 목록</a>
+            <a id="proxy-groups-tab" class="subnav-tab" onclick="switchProxySection('groups')">프록시 그룹 관리</a>
+        </div>
+    </div>
 </div>
+{% endblock %}
+
+{% block content %}
 
 <!-- 프록시 목록 섹션 -->
 <div id="proxy-list-section" class="panel-content">

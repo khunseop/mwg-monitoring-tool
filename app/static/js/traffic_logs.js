@@ -3,7 +3,7 @@
     
     function switchTlTab(tabId) {
         $('.tl-tab-content').hide();
-        $('.tabs li').removeClass('is-active');
+        $('.subnav-tab').removeClass('is-active');
         
         if (tabId === 'remote') {
             $('#tlRemoteSection').show();
