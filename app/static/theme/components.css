@@ -59,6 +59,32 @@
     background: transparent !important;
 }
 
+/* 모바일 burger 메뉴 펼침 시 다크 배경 */
+@media screen and (max-width: 1023px) {
+    .navbar-menu {
+        background: #0f172a !important;
+        border-top: 1px solid #1e293b;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+        padding: 0.25rem 0;
+    }
+
+    .navbar-menu .navbar-item {
+        color: #94a3b8 !important;
+        padding: 0.6rem 1.25rem !important;
+        border-radius: 0 !important;
+    }
+
+    .navbar-menu .navbar-item:hover {
+        background: rgba(255, 255, 255, 0.07) !important;
+        color: #e2e8f0 !important;
+    }
+
+    .navbar-menu .navbar-item.is-active {
+        color: #60a5fa !important;
+        background: rgba(96, 165, 250, 0.08) !important;
+    }
+}
+
 .navbar-dropdown.is-boxed {
     border-radius: var(--radius-md);
     border: 1px solid var(--color-border);
