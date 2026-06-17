@@ -1,14 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="page-header mb-5">
-    <div>
-        <h3 class="title is-4 page-header-title">세션 브라우저</h3>
-        <p class="page-header-subtitle">프록시 서버의 현재 활성 세션을 조회하고 분석합니다.</p>
-    </div>
-</div>
-
-<div class="tabs mb-5">
+<div class="tabs mb-3">
     <ul>
         <li id="sb-tab-list" class="is-active">
             <a onclick="switchSbTab('list')">
@@ -24,7 +17,7 @@
 </div>
 
 <!-- 세션 조회 설정 바 (통합) -->
-<div class="settings-bar mb-5">
+<div class="settings-bar mb-2">
     <div class="is-flex is-align-items-center" style="gap: 1rem;">
         <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
             <span class="filter-label">그룹</span>
@@ -69,7 +62,7 @@
 
 <!-- 세션 목록 영역 -->
 <div id="sbListSection" class="sb-tab-content">
-    <div class="is-flex is-align-items-center is-justify-content-flex-end mb-3" style="min-height: 24px;">
+    <div class="is-flex is-align-items-center is-justify-content-flex-end" style="height: 18px; margin-bottom: 4px;">
         <span id="sbRowCount" class="is-size-7 has-text-grey-light" style="display:none;"></span>
     </div>
 

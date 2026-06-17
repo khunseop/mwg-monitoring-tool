@@ -168,7 +168,7 @@ table.dataTable thead tr.cc-filters .select.is-small select {
 /* ag-grid customization */
 .ag-theme-quartz {
     --ag-font-family: inherit;
-    --ag-font-size: 0.8rem;
+    --ag-font-size: 0.85rem;
     --ag-header-height: 32px;
     --ag-row-height: 28px;
     --ag-border-color: var(--color-border);
