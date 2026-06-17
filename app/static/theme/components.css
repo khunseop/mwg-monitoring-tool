@@ -261,9 +261,6 @@
 .subnav {
     background: #0c1525;
     border-bottom: 1px solid #1e293b;
-    position: sticky;
-    top: 2.75rem;
-    z-index: 99;
 }
 
 .subnav-tabs {

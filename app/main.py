@@ -164,6 +164,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+@app.middleware("http")
+async def no_cache_html(request: Request, call_next):
+    response = await call_next(request)
+    if "text/html" in response.headers.get("content-type", ""):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+    return response
 # Enable docs only when enabled via env (default true)
 if os.getenv("ENABLE_DOCS", "true").lower() in {"1", "true", "yes"}:
     StandaloneDocs(app)
