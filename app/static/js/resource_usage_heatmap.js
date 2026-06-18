@@ -108,32 +108,11 @@
             '</div>' +
             '<div class="ru-hm-tt-value"></div>' +
             '<div class="ru-hm-tt-bar-track"><div class="ru-hm-tt-bar-fill"></div></div>' +
-            '<div class="ru-hm-tt-pct"></div>' +
-            '<div class="ru-hm-tt-sparkline"></div>';
+            '<div class="ru-hm-tt-pct"></div>';
         document.body.appendChild(tooltipEl);
     }
 
-    function buildSparklineSVG(pts, scaled) {
-        const W = 170, H = 30;
-        const vals = pts.map(p => p.y);
-        const min = Math.min(...vals);
-        const max = Math.max(...vals);
-        const range = max - min || 1;
-        const n = pts.length;
-        const points = vals.map((v, i) => {
-            const x = (i / (n - 1)) * W;
-            const y = H - 2 - ((v - min) / range) * (H - 6);
-            return `${x.toFixed(1)},${y.toFixed(1)}`;
-        }).join(' ');
-        const color = scaled !== null && scaled > 110 ? '#ef4444'
-                    : scaled !== null && scaled > 90  ? '#f97316'
-                    : '#4ade80';
-        return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block;">` +
-            `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>` +
-            `</svg>`;
-    }
-
-    function showTooltip(e, proxyName, metricTitle, metricKey, raw, scaled, proxyId) {
+    function showTooltip(e, proxyName, metricTitle, metricKey, raw, scaled) {
         ensureTooltip();
         tooltipEl.querySelector('.ru-hm-tt-proxy').textContent = proxyName;
         tooltipEl.querySelector('.ru-hm-tt-metric').textContent = metricTitle;
@@ -145,19 +124,6 @@
         barFill.style.width = (scaled !== null ? Math.min(scaled, 100) : 0) + '%';
         const cs = getHeatmapCellStyle(scaled);
         barFill.style.background = (scaled === null || scaled <= 0) ? '#475569' : cs.bg;
-
-        // 추세 스파크라인
-        const sparkEl = tooltipEl.querySelector('.ru-hm-tt-sparkline');
-        if (sparkEl) {
-            const bufferKey = metricKey === 'httpd'  ? 'http'
-                            : metricKey === 'httpsd' ? 'https'
-                            : metricKey === 'http2d' ? 'http2'
-                            : metricKey;
-            const pts = proxyId && window.ru && window.ru.tsBuffer
-                ? (((window.ru.tsBuffer[proxyId] || {})[bufferKey]) || []).slice(-20)
-                : [];
-            sparkEl.innerHTML = pts.length >= 2 ? buildSparklineSVG(pts, scaled) : '';
-        }
 
         tooltipEl.style.display = 'block';
         positionTooltip(e);
@@ -265,10 +231,9 @@
             const cell = e.target.closest('td.ru-hm-cell');
             if (!cell || cell === currentTooltipCell || cell.classList.contains('ru-hm-skeleton')) return;
             currentTooltipCell = cell;
-            const raw     = cell.dataset.raw    !== '' ? parseFloat(cell.dataset.raw)      : null;
-            const scaled  = cell.dataset.scaled !== '' ? parseInt(cell.dataset.scaled, 10) : null;
-            const proxyId = cell.dataset.proxyId ? parseInt(cell.dataset.proxyId, 10)      : null;
-            showTooltip(e, cell.dataset.proxy, cell.dataset.mt, cell.dataset.mk, raw, scaled, proxyId);
+            const raw    = cell.dataset.raw    !== '' ? parseFloat(cell.dataset.raw)       : null;
+            const scaled = cell.dataset.scaled !== '' ? parseInt(cell.dataset.scaled, 10)  : null;
+            showTooltip(e, cell.dataset.proxy, cell.dataset.mt, cell.dataset.mk, raw, scaled);
         });
         el.addEventListener('mousemove', e => { if (currentTooltipCell) positionTooltip(e); });
         el.addEventListener('mouseout',  e => {

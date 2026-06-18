@@ -572,7 +572,7 @@
     padding: 10px 13px;
     font-size: 12px;
     pointer-events: none;
-    min-width: 196px;
+    min-width: 170px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
     display: none;
     border: 1px solid rgba(255, 255, 255, 0.07);
@@ -630,11 +630,6 @@
 .ru-hm-tt-pct {
     font-size: 10px;
     color: #64748b;
-}
-
-.ru-hm-tt-sparkline {
-    margin-top: 6px;
-    opacity: 0.85;
 }
 
 /* Legend */
