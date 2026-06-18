@@ -208,7 +208,6 @@
                             if (window.ResourceUsageCharts) {
                                 window.ResourceUsageCharts.bufferAppendBatch(valid);
                                 window.ResourceUsageCharts.renderAllCharts();
-                                window.ResourceUsageCharts.renderAnomalyPanel();
                             }
                         });
                     }
