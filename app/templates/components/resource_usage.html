@@ -88,19 +88,6 @@
         </div>
     </div>
 
-    <!-- 추세 그래프 섹션 -->
-    <div class="mt-4" id="ruChartsSectionWrap">
-        <div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
-            <div class="is-flex is-align-items-center is-justify-content-space-between p-3" id="ruChartsToggleHeader" style="cursor: pointer; user-select: none;">
-                <h4 class="title is-6 mb-0 has-text-grey">추세 그래프</h4>
-                <button class="button is-ghost is-small" id="ruChartsToggleBtn">▼ 펼치기</button>
-            </div>
-            <div id="ruChartsContentWrap" style="display: none; padding: 0.75rem 1rem;">
-                <div id="ruChartsWrap" class="columns is-multiline"></div>
-            </div>
-        </div>
-    </div>
-
     <!-- 이상징후 패널 -->
     <div class="mt-4" id="ruAnomalyPanel" style="display:none;">
         <div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem 1.25rem;">
@@ -215,20 +202,6 @@
             <div id="ruDetailTiles" class="ru-detail-tiles mb-4"></div>
             <p class="is-size-7 has-text-grey mb-2 mt-4" style="font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">시계열 추이 (최근 60회)</p>
             <div id="ruDetailSparklines"></div>
-        </section>
-    </div>
-</div>
-
-<!-- 차트 확대 모달 -->
-<div class="modal" id="ruChartModal">
-    <div class="modal-background" style="background: rgba(15, 23, 42, 0.25);"></div>
-    <div class="modal-card" style="width: 95vw; max-width: 1200px;">
-        <header class="modal-card-head py-3 px-5">
-            <p class="modal-card-title is-size-5" id="ruModalTitle">Chart</p>
-            <button class="delete" aria-label="close" id="ruChartModalClose"></button>
-        </header>
-        <section class="modal-card-body p-4">
-            <div id="ruModalChart"></div>
         </section>
     </div>
 </div>
@@ -492,54 +465,6 @@ $(document).ready(function() {
         if (window.ResourceUsageHeatmap) window.ResourceUsageHeatmap.closeProxyDetail();
     });
 
-    // 차트 확대 모달 닫기
-    $(document).on('click', '#ruChartModalClose, #ruChartModal .modal-background', function() {
-        if (window.ResourceUsageCharts) window.ResourceUsageCharts.closeModal();
-    });
-
-    // 실시간 차트 섹션 토글
-    $(document).on('click', '#ruChartsToggleHeader', function() {
-        const $content = $('#ruChartsContentWrap');
-        const $btn     = $('#ruChartsToggleBtn');
-        const isHidden = !$content.is(':visible');
-        if (isHidden) {
-            $content.slideDown(200, function() {
-                if (window.ResourceUsageCharts) window.ResourceUsageCharts.renderAllCharts();
-            });
-            $btn.text('▲ 접기');
-        } else {
-            $content.slideUp(200);
-            $btn.text('▼ 펼치기');
-        }
-    });
-
-    // 차트 접기/펼치기 토글
-    $(document).on('click', '.ru-chart-toggle-btn', function() {
-        const metric = $(this).data('metric');
-        if (metric && window.ResourceUsageCharts) window.ResourceUsageCharts.toggleChart(metric);
-    });
-
-    // 차트 제목 클릭으로도 토글
-    $(document).on('click', '#ruChartsWrap h5[data-metric]', function() {
-        const metric = $(this).data('metric');
-        if (metric && window.ResourceUsageCharts) window.ResourceUsageCharts.toggleChart(metric);
-    });
-
-    // 차트 확대 버튼
-    $(document).on('click', '.ru-chart-zoom-btn', function() {
-        const metric = $(this).data('metric');
-        if (metric && window.ResourceUsageCharts) window.ResourceUsageCharts.openModal(metric);
-    });
-
-    // 전체 차트 펼치기/접기
-    $(document).on('click', '#ruToggleAllCharts', function() {
-        if (window.ResourceUsageCharts) window.ResourceUsageCharts.toggleAllCharts();
-    });
-
-    // 차트 높이 슬라이더
-    $(document).on('input', '#ruChartHeightSlider', function() {
-        if (window.ResourceUsageCharts) window.ResourceUsageCharts.updateChartHeight(parseInt(this.value, 10));
-    });
 });
 
 function updateRuSelectionSummary() {
