@@ -77,6 +77,11 @@ $(document).ready(function() {
                 
                 if (newContent) {
                     $content.html(newContent.innerHTML);
+
+                    // 서브네비 교체
+                    const newSubnav = doc.querySelector('#subnav-container');
+                    $('#subnav-container').html(newSubnav ? newSubnav.innerHTML : '');
+
                     if (pushState) history.pushState({ url: url }, '', url);
                     
                     // Update active navbar item
