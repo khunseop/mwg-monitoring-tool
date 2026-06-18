@@ -213,6 +213,16 @@ table.dataTable thead tr.cc-filters .select.is-small select {
     text-align: right;
 }
 
+/* ag-grid header filter/sort icons - muted so they don't clutter dense columns */
+.ag-theme-quartz .ag-header-icon {
+    opacity: 0.3;
+}
+
+.ag-theme-quartz .ag-header-icon:hover,
+.ag-theme-quartz .ag-header-cell:hover .ag-header-icon {
+    opacity: 0.7;
+}
+
 /* ag-grid pagination styling */
 .ag-theme-quartz .ag-paging-panel {
     border-top: 1px solid var(--color-border);
