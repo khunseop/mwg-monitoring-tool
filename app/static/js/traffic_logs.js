@@ -4,20 +4,22 @@
     function switchTlTab(tabId) {
         $('.tl-tab-content').hide();
         $('.subnav-tab').removeClass('is-active');
-        
+
         if (tabId === 'remote') {
             $('#tlRemoteSection').show();
             $('#tab-remote').addClass('is-active');
-            // 그리드 리사이즈 유도
             setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
         } else if (tabId === 'analyze') {
             $('#tlAnalyzeSection').show();
             $('#tab-analyze').addClass('is-active');
-            // 차트 리사이즈 유도
             setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
         } else if (tabId === 'upload') {
             $('#tlaUploadSection').show();
             $('#tab-upload').addClass('is-active');
+        } else if (tabId === 'live') {
+            $('#tlLiveSection').show();
+            $('#tab-live').addClass('is-active');
+            populateLiveProxySelect();
         }
     }
     window.switchTlTab = switchTlTab;
@@ -383,6 +385,7 @@
                 onData: (data) => {
                     PROXIES = data.proxies;
                     window.PROXIES = PROXIES; // 글로벌 참조 업데이트
+                    populateLiveProxySelect();
                     
                     // URL 파라미터 확인 (자원이력 연동 등)
                     const urlParams = new URLSearchParams(window.location.search);
@@ -523,14 +526,127 @@
         }
     }
 
+    // ── 실시간 감시 ──────────────────────────────────────────────
+    let _liveInterval = null;
+    let _liveProxyId = null;
+    const LIVE_MAX_LINES = 1000;
+
+    function populateLiveProxySelect() {
+        const $sel = $('#liveProxySelect');
+        const currentVal = $sel.val();
+        $sel.empty().append('<option value="">-- 선택 --</option>');
+        (window.PROXIES || []).forEach(p => {
+            $sel.append(`<option value="${p.id}">${p.host}</option>`);
+        });
+        if (currentVal) $sel.val(currentVal);
+    }
+
+    function setLiveStatus(text, type) {
+        const $tag = $('#liveStatus');
+        $tag.text(text).removeClass().addClass('tag is-small');
+        if (type === 'running') $tag.addClass('is-success is-light');
+        else if (type === 'error') $tag.addClass('is-danger is-light');
+        else if (type === 'loading') $tag.addClass('is-warning is-light');
+        else $tag.addClass('is-light');
+    }
+
+    function appendLiveLines(lines) {
+        const $container = $('#liveLogContainer');
+        $('#liveLogPlaceholder').remove();
+
+        const now = new Date().toLocaleTimeString('ko-KR', {hour12: false});
+        lines.forEach(line => {
+            const $line = $('<div>').text(line).css('border-bottom', '1px solid rgba(255,255,255,0.03)');
+            $container.append($line);
+        });
+
+        // 최대 줄 수 초과 시 오래된 줄 제거
+        const children = $container.children('div');
+        if (children.length > LIVE_MAX_LINES) {
+            children.slice(0, children.length - LIVE_MAX_LINES).remove();
+        }
+
+        if ($('#liveAutoScroll').is(':checked')) {
+            $container.scrollTop($container[0].scrollHeight);
+        }
+    }
+
+    async function fetchLiveLog() {
+        if (!_liveProxyId) return;
+        const initialLines = $('#liveInitialLines').val() || 100;
+        try {
+            const res = await fetch(`${API_BASE}/traffic-logs/live/${_liveProxyId}?initial_lines=${initialLines}`);
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                setLiveStatus('오류: ' + (err.detail || res.status), 'error');
+                return;
+            }
+            const data = await res.json();
+            if (data.lines && data.lines.length > 0) {
+                appendLiveLines(data.lines);
+                setLiveStatus(`감시 중 (총 ${data.total_count.toLocaleString()}줄)`, 'running');
+            } else {
+                setLiveStatus(`감시 중 (총 ${data.total_count.toLocaleString()}줄, 변화 없음)`, 'running');
+            }
+        } catch (e) {
+            setLiveStatus('연결 오류', 'error');
+        }
+    }
+
+    function startLiveLog() {
+        const proxyId = parseInt($('#liveProxySelect').val());
+        if (!proxyId) { alert('프록시를 선택하세요.'); return; }
+
+        if (_liveProxyId && _liveProxyId !== proxyId) {
+            fetch(`${API_BASE}/traffic-logs/live/${_liveProxyId}`, { method: 'DELETE' }).catch(() => {});
+        }
+
+        _liveProxyId = proxyId;
+        $('#liveLogContainer').empty();
+        $('#liveStartBtn').hide();
+        $('#liveStopBtn').show();
+        $('#liveProxySelect, #liveIntervalSelect, #liveInitialLines').prop('disabled', true);
+        setLiveStatus('연결 중...', 'loading');
+
+        fetchLiveLog();
+        const intervalSec = parseInt($('#liveIntervalSelect').val()) || 10;
+        _liveInterval = setInterval(fetchLiveLog, intervalSec * 1000);
+    }
+
+    function stopLiveLog() {
+        clearInterval(_liveInterval);
+        _liveInterval = null;
+        if (_liveProxyId) {
+            fetch(`${API_BASE}/traffic-logs/live/${_liveProxyId}`, { method: 'DELETE' }).catch(() => {});
+        }
+        _liveProxyId = null;
+        $('#liveStartBtn').show();
+        $('#liveStopBtn').hide();
+        $('#liveProxySelect, #liveIntervalSelect, #liveInitialLines').prop('disabled', false);
+        setLiveStatus('중지됨', '');
+    }
+
+    function initLiveLog() {
+        $('#liveStartBtn').off('click').on('click', startLiveLog);
+        $('#liveStopBtn').off('click').on('click', stopLiveLog);
+        $('#liveClearBtn').off('click').on('click', () => {
+            $('#liveLogContainer').empty()
+                .append('<span id="liveLogPlaceholder" style="color:#475569;">로그 영역을 지웠습니다.</span>');
+        });
+    }
+    // ─────────────────────────────────────────────────────────────
+
     $(document).ready(() => {
         initTrafficLogs();
+        initLiveLog();
     });
 
     // PJAX 페이지 전환 대응
     $(document).off('pjax:complete.tl').on('pjax:complete.tl', function(e, url) {
         if (url.includes('/traffic-logs')) {
+            stopLiveLog();
             initTrafficLogs();
+            initLiveLog();
         }
     });
 })();

@@ -22,6 +22,8 @@ import logging
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+_live_state: Dict[int, int] = {}  # proxy_id → last known line count
+
 
 def _validate_query(q: Optional[str]) -> Optional[str]:
 	if q is None:
@@ -533,6 +535,65 @@ def analyze_db_traffic_logs(
         "proxies": proxies_dist,
         "anomalies": anomalies,
     }
+
+
+@router.get("/traffic-logs/live/{proxy_id}")
+def get_live_log(
+    proxy_id: int,
+    initial_lines: int = Query(default=100, ge=1, le=1000),
+    db: Session = Depends(get_db),
+):
+    """SSH로 로그 파일의 새 줄만 가져옵니다 (라인 오프셋 기반 폴링)."""
+    db_proxy = db.query(Proxy).filter(Proxy.id == proxy_id).first()
+    if not db_proxy:
+        raise HTTPException(status_code=404, detail="Proxy not found")
+    if not db_proxy.traffic_log_path:
+        raise HTTPException(status_code=400, detail="traffic_log_path가 설정되지 않은 프록시입니다.")
+
+    safe_path = shlex.quote(db_proxy.traffic_log_path)
+    password = decrypt_string_if_encrypted(db_proxy.password)
+    host, port, username = db_proxy.host, db_proxy.port or 22, db_proxy.username
+
+    try:
+        wc_out = ssh_exec(host, port, username, password, f"wc -l < {safe_path}", timeout_sec=5)
+        current_count = int(wc_out.strip().split()[0])
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"ssh error: {str(e)}")
+
+    is_initial = proxy_id not in _live_state
+
+    if is_initial:
+        cmd = f"timeout 10s nice -n 10 ionice -c2 -n7 tail -n {initial_lines} {safe_path} | sed -e 's/[^[:print:]\\t]//g'"
+        try:
+            raw = ssh_exec(host, port, username, password, cmd, timeout_sec=12)
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"ssh error: {str(e)}")
+        lines = [ln for ln in raw.split("\n") if ln]
+        _live_state[proxy_id] = current_count
+        return {"lines": lines, "total_count": current_count, "is_initial": True, "new_lines": len(lines)}
+
+    last_count = _live_state[proxy_id]
+    if current_count <= last_count:
+        return {"lines": [], "total_count": current_count, "is_initial": False, "new_lines": 0}
+
+    offset = last_count + 1
+    fetch_count = min(current_count - last_count, 500)
+    cmd = f"timeout 10s nice -n 10 ionice -c2 -n7 tail -n +{offset} {safe_path} | head -n {fetch_count} | sed -e 's/[^[:print:]\\t]//g'"
+    try:
+        raw = ssh_exec(host, port, username, password, cmd, timeout_sec=12)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"ssh error: {str(e)}")
+
+    lines = [ln for ln in raw.split("\n") if ln]
+    _live_state[proxy_id] = current_count
+    return {"lines": lines, "total_count": current_count, "is_initial": False, "new_lines": len(lines)}
+
+
+@router.delete("/traffic-logs/live/{proxy_id}")
+def reset_live_log_state(proxy_id: int):
+    """실시간 감시 상태(라인 오프셋)를 초기화합니다."""
+    _live_state.pop(proxy_id, None)
+    return {"reset": True}
 
 
 @router.get("/traffic-logs/{proxy_id}", response_model=TrafficLogResponse)

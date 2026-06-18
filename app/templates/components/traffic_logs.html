@@ -8,6 +8,7 @@
             <a id="tab-remote" class="subnav-tab {% if not is_upload %}is-active{% endif %}" onclick="switchTlTab('remote')">로그 원격 조회</a>
             <a id="tab-analyze" class="subnav-tab" onclick="switchTlTab('analyze')">결과 분석</a>
             <a id="tab-upload" class="subnav-tab {% if is_upload %}is-active{% endif %}" onclick="switchTlTab('upload')">파일 업로드 분석</a>
+            <a id="tab-live" class="subnav-tab" onclick="switchTlTab('live')">실시간 감시</a>
         </div>
     </div>
 </div>
@@ -259,6 +260,53 @@
     
     <div id="tlaUploadDashboard" style="display:none;">
         <!-- 파일 업로드 전용 대시보드는 분석 탭과 동일한 구조를 공유하도록 js에서 처리 -->
+    </div>
+</div>
+
+<!-- 실시간 감시 섹션 -->
+<div id="tlLiveSection" class="tl-tab-content" style="display:none;">
+    <div class="settings-bar mb-2">
+        <div class="is-flex is-align-items-center" style="gap: 0.75rem; flex: 1;">
+            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                <span class="filter-label">프록시</span>
+                <div class="select is-small">
+                    <select id="liveProxySelect"><option value="">-- 선택 --</option></select>
+                </div>
+            </div>
+            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                <span class="filter-label">갱신 간격</span>
+                <div class="select is-small">
+                    <select id="liveIntervalSelect">
+                        <option value="5">5초</option>
+                        <option value="10" selected>10초</option>
+                        <option value="30">30초</option>
+                    </select>
+                </div>
+            </div>
+            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                <span class="filter-label">초기 줄 수</span>
+                <div class="select is-small">
+                    <select id="liveInitialLines">
+                        <option value="50">50줄</option>
+                        <option value="100" selected>100줄</option>
+                        <option value="200">200줄</option>
+                    </select>
+                </div>
+            </div>
+            <span id="liveStatus" class="tag is-light is-small" style="font-weight: 700; border-radius: 4px;">대기</span>
+        </div>
+        <div class="is-flex is-align-items-center" style="gap: 0.5rem; margin-left: auto;">
+            <label class="is-size-7" style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer;">
+                <input type="checkbox" id="liveAutoScroll" checked>
+                자동 스크롤
+            </label>
+            <button class="button is-ghost is-small px-3" id="liveClearBtn" style="color: var(--color-text-muted);">지우기</button>
+            <button class="button is-primary is-small px-5" id="liveStartBtn" style="font-weight: 600;">시작</button>
+            <button class="button is-danger is-small px-4" id="liveStopBtn" style="font-weight: 600; display: none;">중지</button>
+        </div>
+    </div>
+    <div id="liveLogContainer" style="background: #0f172a; color: #e2e8f0; font-family: var(--font-mono, monospace); font-size: 0.72rem; line-height: 1.6; padding: 0.75rem 1rem; border-radius: var(--radius-md); min-height: 70vh; max-height: 75vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all;">
+        <span id="liveLogPlaceholder" style="color: #475569;">프록시를 선택하고 시작 버튼을 눌러 실시간 로그 감시를 시작하세요.</span>
     </div>
 </div>
 
