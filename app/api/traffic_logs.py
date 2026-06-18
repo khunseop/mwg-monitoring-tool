@@ -95,17 +95,14 @@ def _fetch_and_parse_for_proxy(db_proxy: Proxy, q: Optional[str], limit: int, di
                 # Add unparseable line as url_path for some visibility
                 records.append(TrafficLogRecord(url_path=ln, proxy_id=str(db_proxy.id)))
         
-        if to_insert:
-            # We use a separate thread for DB to avoid blocking, but since this is called from ThreadPoolExecutor already, it's fine.
-            # But we must be careful with session thread-safety. 
-            # In get_multi_proxy_traffic_logs, we'll give each call its own session or a lock.
-            try:
-                db.query(TrafficLogModel).filter(TrafficLogModel.proxy_id == db_proxy.id).delete(synchronize_session=False)
+        try:
+            db.query(TrafficLogModel).filter(TrafficLogModel.proxy_id == db_proxy.id).delete(synchronize_session=False)
+            if to_insert:
                 db.execute(sa_insert(TrafficLogModel), to_insert)
-                db.commit()
-            except Exception as e:
-                db.rollback()
-                logger.error(f"DB insert failed for proxy {db_proxy.id}: {e}")
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.error(f"DB insert failed for proxy {db_proxy.id}: {e}")
         
         return records, None
     except Exception as e:
@@ -140,8 +137,12 @@ def collect_traffic_logs_task(
         local_db = SessionLocal()
         try:
             logger.info(f"[traffic_logs] Collecting for proxy {p.id}")
-            _fetch_and_parse_for_proxy(p, q_valid, limit, direction, local_db)
-            logger.info(f"[traffic_logs] Done collecting for proxy {p.id}")
+            _, err = _fetch_and_parse_for_proxy(p, q_valid, limit, direction, local_db)
+            if err:
+                logger.error(f"[traffic_logs] Collection failed for proxy {p.id}: {err}")
+                errors[str(p.id)] = err
+            else:
+                logger.info(f"[traffic_logs] Done collecting for proxy {p.id}")
         except Exception as e:
             logger.error(f"[traffic_logs] Collection failed for proxy {p.id}: {e}")
             errors[str(p.id)] = str(e)

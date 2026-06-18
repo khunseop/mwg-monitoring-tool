@@ -434,7 +434,6 @@
         }
 
         $('#tlLoadBtn').off('click').on('click', () => {
-            if (!tlGridApi) renderTable([]);
             collectLogs();
         });
         
