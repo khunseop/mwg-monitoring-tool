@@ -550,57 +550,76 @@
         else $tag.addClass('is-light');
     }
 
+    const LIVE_LOG_FIELDS = [
+        "datetime","username","client_ip","url_destination_ip","timeintransaction",
+        "response_statuscode","cache_status","comm_name","url_protocol","url_host",
+        "url_path","url_parametersstring","url_port","url_categories","url_reputationstring",
+        "url_reputation","mediatype_header","recv_byte","sent_byte","user_agent","referer",
+        "url_geolocation","application_name","currentruleset","currentrule","action_names",
+        "block_id","proxy_id","ssl_certificate_cn","ssl_certificate_sigmethod",
+        "web_socket","content_lenght"
+    ];
+    const LIVE_BYTE_FIELDS = new Set(["recv_byte","sent_byte","content_lenght"]);
+    const LIVE_STATUS_FIELD = "response_statuscode";
+    const LIVE_LONG_FIELDS = new Set(["url_path","url_parametersstring","user_agent","referer"]);
+    const LIVE_RIGHT_FIELDS = new Set(["recv_byte","sent_byte","content_lenght","url_port","url_reputation","timeintransaction","response_statuscode"]);
+
     function _escHtml(s) {
         if (s === null || s === undefined) return '';
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
-    function _statusCell(code) {
-        if (!code) return '<td style="text-align:center;">-</td>';
-        if (window.AppUtils && AppUtils.renderStatusTag) {
-            return `<td style="text-align:center;">${AppUtils.renderStatusTag(code)}</td>`;
-        }
-        return `<td style="text-align:center;">${_escHtml(code)}</td>`;
-    }
-
-    function _bytesCell(n, align) {
-        const style = align === 'right' ? 'text-align:right;' : '';
-        if (!n && n !== 0) return `<td style="${style}">-</td>`;
-        if (window.AppUtils && AppUtils.formatBytes) {
-            return `<td style="${style}">${AppUtils.formatBytes(n)}</td>`;
-        }
-        return `<td style="${style}">${n}</td>`;
+    function _initLiveTableHead() {
+        const $head = $('#liveTableHead');
+        if ($head.find('th').length > 0) return;
+        const ths = LIVE_LOG_FIELDS.map(f => {
+            const label = f.replace(/_/g, ' ').toUpperCase();
+            const minW = LIVE_LONG_FIELDS.has(f) ? '200px' : f === 'datetime' ? '160px' : '90px';
+            return `<th style="min-width:${minW};">${label}</th>`;
+        }).join('');
+        $head.html(`<tr>${ths}</tr>`);
     }
 
     function appendLiveRecords(records) {
         if (!records || records.length === 0) return;
+        _initLiveTableHead();
         const $tbody = $('#liveTableBody');
         $('#liveTablePlaceholder').remove();
 
         records.forEach(r => {
-            const action = (r.action_names || '').toLowerCase();
-            const actionCls = action === 'block' ? 'style="color:#dc2626;font-weight:700;"' : '';
-            const row = `<tr>
-                <td style="white-space:nowrap;font-size:0.72rem;">${_escHtml(r.datetime || '')}</td>
-                <td>${_escHtml(r.client_ip || '')}</td>
-                <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_escHtml(r.url_host || '')}">${_escHtml(r.url_host || '')}</td>
-                ${_statusCell(r.response_statuscode)}
-                <td ${actionCls}>${_escHtml(r.action_names || '')}</td>
-                ${_bytesCell(r.recv_byte, 'right')}
-                ${_bytesCell(r.sent_byte, 'right')}
-            </tr>`;
-            $tbody.append(row);
+            const cells = LIVE_LOG_FIELDS.map(f => {
+                const v = (r[f] === null || r[f] === undefined) ? '' : r[f];
+                const s = _escHtml(String(v));
+                const isRight = LIVE_RIGHT_FIELDS.has(f);
+                const align = isRight ? 'text-align:right;' : '';
+
+                if (f === LIVE_STATUS_FIELD && v !== '') {
+                    const tag = (window.AppUtils && AppUtils.renderStatusTag) ? AppUtils.renderStatusTag(v) : s;
+                    return `<td style="text-align:center;">${tag}</td>`;
+                }
+                if (LIVE_BYTE_FIELDS.has(f) && v !== '') {
+                    const fmt = (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(v) : s;
+                    return `<td style="text-align:right;">${fmt}</td>`;
+                }
+                if (LIVE_LONG_FIELDS.has(f)) {
+                    return `<td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;" title="${s}">${s}</td>`;
+                }
+                if (f === 'action_names' && String(v).toLowerCase() === 'block') {
+                    return `<td style="${align}color:#dc2626;font-weight:700;">${s}</td>`;
+                }
+                return `<td style="${align}">${s}</td>`;
+            }).join('');
+            $tbody.append(`<tr>${cells}</tr>`);
         });
 
-        // 최대 행 수 초과 시 오래된 행 제거
         const rows = $tbody.children('tr:not(#liveTablePlaceholder)');
         if (rows.length > LIVE_MAX_ROWS) {
             rows.slice(0, rows.length - LIVE_MAX_ROWS).remove();
         }
 
         if ($('#liveAutoScroll').is(':checked')) {
-            const $wrap = $tbody.closest('div[style*="overflow-y"]');
-            if ($wrap.length) $wrap.scrollTop($wrap[0].scrollHeight);
+            const $wrap = $('#liveTableWrap');
+            $wrap.scrollTop($wrap[0].scrollHeight);
         }
     }
 
@@ -638,8 +657,9 @@
         }
 
         _liveProxyId = proxyId;
+        $('#liveTableHead').empty();
         $('#liveTableBody').empty().append(
-            '<tr id="liveTablePlaceholder"><td colspan="7" style="text-align:center;color:var(--color-text-muted);padding:1.5rem;">로딩 중...</td></tr>'
+            '<tr id="liveTablePlaceholder"><td colspan="32" style="text-align:center;color:var(--color-text-muted);padding:1.5rem;">로딩 중...</td></tr>'
         );
         $('#liveStartBtn').hide();
         $('#liveStopBtn').show();

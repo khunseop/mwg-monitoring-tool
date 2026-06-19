@@ -326,22 +326,12 @@
     </div>
 
     <!-- 결과 테이블 -->
-    <div style="overflow-y: auto; max-height: 72vh; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface);">
-        <table class="table is-fullwidth is-narrow is-hoverable mb-0" style="font-size: 0.78rem;">
-            <thead style="position: sticky; top: 0; z-index: 1; background: var(--color-surface);">
-                <tr>
-                    <th style="width: 160px;">Datetime</th>
-                    <th style="width: 120px;">Client IP</th>
-                    <th>URL Host</th>
-                    <th style="width: 70px; text-align: center;">Status</th>
-                    <th style="width: 80px;">Action</th>
-                    <th style="width: 80px; text-align: right;">Recv</th>
-                    <th style="width: 80px; text-align: right;">Sent</th>
-                </tr>
-            </thead>
+    <div id="liveTableWrap" style="overflow: auto; max-height: 72vh; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface);">
+        <table class="table is-narrow is-hoverable mb-0" style="font-size: 0.78rem; white-space: nowrap; min-width: 100%;">
+            <thead id="liveTableHead" style="position: sticky; top: 0; z-index: 1; background: var(--color-surface);"></thead>
             <tbody id="liveTableBody">
                 <tr id="liveTablePlaceholder">
-                    <td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 2rem;">
+                    <td colspan="32" style="text-align: center; color: var(--color-text-muted); padding: 2rem;">
                         프록시와 키워드를 입력하고 시작 버튼을 눌러 실시간 로그 감시를 시작하세요.
                     </td>
                 </tr>

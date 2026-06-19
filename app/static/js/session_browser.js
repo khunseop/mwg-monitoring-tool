@@ -685,15 +685,30 @@
         else $tag.addClass('is-light');
     }
 
+    const SB_LIVE_FIELDS = [
+        "transaction","creation_time","protocol","cust_id","user_name","client_ip",
+        "client_side_mwg_ip","server_side_mwg_ip","server_ip","cl_bytes_received",
+        "cl_bytes_sent","srv_bytes_received","srv_bytes_sent","trxn_index","age_seconds",
+        "status","in_use","url","raw_line"
+    ];
+    const SB_BYTE_FIELDS = new Set(["cl_bytes_received","cl_bytes_sent","srv_bytes_received","srv_bytes_sent"]);
+    const SB_RIGHT_FIELDS = new Set(["cl_bytes_received","cl_bytes_sent","srv_bytes_received","srv_bytes_sent","trxn_index","age_seconds","in_use"]);
+    const SB_LONG_FIELDS = new Set(["url","raw_line"]);
+
     function _sbEsc(s) {
         if (s === null || s === undefined) return '';
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
-    function _sbBytes(n) {
-        if (!n && n !== 0) return '-';
-        if (window.AppUtils && AppUtils.formatBytes) return AppUtils.formatBytes(n);
-        return n;
+    function _initSbLiveHead() {
+        const $head = $('#sbLiveTableHead');
+        if ($head.find('th').length > 0) return;
+        const ths = SB_LIVE_FIELDS.map(f => {
+            const label = f.replace(/_/g, ' ').toUpperCase();
+            const minW = SB_LONG_FIELDS.has(f) ? '250px' : f === 'creation_time' ? '150px' : '100px';
+            return `<th style="min-width:${minW};">${label}</th>`;
+        }).join('');
+        $head.html(`<tr>${ths}</tr>`);
     }
 
     function renderSbLiveRecords(records) {
@@ -701,23 +716,30 @@
         $tbody.empty();
 
         if (!records || records.length === 0) {
-            $tbody.html('<tr><td colspan="8" style="text-align:center;color:var(--color-text-muted);padding:1.5rem;">일치하는 세션이 없습니다.</td></tr>');
+            $tbody.html(`<tr><td colspan="${SB_LIVE_FIELDS.length}" style="text-align:center;color:var(--color-text-muted);padding:1.5rem;">일치하는 세션이 없습니다.</td></tr>`);
             return;
         }
 
+        _initSbLiveHead();
+
         records.forEach(r => {
-            const ct = r.creation_time ? String(r.creation_time).replace('T', ' ').slice(0, 19) : '-';
-            const url = _sbEsc(r.url || '');
-            $tbody.append(`<tr>
-                <td style="white-space:nowrap;font-size:0.72rem;">${_sbEsc(ct)}</td>
-                <td>${_sbEsc(r.client_ip || '')}</td>
-                <td>${_sbEsc(r.server_ip || '')}</td>
-                <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${url}">${url}</td>
-                <td>${_sbEsc(r.protocol || '')}</td>
-                <td style="text-align:right;">${r.age_seconds != null ? r.age_seconds : '-'}</td>
-                <td style="text-align:right;">${_sbBytes(r.cl_bytes_received)}</td>
-                <td style="text-align:right;">${_sbBytes(r.cl_bytes_sent)}</td>
-            </tr>`);
+            const cells = SB_LIVE_FIELDS.map(f => {
+                let v = r[f];
+                if (v === null || v === undefined) v = '';
+                if (f === 'creation_time' && v) v = String(v).replace('T', ' ').slice(0, 19);
+                const s = _sbEsc(String(v));
+                const align = SB_RIGHT_FIELDS.has(f) ? 'text-align:right;' : '';
+
+                if (SB_BYTE_FIELDS.has(f) && v !== '') {
+                    const fmt = (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(v) : s;
+                    return `<td style="text-align:right;">${fmt}</td>`;
+                }
+                if (SB_LONG_FIELDS.has(f)) {
+                    return `<td style="max-width:350px;overflow:hidden;text-overflow:ellipsis;" title="${s}">${s}</td>`;
+                }
+                return `<td style="${align}">${s}</td>`;
+            }).join('');
+            $tbody.append(`<tr>${cells}</tr>`);
         });
     }
 
@@ -749,8 +771,9 @@
         if (!keyword) { alert('키워드를 입력해야 시작할 수 있습니다.'); $('#sbLiveKeyword').focus(); return; }
 
         _sbLiveProxyId = proxyId;
+        $('#sbLiveTableHead').empty();
         $('#sbLiveTableBody').html(
-            '<tr><td colspan="8" style="text-align:center;color:var(--color-text-muted);padding:1.5rem;">로딩 중...</td></tr>'
+            `<tr><td colspan="${SB_LIVE_FIELDS.length}" style="text-align:center;color:var(--color-text-muted);padding:1.5rem;">로딩 중...</td></tr>`
         );
         $('#sbLiveStartBtn').hide();
         $('#sbLiveStopBtn').show();
