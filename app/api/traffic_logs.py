@@ -541,9 +541,16 @@ def analyze_db_traffic_logs(
 def get_live_log(
     proxy_id: int,
     initial_lines: int = Query(default=100, ge=1, le=1000),
+    q: Optional[str] = Query(default=None, max_length=256),
+    client_ip: Optional[str] = Query(default=None, max_length=64),
+    url_host: Optional[str] = Query(default=None, max_length=256),
     db: Session = Depends(get_db),
 ):
-    """SSH로 로그 파일의 새 줄만 가져옵니다 (라인 오프셋 기반 폴링)."""
+    """SSH로 로그 파일의 새 줄만 가져옵니다 (라인 오프셋 기반 폴링, 파싱 후 반환)."""
+    q_valid = _validate_query(q)
+    if not q_valid:
+        raise HTTPException(status_code=400, detail="키워드(q)는 필수입니다.")
+
     db_proxy = db.query(Proxy).filter(Proxy.id == proxy_id).first()
     if not db_proxy:
         raise HTTPException(status_code=404, detail="Proxy not found")
@@ -551,8 +558,10 @@ def get_live_log(
         raise HTTPException(status_code=400, detail="traffic_log_path가 설정되지 않은 프록시입니다.")
 
     safe_path = shlex.quote(db_proxy.traffic_log_path)
+    safe_q = shlex.quote(q_valid)
     password = decrypt_string_if_encrypted(db_proxy.password)
     host, port, username = db_proxy.host, db_proxy.port or 22, db_proxy.username
+    clean = " | sed -e 's/[^[:print:]\\t]//g'"
 
     try:
         wc_out = ssh_exec(host, port, username, password, f"wc -l < {safe_path}", timeout_sec=5)
@@ -560,33 +569,57 @@ def get_live_log(
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"ssh error: {str(e)}")
 
+    def _parse_and_filter(raw: str) -> List[Dict[str, Any]]:
+        records = []
+        for ln in raw.split("\n"):
+            if not ln:
+                continue
+            fields = ln.split(" :| ")
+            if client_ip and (len(fields) < 3 or fields[2] != client_ip):
+                continue
+            if url_host and (len(fields) < 10 or fields[9] != url_host):
+                continue
+            try:
+                records.append(parse_log_line(ln))
+            except Exception:
+                records.append({"_raw_line_": ln})
+        return records
+
     is_initial = proxy_id not in _live_state
 
     if is_initial:
-        cmd = f"timeout 10s nice -n 10 ionice -c2 -n7 tail -n {initial_lines} {safe_path} | sed -e 's/[^[:print:]\\t]//g'"
+        cmd = (
+            f"timeout 10s nice -n 10 ionice -c2 -n7 "
+            f"tail -n {initial_lines * 10} {safe_path} | grep -F -- {safe_q} | tail -n {initial_lines}"
+            + clean
+        )
         try:
             raw = ssh_exec(host, port, username, password, cmd, timeout_sec=12)
         except Exception as e:
             raise HTTPException(status_code=502, detail=f"ssh error: {str(e)}")
-        lines = [ln for ln in raw.split("\n") if ln]
+        records = _parse_and_filter(raw)
         _live_state[proxy_id] = current_count
-        return {"lines": lines, "total_count": current_count, "is_initial": True, "new_lines": len(lines)}
+        return {"records": records, "total_count": current_count, "is_initial": True, "new_lines": len(records)}
 
     last_count = _live_state[proxy_id]
     if current_count <= last_count:
-        return {"lines": [], "total_count": current_count, "is_initial": False, "new_lines": 0}
+        return {"records": [], "total_count": current_count, "is_initial": False, "new_lines": 0}
 
     offset = last_count + 1
-    fetch_count = min(current_count - last_count, 500)
-    cmd = f"timeout 10s nice -n 10 ionice -c2 -n7 tail -n +{offset} {safe_path} | head -n {fetch_count} | sed -e 's/[^[:print:]\\t]//g'"
+    fetch_count = min(current_count - last_count, 2000)
+    cmd = (
+        f"timeout 10s nice -n 10 ionice -c2 -n7 "
+        f"tail -n +{offset} {safe_path} | head -n {fetch_count} | grep -F -- {safe_q} | head -n 500"
+        + clean
+    )
     try:
         raw = ssh_exec(host, port, username, password, cmd, timeout_sec=12)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"ssh error: {str(e)}")
 
-    lines = [ln for ln in raw.split("\n") if ln]
+    records = _parse_and_filter(raw)
     _live_state[proxy_id] = current_count
-    return {"lines": lines, "total_count": current_count, "is_initial": False, "new_lines": len(lines)}
+    return {"records": records, "total_count": current_count, "is_initial": False, "new_lines": len(records)}
 
 
 @router.delete("/traffic-logs/live/{proxy_id}")

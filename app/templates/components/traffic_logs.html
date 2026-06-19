@@ -265,7 +265,8 @@
 
 <!-- 실시간 감시 섹션 -->
 <div id="tlLiveSection" class="tl-tab-content" style="display:none;">
-    <div class="settings-bar mb-2">
+    <!-- 1행: 프록시·간격·초기줄수 -->
+    <div class="settings-bar mb-1">
         <div class="is-flex is-align-items-center" style="gap: 0.75rem; flex: 1;">
             <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
                 <span class="filter-label">프록시</span>
@@ -305,8 +306,47 @@
             <button class="button is-danger is-small px-4" id="liveStopBtn" style="font-weight: 600; display: none;">중지</button>
         </div>
     </div>
-    <div id="liveLogContainer" style="background: #0f172a; color: #e2e8f0; font-family: var(--font-mono, monospace); font-size: 0.72rem; line-height: 1.6; padding: 0.75rem 1rem; border-radius: var(--radius-md); min-height: 70vh; max-height: 75vh; overflow-y: auto; white-space: pre-wrap; word-break: break-all;">
-        <span id="liveLogPlaceholder" style="color: #475569;">프록시를 선택하고 시작 버튼을 눌러 실시간 로그 감시를 시작하세요.</span>
+    <!-- 2행: 필터 입력 (키워드 필수) -->
+    <div class="settings-bar mb-2" style="background: var(--color-surface-alt, #f8fafc); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem;">
+        <div class="is-flex is-align-items-center" style="gap: 0.75rem; flex: 1; flex-wrap: wrap;">
+            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                <span class="filter-label" style="color: var(--color-danger, #dc2626); font-weight: 700;">키워드 *</span>
+                <input class="input is-small" id="liveKeyword" type="text" placeholder="필수 — grep -F 검색어" style="width: 220px;">
+            </div>
+            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                <span class="filter-label">Client IP</span>
+                <input class="input is-small" id="liveClientIp" type="text" placeholder="예: 10.0.0.1 (선택)" style="width: 150px;">
+            </div>
+            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                <span class="filter-label">URL Host</span>
+                <input class="input is-small" id="liveUrlHost" type="text" placeholder="예: example.com (선택)" style="width: 180px;">
+            </div>
+        </div>
+        <span class="is-size-7 has-text-grey" style="margin-left: auto; white-space: nowrap;">키워드 없이 시작 불가</span>
+    </div>
+
+    <!-- 결과 테이블 -->
+    <div style="overflow-y: auto; max-height: 72vh; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface);">
+        <table class="table is-fullwidth is-narrow is-hoverable mb-0" style="font-size: 0.78rem;">
+            <thead style="position: sticky; top: 0; z-index: 1; background: var(--color-surface);">
+                <tr>
+                    <th style="width: 160px;">Datetime</th>
+                    <th style="width: 120px;">Client IP</th>
+                    <th>URL Host</th>
+                    <th style="width: 70px; text-align: center;">Status</th>
+                    <th style="width: 80px;">Action</th>
+                    <th style="width: 80px; text-align: right;">Recv</th>
+                    <th style="width: 80px; text-align: right;">Sent</th>
+                </tr>
+            </thead>
+            <tbody id="liveTableBody">
+                <tr id="liveTablePlaceholder">
+                    <td colspan="7" style="text-align: center; color: var(--color-text-muted); padding: 2rem;">
+                        프록시와 키워드를 입력하고 시작 버튼을 눌러 실시간 로그 감시를 시작하세요.
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </div>
 

@@ -529,7 +529,7 @@
     // ── 실시간 감시 ──────────────────────────────────────────────
     let _liveInterval = null;
     let _liveProxyId = null;
-    const LIVE_MAX_LINES = 1000;
+    const LIVE_MAX_ROWS = 1000;
 
     function populateLiveProxySelect() {
         const $sel = $('#liveProxySelect');
@@ -550,44 +550,78 @@
         else $tag.addClass('is-light');
     }
 
-    function appendLiveLines(lines) {
-        const $container = $('#liveLogContainer');
-        $('#liveLogPlaceholder').remove();
+    function _escHtml(s) {
+        if (s === null || s === undefined) return '';
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
 
-        const now = new Date().toLocaleTimeString('ko-KR', {hour12: false});
-        lines.forEach(line => {
-            const $line = $('<div>').text(line).css('border-bottom', '1px solid rgba(255,255,255,0.03)');
-            $container.append($line);
+    function _statusCell(code) {
+        if (!code) return '<td style="text-align:center;">-</td>';
+        if (window.AppUtils && AppUtils.renderStatusTag) {
+            return `<td style="text-align:center;">${AppUtils.renderStatusTag(code)}</td>`;
+        }
+        return `<td style="text-align:center;">${_escHtml(code)}</td>`;
+    }
+
+    function _bytesCell(n, align) {
+        const style = align === 'right' ? 'text-align:right;' : '';
+        if (!n && n !== 0) return `<td style="${style}">-</td>`;
+        if (window.AppUtils && AppUtils.formatBytes) {
+            return `<td style="${style}">${AppUtils.formatBytes(n)}</td>`;
+        }
+        return `<td style="${style}">${n}</td>`;
+    }
+
+    function appendLiveRecords(records) {
+        if (!records || records.length === 0) return;
+        const $tbody = $('#liveTableBody');
+        $('#liveTablePlaceholder').remove();
+
+        records.forEach(r => {
+            const action = (r.action_names || '').toLowerCase();
+            const actionCls = action === 'block' ? 'style="color:#dc2626;font-weight:700;"' : '';
+            const row = `<tr>
+                <td style="white-space:nowrap;font-size:0.72rem;">${_escHtml(r.datetime || '')}</td>
+                <td>${_escHtml(r.client_ip || '')}</td>
+                <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_escHtml(r.url_host || '')}">${_escHtml(r.url_host || '')}</td>
+                ${_statusCell(r.response_statuscode)}
+                <td ${actionCls}>${_escHtml(r.action_names || '')}</td>
+                ${_bytesCell(r.recv_byte, 'right')}
+                ${_bytesCell(r.sent_byte, 'right')}
+            </tr>`;
+            $tbody.append(row);
         });
 
-        // 최대 줄 수 초과 시 오래된 줄 제거
-        const children = $container.children('div');
-        if (children.length > LIVE_MAX_LINES) {
-            children.slice(0, children.length - LIVE_MAX_LINES).remove();
+        // 최대 행 수 초과 시 오래된 행 제거
+        const rows = $tbody.children('tr:not(#liveTablePlaceholder)');
+        if (rows.length > LIVE_MAX_ROWS) {
+            rows.slice(0, rows.length - LIVE_MAX_ROWS).remove();
         }
 
         if ($('#liveAutoScroll').is(':checked')) {
-            $container.scrollTop($container[0].scrollHeight);
+            const $wrap = $tbody.closest('div[style*="overflow-y"]');
+            if ($wrap.length) $wrap.scrollTop($wrap[0].scrollHeight);
         }
     }
 
     async function fetchLiveLog() {
         if (!_liveProxyId) return;
         const initialLines = $('#liveInitialLines').val() || 100;
+        const q = encodeURIComponent($('#liveKeyword').val().trim());
+        const clientIp = encodeURIComponent($('#liveClientIp').val().trim());
+        const urlHost = encodeURIComponent($('#liveUrlHost').val().trim());
+        const url = `${API_BASE}/traffic-logs/live/${_liveProxyId}?initial_lines=${initialLines}&q=${q}&client_ip=${clientIp}&url_host=${urlHost}`;
         try {
-            const res = await fetch(`${API_BASE}/traffic-logs/live/${_liveProxyId}?initial_lines=${initialLines}`);
+            const res = await fetch(url);
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 setLiveStatus('오류: ' + (err.detail || res.status), 'error');
                 return;
             }
             const data = await res.json();
-            if (data.lines && data.lines.length > 0) {
-                appendLiveLines(data.lines);
-                setLiveStatus(`감시 중 (총 ${data.total_count.toLocaleString()}줄)`, 'running');
-            } else {
-                setLiveStatus(`감시 중 (총 ${data.total_count.toLocaleString()}줄, 변화 없음)`, 'running');
-            }
+            appendLiveRecords(data.records);
+            const newMsg = data.new_lines > 0 ? `, +${data.new_lines}건` : ', 변화 없음';
+            setLiveStatus(`감시 중 (총 ${(data.total_count || 0).toLocaleString()}줄${newMsg})`, 'running');
         } catch (e) {
             setLiveStatus('연결 오류', 'error');
         }
@@ -596,16 +630,20 @@
     function startLiveLog() {
         const proxyId = parseInt($('#liveProxySelect').val());
         if (!proxyId) { alert('프록시를 선택하세요.'); return; }
+        const keyword = $('#liveKeyword').val().trim();
+        if (!keyword) { alert('키워드를 입력해야 시작할 수 있습니다.'); $('#liveKeyword').focus(); return; }
 
         if (_liveProxyId && _liveProxyId !== proxyId) {
             fetch(`${API_BASE}/traffic-logs/live/${_liveProxyId}`, { method: 'DELETE' }).catch(() => {});
         }
 
         _liveProxyId = proxyId;
-        $('#liveLogContainer').empty();
+        $('#liveTableBody').empty().append(
+            '<tr id="liveTablePlaceholder"><td colspan="7" style="text-align:center;color:var(--color-text-muted);padding:1.5rem;">로딩 중...</td></tr>'
+        );
         $('#liveStartBtn').hide();
         $('#liveStopBtn').show();
-        $('#liveProxySelect, #liveIntervalSelect, #liveInitialLines').prop('disabled', true);
+        $('#liveProxySelect, #liveIntervalSelect, #liveInitialLines, #liveKeyword, #liveClientIp, #liveUrlHost').prop('disabled', true);
         setLiveStatus('연결 중...', 'loading');
 
         fetchLiveLog();
@@ -622,7 +660,7 @@
         _liveProxyId = null;
         $('#liveStartBtn').show();
         $('#liveStopBtn').hide();
-        $('#liveProxySelect, #liveIntervalSelect, #liveInitialLines').prop('disabled', false);
+        $('#liveProxySelect, #liveIntervalSelect, #liveInitialLines, #liveKeyword, #liveClientIp, #liveUrlHost').prop('disabled', false);
         setLiveStatus('중지됨', '');
     }
 
@@ -630,8 +668,9 @@
         $('#liveStartBtn').off('click').on('click', startLiveLog);
         $('#liveStopBtn').off('click').on('click', stopLiveLog);
         $('#liveClearBtn').off('click').on('click', () => {
-            $('#liveLogContainer').empty()
-                .append('<span id="liveLogPlaceholder" style="color:#475569;">로그 영역을 지웠습니다.</span>');
+            $('#liveTableBody').empty().append(
+                '<tr id="liveTablePlaceholder"><td colspan="7" style="text-align:center;color:var(--color-text-muted);padding:2rem;">로그 영역을 지웠습니다.</td></tr>'
+            );
         });
     }
     // ─────────────────────────────────────────────────────────────
