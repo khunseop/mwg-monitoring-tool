@@ -6,6 +6,7 @@
         <div class="subnav-tabs">
             <a id="sb-tab-list" class="subnav-tab is-active" onclick="switchSbTab('list')">세션 목록</a>
             <a id="sb-tab-analyze" class="subnav-tab" onclick="switchSbTab('analyze')">결과 분석</a>
+            <a id="sb-tab-live" class="subnav-tab" onclick="switchSbTab('live')">실시간 감시</a>
         </div>
     </div>
 </div>
@@ -212,6 +213,79 @@
         <footer class="modal-card-foot is-justify-content-flex-end py-3 px-5">
             <button class="button is-primary is-small px-5" onclick="$('#sbDetailModal').removeClass('is-active');">확인</button>
         </footer>
+    </div>
+</div>
+
+<!-- 실시간 감시 섹션 -->
+<div id="sbLiveSection" class="sb-tab-content" style="display:none;">
+    <!-- 1행: 프록시·간격 -->
+    <div class="settings-bar mb-1">
+        <div class="is-flex is-align-items-center" style="gap: 0.75rem; flex: 1;">
+            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                <span class="filter-label">프록시</span>
+                <div class="select is-small">
+                    <select id="sbLiveProxySelect"><option value="">-- 선택 --</option></select>
+                </div>
+            </div>
+            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                <span class="filter-label">갱신 간격</span>
+                <div class="select is-small">
+                    <select id="sbLiveIntervalSelect">
+                        <option value="5">5초</option>
+                        <option value="10" selected>10초</option>
+                        <option value="30">30초</option>
+                    </select>
+                </div>
+            </div>
+            <span id="sbLiveStatus" class="tag is-light is-small" style="font-weight: 700; border-radius: 4px;">대기</span>
+        </div>
+        <div class="is-flex is-align-items-center" style="gap: 0.5rem; margin-left: auto;">
+            <button class="button is-primary is-small px-5" id="sbLiveStartBtn" style="font-weight: 600;">시작</button>
+            <button class="button is-danger is-small px-4" id="sbLiveStopBtn" style="font-weight: 600; display: none;">중지</button>
+        </div>
+    </div>
+    <!-- 2행: 필터 (키워드 필수) -->
+    <div class="settings-bar mb-2" style="background: var(--color-surface-alt, #f8fafc); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem;">
+        <div class="is-flex is-align-items-center" style="gap: 0.75rem; flex: 1; flex-wrap: wrap;">
+            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                <span class="filter-label" style="color: var(--color-danger, #dc2626); font-weight: 700;">키워드 *</span>
+                <input class="input is-small" id="sbLiveKeyword" type="text" placeholder="필수 — grep -F 검색어" style="width: 220px;">
+            </div>
+            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                <span class="filter-label">Client IP</span>
+                <input class="input is-small" id="sbLiveClientIp" type="text" placeholder="예: 10.0.0.1 (선택)" style="width: 150px;">
+            </div>
+            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                <span class="filter-label">Server IP</span>
+                <input class="input is-small" id="sbLiveServerIp" type="text" placeholder="예: 203.0.113.1 (선택)" style="width: 150px;">
+            </div>
+        </div>
+        <span class="is-size-7 has-text-grey" style="margin-left: auto; white-space: nowrap;">키워드 없이 시작 불가 · 매 갱신 시 전체 교체</span>
+    </div>
+
+    <!-- 세션 테이블 -->
+    <div style="overflow-y: auto; max-height: 72vh; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface);">
+        <table class="table is-fullwidth is-narrow is-hoverable mb-0" style="font-size: 0.78rem;">
+            <thead style="position: sticky; top: 0; z-index: 1; background: var(--color-surface);">
+                <tr>
+                    <th style="width: 140px;">생성 시각</th>
+                    <th style="width: 120px;">Client IP</th>
+                    <th style="width: 120px;">Server IP</th>
+                    <th>URL</th>
+                    <th style="width: 80px;">Protocol</th>
+                    <th style="width: 70px; text-align: right;">Age(s)</th>
+                    <th style="width: 80px; text-align: right;">Recv</th>
+                    <th style="width: 80px; text-align: right;">Sent</th>
+                </tr>
+            </thead>
+            <tbody id="sbLiveTableBody">
+                <tr id="sbLiveTablePlaceholder">
+                    <td colspan="8" style="text-align: center; color: var(--color-text-muted); padding: 2rem;">
+                        프록시와 키워드를 입력하고 시작 버튼을 눌러 실시간 세션 감시를 시작하세요.
+                    </td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </div>
 

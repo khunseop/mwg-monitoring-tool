@@ -232,6 +232,43 @@ def _collect_for_proxy(proxy: Proxy, cfg: SessionBrowserConfigModel, q: Optional
         return proxy.id, None, str(e)
 
 
+@router.get("/session-browser/live/{proxy_id}")
+def get_live_session(
+    proxy_id: int,
+    q: Optional[str] = Query(default=None, max_length=256),
+    client_ip: Optional[str] = Query(default=None, max_length=64),
+    server_ip: Optional[str] = Query(default=None, max_length=64),
+    db: Session = Depends(get_db),
+):
+    """단일 프록시의 현재 활성 세션을 실시간으로 조회합니다 (키워드 필수)."""
+    if not q or not q.strip():
+        raise HTTPException(status_code=400, detail="키워드(q)는 필수입니다.")
+    q = q.strip()
+    for ch in q:
+        if ch in ("\n", "\r") or (ord(ch) < 32 and ch != "\t"):
+            raise HTTPException(status_code=400, detail="q에 유효하지 않은 문자가 포함되어 있습니다.")
+
+    proxy = db.query(Proxy).filter(Proxy.id == proxy_id, Proxy.is_active == True).first()
+    if not proxy:
+        raise HTTPException(status_code=404, detail="Proxy not found")
+
+    cfg = _get_cfg(db)
+    _, records, err = _collect_for_proxy(proxy, cfg, q)
+    if err:
+        raise HTTPException(status_code=502, detail=f"ssh error: {err}")
+
+    result = []
+    for rec in (records or []):
+        if client_ip and rec.get("client_ip") != client_ip:
+            continue
+        if server_ip and rec.get("server_ip") != server_ip:
+            continue
+        rec["host"] = proxy.host
+        result.append(rec)
+
+    return {"records": result, "total": len(result)}
+
+
 @router.post("/session-browser/collect", response_model=CollectResponse)
 async def collect_sessions(payload: CollectRequest, db: Session = Depends(get_db)):
     if not payload.proxy_ids or len(payload.proxy_ids) == 0:

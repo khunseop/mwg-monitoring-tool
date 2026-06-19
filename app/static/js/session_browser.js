@@ -4,21 +4,22 @@
     function switchSbTab(tabId) {
         $('.sb-tab-content').hide();
         $('.subnav-tab').removeClass('is-active');
-        
+
         if (tabId === 'list') {
             $('#sbListSection').show();
             $('#sb-tab-list').addClass('is-active');
-            // 그리드 리사이즈 유도
             setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
         } else if (tabId === 'analyze') {
             $('#sbAnalyzeSection').show();
             $('#sb-tab-analyze').addClass('is-active');
-            // 분석 탭으로 전환 시 현재 데이터가 있으면 자동 분석 실행
             if (sb.records && sb.records.length > 0) {
                 analyzeSessions(sb.records);
             }
-            // 차트 리사이즈 유도
             setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+        } else if (tabId === 'live') {
+            $('#sbLiveSection').show();
+            $('#sb-tab-live').addClass('is-active');
+            populateSbLiveProxySelect();
         }
     }
     window.switchSbTab = switchSbTab;
@@ -616,6 +617,7 @@
                 onData: (data) => {
                     sb.groups = data.groups;
                     sb.proxies = data.proxies;
+                    populateSbLiveProxySelect();
                 }
             });
         }
@@ -660,17 +662,136 @@
         });
     }
 
+    // ── 실시간 감시 ──────────────────────────────────────────────
+    let _sbLiveInterval = null;
+    let _sbLiveProxyId = null;
+
+    function populateSbLiveProxySelect() {
+        const $sel = $('#sbLiveProxySelect');
+        const currentVal = $sel.val();
+        $sel.empty().append('<option value="">-- 선택 --</option>');
+        (sb.proxies || []).forEach(p => {
+            $sel.append(`<option value="${p.id}">${p.host}</option>`);
+        });
+        if (currentVal) $sel.val(currentVal);
+    }
+
+    function setSbLiveStatus(text, type) {
+        const $tag = $('#sbLiveStatus');
+        $tag.text(text).removeClass().addClass('tag is-small');
+        if (type === 'running') $tag.addClass('is-success is-light');
+        else if (type === 'error') $tag.addClass('is-danger is-light');
+        else if (type === 'loading') $tag.addClass('is-warning is-light');
+        else $tag.addClass('is-light');
+    }
+
+    function _sbEsc(s) {
+        if (s === null || s === undefined) return '';
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function _sbBytes(n) {
+        if (!n && n !== 0) return '-';
+        if (window.AppUtils && AppUtils.formatBytes) return AppUtils.formatBytes(n);
+        return n;
+    }
+
+    function renderSbLiveRecords(records) {
+        const $tbody = $('#sbLiveTableBody');
+        $tbody.empty();
+
+        if (!records || records.length === 0) {
+            $tbody.html('<tr><td colspan="8" style="text-align:center;color:var(--color-text-muted);padding:1.5rem;">일치하는 세션이 없습니다.</td></tr>');
+            return;
+        }
+
+        records.forEach(r => {
+            const ct = r.creation_time ? String(r.creation_time).replace('T', ' ').slice(0, 19) : '-';
+            const url = _sbEsc(r.url || '');
+            $tbody.append(`<tr>
+                <td style="white-space:nowrap;font-size:0.72rem;">${_sbEsc(ct)}</td>
+                <td>${_sbEsc(r.client_ip || '')}</td>
+                <td>${_sbEsc(r.server_ip || '')}</td>
+                <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${url}">${url}</td>
+                <td>${_sbEsc(r.protocol || '')}</td>
+                <td style="text-align:right;">${r.age_seconds != null ? r.age_seconds : '-'}</td>
+                <td style="text-align:right;">${_sbBytes(r.cl_bytes_received)}</td>
+                <td style="text-align:right;">${_sbBytes(r.cl_bytes_sent)}</td>
+            </tr>`);
+        });
+    }
+
+    async function fetchSbLive() {
+        if (!_sbLiveProxyId) return;
+        const q = encodeURIComponent($('#sbLiveKeyword').val().trim());
+        const clientIp = encodeURIComponent($('#sbLiveClientIp').val().trim());
+        const serverIp = encodeURIComponent($('#sbLiveServerIp').val().trim());
+        const url = `/api/session-browser/live/${_sbLiveProxyId}?q=${q}&client_ip=${clientIp}&server_ip=${serverIp}`;
+        try {
+            const res = await fetch(url);
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                setSbLiveStatus('오류: ' + (err.detail || res.status), 'error');
+                return;
+            }
+            const data = await res.json();
+            renderSbLiveRecords(data.records);
+            setSbLiveStatus(`감시 중 (${(data.total || 0).toLocaleString()}건)`, 'running');
+        } catch (e) {
+            setSbLiveStatus('연결 오류', 'error');
+        }
+    }
+
+    function startSbLive() {
+        const proxyId = parseInt($('#sbLiveProxySelect').val());
+        if (!proxyId) { alert('프록시를 선택하세요.'); return; }
+        const keyword = $('#sbLiveKeyword').val().trim();
+        if (!keyword) { alert('키워드를 입력해야 시작할 수 있습니다.'); $('#sbLiveKeyword').focus(); return; }
+
+        _sbLiveProxyId = proxyId;
+        $('#sbLiveTableBody').html(
+            '<tr><td colspan="8" style="text-align:center;color:var(--color-text-muted);padding:1.5rem;">로딩 중...</td></tr>'
+        );
+        $('#sbLiveStartBtn').hide();
+        $('#sbLiveStopBtn').show();
+        $('#sbLiveProxySelect, #sbLiveIntervalSelect, #sbLiveKeyword, #sbLiveClientIp, #sbLiveServerIp').prop('disabled', true);
+        setSbLiveStatus('연결 중...', 'loading');
+
+        fetchSbLive();
+        const intervalSec = parseInt($('#sbLiveIntervalSelect').val()) || 10;
+        _sbLiveInterval = setInterval(fetchSbLive, intervalSec * 1000);
+    }
+
+    function stopSbLive() {
+        clearInterval(_sbLiveInterval);
+        _sbLiveInterval = null;
+        _sbLiveProxyId = null;
+        $('#sbLiveStartBtn').show();
+        $('#sbLiveStopBtn').hide();
+        $('#sbLiveProxySelect, #sbLiveIntervalSelect, #sbLiveKeyword, #sbLiveClientIp, #sbLiveServerIp').prop('disabled', false);
+        setSbLiveStatus('중지됨', '');
+    }
+
+    function initSbLive() {
+        $('#sbLiveStartBtn').off('click').on('click', startSbLive);
+        $('#sbLiveStopBtn').off('click').on('click', stopSbLive);
+    }
+    // ─────────────────────────────────────────────────────────────
+
     // 초기화 및 PJAX 지원
     $(document).ready(() => {
-        // PJAX 환경에서는 document.ready가 로드 시 한 번만 실행될 수도 있고, 
+        // PJAX 환경에서는 document.ready가 로드 시 한 번만 실행될 수도 있고,
         // base.js에서 스크립트를 수동으로 실행할 때 즉시 실행될 수도 있음.
         initSessionBrowser();
+        initSbLive();
     });
 
     // PJAX 페이지 전환 대응 (네임스페이스 사용하여 중복 등록 방지)
     $(document).off('pjax:complete.sb').on('pjax:complete.sb', function(e, url) {
         if (url.includes('/session')) {
+            stopSbLive();
             initSessionBrowser();
+            initSbLive();
         }
     });
 
