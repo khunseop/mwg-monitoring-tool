@@ -346,8 +346,8 @@
             infiniteInitialRowCount: 100,
             pagination: true,
             paginationPageSize: 100,
-            rowHeight: 35,
-            headerHeight: 45,
+            rowHeight: 28,
+            headerHeight: 32,
             onRowDoubleClicked: params => showDetail(params.data),
             overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted);">로그가 비어있습니다. [수집/조회] 버튼을 눌러보세요.</div>',
         };
