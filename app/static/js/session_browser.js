@@ -744,6 +744,11 @@
             }).join('');
             $tbody.append(`<tr>${cells}</tr>`);
         });
+
+        if ($('#sbLiveAutoScroll').is(':checked')) {
+            const $wrap = $('#sbLiveTableWrap');
+            $wrap.scrollTop($wrap[0].scrollHeight);
+        }
     }
 
     async function fetchSbLive() {
@@ -801,6 +806,12 @@
     function initSbLive() {
         $('#sbLiveStartBtn').off('click').on('click', startSbLive);
         $('#sbLiveStopBtn').off('click').on('click', stopSbLive);
+        $('#sbLiveClearBtn').off('click').on('click', () => {
+            $('#sbLiveTableHead').empty();
+            $('#sbLiveTableBody').html(
+                `<tr id="sbLiveTablePlaceholder"><td colspan="${SB_LIVE_FIELDS.length}" style="text-align:center;color:var(--color-text-muted);padding:2rem;">로그 영역을 지웠습니다.</td></tr>`
+            );
+        });
     }
     // ─────────────────────────────────────────────────────────────
 

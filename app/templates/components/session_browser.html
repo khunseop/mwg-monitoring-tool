@@ -240,6 +240,11 @@
             <span id="sbLiveStatus" class="tag is-light is-small" style="font-weight: 700; border-radius: 4px;">대기</span>
         </div>
         <div class="is-flex is-align-items-center" style="gap: 0.5rem; margin-left: auto;">
+            <label class="is-size-7" style="display: flex; align-items: center; gap: 0.3rem; cursor: pointer;">
+                <input type="checkbox" id="sbLiveAutoScroll" checked>
+                자동 스크롤
+            </label>
+            <button class="button is-ghost is-small px-3" id="sbLiveClearBtn" style="color: var(--color-text-muted);">지우기</button>
             <button class="button is-primary is-small px-5" id="sbLiveStartBtn" style="font-weight: 600;">시작</button>
             <button class="button is-danger is-small px-4" id="sbLiveStopBtn" style="font-weight: 600; display: none;">중지</button>
         </div>
