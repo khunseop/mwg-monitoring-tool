@@ -167,65 +167,100 @@ table.dataTable thead tr.cc-filters .select.is-small select {
 
 /* ag-grid customization */
 .ag-theme-quartz {
-    --ag-font-family: inherit;
-    --ag-font-size: 0.85rem;
-    --ag-header-height: 32px;
-    --ag-row-height: 28px;
-    --ag-border-color: var(--color-border);
-    --ag-header-background-color: #f9fafb;
+    --ag-background-color: transparent;
     --ag-odd-row-background-color: transparent;
-    --ag-row-hover-color: #f8fafc;
-    --ag-selected-row-background-color: color-mix(in srgb, var(--color-primary) 8%, white);
-    --ag-range-selection-background-color: color-mix(in srgb, var(--color-primary) 12%, white);
+    --ag-header-background-color: rgba(235, 240, 245, 0.7);
+    --ag-header-foreground-color: rgba(86, 97, 102, 0.6);
+    --ag-row-hover-color: rgba(240, 244, 247, 0.3);
+    --ag-border-color: transparent;
+    --ag-borders: none;
+    --ag-row-border-color: rgba(169, 180, 185, 0.08);
+    --ag-row-border-width: 1px;
+    --ag-cell-horizontal-border: none;
+    --ag-header-column-separator-display: none;
+    --ag-header-column-resize-handle-display: none;
+    --ag-font-family: inherit;
+    --ag-font-size: 11px;
+    --ag-row-height: 28px;
+    --ag-header-height: 32px;
+    --ag-cell-horizontal-padding: 10px;
+    --ag-wrapper-border-radius: 0;
+    --ag-grid-size: 4px;
+    --ag-list-item-height: 32px;
+    --ag-selected-row-background-color: rgba(219, 234, 254, 0.4);
+}
+
+/* 외부 테두리 제거 */
+.ag-theme-quartz .ag-root-wrapper {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+.ag-theme-quartz .ag-header {
+    border-top: none !important;
+    border-bottom: 1px solid rgba(169, 180, 185, 0.12) !important;
+}
+
+/* 헤더 텍스트 스타일 */
+.ag-theme-quartz .ag-header-cell-text {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.12em !important;
+    color: rgba(86, 97, 102, 0.6) !important;
 }
 
 .ag-theme-quartz .ag-header-cell {
-    font-weight: 600;
-    color: var(--color-text);
-    white-space: nowrap;
-    line-height: 1.3;
-    padding: 5px 8px;
+    border-right: none !important;
 }
 
-.ag-theme-quartz .ag-header-cell-label {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    height: 100%;
-    text-align: left;
+/* 리사이즈 핸들: 평소엔 숨김, 호버 시만 표시 */
+.ag-theme-quartz .ag-header-cell-resize::after {
+    background: transparent !important;
+}
+.ag-theme-quartz .ag-header-cell:hover .ag-header-cell-resize::after {
+    background: rgba(169, 180, 185, 0.25) !important;
 }
 
-.ag-theme-quartz .ag-cell {
-    color: var(--bulma-text);
-    padding: 0 8px;
-    line-height: 28px;
-}
-
+/* 행 구분선 */
 .ag-theme-quartz .ag-row {
-    border-bottom: 1px solid var(--color-border);
+    border-bottom: 1px solid rgba(169, 180, 185, 0.08) !important;
+    border-top: none !important;
 }
+
+/* 셀 수직 중앙 정렬 */
+.ag-theme-quartz .ag-cell {
+    font-size: 11px !important;
+    display: flex !important;
+    align-items: center !important;
+    line-height: 1.4 !important;
+}
+
+/* 정렬·필터 아이콘 색상 */
+.ag-theme-quartz .ag-sort-indicator-icon { color: #3b82f6 !important; }
+.ag-theme-quartz .ag-icon-filter         { color: #3b82f6 !important; }
+
+/* 핀 컬럼 구분선 */
+.ag-theme-quartz .ag-pinned-left-cols-container,
+.ag-theme-quartz .ag-pinned-left-header {
+    border-right: 1px solid rgba(169, 180, 185, 0.18) !important;
+}
+
+/* 클릭 가능 행 커서 */
+.ag-theme-quartz.ag-clickable-rows .ag-row { cursor: pointer; }
 
 .ag-theme-quartz .ag-cell.mono {
     font-family: 'Courier New', monospace;
 }
 
 .ag-theme-quartz .ag-cell.num {
-    text-align: right;
-}
-
-/* ag-grid header filter/sort icons - muted so they don't clutter dense columns */
-.ag-theme-quartz .ag-header-icon {
-    opacity: 0.3;
-}
-
-.ag-theme-quartz .ag-header-icon:hover,
-.ag-theme-quartz .ag-header-cell:hover .ag-header-icon {
-    opacity: 0.7;
+    justify-content: flex-end;
 }
 
 /* ag-grid pagination styling */
 .ag-theme-quartz .ag-paging-panel {
-    border-top: 1px solid var(--color-border);
+    border-top: 1px solid rgba(169, 180, 185, 0.12);
     padding: 0.4rem 0;
     color: var(--color-text-muted);
     font-size: 0.78rem;
