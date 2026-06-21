@@ -575,9 +575,9 @@ def get_live_log(
             if not ln:
                 continue
             fields = ln.split(" :| ")
-            if client_ip and (len(fields) < 3 or fields[2] != client_ip):
+            if client_ip and (len(fields) < 3 or client_ip not in fields[2]):
                 continue
-            if url_host and (len(fields) < 10 or fields[9] != url_host):
+            if url_host and (len(fields) < 10 or url_host not in fields[9]):
                 continue
             try:
                 records.append(parse_log_line(ln))

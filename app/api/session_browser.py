@@ -237,7 +237,7 @@ def get_live_session(
     proxy_id: int,
     q: Optional[str] = Query(default=None, max_length=256),
     client_ip: Optional[str] = Query(default=None, max_length=64),
-    server_ip: Optional[str] = Query(default=None, max_length=64),
+    url_host: Optional[str] = Query(default=None, max_length=256),
     db: Session = Depends(get_db),
 ):
     """단일 프록시의 현재 활성 세션을 실시간으로 조회합니다 (키워드 필수)."""
@@ -259,9 +259,9 @@ def get_live_session(
 
     result = []
     for rec in (records or []):
-        if client_ip and rec.get("client_ip") != client_ip:
+        if client_ip and client_ip not in (rec.get("client_ip") or ""):
             continue
-        if server_ip and rec.get("server_ip") != server_ip:
+        if url_host and url_host not in (rec.get("url") or ""):
             continue
         rec["host"] = proxy.host
         result.append(rec)

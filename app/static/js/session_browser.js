@@ -6,10 +6,12 @@
         $('.subnav-tab').removeClass('is-active');
 
         if (tabId === 'list') {
+            $('#sbMainSettingsBar').show();
             $('#sbListSection').show();
             $('#sb-tab-list').addClass('is-active');
             setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
         } else if (tabId === 'analyze') {
+            $('#sbMainSettingsBar').show();
             $('#sbAnalyzeSection').show();
             $('#sb-tab-analyze').addClass('is-active');
             if (sb.records && sb.records.length > 0) {
@@ -17,6 +19,7 @@
             }
             setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
         } else if (tabId === 'live') {
+            $('#sbMainSettingsBar').hide();
             $('#sbLiveSection').show();
             $('#sb-tab-live').addClass('is-active');
             populateSbLiveProxySelect();
@@ -747,8 +750,8 @@
         if (!_sbLiveProxyId) return;
         const q = encodeURIComponent($('#sbLiveKeyword').val().trim());
         const clientIp = encodeURIComponent($('#sbLiveClientIp').val().trim());
-        const serverIp = encodeURIComponent($('#sbLiveServerIp').val().trim());
-        const url = `/api/session-browser/live/${_sbLiveProxyId}?q=${q}&client_ip=${clientIp}&server_ip=${serverIp}`;
+        const urlHost = encodeURIComponent($('#sbLiveUrlHost').val().trim());
+        const url = `/api/session-browser/live/${_sbLiveProxyId}?q=${q}&client_ip=${clientIp}&url_host=${urlHost}`;
         try {
             const res = await fetch(url);
             if (!res.ok) {
@@ -777,7 +780,7 @@
         );
         $('#sbLiveStartBtn').hide();
         $('#sbLiveStopBtn').show();
-        $('#sbLiveProxySelect, #sbLiveIntervalSelect, #sbLiveKeyword, #sbLiveClientIp, #sbLiveServerIp').prop('disabled', true);
+        $('#sbLiveProxySelect, #sbLiveIntervalSelect, #sbLiveKeyword, #sbLiveClientIp, #sbLiveUrlHost').prop('disabled', true);
         setSbLiveStatus('연결 중...', 'loading');
 
         fetchSbLive();
@@ -791,7 +794,7 @@
         _sbLiveProxyId = null;
         $('#sbLiveStartBtn').show();
         $('#sbLiveStopBtn').hide();
-        $('#sbLiveProxySelect, #sbLiveIntervalSelect, #sbLiveKeyword, #sbLiveClientIp, #sbLiveServerIp').prop('disabled', false);
+        $('#sbLiveProxySelect, #sbLiveIntervalSelect, #sbLiveKeyword, #sbLiveClientIp, #sbLiveUrlHost').prop('disabled', false);
         setSbLiveStatus('중지됨', '');
     }
 

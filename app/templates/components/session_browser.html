@@ -15,7 +15,7 @@
 {% block content %}
 
 <!-- 세션 조회 설정 바 (통합) -->
-<div class="settings-bar mb-2">
+<div id="sbMainSettingsBar" class="settings-bar mb-2">
     <div class="is-flex is-align-items-center" style="gap: 1rem;">
         <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
             <span class="filter-label">그룹</span>
@@ -256,8 +256,8 @@
                 <input class="input is-small" id="sbLiveClientIp" type="text" placeholder="예: 10.0.0.1 (선택)" style="width: 150px;">
             </div>
             <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
-                <span class="filter-label">Server IP</span>
-                <input class="input is-small" id="sbLiveServerIp" type="text" placeholder="예: 203.0.113.1 (선택)" style="width: 150px;">
+                <span class="filter-label">URL Host</span>
+                <input class="input is-small" id="sbLiveUrlHost" type="text" placeholder="예: example.com (선택)" style="width: 180px;">
             </div>
         </div>
         <span class="is-size-7 has-text-grey" style="margin-left: auto; white-space: nowrap;">키워드 없이 시작 불가 · 매 갱신 시 전체 교체</span>
