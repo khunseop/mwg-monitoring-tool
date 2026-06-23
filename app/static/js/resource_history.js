@@ -2,11 +2,6 @@ $(document).ready(function() {
     const history = {
         proxies: [],
         groups: [],
-        currentPage: 1,
-        pageSize: 500,
-        totalCount: 0,
-        hasMore: false,
-        gridApi: null,
         storageKey: 'ru_history_state',
         lastData: [],
         charts: {}
@@ -96,19 +91,16 @@ $(document).ready(function() {
         const startTime = $('#ruHistoryStartTime').val();
         const endTime = $('#ruHistoryEndTime').val();
         const limit = parseInt($('#ruHistoryLimit').val(), 10) || 500;
-        
+
         if (proxyIds.length === 0) {
             alert('조회할 프록시를 선택하세요.');
             return;
         }
 
-        history.currentPage = 1;
-        history.pageSize = limit;
-
         const params = {
             limit: limit,
             offset: 0,
-            proxy_ids: proxyIds.join(',') // 다중 프록시 조회를 위해 쉼표로 구분된 ID 목록 전달
+            proxy_ids: proxyIds.join(',')
         };
 
         if (startTime) params.start_time = convertKSTToUTC(startTime);
@@ -116,36 +108,24 @@ $(document).ready(function() {
 
         loadHistoryData(params);
     }
-    
+
     // Load all history (no date filter)
     function loadAllHistory() {
         const proxyIds = getSelectedProxyIds();
         const limit = parseInt($('#ruHistoryLimit').val(), 10) || 500;
-        
+
         if (proxyIds.length === 0) {
             alert('프록시를 선택하세요.');
             return;
         }
 
-        history.currentPage = 1;
-        history.pageSize = limit;
-
-        const params = {
-            limit: limit,
-            offset: 0,
-            proxy_ids: proxyIds.join(',') // 다중 프록시 조회를 위해 쉼표로 구분된 ID 목록 전달
-        };
-
-        loadHistoryData(params);
+        loadHistoryData({ limit: limit, offset: 0, proxy_ids: proxyIds.join(',') });
     }
-    
-    // Load history data with pagination
-    function loadHistoryData(params, append = false) {
+
+    function loadHistoryData(params) {
         $('#ruHistoryLoading').show();
         $('#ruHistoryError').hide();
-        if (!append) {
-            $('#ruHistoryResults').hide();
-        }
+        $('#ruHistoryResults').hide();
 
         $.ajax({
             url: '/api/history',
@@ -154,224 +134,24 @@ $(document).ready(function() {
         }).then(data => {
             $('#ruHistoryLoading').hide();
             if (!data || data.length === 0) {
-                if (!append) {
-                    $('#ruHistoryError').text('조회된 데이터가 없습니다.').show();
-                    $('#ruHistoryResults').hide();
-                }
+                $('#ruHistoryError').text('조회된 데이터가 없습니다.').show();
                 return;
             }
-
-            history.totalCount = data.length;
-            history.hasMore = data.length === params.limit;
-            history.lastData = append ? [...history.lastData, ...data] : data;
-            displayHistoryResults(data, append);
+            history.lastData = data;
+            displayHistoryResults(data);
         }).catch(err => {
             $('#ruHistoryLoading').hide();
-            const errorMsg = err.responseJSON && err.responseJSON.detail 
-                ? err.responseJSON.detail 
+            const errorMsg = err.responseJSON && err.responseJSON.detail
+                ? err.responseJSON.detail
                 : '이력 조회 중 오류가 발생했습니다.';
             $('#ruHistoryError').text(errorMsg).show();
         });
     }
-    
-    // Load next page
-    function loadNextPage() {
-        history.currentPage++;
-        const proxyIds = getSelectedProxyIds();
-        const startTime = $('#ruHistoryStartTime').val();
-        const endTime = $('#ruHistoryEndTime').val();
-        const limit = history.pageSize;
-        const offset = (history.currentPage - 1) * limit;
 
-        const params = {
-            limit: limit,
-            offset: offset
-        };
-
-        if (startTime) {
-            params.start_time = convertKSTToUTC(startTime);
-        }
-        if (endTime) {
-            params.end_time = convertKSTToUTC(endTime);
-        }
-        if (proxyIds.length > 0) {
-            params.proxy_ids = proxyIds.join(',');
-        }
-
-        loadHistoryData(params, true);
-    }
-
-    // Load previous page
-    function loadPrevPage() {
-        if (history.currentPage <= 1) return;
-
-        history.currentPage--;
-        const proxyIds = getSelectedProxyIds();
-        const startTime = $('#ruHistoryStartTime').val();
-        const endTime = $('#ruHistoryEndTime').val();
-        const limit = history.pageSize;
-        const offset = (history.currentPage - 1) * limit;
-
-        const params = {
-            limit: limit,
-            offset: offset
-        };
-
-        if (startTime) {
-            params.start_time = convertKSTToUTC(startTime);
-        }
-        if (endTime) {
-            params.end_time = convertKSTToUTC(endTime);
-        }
-        if (proxyIds.length > 0) {
-            params.proxy_ids = proxyIds.join(',');
-        }
-
-        loadHistoryData(params, true);
-    }
-
-    function updateFilterCount() {
-        if (!history.gridApi) return;
-        try {
-            var filterModel = history.gridApi.getFilterModel();
-            var filterCount = 0;
-            if (filterModel) {
-                // 필터 모델에서 실제로 값이 있는 필터의 수를 계산
-                for (var colId in filterModel) {
-                    if (filterModel.hasOwnProperty(colId)) {
-                        var filter = filterModel[colId];
-                        // 필터가 있고 값이 있는지 확인
-                        if (filter && typeof filter === 'object') {
-                            // agTextColumnFilter의 경우 filter 속성 확인
-                            if (filter.filter && String(filter.filter).trim() !== '') {
-                                filterCount++;
-                            }
-                            // agNumberColumnFilter의 경우 filter, filterTo, filterTo 등 확인
-                            else if (filter.filter !== undefined && filter.filter !== null && filter.filter !== '') {
-                                filterCount++;
-                            }
-                            else if (filter.filterTo !== undefined && filter.filterTo !== null && filter.filterTo !== '') {
-                                filterCount++;
-                            }
-                            else if (filter.type && filter.type !== 'equals') {
-                                // 다른 필터 타입들
-                                filterCount++;
-                            }
-                        }
-                    }
-                }
-            }
-            // resource_history.html에는 필터 수 표시 요소가 없을 수 있으므로, 콘솔에만 출력하거나 나중에 추가 가능
-            // var $filterCount = $('#ruHistoryFilterCount');
-            // if (filterCount > 0) {
-            //     $filterCount.text('필터: ' + filterCount).show();
-            // } else {
-            //     $filterCount.hide();
-            // }
-        } catch (e) {
-            console.error('Failed to update filter count:', e);
-        }
-    }
-
-    // Display history results
-    function displayHistoryResults(data, append = false) {
-        const proxyMap = {};
-        (history.proxies || []).forEach(p => { proxyMap[p.id] = p.host; });
-
-        // 데이터 변환 (ag-grid 형식으로)
-        const rowData = data.map(row => ({
-            collected_at: row.collected_at,
-            proxy_id: row.proxy_id,
-            proxy_name: proxyMap[row.proxy_id] || `#${row.proxy_id}`,
-            cpu: row.cpu,
-            mem: row.mem,
-            disk: row.disk,
-            cc: row.cc,
-            cs: row.cs,
-            blocked: row.blocked,
-            http: row.http,
-            https: row.https,
-            http2: row.http2,
-            interface_mbps: row.interface_mbps
-        }));
-
-        // ag-grid 초기화 또는 업데이트
-        const gridDiv = document.querySelector('#ruHistoryTableGrid');
-        if (gridDiv && window.agGrid) {
-            // PJAX 대응: 엘리먼트가 비어있으면 API 리셋
-            if (gridDiv.innerHTML === "") {
-                history.gridApi = null;
-            }
-
-            if (!history.gridApi) {
-                // 초기화
-                const gridOptions = {
-                    columnDefs: window.AgGridConfig ? window.AgGridConfig.getResourceHistoryColumns() : [],
-                    rowData: rowData,
-                    defaultColDef: {
-                        sortable: true,
-                        filter: 'agTextColumnFilter',
-                        filterParams: { applyButton: true, clearButton: true },
-                        resizable: true,
-                        minWidth: 100
-                    },
-                    rowModelType: 'clientSide',
-                    pagination: true,
-                    paginationPageSize: history.pageSize,
-                    domLayout: 'autoHeight',
-                    suppressPaginationPanel: true, // 커스텀 페이지네이션 사용
-                    enableFilter: true,
-                    enableSorting: true,
-                    animateRows: false,
-                    suppressRowClickSelection: true,
-                    headerHeight: 40,
-                    rowHeight: 35,
-                    overlayNoRowsTemplate: '<div style="padding: 20px; text-align: center; color: var(--color-text-muted); font-size: 0.875rem;">조회된 데이터가 없습니다.</div>',
-                    onGridReady: function(params) {
-                        history.gridApi = params.api;
-                        // 초기 로드 시 컬럼 너비 최적화
-                        setTimeout(() => {
-                            if (history.gridApi) history.gridApi.sizeColumnsToFit();
-                        }, 100);
-                        updateFilterCount();
-                    },
-                    onFilterChanged: function() {
-                        updateFilterCount();
-                    }
-                };
-
-                try {
-                    if (typeof window.agGrid.createGrid === 'function') {
-                        history.gridApi = window.agGrid.createGrid(gridDiv, gridOptions);
-                    } else if (window.agGrid.Grid) {
-                        history.gridApi = new window.agGrid.Grid(gridDiv, gridOptions);
-                    }
-                } catch (e) {
-                    console.error('[ResourceHistory] ag-grid init failed:', e);
-                }
-            } else {
-                // 데이터 업데이트
-                history.gridApi.setGridOption('rowData', rowData);
-            }
-        } else {
-            console.warn('[ResourceHistory] ag-grid not available or grid div not found');
-        }
-
-        const totalDisplayed = rowData.length;
-        const pageInfo = `페이지 ${history.currentPage} (${totalDisplayed}건 표시)`;
-        $('#ruHistoryCount').text(`총 ${totalDisplayed}건의 데이터가 표시됩니다.`);
-        $('#ruHistoryPaginationInfo').text(pageInfo);
-        
-        // Show/hide pagination
-        if (history.hasMore || history.currentPage > 1) {
-            $('#ruHistoryPagination').show();
-            $('#ruHistoryPrevBtn').toggleClass('is-disabled', history.currentPage <= 1);
-            $('#ruHistoryNextBtn').toggleClass('is-disabled', !history.hasMore);
-        } else {
-            $('#ruHistoryPagination').hide();
-        }
-        
+    function displayHistoryResults(data) {
+        $('#ruHistoryCount').text(`총 ${data.length}건의 데이터를 기반으로 그래프를 표시합니다.`);
         $('#ruHistoryResults').show();
+        renderHistoryCharts();
     }
 
 
@@ -518,16 +298,6 @@ $(document).ready(function() {
         $('#ruHistorySearchBtn').off('click').on('click', searchHistory);
         $('#ruHistoryLoadAllBtn').off('click').on('click', loadAllHistory);
         $('#ruHistoryExportBtn').off('click').on('click', exportHistory);
-        
-        $('#ruHistoryClearFiltersBtn').off('click').on('click', () => {
-            if (history.gridApi) {
-                history.gridApi.setFilterModel(null);
-                // 필터 초기화 피드백
-                const originalText = $('#ruHistoryClearFiltersBtn').text();
-                $('#ruHistoryClearFiltersBtn').text('초기화 완료');
-                setTimeout(() => $('#ruHistoryClearFiltersBtn').text(originalText), 1500);
-            }
-        });
 
         $('#ruHistoryDeleteBtn').off('click').on('click', function() {
             initDeleteProxySelect();
@@ -543,17 +313,6 @@ $(document).ready(function() {
         $('#ruHistoryDeleteConfirmBtn').off('click').on('click', deleteHistory);
         $('#ruHistoryDeleteCancelBtn, #ruHistoryDeleteModal .delete, #ruHistoryDeleteModal .modal-background').off('click').on('click', function() {
             $('#ruHistoryDeleteModal').removeClass('is-active');
-        });
-        
-        $('#ruHistoryPrevBtn').off('click').on('click', function() {
-            if (!$(this).hasClass('is-disabled')) {
-                loadPrevPage();
-            }
-        });
-        $('#ruHistoryNextBtn').off('click').on('click', function() {
-            if (!$(this).hasClass('is-disabled')) {
-                loadNextPage();
-            }
         });
         
         // 시간 범위 프리셋 핸들러

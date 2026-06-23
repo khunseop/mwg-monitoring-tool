@@ -156,7 +156,6 @@
                 <button class="button is-primary is-small px-4" id="ruHistorySearchBtn" style="font-weight: 600;">조회</button>
                 <button class="button is-subtle is-small px-3" id="ruHistoryLoadAllBtn">전체 조회</button>
                 <span class="settings-bar-separator"></span>
-                <button class="button is-ghost is-small px-3" id="ruHistoryClearFiltersBtn" title="필터 초기화" style="color: var(--color-text-muted);">필터 초기화</button>
                 <button class="button is-ghost is-small px-3" id="ruHistoryExportBtn" title="내보내기" style="color: var(--color-text-muted);">내보내기</button>
                 <span class="settings-bar-separator"></span>
                 <button class="button is-subtle-danger is-small px-3" id="ruHistoryDeleteBtn">삭제</button>
@@ -168,20 +167,12 @@
         <span class="loader" style="display: inline-block; width: 2rem; height: 2rem;"></span>
         <p class="mt-3 has-text-grey is-size-7">데이터를 불러오는 중입니다...</p>
     </div>
-    
+
+    <div id="ruHistoryError" class="notification is-danger is-light is-size-7 mt-2" style="display:none;"></div>
+
     <div id="ruHistoryResults" style="display:none;">
-        <div class="grid-container" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden;">
-            <div id="ruHistoryTableGrid" class="ag-theme-quartz" style="width: 100%;"></div>
-        </div>
-        
-        <div class="is-flex is-align-items-center is-justify-content-between mt-4">
-            <p id="ruHistoryCount" class="is-size-7 has-text-grey-light"></p>
-            <nav class="pagination is-small is-centered" role="navigation" id="ruHistoryPagination" style="display:none;">
-                <a class="pagination-previous" id="ruHistoryPrevBtn">이전</a>
-                <a class="pagination-next" id="ruHistoryNextBtn">다음</a>
-                <div id="ruHistoryPaginationInfo" class="is-size-7 has-text-grey mx-3" style="display: flex; align-items: center;"></div>
-            </nav>
-        </div>
+        <p id="ruHistoryCount" class="is-size-7 has-text-grey-light mt-3 mb-2"></p>
+        <div id="ruHistoryCharts" class="columns is-multiline"></div>
     </div>
 </div>
 
@@ -273,18 +264,10 @@
     </div>
 </div>
 
-<!-- 이력 분석 섹션 (그래프 + 부하 분석 통합) -->
+<!-- 이력 분석 섹션 -->
 <div id="history-analysis-tab" class="tab-content ru-tab-content" style="display:none;">
 
-<div class="is-flex is-align-items-center mb-4" style="border-bottom: 1px solid var(--color-border); padding-bottom: 0.75rem;">
-    <div class="buttons has-addons mb-0">
-        <button id="btn-section-graph" class="button is-small px-4 is-primary" onclick="showHistoryAnalysisSection('graph')">그래프</button>
-        <button id="btn-section-analysis" class="button is-small px-4 is-subtle" onclick="showHistoryAnalysisSection('analysis')">부하 분석</button>
-    </div>
-</div>
-
-<!-- 부하 분석 섹션 (내부) -->
-<div id="analysis-tab" style="display:none;">
+<div id="analysis-tab">
     <div class="settings-bar mb-2" style="flex-wrap: wrap; align-items: center;">
         <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
             <span class="filter-label">프록시</span>
@@ -414,21 +397,7 @@
     </div>
 </div>
 
-<!-- 이력 그래프 섹션 (내부) -->
-<div id="history-graph-tab" style="">
-    <div class="settings-bar mb-5">
-        <div class="is-flex is-align-items-center is-flex-wrap-wrap" style="gap: 1rem; width: 100%;">
-            <p class="is-size-7 has-text-grey">이력 테이블에서 조회된 데이터를 기반으로 시각화합니다.</p>
-            <div class="buttons ml-auto">
-                <button class="button is-link is-light is-small px-4" onclick="renderHistoryCharts()">그래프 생성/새로고침</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="ruHistoryCharts" class="columns is-multiline">
-        <!-- JS에서 지표별/회선별 그래프 박스가 동적으로 생성되어 삽입됩니다. -->
-    </div>
-</div>
+</div><!-- /analysis-tab -->
 
 </div><!-- /history-analysis-tab -->
 
@@ -446,24 +415,6 @@ function switchRuTab(tabId) {
     } else if (tabId === 'history-analysis') {
         $('#history-analysis-tab').show();
         $('#tab-history-analysis').addClass('is-active');
-        showHistoryAnalysisSection('graph');
-    }
-    // 리사이즈 트리거
-    setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
-}
-
-function showHistoryAnalysisSection(section) {
-    if (section === 'graph') {
-        $('#history-graph-tab').show();
-        $('#analysis-tab').hide();
-        $('#btn-section-graph').removeClass('is-subtle').addClass('is-primary');
-        $('#btn-section-analysis').removeClass('is-primary').addClass('is-subtle');
-        if (window.renderHistoryCharts) renderHistoryCharts();
-    } else if (section === 'analysis') {
-        $('#analysis-tab').show();
-        $('#history-graph-tab').hide();
-        $('#btn-section-analysis').removeClass('is-subtle').addClass('is-primary');
-        $('#btn-section-graph').removeClass('is-primary').addClass('is-subtle');
         if (window.HistoryAnalysis) window.HistoryAnalysis.onTabEnter();
     }
     setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
@@ -511,6 +462,6 @@ function updateRuSelectionSummary() {
 <script src="/static/js/resource_usage_charts.js"></script>
 <script src="/static/js/resource_usage_polling.js"></script>
 <script src="/static/js/resource_usage.js"></script>
-<script src="/static/js/resource_history.js"></script>
-<script src="/static/js/resource_history_analysis.js"></script>
+<script src="/static/js/resource_history.js?v={{ request.app.version }}"></script>
+<script src="/static/js/resource_history_analysis.js?v={{ request.app.version }}"></script>
 {% endblock %}
