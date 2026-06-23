@@ -142,8 +142,8 @@ function loadProxies() {
                         <td class="py-3">${proxy.group_name || '<span class="has-text-grey-light">없음</span>'}</td>
                         <td class="has-text-centered py-3">${statusTag}</td>
                         <td class="py-3 is-size-7 has-text-grey">${proxy.description || ''}</td>
-                        <td class="has-text-centered py-2">
-                            <div class="buttons has-addons is-centered mb-0">
+                        <td class="has-text-centered py-2" style="white-space: nowrap;">
+                            <div class="buttons has-addons is-centered mb-0" style="flex-wrap: nowrap; justify-content: center;">
                                 <button class="button is-subtle is-small" onclick="openModal('proxy', ${proxy.id})">수정</button>
                                 <button class="button is-subtle is-small" onclick="cloneProxy(${proxy.id})">복제</button>
                                 <button class="button is-subtle-danger is-small" onclick="deleteProxy(${proxy.id})">삭제</button>
@@ -252,8 +252,8 @@ function loadGroups() {
                         <td class="has-text-centered py-3">
                             <span class="tag is-info is-light" style="font-weight:700;">${group.proxies_count}</span>
                         </td>
-                        <td class="has-text-centered py-2">
-                            <div class="buttons has-addons is-centered mb-0">
+                        <td class="has-text-centered py-2" style="white-space: nowrap;">
+                            <div class="buttons has-addons is-centered mb-0" style="flex-wrap: nowrap; justify-content: center;">
                                 <button class="button is-subtle is-small" onclick="openModal('group', ${group.id})">수정</button>
                                 <button class="button is-subtle-danger is-small" onclick="deleteGroup(${group.id})">삭제</button>
                             </div>
