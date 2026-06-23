@@ -420,6 +420,18 @@ function switchRuTab(tabId) {
     setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
 }
 
+// PJAX 복귀 시 동기적으로 탭 전환 ($(document).ready는 비동기라 깜빡임 발생)
+$(document).off('pjax:complete.rutabs').on('pjax:complete.rutabs', function(e, url) {
+    if (!url) return;
+    if (url === '/' || url.startsWith('/resource')) {
+        if (url.includes('/history')) {
+            switchRuTab('history');
+        } else {
+            switchRuTab('realtime');
+        }
+    }
+});
+
 $(document).ready(function() {
     const path = window.location.pathname;
     if (path === '/history') {
