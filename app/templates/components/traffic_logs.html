@@ -5,7 +5,7 @@
 <div class="subnav">
     <div class="container">
         <div class="subnav-tabs">
-            <a id="tab-remote" class="subnav-tab {% if not is_upload %}is-active{% endif %}" onclick="switchTlTab('remote')">로그 원격 조회</a>
+            <a id="tab-remote" class="subnav-tab {% if not is_upload %}is-active{% endif %}" onclick="switchTlTab('remote')">원격 조회</a>
             <a id="tab-analyze" class="subnav-tab" onclick="switchTlTab('analyze')">결과 분석</a>
             <a id="tab-upload" class="subnav-tab {% if is_upload %}is-active{% endif %}" onclick="switchTlTab('upload')">파일 업로드 분석</a>
             <a id="tab-live" class="subnav-tab" onclick="switchTlTab('live')">실시간 감시</a>
@@ -237,7 +237,7 @@
 
     <div id="tlaEmptyState" class="empty-state mb-5" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
         <p class="title is-5 mb-2">NO DATA</p>
-        <p class="subtitle is-6" id="tlaEmptyStateMsg">분석할 로그 데이터가 없습니다. 프록시를 선택하고 "분석 실행"을 클릭하세요.</p>
+        <p class="subtitle is-6" id="tlaEmptyStateMsg">원격 조회 탭에서 로그를 수집한 후, "분석하기" 버튼 또는 이 탭의 "분석 실행"을 클릭하세요.</p>
     </div>
 </div>
 

@@ -22,6 +22,8 @@
     --color-surface: #ffffff;
     --color-text: #0f172a; /* slate-900 */
     --color-text-muted: #64748b; /* slate-500 */
+    --color-text-placeholder: #cbd5e1; /* slate-300, empty state 제목 */
+    --color-text-subtle: #94a3b8; /* slate-400, empty state 본문 */
     --color-border: #e2e8f0; /* slate-200 */
     --color-primary: #3b82f6; /* blue-500, slightly lighter than blue-600 */
     --color-primary-contrast: #ffffff;
@@ -30,6 +32,7 @@
     --radius-sm: 4px;
     --radius-md: 6px;
     --radius-lg: 10px;
+    --radius-card: 8px;
 
     /* Shadows */
     --shadow-sm: 0 1px 2px rgba(2, 6, 23, 0.06);

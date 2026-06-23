@@ -6,9 +6,8 @@
     <div class="container">
         <div class="subnav-tabs">
             <a id="tab-realtime" class="subnav-tab {% if not is_history %}is-active{% endif %}" onclick="switchRuTab('realtime')">실시간 모니터링</a>
-            <a id="tab-history" class="subnav-tab {% if is_history %}is-active{% endif %}" onclick="switchRuTab('history')">자원사용률 이력</a>
-            <a id="tab-history-graph" class="subnav-tab" onclick="switchRuTab('graph')">이력 그래프 분석</a>
-            <a id="tab-analysis" class="subnav-tab" onclick="switchRuTab('analysis')">부하 분석</a>
+            <a id="tab-history" class="subnav-tab {% if is_history %}is-active{% endif %}" onclick="switchRuTab('history')">이력 조회</a>
+            <a id="tab-history-analysis" class="subnav-tab" onclick="switchRuTab('history-analysis')">이력 분석</a>
         </div>
     </div>
 </div>
@@ -274,8 +273,18 @@
     </div>
 </div>
 
-<!-- 부하 분석 섹션 -->
-<div id="analysis-tab" class="tab-content ru-tab-content" style="display:none;">
+<!-- 이력 분석 섹션 (그래프 + 부하 분석 통합) -->
+<div id="history-analysis-tab" class="tab-content ru-tab-content" style="display:none;">
+
+<div class="is-flex is-align-items-center mb-4" style="border-bottom: 1px solid var(--color-border); padding-bottom: 0.75rem;">
+    <div class="buttons has-addons mb-0">
+        <button id="btn-section-graph" class="button is-small px-4 is-primary" onclick="showHistoryAnalysisSection('graph')">그래프</button>
+        <button id="btn-section-analysis" class="button is-small px-4 is-subtle" onclick="showHistoryAnalysisSection('analysis')">부하 분석</button>
+    </div>
+</div>
+
+<!-- 부하 분석 섹션 (내부) -->
+<div id="analysis-tab" style="display:none;">
     <div class="settings-bar mb-2" style="flex-wrap: wrap; align-items: center;">
         <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
             <span class="filter-label">프록시</span>
@@ -405,9 +414,8 @@
     </div>
 </div>
 
-<!-- 이력 그래프 분석 섹션 -->
-<div id="history-graph-tab" class="tab-content ru-tab-content" style="display:none;">
-    <!-- 그래프 설정 바 (이력 조회와 검색 조건 공유 가능하도록 js에서 처리) -->
+<!-- 이력 그래프 섹션 (내부) -->
+<div id="history-graph-tab" style="">
     <div class="settings-bar mb-5">
         <div class="is-flex is-align-items-center is-flex-wrap-wrap" style="gap: 1rem; width: 100%;">
             <p class="is-size-7 has-text-grey">이력 테이블에서 조회된 데이터를 기반으로 시각화합니다.</p>
@@ -422,6 +430,8 @@
     </div>
 </div>
 
+</div><!-- /history-analysis-tab -->
+
 <script>
 function switchRuTab(tabId) {
     $('.ru-tab-content').hide();
@@ -433,17 +443,29 @@ function switchRuTab(tabId) {
     } else if (tabId === 'history') {
         $('#history-tab').show();
         $('#tab-history').addClass('is-active');
-    } else if (tabId === 'graph') {
-        $('#history-graph-tab').show();
-        $('#tab-history-graph').addClass('is-active');
-        // 그래프 탭 진입 시 데이터가 있으면 자동 렌더링
-        if (window.renderHistoryCharts) renderHistoryCharts();
-    } else if (tabId === 'analysis') {
-        $('#analysis-tab').show();
-        $('#tab-analysis').addClass('is-active');
-        if (window.HistoryAnalysis) window.HistoryAnalysis.onTabEnter();
+    } else if (tabId === 'history-analysis') {
+        $('#history-analysis-tab').show();
+        $('#tab-history-analysis').addClass('is-active');
+        showHistoryAnalysisSection('graph');
     }
     // 리사이즈 트리거
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+}
+
+function showHistoryAnalysisSection(section) {
+    if (section === 'graph') {
+        $('#history-graph-tab').show();
+        $('#analysis-tab').hide();
+        $('#btn-section-graph').removeClass('is-subtle').addClass('is-primary');
+        $('#btn-section-analysis').removeClass('is-primary').addClass('is-subtle');
+        if (window.renderHistoryCharts) renderHistoryCharts();
+    } else if (section === 'analysis') {
+        $('#analysis-tab').show();
+        $('#history-graph-tab').hide();
+        $('#btn-section-analysis').removeClass('is-subtle').addClass('is-primary');
+        $('#btn-section-graph').removeClass('is-primary').addClass('is-subtle');
+        if (window.HistoryAnalysis) window.HistoryAnalysis.onTabEnter();
+    }
     setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
 }
 

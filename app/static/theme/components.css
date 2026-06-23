@@ -33,7 +33,7 @@
     position: relative;
     display: flex;
     align-items: center;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
 }
 
 .navbar-item:hover {
@@ -45,6 +45,7 @@
     color: var(--color-primary) !important;
     font-weight: 600;
     background: transparent !important;
+    border-bottom: 2px solid var(--color-primary);
 }
 
 .navbar-item.is-active::after {
@@ -216,7 +217,7 @@
 /* Standardized Status Tags */
 .tag {
     font-weight: 600 !important;
-    border-radius: 4px !important;
+    border-radius: var(--radius-sm) !important;
     letter-spacing: -0.01em;
 }
 
@@ -255,7 +256,7 @@
 }
 
 .empty-state .empty-state-title {
-    color: #cbd5e1;
+    color: var(--color-text-placeholder);
     font-size: 0.875rem;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -264,7 +265,7 @@
 }
 
 .empty-state .empty-state-body {
-    color: #94a3b8;
+    color: var(--color-text-subtle);
     font-size: 0.875rem;
     max-width: 360px;
     margin: 0 auto;
@@ -273,13 +274,13 @@
 
 /* Legacy selectors for backward compat */
 .empty-state p.title {
-    color: #cbd5e1;
+    color: var(--color-text-placeholder);
     font-weight: 800;
     letter-spacing: 0.05em;
 }
 
 .empty-state p.subtitle {
-    color: #94a3b8;
+    color: var(--color-text-subtle);
     margin-top: 0.5rem;
 }
 
@@ -449,7 +450,7 @@
 
 .page-header-subtitle {
     font-size: 0.8125rem;
-    color: #94a3b8;
+    color: var(--color-text-subtle);
     margin-top: 0.2rem;
     font-weight: 400;
 }
@@ -531,7 +532,7 @@
 .ru-hm-cell {
     text-align: center;
     padding: 0 2px;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     font-size: 11px;
     font-weight: 700;
     height: 24px;
@@ -568,7 +569,7 @@
     z-index: 9999;
     background: #0f172a;
     color: #f1f5f9;
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     padding: 10px 13px;
     font-size: 12px;
     pointer-events: none;
@@ -589,7 +590,7 @@
 .ru-hm-tt-proxy {
     font-weight: 700;
     font-size: 11px;
-    color: #cbd5e1;
+    color: var(--color-text-placeholder);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -694,7 +695,7 @@
 }
 
 .ru-detail-tile {
-    border-radius: 8px;
+    border-radius: var(--radius-card);
     padding: 10px 8px 8px;
     text-align: center;
     transition: filter 0.1s ease;
@@ -736,7 +737,7 @@
 .ru-detail-sparkline-item {
     background: var(--color-bg, #f8fafc);
     border: 1px solid var(--color-border, #e2e8f0);
-    border-radius: 8px;
+    border-radius: var(--radius-card);
     padding: 8px 10px 4px;
 }
 
@@ -768,7 +769,7 @@
 .ru-anomaly-card {
     background: var(--color-bg, #f8fafc);
     border: 1px solid var(--color-border, #e2e8f0);
-    border-radius: 8px;
+    border-radius: var(--radius-card);
     padding: 8px 10px 4px;
 }
 

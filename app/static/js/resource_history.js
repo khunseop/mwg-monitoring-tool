@@ -1,32 +1,4 @@
 $(document).ready(function() {
-    function formatBytes(bytes, decimals = 2, perSecond = false) {
-        if (bytes === null || bytes === undefined || isNaN(bytes)) return '';
-        if (bytes < 0) bytes = 0;
-
-        if (bytes === 0) {
-            let str = '0 Bytes';
-            if (perSecond) str += '/s';
-            return str;
-        }
-
-        const k = 1024;
-        const dm = decimals < 0 ? 0 : decimals;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-
-        let i = Math.floor(Math.log(bytes) / Math.log(k));
-        if (i < 0) i = 0;
-        if (i >= sizes.length) i = sizes.length - 1;
-
-        let str = parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-        if (perSecond) str += '/s';
-        return str;
-    }
-
-    function formatNumber(num) {
-        if (num === null || num === undefined) return '';
-        return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,');
-    }
-
     const history = {
         proxies: [],
         groups: [],
