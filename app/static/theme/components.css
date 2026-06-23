@@ -1,31 +1,31 @@
 /* Component Styles */
 
-/* Navbar - Dark Compact */
+/* Navbar - Light Compact */
 .navbar {
-    background: #0f172a !important;
+    background: var(--color-surface) !important;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    border-bottom: 1px solid #1e293b;
+    border-bottom: 1px solid var(--color-border);
     position: sticky;
     top: 0;
     z-index: 100;
     min-height: 2.75rem;
-    box-shadow: none;
+    box-shadow: var(--shadow-sm);
 }
 
 .navbar-brand .navbar-item {
-    color: #f1f5f9 !important;
+    color: var(--color-primary) !important;
     font-weight: 700;
     letter-spacing: -0.5px;
 }
 
 .navbar-brand .navbar-item:hover {
-    color: #ffffff !important;
+    color: var(--color-primary) !important;
     background: transparent !important;
 }
 
 .navbar-item {
-    color: #64748b;
+    color: var(--color-text-muted);
     font-size: 0.825rem;
     font-weight: 500;
     transition: color 0.15s ease, background 0.15s ease;
@@ -37,12 +37,12 @@
 }
 
 .navbar-item:hover {
-    color: #e2e8f0 !important;
-    background: rgba(255, 255, 255, 0.07) !important;
+    color: var(--color-text) !important;
+    background: var(--color-bg) !important;
 }
 
 .navbar-item.is-active {
-    color: #60a5fa !important;
+    color: var(--color-primary) !important;
     font-weight: 600;
     background: transparent !important;
 }
@@ -59,29 +59,29 @@
     background: transparent !important;
 }
 
-/* 모바일 burger 메뉴 펼침 시 다크 배경 */
+/* 모바일 burger 메뉴 펼침 시 라이트 배경 */
 @media screen and (max-width: 1023px) {
     .navbar-menu {
-        background: #0f172a !important;
-        border-top: 1px solid #1e293b;
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+        background: var(--color-surface) !important;
+        border-top: 1px solid var(--color-border);
+        box-shadow: var(--shadow-md);
         padding: 0.25rem 0;
     }
 
     .navbar-menu .navbar-item {
-        color: #94a3b8 !important;
+        color: var(--color-text-muted) !important;
         padding: 0.6rem 1.25rem !important;
         border-radius: 0 !important;
     }
 
     .navbar-menu .navbar-item:hover {
-        background: rgba(255, 255, 255, 0.07) !important;
-        color: #e2e8f0 !important;
+        background: var(--color-bg) !important;
+        color: var(--color-text) !important;
     }
 
     .navbar-menu .navbar-item.is-active {
-        color: #60a5fa !important;
-        background: rgba(96, 165, 250, 0.08) !important;
+        color: var(--color-primary) !important;
+        background: #eff6ff !important;
     }
 }
 
@@ -283,10 +283,10 @@
     margin-top: 0.5rem;
 }
 
-/* Subnav - 2차 탭 (navbar에 통합) */
+/* Subnav - 2차 탭 */
 .subnav {
-    background: #0c1525;
-    border-bottom: 1px solid #1e293b;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
 }
 
 .subnav-tabs {
@@ -302,7 +302,7 @@
     padding: 0 1rem;
     font-size: 0.775rem;
     font-weight: 500;
-    color: #475569;
+    color: var(--color-text-muted);
     cursor: pointer;
     border-bottom: 2px solid transparent;
     transition: color 0.15s ease, border-color 0.15s ease;
@@ -311,13 +311,13 @@
 }
 
 .subnav-tab:hover {
-    color: #94a3b8;
-    border-bottom-color: #334155;
+    color: var(--color-text);
+    border-bottom-color: var(--color-border);
 }
 
 .subnav-tab.is-active {
-    color: #60a5fa;
-    border-bottom-color: #3b82f6;
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
     font-weight: 600;
 }
 
