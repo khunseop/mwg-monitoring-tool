@@ -813,3 +813,26 @@
     background: var(--color-surface);
     padding: 1.25rem;
 }
+
+/* ── Settings / Proxy tables ─────────────────────────────────── */
+.settings-table {
+    font-size: 0.875rem;
+}
+
+.settings-table th {
+    font-weight: 600 !important;
+    color: var(--color-text-muted) !important;
+    border-bottom-width: 1px !important;
+    padding: 12px 10px !important;
+    background: transparent !important;
+}
+
+.settings-table td {
+    padding: 10px !important;
+    vertical-align: middle !important;
+}
+
+.input.mono {
+    font-family: monospace;
+    font-size: 0.8rem;
+}

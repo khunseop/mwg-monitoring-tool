@@ -143,16 +143,10 @@ function loadProxies() {
                         <td class="has-text-centered py-3">${statusTag}</td>
                         <td class="py-3 is-size-7 has-text-grey">${proxy.description || ''}</td>
                         <td class="has-text-centered py-2">
-                            <div class="buttons is-centered">
-                                <button class="button is-subtle is-small" onclick="openModal('proxy', ${proxy.id})" title="수정">
-                                    <span>수정</span>
-                                </button>
-                                <button class="button is-info is-light is-small border" onclick="cloneProxy(${proxy.id})" title="복제" style="border-color: #bfdbfe !important;">
-                                    <span>복제</span>
-                                </button>
-                                <button class="button is-subtle-danger is-small" onclick="deleteProxy(${proxy.id})" title="삭제">
-                                    <span>삭제</span>
-                                </button>
+                            <div class="buttons has-addons is-centered mb-0">
+                                <button class="button is-subtle is-small" onclick="openModal('proxy', ${proxy.id})">수정</button>
+                                <button class="button is-subtle is-small" onclick="cloneProxy(${proxy.id})">복제</button>
+                                <button class="button is-subtle-danger is-small" onclick="deleteProxy(${proxy.id})">삭제</button>
                             </div>
                         </td>
                     </tr>
@@ -259,13 +253,9 @@ function loadGroups() {
                             <span class="tag is-info is-light" style="font-weight:700;">${group.proxies_count}</span>
                         </td>
                         <td class="has-text-centered py-2">
-                            <div class="buttons is-centered">
-                                <button class="button is-subtle is-small" onclick="openModal('group', ${group.id})">
-                                    <span>수정</span>
-                                </button>
-                                <button class="button is-subtle is-small has-text-danger" onclick="deleteGroup(${group.id})">
-                                    <span>삭제</span>
-                                </button>
+                            <div class="buttons has-addons is-centered mb-0">
+                                <button class="button is-subtle is-small" onclick="openModal('group', ${group.id})">수정</button>
+                                <button class="button is-subtle-danger is-small" onclick="deleteGroup(${group.id})">삭제</button>
                             </div>
                         </td>
                     </tr>
