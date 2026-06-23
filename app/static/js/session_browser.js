@@ -27,13 +27,26 @@
     }
     window.switchSbTab = switchSbTab;
 
+    window.switchSbaTab = function(tabId) {
+        $('.sba-tab-section').hide();
+        $('#sbaSubNav li').removeClass('is-active');
+        $(`#sba-section-${tabId}`).show();
+        $(`#sba-nav-${tabId}`).addClass('is-active');
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+        if (tabId === 'cpu' && !sb._cpuFetched) {
+            loadCpuCorrelation();
+        }
+    };
+
     const sb = {
         groups: [],
         proxies: [],
         records: [],
         gridApi: null,
         storageKey: 'sb_state_v1',
-        charts: {}
+        charts: {},
+        _lastPerProxy: [],
+        _cpuFetched: false
     };
 
     const COLS = [
@@ -171,17 +184,101 @@
         $section.show();
     }
 
+    function computePerProxyStats(records) {
+        const byProxy = {};
+        records.forEach(rec => {
+            const host = rec.host || 'Unknown';
+            if (!byProxy[host]) {
+                byProxy[host] = { proxy_id: rec.proxy_id, total: 0, ssl: 0, totalBytes: 0, totalAge: 0, ageCount: 0, clients: new Set(), urlHosts: {} };
+            }
+            const p = byProxy[host];
+            p.total++;
+            const proto = (rec.protocol || '').toUpperCase();
+            if (proto.includes('SSL') || proto.includes('HTTPS') || proto.includes('HTTP/2') || proto.includes('HTTP2')) p.ssl++;
+            p.totalBytes += (rec.cl_bytes_received || 0) + (rec.cl_bytes_sent || 0) + (rec.srv_bytes_received || 0) + (rec.srv_bytes_sent || 0);
+            if (rec.age_seconds != null) { p.totalAge += rec.age_seconds; p.ageCount++; }
+            if (rec.client_ip) p.clients.add(rec.client_ip);
+            if (rec.url) {
+                try {
+                    const h = new URL(rec.url).hostname || rec.url;
+                    p.urlHosts[h] = (p.urlHosts[h] || 0) + 1;
+                } catch(e) {
+                    const h = String(rec.url).split('/')[0];
+                    p.urlHosts[h] = (p.urlHosts[h] || 0) + 1;
+                }
+            }
+        });
+        return Object.entries(byProxy).map(([host, p]) => ({
+            host,
+            proxy_id: p.proxy_id,
+            total: p.total,
+            httpsRatio: p.total > 0 ? Math.round(p.ssl / p.total * 100) : 0,
+            totalBytes: p.totalBytes,
+            avgAge: p.ageCount > 0 ? Math.round(p.totalAge / p.ageCount) : 0,
+            uniqueClients: p.clients.size,
+            topUrls: Object.entries(p.urlHosts).sort((a, b) => b[1] - a[1]).slice(0, 10)
+        })).sort((a, b) => b.total - a.total);
+    }
+
+    async function loadCpuCorrelation() {
+        if (!sb._lastPerProxy || !sb._lastPerProxy.length) return;
+        const proxyIds = [...new Set(sb._lastPerProxy.map(p => p.proxy_id).filter(Boolean))];
+        if (!proxyIds.length) { $('#sba-cpu-col-header').text('CPU p95 (proxy_id 없음)'); return; }
+
+        $('#sba-cpu-loading').show();
+        try {
+            const end = new Date();
+            const start = new Date(end.getTime() - 3600 * 1000);
+            const params = new URLSearchParams({
+                proxy_ids: proxyIds.join(','),
+                metrics: 'cpu',
+                start_time: start.toISOString(),
+                end_time: end.toISOString()
+            });
+            const res = await fetch(`/api/resource-usage/analysis/percentiles?${params}`);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const rows = await res.json();
+            const cpuByProxy = {};
+            rows.forEach(r => { if (r.p95 != null) cpuByProxy[r.proxy_id] = r.p95; });
+
+            sb._lastPerProxy.forEach(p => {
+                const cpu = cpuByProxy[p.proxy_id];
+                const $cell = $(`#sba-cpu-cell-${p.proxy_id}`);
+                if (cpu != null) {
+                    $cell.text(`${cpu}%`);
+                    if (cpu >= 80) $cell.addClass('has-text-danger has-text-weight-bold');
+                    else if (cpu >= 60) $cell.addClass('has-text-warning has-text-weight-bold');
+                } else {
+                    $cell.text('데이터 없음').addClass('has-text-grey');
+                }
+            });
+            sb._cpuFetched = true;
+        } catch(e) {
+            $('#sba-cpu-col-header').text('CPU p95 (로딩 실패)');
+        } finally {
+            $('#sba-cpu-loading').hide();
+        }
+    }
+
     function analyzeSessions(records) {
         if (!records || records.length === 0) {
-            $('#sbaDashboard').hide();
+            $('#sbaSubNav').hide();
             $('#sbaEmptyState').show();
+            $('.sba-tab-section').hide();
             return;
         }
 
         $('#sbaEmptyState').hide();
-        $('#sbaDashboard').show();
+        sb._cpuFetched = false;
+        $('#sba-cpu-col-header').text('CPU p95');
 
         const fmt = (v) => (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(v) : String(v || 0);
+        const fmtAge = (s) => {
+            if (s == null || s === 0) return '0초';
+            if (s >= 3600) return `${(s / 3600).toFixed(1)}시간`;
+            if (s >= 60) return `${Math.floor(s / 60)}분 ${s % 60}초`;
+            return `${s}초`;
+        };
 
         const stats = {
             total: records.length,
@@ -207,34 +304,39 @@
                 stats.uniqueServers.add(rec.server_ip);
                 stats.serverCounts[rec.server_ip] = (stats.serverCounts[rec.server_ip] || 0) + 1;
             }
-
-            const traffic = (rec.cl_bytes_received || 0) + (rec.cl_bytes_sent || 0);
-            stats.totalTraffic += traffic;
-
-            const proxy = rec.host || 'Unknown';
-            stats.proxyDist[proxy] = (stats.proxyDist[proxy] || 0) + 1;
-
-            const proto = rec.protocol || 'Unknown';
-            stats.protocolDist[proto] = (stats.protocolDist[proto] || 0) + 1;
+            stats.totalTraffic += (rec.cl_bytes_received || 0) + (rec.cl_bytes_sent || 0);
+            stats.proxyDist[rec.host || 'Unknown'] = (stats.proxyDist[rec.host || 'Unknown'] || 0) + 1;
+            stats.protocolDist[rec.protocol || 'Unknown'] = (stats.protocolDist[rec.protocol || 'Unknown'] || 0) + 1;
         });
 
-        // 이상 징후 탐지
+        const perProxy = computePerProxyStats(records);
+        sb._lastPerProxy = perProxy;
+
+        // ── 개요 탭 ──
         const anomalies = detectSessionAnomalies(records);
         renderAnomalies(anomalies, 'sba-anomaly-section', 'sba-anomaly-list', 'sba-anomaly-count', 'sba-anomaly-severity-dot');
-
-        // 요약 카드
         $('#sb-stat-total').text(stats.total.toLocaleString());
         $('#sb-stat-unique-clients').text(stats.uniqueClients.size.toLocaleString());
         $('#sb-stat-unique-servers').text(stats.uniqueServers.size.toLocaleString());
         $('#sb-stat-traffic').text(fmt(stats.totalTraffic));
 
-        // 차트 (Top 20)
+        // ── 분포 분석 탭 ──
         renderPieChart('sb-chart-proxy', stats.proxyDist, '프록시');
         renderPieChart('sb-chart-protocol', stats.protocolDist, '프로토콜', true);
+        renderBarChart('sb-chart-proxy-https',
+            Object.fromEntries(perProxy.map(p => [p.host, p.httpsRatio])),
+            'HTTPS/SSL 비율 (%)', perProxy.length);
+        renderBarChart('sb-chart-proxy-age',
+            Object.fromEntries(perProxy.map(p => [p.host, p.avgAge])),
+            '평균 세션 수명 (초)', perProxy.length);
+        renderBarChart('sb-chart-proxy-bytes',
+            Object.fromEntries(perProxy.map(p => [p.host, p.totalBytes])),
+            '총 바이트', perProxy.length, true);
+
+        // ── 클라이언트/서버 탭 ──
         renderBarChart('sb-chart-top-clients', stats.clientCounts, '클라이언트 (Top 20)', 20);
         renderBarChart('sb-chart-top-servers', stats.serverCounts, '서버 IP (Top 20)', 20);
 
-        // 전체 통계 테이블 - 클라이언트
         const sortedClients = Object.entries(stats.clientCounts).sort((a, b) => b[1] - a[1]);
         const $ctbody = $('#sb-stats-clients-tbody');
         $ctbody.empty();
@@ -247,7 +349,6 @@
         });
         $('#sb-clients-count').text(`${sortedClients.length.toLocaleString()}개`);
 
-        // 전체 통계 테이블 - 서버 IP
         const sortedServers = Object.entries(stats.serverCounts).sort((a, b) => b[1] - a[1]);
         const $stbody = $('#sb-stats-servers-tbody');
         $stbody.empty();
@@ -256,8 +357,34 @@
         });
         $('#sb-servers-count').text(`${sortedServers.length.toLocaleString()}개`);
 
-        // CSV 내보내기 핸들러 저장
+        // ── CPU 연관 분석 탭 ──
+        const $cpuTbody = $('#sb-proxy-cpu-tbody');
+        $cpuTbody.empty();
+        perProxy.forEach(p => {
+            const httpsClass = p.httpsRatio >= 70 ? 'has-text-danger has-text-weight-semibold' : p.httpsRatio >= 50 ? 'has-text-warning has-text-weight-semibold' : '';
+            const ageClass = p.avgAge >= 3600 ? 'has-text-danger has-text-weight-semibold' : p.avgAge >= 1800 ? 'has-text-warning has-text-weight-semibold' : '';
+            $cpuTbody.append(`
+                <tr>
+                    <td><code class="is-size-7">${p.host}</code></td>
+                    <td class="has-text-right">${p.total.toLocaleString()}</td>
+                    <td class="has-text-right ${httpsClass}">${p.httpsRatio}%</td>
+                    <td class="has-text-right ${ageClass}">${fmtAge(p.avgAge)}</td>
+                    <td class="has-text-right">${fmt(p.totalBytes)}</td>
+                    <td class="has-text-right">${p.uniqueClients.toLocaleString()}</td>
+                    <td class="has-text-right has-text-grey" id="sba-cpu-cell-${p.proxy_id}">-</td>
+                </tr>
+            `);
+        });
+
+        const allUrls = {};
+        perProxy.forEach(p => p.topUrls.forEach(([h, cnt]) => { allUrls[h] = (allUrls[h] || 0) + cnt; }));
+        renderBarChart('sb-chart-top-urls', allUrls, 'URL 호스트 (Top 20)', 20);
+
         sb._lastAnalysisStats = { sortedClients, sortedServers, stats };
+
+        // 서브탭 표시 및 개요 탭 활성화
+        $('#sbaSubNav').show();
+        window.switchSbaTab('overview');
     }
 
     function exportClientsCsv() {
@@ -313,7 +440,7 @@
         }
     }
 
-    function renderBarChart(elId, dataMap, title, limit = 20) {
+    function renderBarChart(elId, dataMap, title, limit = 20, fmtBytes = false) {
         const sorted = Object.entries(dataMap)
             .sort((a, b) => b[1] - a[1])
             .slice(0, limit);
@@ -322,12 +449,17 @@
         const data = sorted.map(x => x[1]);
         if (!categories.length) return;
 
+        const bytesFormatter = v => (window.AppUtils && AppUtils.formatBytes) ? AppUtils.formatBytes(v) : String(v);
+
         const options = {
-            chart: { type: 'bar', height: Math.max(300, Math.min(limit * 22, 500)), toolbar: { show: false } },
+            chart: { type: 'bar', height: Math.max(220, Math.min(limit * 22, 500)), toolbar: { show: false } },
             plotOptions: { bar: { horizontal: true } },
-            series: [{ name: '세션 수', data: data }],
-            xaxis: { categories: categories },
-            title: { text: title, align: 'center', style: { fontSize: '14px' } }
+            series: [{ name: fmtBytes ? '바이트' : '세션 수', data: data }],
+            xaxis: { categories: categories, ...(fmtBytes ? { labels: { formatter: bytesFormatter } } : {}) },
+            ...(fmtBytes ? {
+                dataLabels: { enabled: true, formatter: bytesFormatter },
+                tooltip: { x: { formatter: bytesFormatter } }
+            } : {})
         };
 
         if (sb.charts[elId]) {
@@ -658,6 +790,7 @@
 
         $('#sbExportClientsBtn').off('click').on('click', exportClientsCsv);
         $('#sbExportServersBtn').off('click').on('click', exportServersCsv);
+        $('#sbCpuRefreshBtn').off('click').on('click', () => { sb._cpuFetched = false; loadCpuCorrelation(); });
 
         // Modal closing handlers
         $('#sbDetailModal .delete, #sbDetailModal .button, #sbDetailModal .modal-background').off('click').on('click', () => {

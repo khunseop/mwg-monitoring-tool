@@ -75,10 +75,28 @@
 
 <!-- 세션 결과 분석 섹션 -->
 <div id="sbAnalyzeSection" class="sb-tab-content" style="display:none;">
-    <div id="sbaDashboard" style="display:none;">
-        <!-- 이상 징후 탐지 패널 -->
-        <div id="sba-anomaly-section" class="mb-5" style="display:none; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden;">
-            <div class="is-flex is-align-items-center px-4 py-3" id="sba-anomaly-header" style="border-bottom: 1px solid var(--color-border); cursor: pointer;" onclick="$('#sba-anomaly-body').slideToggle(150);">
+    <!-- 서브탭 네비게이션 -->
+    <div id="sbaSubNav" class="mb-3" style="display:none;">
+        <div class="tabs is-small mb-0" style="border-bottom: 1px solid var(--color-border);">
+            <ul>
+                <li id="sba-nav-overview"><a onclick="window.switchSbaTab('overview')">개요</a></li>
+                <li id="sba-nav-dist"><a onclick="window.switchSbaTab('dist')">분포 분석</a></li>
+                <li id="sba-nav-clients"><a onclick="window.switchSbaTab('clients')">클라이언트/서버</a></li>
+                <li id="sba-nav-cpu"><a onclick="window.switchSbaTab('cpu')">CPU 연관 분석</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div id="sbaEmptyState" class="empty-state mb-5" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
+        <p class="title is-5 mb-2">NO DATA</p>
+        <p class="subtitle is-6">분석할 세션 데이터가 없습니다. 상단에서 세션 불러오기 후 "분석하기"를 클릭하세요.</p>
+    </div>
+
+    <!-- 개요 탭 -->
+    <div id="sba-section-overview" class="sba-tab-section" style="display:none;">
+        <div id="sba-anomaly-section" class="mb-4" style="display:none; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden;">
+            <div class="is-flex is-align-items-center px-4 py-3" style="border-bottom: 1px solid var(--color-border); cursor: pointer;" onclick="$('#sba-anomaly-body').slideToggle(150);">
                 <span id="sba-anomaly-severity-dot" style="width: 10px; height: 10px; border-radius: 50%; background: #dc2626; display: inline-block; margin-right: 0.6rem; flex-shrink: 0;"></span>
                 <span class="is-size-7 has-text-weight-bold mr-2">이상 징후 탐지</span>
                 <span class="tag is-danger is-small is-rounded mr-auto" id="sba-anomaly-count"></span>
@@ -88,9 +106,7 @@
                 <div id="sba-anomaly-list"></div>
             </div>
         </div>
-
-        <!-- 요약 카드 -->
-        <div class="columns is-multiline mb-5">
+        <div class="columns is-multiline">
             <div class="column is-3">
                 <div class="box has-text-centered py-4">
                     <p class="is-size-7 has-text-grey mb-1">총 세션 수</p>
@@ -111,40 +127,68 @@
             </div>
             <div class="column is-3">
                 <div class="box has-text-centered py-4">
-                    <p class="is-size-7 has-text-grey mb-1">총 전송량 (송신+수신)</p>
+                    <p class="is-size-7 has-text-grey mb-1">총 전송량 (CL 송수신)</p>
                     <h4 class="title is-4 mb-0" id="sb-stat-traffic">-</h4>
                 </div>
             </div>
         </div>
+    </div>
 
-        <div class="columns is-multiline mb-5">
+    <!-- 분포 분석 탭 -->
+    <div id="sba-section-dist" class="sba-tab-section" style="display:none;">
+        <div class="columns is-multiline">
             <div class="column is-6">
                 <div class="box">
-                    <h5 class="title is-6 mb-4">프록시별 세션 분포</h5>
-                    <div id="sb-chart-proxy" style="height: 300px;"></div>
+                    <h5 class="title is-6 mb-3">프록시별 세션 분포</h5>
+                    <div id="sb-chart-proxy" style="height: 280px;"></div>
                 </div>
             </div>
             <div class="column is-6">
                 <div class="box">
-                    <h5 class="title is-6 mb-4">프로토콜 분포</h5>
-                    <div id="sb-chart-protocol" style="height: 300px;"></div>
+                    <h5 class="title is-6 mb-3">프로토콜 분포</h5>
+                    <div id="sb-chart-protocol" style="height: 280px;"></div>
+                </div>
+            </div>
+            <div class="column is-12">
+                <div class="box">
+                    <h5 class="title is-6 mb-1">프록시별 HTTPS/SSL 비율</h5>
+                    <p class="is-size-7 has-text-grey mb-3">SSL 인스펙션 부하 비교 — 비율이 높을수록 CPU 점유 가능성 높음</p>
+                    <div id="sb-chart-proxy-https" style="height: 220px;"></div>
                 </div>
             </div>
             <div class="column is-6">
                 <div class="box">
-                    <h5 class="title is-6 mb-4">Top 20 클라이언트 (세션 수)</h5>
+                    <h5 class="title is-6 mb-1">프록시별 평균 세션 수명</h5>
+                    <p class="is-size-7 has-text-grey mb-3">장수명 세션은 SSL 상태 유지 비용 누적</p>
+                    <div id="sb-chart-proxy-age" style="height: 220px;"></div>
+                </div>
+            </div>
+            <div class="column is-6">
+                <div class="box">
+                    <h5 class="title is-6 mb-1">프록시별 총 바이트 처리량</h5>
+                    <p class="is-size-7 has-text-grey mb-3">대용량 처리 프록시는 복호화·재암호화 부하 높음</p>
+                    <div id="sb-chart-proxy-bytes" style="height: 220px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 클라이언트/서버 탭 -->
+    <div id="sba-section-clients" class="sba-tab-section" style="display:none;">
+        <div class="columns is-multiline mb-4">
+            <div class="column is-6">
+                <div class="box">
+                    <h5 class="title is-6 mb-3">Top 20 클라이언트 (세션 수)</h5>
                     <div id="sb-chart-top-clients" style="height: 400px;"></div>
                 </div>
             </div>
             <div class="column is-6">
                 <div class="box">
-                    <h5 class="title is-6 mb-4">Top 20 서버 IP (세션 수)</h5>
+                    <h5 class="title is-6 mb-3">Top 20 서버 IP (세션 수)</h5>
                     <div id="sb-chart-top-servers" style="height: 400px;"></div>
                 </div>
             </div>
         </div>
-
-        <!-- 전체 통계 테이블 -->
         <div class="columns is-multiline">
             <div class="column is-6">
                 <div class="box">
@@ -189,9 +233,42 @@
         </div>
     </div>
 
-    <div id="sbaEmptyState" class="empty-state mb-5" style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);">
-        <p class="title is-5 mb-2">NO DATA</p>
-        <p class="subtitle is-6">분석할 세션 데이터가 없습니다. 상단에서 세션 불러오기 후 "분석하기"를 클릭하세요.</p>
+    <!-- CPU 연관 분석 탭 -->
+    <div id="sba-section-cpu" class="sba-tab-section" style="display:none;">
+        <div class="box mb-4">
+            <div class="is-flex is-align-items-center is-justify-content-space-between mb-3">
+                <div>
+                    <h5 class="title is-6 mb-1">프록시별 CPU 연관 지표</h5>
+                    <p class="is-size-7 has-text-grey">세션 스냅샷 기반 · CPU p95는 최근 1시간 SNMP 수집 데이터 기준</p>
+                </div>
+                <button class="button is-small is-light" id="sbCpuRefreshBtn">CPU 새로고침</button>
+            </div>
+            <div id="sba-cpu-loading" class="is-flex is-align-items-center mb-3" style="display:none !important; gap: 0.5rem;">
+                <span class="loader is-small"></span>
+                <span class="is-size-7 has-text-grey">CPU 데이터 로딩 중...</span>
+            </div>
+            <div style="overflow-x: auto;">
+                <table class="table is-fullwidth is-striped is-hoverable is-narrow" style="font-size: 0.78rem;">
+                    <thead>
+                        <tr>
+                            <th>프록시</th>
+                            <th class="has-text-right">세션 수</th>
+                            <th class="has-text-right">HTTPS/SSL 비율</th>
+                            <th class="has-text-right">평균 세션 수명</th>
+                            <th class="has-text-right">총 바이트</th>
+                            <th class="has-text-right">고유 클라이언트</th>
+                            <th class="has-text-right" id="sba-cpu-col-header">CPU p95</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sb-proxy-cpu-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="box">
+            <h5 class="title is-6 mb-1">Top 20 URL 호스트 (전체 프록시 합산)</h5>
+            <p class="is-size-7 has-text-grey mb-3">특정 도메인 집중 여부 확인 — 스트리밍·대용량 다운로드 도메인은 CPU 상승 유발 가능</p>
+            <div id="sb-chart-top-urls" style="height: 400px;"></div>
+        </div>
     </div>
 </div>
 
