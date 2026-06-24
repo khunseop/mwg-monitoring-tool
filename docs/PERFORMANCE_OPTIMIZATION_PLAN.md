@@ -1,4 +1,4 @@
-# Performance Optimization Plan: mwg-monitoring-tool
+# Performance Optimization Plan: proxy-monitoring-tool
 
 ## 1. Overview
 The current application faces performance bottlenecks when handling large volumes of data, particularly traffic logs (200k+ lines). The primary issues are:
