@@ -39,6 +39,8 @@ def _validate_query(q: Optional[str]) -> Optional[str]:
 
 
 def _build_remote_command(log_path: str, q: Optional[str], limit: int, direction: str) -> str:
+	if ".." in log_path:
+		raise HTTPException(status_code=400, detail="log path must not contain '..'")
 	safe_path = shlex.quote(log_path)
 	limit_str = str(limit)
 	base_prefix = "timeout 15s nice -n 10 ionice -c2 -n7 "

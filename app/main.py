@@ -1,6 +1,9 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 import os
+import time as _time
 from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -143,17 +146,56 @@ resource_config_model.Base.metadata.create_all(bind=engine)
 session_browser_config_model.Base.metadata.create_all(bind=engine)
 traffic_log_model.Base.metadata.create_all(bind=engine)
 
+_app_start_time = _time.monotonic()
+
 app = FastAPI(
     title="PMT",
     description="Proxy Monitoring Tool",
     version="2026.06.18"
 )
+
+# 전역 예외 핸들러 — 스택 트레이스 유출 방지
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    _startup_logger.error("Unhandled exception on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"error": "Internal server error"},
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={"error": "Validation error", "detail": exc.errors()},
+    )
+
+# Rate Limiting (slowapi)
+try:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+    from slowapi.middleware import SlowAPIMiddleware
+
+    limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_middleware(SlowAPIMiddleware)
+except ImportError:
+    _startup_logger.warning("slowapi not installed — rate limiting disabled")
+    limiter = None
+
 # Security/CORS middleware (configure via env)
 cors_origins = os.getenv("CORS_ALLOW_ORIGINS", "*")
 allow_origins = [o.strip() for o in cors_origins.split(",") if o.strip()]
 allow_credentials_env = os.getenv("CORS_ALLOW_CREDENTIALS", "false").lower() in {"1", "true", "yes"}
 # Starlette forbids wildcard origins with credentials; disable credentials if wildcard is present
 allow_credentials = False if ("*" in allow_origins and len(allow_origins) == 1) else allow_credentials_env
+if "*" in allow_origins:
+    _startup_logger.warning(
+        "CORS_ALLOW_ORIGINS is set to wildcard '*'. "
+        "Set CORS_ALLOW_ORIGINS to specific origins in production."
+    )
 from fastapi.middleware.gzip import GZipMiddleware
 ...
 app.add_middleware(
@@ -177,6 +219,13 @@ if os.getenv("ENABLE_DOCS", "true").lower() in {"1", "true", "yes"}:
     StandaloneDocs(app)
     # expose version in app state for templates
 app.github_url = os.getenv("GITHUB_URL")
+
+# Prometheus 메트릭
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+    Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+except ImportError:
+    _startup_logger.warning("prometheus-fastapi-instrumentator not installed — /metrics disabled")
 
 # 템플릿과 정적 파일 설정 (dev/pyinstaller 모두 지원)
 templates = Jinja2Templates(directory=get_templates_dir())
@@ -247,7 +296,28 @@ async def read_session(request: Request):
 
 @app.get("/healthz")
 def healthz():
-    return {"status": "ok"}
+    from app.utils.background_collector import background_collector
+    db_status = "ok"
+    try:
+        db = SessionLocal()
+        try:
+            db.execute(text("SELECT 1"))
+        finally:
+            db.close()
+    except Exception as e:
+        _startup_logger.error("Health check DB error: %s", e)
+        db_status = "error"
+
+    collector_status = "running" if background_collector._retention_task and not background_collector._retention_task.done() else "stopped"
+    uptime_seconds = int(_time.monotonic() - _app_start_time)
+
+    status = "ok" if db_status == "ok" else "degraded"
+    return {
+        "status": status,
+        "db": db_status,
+        "collector": collector_status,
+        "uptime_seconds": uptime_seconds,
+    }
 
 
 @app.get("/traffic-logs")
