@@ -106,18 +106,6 @@ $(document).ready(function() {
         loadHistoryData(params);
     }
 
-    // Load all history (no date filter)
-    function loadAllHistory() {
-        const proxyIds = getSelectedProxyIds();
-
-        if (proxyIds.length === 0) {
-            alert('프록시를 선택하세요.');
-            return;
-        }
-
-        loadHistoryData({ proxy_ids: proxyIds.join(',') });
-    }
-
     function loadHistoryData(params) {
         $('#ruHistoryLoading').show();
         $('#ruHistoryError').hide();
@@ -292,7 +280,6 @@ $(document).ready(function() {
 
         // Event handlers (중복 바인딩 방지)
         $('#ruHistorySearchBtn').off('click').on('click', searchHistory);
-        $('#ruHistoryLoadAllBtn').off('click').on('click', loadAllHistory);
         $('#ruHistoryExportBtn').off('click').on('click', exportHistory);
 
         $('#ruHistoryDeleteBtn').off('click').on('click', function() {
