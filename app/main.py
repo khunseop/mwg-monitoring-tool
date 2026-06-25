@@ -206,7 +206,11 @@ async def read_resource(request: Request):
 
 @app.get("/history")
 async def read_resource_history(request: Request):
-    return templates.TemplateResponse("components/resource_usage.html", {"request": request})
+    return templates.TemplateResponse("components/resource_history.html", {"request": request})
+
+@app.get("/resource-analysis")
+async def read_resource_analysis(request: Request):
+    return templates.TemplateResponse("components/resource_analysis.html", {"request": request})
 
 @app.get("/resource/history")
 async def read_resource_history_redirect(request: Request):

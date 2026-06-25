@@ -21,7 +21,7 @@
 
     // ── 유틸 ──────────────────────────────────────────────────────
     function getSelectedProxyIds() {
-        const sel = document.getElementById('ruHistoryProxySelect');
+        const sel = document.getElementById('analysisPageProxySelect');
         if (!sel) return [];
         if (sel._tom) return sel._tom.getValue().map(Number).filter(Boolean);
         return Array.from(sel.selectedOptions).map(o => Number(o.value)).filter(Boolean);
@@ -57,7 +57,7 @@
     async function runAnalysis() {
         const pids = getSelectedProxyIds();
         if (!pids.length) {
-            alert('분석할 프록시를 선택하세요.\n(이력 조회 탭에서 프록시를 먼저 선택해주세요)');
+            alert('분석할 프록시를 선택하세요.');
             return;
         }
 
@@ -442,15 +442,17 @@
         $(`.analysis-preset[data-range="${range}"]`).addClass('is-active-preset');
     }
 
-    function updateProxyInfo() {
-        const n = getSelectedProxyIds().length;
-        $('#analysisProxyInfo')
-            .text(n ? `${n}개 선택됨` : '선택 없음')
-            .toggleClass('is-info', n > 0).toggleClass('is-warning', n === 0);
-    }
-
     // ── 초기화 ────────────────────────────────────────────────────
     function init() {
+        window.DeviceSelector.init({
+            groupSelect: '#analysisGroupSelect',
+            proxySelect: '#analysisPageProxySelect',
+            proxyTrigger: '#analysisProxyTrigger',
+            deselectBtn: '#analysisDeselectAllBtn',
+            selectionCounter: '#analysisSelectionCounter',
+            storageKey: 'ru_analysis_state',
+        });
+
         $('#runAnalysisBtn').off('click.analysis').on('click.analysis', runAnalysis);
 
         $(document).off('click.ap', '.analysis-preset').on('click.ap', '.analysis-preset', function () {
@@ -464,11 +466,9 @@
         if (!$('#analysisStartTime').val()) applyPreset('1m');
     }
 
-    window.HistoryAnalysis = { onTabEnter: updateProxyInfo };
-
     $(document).ready(init);
     $(document).off('pjax:complete.analysis').on('pjax:complete.analysis', function (e, url) {
-        if (url && (url.includes('/history') || url.includes('/resource'))) init();
+        if (url && url.includes('/resource-analysis')) init();
     });
 
 })(jQuery, window);
