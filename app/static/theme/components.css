@@ -462,8 +462,6 @@
 
 #ruHeatmapWrap {
     overflow-x: auto;
-    overflow-y: auto;
-    max-height: 72vh;
 }
 
 .ru-hm-table {
