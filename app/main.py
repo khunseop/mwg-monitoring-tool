@@ -208,9 +208,14 @@ async def read_resource(request: Request):
 async def read_resource_history(request: Request):
     return templates.TemplateResponse("components/resource_history.html", {"request": request})
 
+@app.get("/history/analysis")
+async def read_resource_history_analysis(request: Request):
+    return templates.TemplateResponse("components/resource_history.html", {"request": request})
+
 @app.get("/resource-analysis")
-async def read_resource_analysis(request: Request):
-    return templates.TemplateResponse("components/resource_analysis.html", {"request": request})
+async def read_resource_analysis_redirect(request: Request):
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/history/analysis", status_code=301)
 
 @app.get("/resource/history")
 async def read_resource_history_redirect(request: Request):

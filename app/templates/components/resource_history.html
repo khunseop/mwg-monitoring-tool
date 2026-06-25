@@ -1,77 +1,92 @@
 {% extends "base.html" %}
+{% set is_analysis = request.url.path == '/history/analysis' %}
 
-{% block content %}
-<!-- 이력 조회 필터 바 -->
-<div class="settings-bar mb-2">
-    <div class="is-flex is-align-items-center is-flex-wrap-wrap" style="gap: 1.25rem; width: 100%;">
-        <div class="is-flex is-align-items-center" style="gap: 0.75rem;">
-            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
-                <span class="filter-label">그룹</span>
-                <div class="select is-small">
-                    <select id="ruHistoryGroupSelect"></select>
-                </div>
-            </div>
-            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
-                <span class="filter-label">프록시</span>
-                <div style="position: relative; display: flex; align-items: center;">
-                    <button id="ruHistoryProxyTrigger" class="button is-small is-subtle has-chevron px-3" type="button" style="border: 1px solid var(--color-border); min-width: 120px; justify-content: space-between;">
-                        <span id="ruHistorySelectionCounter">0 / 0</span>
-                    </button>
-                    <button class="button is-ghost is-small p-0 ml-2" id="ruHistoryDeselectAllBtn" style="font-size: 0.7rem; color: var(--color-text-muted);">모두해제</button>
-                    <div style="position: absolute; visibility: hidden; height: 0;">
-                        <select id="ruHistoryProxySelect" multiple></select>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="is-flex is-align-items-center" style="gap: 0.5rem;">
-            <div class="buttons has-addons mb-0 mr-2">
-                <button class="button is-small is-subtle px-2 ru-history-preset" data-range="1h">1h</button>
-                <button class="button is-small is-subtle px-2 ru-history-preset" data-range="6h">6h</button>
-                <button class="button is-small is-subtle px-2 ru-history-preset" data-range="12h">12h</button>
-                <button class="button is-small is-subtle px-2 ru-history-preset" data-range="1d">1d</button>
-                <button class="button is-small is-subtle px-2 ru-history-preset" data-range="7d">7d</button>
-            </div>
-            <input class="input is-small" id="ruHistoryStartTime" type="datetime-local" style="width: 190px;">
-            <span class="has-text-grey">~</span>
-            <input class="input is-small" id="ruHistoryEndTime" type="datetime-local" style="width: 190px;">
-        </div>
-
-        <div class="select is-small">
-            <select id="ruHistoryLimit">
-                <option value="100">100개씩</option>
-                <option value="500" selected>500개씩</option>
-                <option value="1000">1,000개씩</option>
-            </select>
-        </div>
-
-        <div class="is-flex is-align-items-center ml-2">
-            <span class="is-size-7 has-text-grey-light mr-2" style="font-weight: 600;">총 레코드</span>
-            <span class="tag is-primary is-light is-small" id="ruHistoryTotalCount" style="font-weight: 700; border-radius: 4px;">-</span>
-        </div>
-
-        <div class="is-flex is-align-items-center mb-0 ml-auto" style="gap: 0.4rem;">
-            <button class="button is-primary is-small px-4" id="ruHistorySearchBtn" style="font-weight: 600;">조회</button>
-            <button class="button is-subtle is-small px-3" id="ruHistoryLoadAllBtn">전체 조회</button>
-            <span class="settings-bar-separator"></span>
-            <button class="button is-ghost is-small px-3" id="ruHistoryExportBtn" title="내보내기" style="color: var(--color-text-muted);">내보내기</button>
-            <span class="settings-bar-separator"></span>
-            <button class="button is-subtle-danger is-small px-3" id="ruHistoryDeleteBtn">삭제</button>
+{% block subnav %}
+<div class="subnav">
+    <div class="container">
+        <div class="subnav-tabs">
+            <a class="subnav-tab {% if not is_analysis %}is-active{% endif %}" href="/history">이력 조회</a>
+            <a class="subnav-tab {% if is_analysis %}is-active{% endif %}" href="/history/analysis">이력 분석</a>
         </div>
     </div>
 </div>
+{% endblock %}
 
-<div id="ruHistoryLoading" class="has-text-centered p-6" style="display:none;">
-    <span class="loader" style="display: inline-block; width: 2rem; height: 2rem;"></span>
-    <p class="mt-3 has-text-grey is-size-7">데이터를 불러오는 중입니다...</p>
-</div>
+{% block content %}
 
-<div id="ruHistoryError" class="notification is-danger is-light is-size-7 mt-2" style="display:none;"></div>
+<!-- 이력 조회 섹션 -->
+<div id="history-tab" class="tab-content {% if not is_analysis %}is-active{% endif %}">
+    <div class="settings-bar mb-2">
+        <div class="is-flex is-align-items-center is-flex-wrap-wrap" style="gap: 1.25rem; width: 100%;">
+            <div class="is-flex is-align-items-center" style="gap: 0.75rem;">
+                <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                    <span class="filter-label">그룹</span>
+                    <div class="select is-small">
+                        <select id="ruHistoryGroupSelect"></select>
+                    </div>
+                </div>
+                <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                    <span class="filter-label">프록시</span>
+                    <div style="position: relative; display: flex; align-items: center;">
+                        <button id="ruHistoryProxyTrigger" class="button is-small is-subtle has-chevron px-3" type="button" style="border: 1px solid var(--color-border); min-width: 120px; justify-content: space-between;">
+                            <span id="ruHistorySelectionCounter">0 / 0</span>
+                        </button>
+                        <button class="button is-ghost is-small p-0 ml-2" id="ruHistoryDeselectAllBtn" style="font-size: 0.7rem; color: var(--color-text-muted);">모두해제</button>
+                        <div style="position: absolute; visibility: hidden; height: 0;">
+                            <select id="ruHistoryProxySelect" multiple></select>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-<div id="ruHistoryResults" style="display:none;">
-    <p id="ruHistoryCount" class="is-size-7 has-text-grey-light mt-3 mb-2"></p>
-    <div id="ruHistoryCharts" class="columns is-multiline"></div>
+            <div class="is-flex is-align-items-center" style="gap: 0.5rem;">
+                <div class="buttons has-addons mb-0 mr-2">
+                    <button class="button is-small is-subtle px-2 ru-history-preset" data-range="1h">1h</button>
+                    <button class="button is-small is-subtle px-2 ru-history-preset" data-range="6h">6h</button>
+                    <button class="button is-small is-subtle px-2 ru-history-preset" data-range="12h">12h</button>
+                    <button class="button is-small is-subtle px-2 ru-history-preset" data-range="1d">1d</button>
+                    <button class="button is-small is-subtle px-2 ru-history-preset" data-range="7d">7d</button>
+                </div>
+                <input class="input is-small" id="ruHistoryStartTime" type="datetime-local" style="width: 190px;">
+                <span class="has-text-grey">~</span>
+                <input class="input is-small" id="ruHistoryEndTime" type="datetime-local" style="width: 190px;">
+            </div>
+
+            <div class="select is-small">
+                <select id="ruHistoryLimit">
+                    <option value="100">100개씩</option>
+                    <option value="500" selected>500개씩</option>
+                    <option value="1000">1,000개씩</option>
+                </select>
+            </div>
+
+            <div class="is-flex is-align-items-center ml-2">
+                <span class="is-size-7 has-text-grey-light mr-2" style="font-weight: 600;">총 레코드</span>
+                <span class="tag is-primary is-light is-small" id="ruHistoryTotalCount" style="font-weight: 700; border-radius: 4px;">-</span>
+            </div>
+
+            <div class="is-flex is-align-items-center mb-0 ml-auto" style="gap: 0.4rem;">
+                <button class="button is-primary is-small px-4" id="ruHistorySearchBtn" style="font-weight: 600;">조회</button>
+                <button class="button is-subtle is-small px-3" id="ruHistoryLoadAllBtn">전체 조회</button>
+                <span class="settings-bar-separator"></span>
+                <button class="button is-ghost is-small px-3" id="ruHistoryExportBtn" title="내보내기" style="color: var(--color-text-muted);">내보내기</button>
+                <span class="settings-bar-separator"></span>
+                <button class="button is-subtle-danger is-small px-3" id="ruHistoryDeleteBtn">삭제</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="ruHistoryLoading" class="has-text-centered p-6" style="display:none;">
+        <span class="loader" style="display: inline-block; width: 2rem; height: 2rem;"></span>
+        <p class="mt-3 has-text-grey is-size-7">데이터를 불러오는 중입니다...</p>
+    </div>
+
+    <div id="ruHistoryError" class="notification is-danger is-light is-size-7 mt-2" style="display:none;"></div>
+
+    <div id="ruHistoryResults" style="display:none;">
+        <p id="ruHistoryCount" class="is-size-7 has-text-grey-light mt-3 mb-2"></p>
+        <div id="ruHistoryCharts" class="columns is-multiline"></div>
+    </div>
 </div>
 
 <!-- 삭제 모달 -->
@@ -142,6 +157,151 @@
     </div>
 </div>
 
+<!-- 이력 분석 섹션 -->
+<div id="history-analysis-tab" class="tab-content {% if is_analysis %}is-active{% endif %}">
+    <div class="settings-bar mb-2" style="flex-wrap: wrap; align-items: center;">
+        <div class="is-flex is-align-items-center" style="gap: 0.75rem;">
+            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                <span class="filter-label">그룹</span>
+                <div class="select is-small">
+                    <select id="analysisGroupSelect"></select>
+                </div>
+            </div>
+            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+                <span class="filter-label">프록시</span>
+                <div style="position: relative; display: flex; align-items: center;">
+                    <button id="analysisProxyTrigger" class="button is-small is-subtle has-chevron px-3" type="button" style="border: 1px solid var(--color-border); min-width: 120px; justify-content: space-between;">
+                        <span id="analysisSelectionCounter">0 / 0</span>
+                    </button>
+                    <button class="button is-ghost is-small p-0 ml-2" id="analysisDeselectAllBtn" style="font-size: 0.7rem; color: var(--color-text-muted);">모두해제</button>
+                    <div style="position: absolute; visibility: hidden; height: 0;">
+                        <select id="analysisPageProxySelect" multiple></select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <label class="is-flex is-align-items-center is-size-7" style="gap: 0.35rem; cursor: pointer;">
+            <input type="checkbox" id="analysisBusinessHours">
+            <span>업무시간만</span>
+            <span class="has-text-grey">(월~금 09~18시)</span>
+        </label>
+        <div class="buttons has-addons mb-0">
+            <button class="button is-small is-subtle px-2 analysis-preset" data-range="1w">1주</button>
+            <button class="button is-small is-subtle px-2 analysis-preset" data-range="2w">2주</button>
+            <button class="button is-small is-subtle px-2 analysis-preset" data-range="1m">1달</button>
+            <button class="button is-small is-subtle px-2 analysis-preset" data-range="3m">3달</button>
+        </div>
+        <input class="input is-small" id="analysisStartTime" type="datetime-local" style="width: 190px;">
+        <span class="has-text-grey">~</span>
+        <input class="input is-small" id="analysisEndTime" type="datetime-local" style="width: 190px;">
+        <div class="select is-small">
+            <select id="analysisPrimaryMetric">
+                <option value="cpu">CPU (%)</option>
+                <option value="mem">MEM (%)</option>
+                <option value="disk">Disk (%)</option>
+                <option value="cc">Client Count</option>
+                <option value="cs">Connected Sockets</option>
+                <option value="http">HTTP (Mbps)</option>
+                <option value="https">HTTPS (Mbps)</option>
+                <option value="http2">HTTP2 (Mbps)</option>
+                <option value="blocked">Blocked</option>
+            </select>
+        </div>
+        <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+            <span class="filter-label">임계치</span>
+            <input class="input is-small has-text-centered" id="analysisThreshold" type="number" value="80" min="0" style="width: 64px;">
+        </div>
+        <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
+            <span class="filter-label">이동평균</span>
+            <input class="input is-small has-text-centered" id="analysisWindowMin" type="number" value="5" min="1" max="60" style="width: 52px;">
+            <span class="filter-label">분</span>
+        </div>
+        <button class="button is-primary is-small px-5 ml-auto" id="runAnalysisBtn" style="font-weight: 600;">분석 실행</button>
+    </div>
+
+    <div id="analysisLoading" class="has-text-centered p-6" style="display:none;">
+        <span class="loader" style="display: inline-block; width: 2rem; height: 2rem;"></span>
+        <p class="mt-3 has-text-grey is-size-7">분석 중...</p>
+    </div>
+    <div id="analysisError" class="notification is-danger is-light is-size-7 mb-4" style="display:none;"></div>
+
+    <div id="analysisResults" style="display:none;">
+        <div class="is-flex is-align-items-center is-flex-wrap-wrap mb-4"
+             style="gap:0.75rem; padding:0.6rem 1rem; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md);">
+            <span class="filter-label">장비 필터</span>
+            <div id="analysisProxyFilter" class="buttons has-addons mb-0"></div>
+            <div id="analysisSummaryCards" class="is-flex is-flex-wrap-wrap ml-auto" style="gap:0.5rem;"></div>
+        </div>
+
+        <p class="is-size-7 mb-3" style="font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-text-muted,#94a3b8);">부하 패턴 분석</p>
+
+        <div class="box mb-3 p-4">
+            <h5 class="title is-6 mb-3">백분위수 분석
+                <span class="is-size-7 has-text-grey" style="font-weight:400;"> — p50 / p95 / p99, 전체 지표</span>
+            </h5>
+            <div class="table-container" style="overflow-x:auto;">
+                <table class="table is-fullwidth is-hoverable is-size-7">
+                    <thead>
+                        <tr>
+                            <th>프록시</th><th>지표</th>
+                            <th class="has-text-right">샘플</th>
+                            <th class="has-text-right">평균</th>
+                            <th class="has-text-right">최대</th>
+                            <th class="has-text-right">p50</th>
+                            <th class="has-text-right" style="color:#b45309;">p95</th>
+                            <th class="has-text-right" style="color:#dc2626;">p99</th>
+                        </tr>
+                    </thead>
+                    <tbody id="analysisPercentilesBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="columns mb-3">
+            <div class="column is-5">
+                <div class="box p-4" style="height:100%;">
+                    <h5 class="title is-6 mb-1">Time-in-Band</h5>
+                    <p class="is-size-7 has-text-grey mb-3">지표(<span id="analysisTimeBandMetric" style="font-weight:600;"></span>) 구간별 점유 시간</p>
+                    <div id="analysisTimeBandContent"></div>
+                </div>
+            </div>
+            <div class="column is-7">
+                <div class="box p-4" style="height:100%;">
+                    <h5 class="title is-6 mb-1">요일×시간대 히트맵</h5>
+                    <p class="is-size-7 has-text-grey mb-3">지표(<span id="analysisHeatmapMetricLabel" style="font-weight:600;"></span>) 시간대별 평균</p>
+                    <div id="analysisHeatmapContent"></div>
+                </div>
+            </div>
+        </div>
+
+        <p class="is-size-7 mb-3 mt-5" style="font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-text-muted,#94a3b8);">위험도 분석</p>
+
+        <div class="columns mb-3">
+            <div class="column is-4">
+                <div class="box p-4" style="height:100%;">
+                    <h5 class="title is-6 mb-1">p95 장비 순위</h5>
+                    <p class="is-size-7 has-text-grey mb-3">지표(<span id="analysisTopNMetricLabel" style="font-weight:600;"></span>) p95 기준</p>
+                    <div id="analysisTopNContent"></div>
+                </div>
+            </div>
+            <div class="column is-8">
+                <div class="box p-4" style="height:100%;">
+                    <h5 class="title is-6 mb-1">이동 평균 트렌드</h5>
+                    <p class="is-size-7 has-text-grey mb-3">지표(<span id="analysisSmoothedMetricLabel" style="font-weight:600;"></span>) · <span id="analysisSmoothedWindowLabel" style="font-weight:600;"></span>분 이동평균</p>
+                    <div id="analysisSmoothedChart" style="height:260px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="box p-4 mb-4">
+            <h5 class="title is-6 mb-1">임계치 연속 초과 이력</h5>
+            <p class="is-size-7 has-text-grey mb-3">지표(<span id="analysisThresholdMetricLabel" style="font-weight:600;"></span>)가 <span id="analysisThresholdValueLabel" style="font-weight:600;"></span> 이상을 연속으로 유지한 구간</p>
+            <div id="analysisThresholdContent"></div>
+        </div>
+    </div>
+</div>
+
 <script>
 $(document).on('click', '.ru-delete-days-preset', function() {
     $('#ruDeleteOlderDays').val($(this).data('days'));
@@ -150,4 +310,5 @@ $(document).on('click', '.ru-delete-days-preset', function() {
 
 <script src="/static/js/resource_usage_utils.js"></script>
 <script src="/static/js/resource_history.js?v={{ request.app.version }}"></script>
+<script src="/static/js/resource_history_analysis.js?v={{ request.app.version }}"></script>
 {% endblock %}

@@ -43,11 +43,8 @@
                     <a class="navbar-item {% if request.url.path == '/' or request.url.path == '/resource' %}is-active{% endif %}" href="/resource">
                         대시보드
                     </a>
-                    <a class="navbar-item {% if request.url.path == '/history' %}is-active{% endif %}" href="/history">
-                        이력 조회
-                    </a>
-                    <a class="navbar-item {% if request.url.path == '/resource-analysis' %}is-active{% endif %}" href="/resource-analysis">
-                        이력 분석
+                    <a class="navbar-item {% if request.url.path.startswith('/history') %}is-active{% endif %}" href="/history">
+                        이력
                     </a>
                     <a class="navbar-item {% if request.url.path.startswith('/session') %}is-active{% endif %}" href="/session">
                         세션브라우저

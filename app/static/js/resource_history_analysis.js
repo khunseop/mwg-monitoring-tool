@@ -468,7 +468,7 @@
 
     $(document).ready(init);
     $(document).off('pjax:complete.analysis').on('pjax:complete.analysis', function (e, url) {
-        if (url && url.includes('/resource-analysis')) init();
+        if (url && url.includes('/history/analysis')) init();
     });
 
 })(jQuery, window);
