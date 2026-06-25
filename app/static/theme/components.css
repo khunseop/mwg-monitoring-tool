@@ -756,51 +756,6 @@
     line-height: 1;
 }
 
-/* ── 이상징후 패널 ──────────────────────────────────────────── */
-.ru-anomaly-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 10px;
-}
-
-.ru-anomaly-card {
-    background: var(--color-bg, #f8fafc);
-    border: 1px solid var(--color-border, #e2e8f0);
-    border-radius: var(--radius-card);
-    padding: 8px 10px 4px;
-}
-
-.ru-anomaly-card-header {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    margin-bottom: 2px;
-}
-
-.ru-anomaly-proxy {
-    font-size: 10px;
-    color: var(--color-text-muted, #64748b);
-    font-weight: 500;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 90px;
-    flex-shrink: 1;
-}
-
-.ru-anomaly-metric {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    white-space: nowrap;
-}
-
-.ru-anomaly-value {
-    font-size: 11px;
-    font-weight: 600;
-    margin-left: auto;
-    white-space: nowrap;
-}
 
 /* ── Proxy management panel ─────────────────────────────────── */
 .panel-content {

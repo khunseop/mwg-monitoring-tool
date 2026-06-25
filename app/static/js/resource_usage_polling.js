@@ -206,7 +206,6 @@
                             if (window.ResourceUsageHeatmap) window.ResourceUsageHeatmap.updateTable(valid);
                             if (window.ResourceUsageCharts) {
                                 window.ResourceUsageCharts.bufferAppendBatch(valid);
-                                window.ResourceUsageCharts.renderAnomalyPanel();
                             }
                         });
                     }

@@ -36,7 +36,6 @@
                 polling.stopPolling();
             } else {
                 polling.startPolling();
-                $('#ruAnomalyPanel').show();
             }
         });
 
@@ -102,7 +101,6 @@
                     ru.taskId = window.ResourceUsageCollector.taskId;
                     polling.setRunning(true);
                     ru.intervalId = 'background';
-                    $('#ruAnomalyPanel').show();
                     // 페이지별 콜백 등록
                     polling.registerPageCallback();
                     // 페이지 로드 시 수집이 실행 중이면 데이터 재동기화
