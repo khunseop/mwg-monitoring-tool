@@ -487,7 +487,7 @@ async function exportConfig() {
         $('#cfgStatus').removeClass('is-danger').addClass('is-success').text('내보내기 완료');
     } catch (err) {
         console.error('Export failed:', err);
-        alert('설정 내보내기 실패: ' + err.message);
+        AppToast.error('설정 내보내기 실패: ' + err.message);
         $('#cfgStatus').addClass('is-danger').text('내보내기 실패');
     }
 }
@@ -505,7 +505,7 @@ function updateImportFileName() {
 function importConfig() {
     const fileInput = document.getElementById('cfgImportFile');
     if (fileInput.files.length === 0) {
-        alert('가져올 Excel(.xlsx) 파일을 선택하세요.');
+        AppToast.warn('가져올 Excel(.xlsx) 파일을 선택하세요.');
         return;
     }
 
@@ -525,12 +525,12 @@ function importConfig() {
         processData: false,
         contentType: false,
         success: (res) => {
-            alert('설정을 성공적으로 불러왔습니다. 페이지를 새로고침합니다.');
+            AppToast.success('설정을 성공적으로 불러왔습니다. 새로고침합니다.');
             window.location.reload();
         },
         error: (xhr) => {
             const detail = xhr.responseJSON ? xhr.responseJSON.detail : '알 수 없는 오류';
-            alert('설정 불러오기 실패: ' + detail);
+            AppToast.error('설정 불러오기 실패: ' + detail);
             $('#cfgStatus').addClass('is-danger').text('가져오기 실패');
         }
     });
@@ -553,10 +553,10 @@ async function resetConfig() {
             const errData = await res.json().catch(() => ({}));
             throw new Error(errData.detail || '초기화에 실패했습니다.');
         }
-        alert('시스템이 성공적으로 초기화되었습니다. 페이지를 새로고침합니다.');
+        AppToast.success('시스템이 초기화되었습니다. 새로고침합니다.');
         window.location.reload();
     } catch (err) {
-        alert('초기화 실패: ' + err.message);
+        AppToast.error('초기화 실패: ' + err.message);
         $('#cfgStatus').addClass('is-danger').text('초기화 실패');
     }
 }

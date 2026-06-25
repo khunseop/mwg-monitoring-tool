@@ -1,3 +1,37 @@
+// Page progress bar
+var AppProgress = (function () {
+    var el = null;
+    var _timer = null;
+    function _el() {
+        if (!el) el = document.getElementById('page-progress');
+        return el;
+    }
+    return {
+        start: function () {
+            var e = _el(); if (!e) return;
+            clearTimeout(_timer);
+            e.style.transition = 'none';
+            e.style.width = '0';
+            e.style.opacity = '1';
+            setTimeout(function () {
+                e.style.transition = 'width 0.35s ease';
+                e.style.width = '70%';
+            }, 16);
+        },
+        done: function () {
+            var e = _el(); if (!e) return;
+            e.style.transition = 'width 0.2s ease';
+            e.style.width = '100%';
+            _timer = setTimeout(function () {
+                e.style.transition = 'opacity 0.2s ease';
+                e.style.opacity = '0';
+                setTimeout(function () { e.style.width = '0'; }, 220);
+            }, 180);
+        },
+    };
+})();
+window.AppProgress = AppProgress;
+
 $(document).ready(function() {
     // Navbar burger toggle
     $(document).on('click', '.navbar-burger', function() {
@@ -62,8 +96,7 @@ $(document).ready(function() {
         }
 
         const $content = $('.main-content .container');
-        // Add loading state
-        $content.css('opacity', '0.5');
+        AppProgress.start();
 
         fetch(url)
             .then(response => {
@@ -74,7 +107,7 @@ $(document).ready(function() {
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
                 const newContent = doc.querySelector('.main-content .container');
-                
+
                 if (newContent) {
                     $content.html(newContent.innerHTML);
 
@@ -83,11 +116,11 @@ $(document).ready(function() {
                     $('#subnav-container').html(newSubnav ? newSubnav.innerHTML : '');
 
                     if (pushState) history.pushState({ url: url }, '', url);
-                    
+
                     // Update active navbar item
                     $('.navbar-item').removeClass('is-active');
                     $(`.navbar-item[href="${url}"], .navbar-item[href="${url.split('?')[0]}"]`).addClass('is-active');
-                    
+
                     // Re-run scripts in the new content
                     $content.find('script').each(function() {
                         const newScript = document.createElement('script');
@@ -98,10 +131,10 @@ $(document).ready(function() {
                         }
                         document.body.appendChild(newScript).parentNode.removeChild(newScript);
                     });
-                    
+
                     // Scroll to top
                     window.scrollTo(0, 0);
-                    
+
                     // Trigger custom event for page load
                     $(document).trigger('pjax:complete', [url]);
                 } else {
@@ -113,7 +146,7 @@ $(document).ready(function() {
                 window.location.href = url;
             })
             .finally(() => {
-                $content.css('opacity', '1');
+                AppProgress.done();
             });
     }
 

@@ -92,7 +92,7 @@ $(document).ready(function() {
         const endTime = $('#ruHistoryEndTime').val();
 
         if (proxyIds.length === 0) {
-            alert('조회할 프록시를 선택하세요.');
+            AppToast.warn('조회할 프록시를 선택하세요.');
             return;
         }
 
@@ -183,7 +183,7 @@ $(document).ready(function() {
         const endTime = $('#ruHistoryEndTime').val();
         
         if (proxyIds.length === 0) {
-            alert('내보낼 프록시를 선택하세요.');
+            AppToast.warn('내보낼 프록시를 선택하세요.');
             return;
         }
 
@@ -220,7 +220,7 @@ $(document).ready(function() {
         if (deleteOption === 'older') {
             const days = parseInt($('#ruDeleteOlderDays').val(), 10);
             if (!days || days < 1) {
-                alert('삭제할 기간을 입력하세요.');
+                AppToast.warn('삭제할 기간을 입력하세요.');
                 return;
             }
             deleteData.older_than_days = days;
@@ -228,7 +228,7 @@ $(document).ready(function() {
             const startTime = $('#ruDeleteStartTime').val();
             const endTime = $('#ruDeleteEndTime').val();
             if (!startTime || !endTime) {
-                alert('시작 시간과 종료 시간을 모두 입력하세요.');
+                AppToast.warn('시작 시간과 종료 시간을 모두 입력하세요.');
                 return;
             }
             deleteData.start_time = convertKSTToUTC(startTime);
@@ -245,16 +245,16 @@ $(document).ready(function() {
             contentType: 'application/json',
             data: JSON.stringify(deleteData)
         }).then(function(response) {
-            alert(response.message);
+            AppToast.success(response.message || '삭제가 완료되었습니다.');
             $modal.removeClass('is-active');
             loadStatistics();
             // Clear current results
             $('#ruHistoryResults').hide();
         }).catch(function(err) {
-            const errorMsg = err.responseJSON && err.responseJSON.detail 
-                ? err.responseJSON.detail 
+            const errorMsg = err.responseJSON && err.responseJSON.detail
+                ? err.responseJSON.detail
                 : '로그 삭제 중 오류가 발생했습니다.';
-            alert(errorMsg);
+            AppToast.error(errorMsg);
         });
     }
     

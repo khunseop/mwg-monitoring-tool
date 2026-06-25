@@ -2,9 +2,9 @@
 	'use strict';
 
 	const AppUtils = {
-		// Show a simple alert-based error (can be replaced with Bulma toast later)
 		showError(message){
-			window.alert(message || '오류가 발생했습니다.');
+			if (window.AppToast) { window.AppToast.error(message || '오류가 발생했습니다.'); }
+			else { window.alert(message || '오류가 발생했습니다.'); }
 		},
 		// Toggle element visibility by adding/removing Bulma helper classes
 		setVisible(selectorOrEl, visible){
@@ -204,7 +204,57 @@
 		}
 		};
 
+		/**
+		 * Toast 알림 시스템 — alert() 대체
+		 * 타입: 'success' | 'error' | 'info' | 'warning'
+		 */
+		const AppToast = (function () {
+			function _getContainer() {
+				return document.getElementById('toast-container');
+			}
+
+			function _remove(el) {
+				el.classList.add('is-hiding');
+				setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 320);
+			}
+
+			function show(message, type, duration) {
+				type = type || 'error';
+				duration = (duration === undefined) ? 4000 : duration;
+				var container = _getContainer();
+				if (!container) {
+					window.alert(message);
+					return;
+				}
+				var el = document.createElement('div');
+				el.className = 'toast-item toast-' + type;
+				el.setAttribute('role', 'alert');
+				var closeBtn = document.createElement('button');
+				closeBtn.className = 'toast-close';
+				closeBtn.setAttribute('aria-label', '닫기');
+				closeBtn.textContent = '×';
+				closeBtn.onclick = function () { _remove(el); };
+				var msg = document.createElement('span');
+				msg.textContent = message || '';
+				el.appendChild(msg);
+				el.appendChild(closeBtn);
+				container.appendChild(el);
+				if (duration > 0) {
+					setTimeout(function () { _remove(el); }, duration);
+				}
+			}
+
+			return {
+				show: show,
+				success: function (m, d) { show(m, 'success', d); },
+				error:   function (m, d) { show(m, 'error',   d); },
+				info:    function (m, d) { show(m, 'info',    d); },
+				warn:    function (m, d) { show(m, 'warning', d); },
+			};
+		})();
+
 		window.AppUtils = AppUtils;
 		window.AppDB = AppDB;
+		window.AppToast = AppToast;
 
 		})(window);
