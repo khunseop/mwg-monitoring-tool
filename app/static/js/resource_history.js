@@ -90,7 +90,6 @@ $(document).ready(function() {
         const proxyIds = getSelectedProxyIds();
         const startTime = $('#ruHistoryStartTime').val();
         const endTime = $('#ruHistoryEndTime').val();
-        const limit = parseInt($('#ruHistoryLimit').val(), 10) || 500;
 
         if (proxyIds.length === 0) {
             alert('조회할 프록시를 선택하세요.');
@@ -98,8 +97,6 @@ $(document).ready(function() {
         }
 
         const params = {
-            limit: limit,
-            offset: 0,
             proxy_ids: proxyIds.join(',')
         };
 
@@ -112,14 +109,13 @@ $(document).ready(function() {
     // Load all history (no date filter)
     function loadAllHistory() {
         const proxyIds = getSelectedProxyIds();
-        const limit = parseInt($('#ruHistoryLimit').val(), 10) || 500;
 
         if (proxyIds.length === 0) {
             alert('프록시를 선택하세요.');
             return;
         }
 
-        loadHistoryData({ limit: limit, offset: 0, proxy_ids: proxyIds.join(',') });
+        loadHistoryData({ proxy_ids: proxyIds.join(',') });
     }
 
     function loadHistoryData(params) {

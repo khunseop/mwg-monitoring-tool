@@ -243,8 +243,6 @@ async def get_resource_usage_history(
     proxy_ids: Optional[str] = Query(None),
     start_time: Optional[str] = Query(None),
     end_time: Optional[str] = Query(None),
-    limit: int = Query(1000, ge=1, le=10000),
-    offset: int = Query(0, ge=0),
 ):
     query = db.query(ResourceUsageModel)
     if proxy_id:
@@ -255,22 +253,22 @@ async def get_resource_usage_history(
             if ids: query = query.filter(ResourceUsageModel.proxy_id.in_(ids))
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid proxy_ids format.")
-    
+
     if start_time:
         try:
             dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
             if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
             query = query.filter(ResourceUsageModel.collected_at >= dt.astimezone(KST_TZ))
         except ValueError: raise HTTPException(status_code=400, detail="Invalid start_time.")
-    
+
     if end_time:
         try:
             dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
             if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
             query = query.filter(ResourceUsageModel.collected_at <= dt.astimezone(KST_TZ))
         except ValueError: raise HTTPException(status_code=400, detail="Invalid end_time.")
-    
-    rows = query.order_by(ResourceUsageModel.collected_at.desc()).offset(offset).limit(limit).all()
+
+    rows = query.order_by(ResourceUsageModel.collected_at.desc()).all()
     return rows
 
 
