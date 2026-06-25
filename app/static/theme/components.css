@@ -661,8 +661,6 @@
 /* ── 히트맵 스크롤 컨테이너 (50개 프록시 대응) ─────────────── */
 .ru-heatmap-scroll-wrap {
     overflow-x: auto;
-    overflow-y: auto;
-    max-height: calc(100vh - 230px);
     min-height: 120px;
 }
 
