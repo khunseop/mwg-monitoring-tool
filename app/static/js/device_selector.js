@@ -302,9 +302,13 @@
 				}
 			}
 
-			var p1 = $.getJSON(apiGroups).then(function(data) { 
-				state.groups = Array.isArray(data) ? data : []; 
-				populateGroups(); 
+			// API 응답 전 로딩 표시
+			if ($group && $group.length) {
+				$group.empty().append('<option value="" disabled>로딩 중...</option>');
+			}
+			var p1 = $.getJSON(apiGroups).then(function(data) {
+				state.groups = Array.isArray(data) ? data : [];
+				populateGroups();
 			}).catch(function(err) {
 				state.groups = [];
 				populateGroups();
