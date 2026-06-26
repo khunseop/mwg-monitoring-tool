@@ -908,14 +908,12 @@
 #content-loader {
     position: fixed;
     inset: 0;
-    background: rgba(248, 250, 252, 0.78);
+    background: rgba(248, 250, 252, 0.6);
     display: none;
     align-items: center;
     justify-content: center;
     z-index: 490;
     pointer-events: none;
-    backdrop-filter: blur(1px);
-    -webkit-backdrop-filter: blur(1px);
 }
 
 #content-loader.is-active {

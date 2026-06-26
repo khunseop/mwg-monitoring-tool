@@ -1,29 +1,41 @@
 // Content loading overlay (spinner over the main content area)
 var AppLoader = (function () {
-    var el = null, _hideTimer = null, _debounceTimer = null;
+    var el = null, _hideTimer = null, _showTimer = null, _showing = false;
     function _el() {
         if (!el) el = document.getElementById('content-loader');
         return el;
     }
+    function _doShow() {
+        _showing = true;
+        var e = _el(); if (!e) return;
+        e.setAttribute('aria-hidden', 'false');
+        e.classList.add('is-active');
+    }
     return {
-        show: function (autoHideMs) {
-            clearTimeout(_hideTimer);
-            clearTimeout(_debounceTimer);
-            var e = _el(); if (!e) return;
-            e.setAttribute('aria-hidden', 'false');
-            e.classList.add('is-active');
-            if (autoHideMs) {
-                _hideTimer = setTimeout(function () { AppLoader.hide(); }, autoHideMs);
-            }
-        },
-        // Show only if still loading after `delayMs` — prevents flicker on fast tabs
+        // Show after delayMs — cancels itself if finish()/hide() is called first
         showDelayed: function (delayMs, autoHideMs) {
-            clearTimeout(_debounceTimer);
-            _debounceTimer = setTimeout(function () { AppLoader.show(autoHideMs); }, delayMs);
+            clearTimeout(_showTimer);
+            if (_showing) return; // already visible
+            _showTimer = setTimeout(function () {
+                _doShow();
+                if (autoHideMs) {
+                    _hideTimer = setTimeout(function () { AppLoader.hide(); }, autoHideMs);
+                }
+            }, delayMs);
+        },
+        // Call when work is done:
+        //   - if spinner never appeared (fast load): cancels the pending timer silently
+        //   - if spinner is showing: keeps it a little longer (holdMs) so it doesn't flash away
+        finish: function (holdMs) {
+            clearTimeout(_showTimer);
+            if (!_showing) return;
+            clearTimeout(_hideTimer);
+            _hideTimer = setTimeout(function () { AppLoader.hide(); }, holdMs || 0);
         },
         hide: function () {
             clearTimeout(_hideTimer);
-            clearTimeout(_debounceTimer);
+            clearTimeout(_showTimer);
+            _showing = false;
             var e = _el(); if (!e) return;
             e.setAttribute('aria-hidden', 'true');
             e.classList.remove('is-active');
@@ -131,7 +143,7 @@ $(document).ready(function() {
 
         const $content = $('.main-content .container');
         AppProgress.start();
-        AppLoader.show();
+        AppLoader.showDelayed(300);
 
         fetch(url)
             .then(response => {
@@ -173,8 +185,8 @@ $(document).ready(function() {
                     // Trigger custom event for page load
                     $(document).trigger('pjax:complete', [url]);
 
-                    // Hide overlay after a short delay — gives page scripts time to show their own loading state
-                    AppLoader.show(700);
+                    // If spinner appeared, hold briefly so page scripts can show their own loading state
+                    AppLoader.finish(600);
                 } else {
                     AppLoader.hide();
                     window.location.href = url;
