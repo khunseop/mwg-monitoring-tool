@@ -1,3 +1,37 @@
+// Content loading overlay (spinner over the main content area)
+var AppLoader = (function () {
+    var el = null, _hideTimer = null, _debounceTimer = null;
+    function _el() {
+        if (!el) el = document.getElementById('content-loader');
+        return el;
+    }
+    return {
+        show: function (autoHideMs) {
+            clearTimeout(_hideTimer);
+            clearTimeout(_debounceTimer);
+            var e = _el(); if (!e) return;
+            e.setAttribute('aria-hidden', 'false');
+            e.classList.add('is-active');
+            if (autoHideMs) {
+                _hideTimer = setTimeout(function () { AppLoader.hide(); }, autoHideMs);
+            }
+        },
+        // Show only if still loading after `delayMs` — prevents flicker on fast tabs
+        showDelayed: function (delayMs, autoHideMs) {
+            clearTimeout(_debounceTimer);
+            _debounceTimer = setTimeout(function () { AppLoader.show(autoHideMs); }, delayMs);
+        },
+        hide: function () {
+            clearTimeout(_hideTimer);
+            clearTimeout(_debounceTimer);
+            var e = _el(); if (!e) return;
+            e.setAttribute('aria-hidden', 'true');
+            e.classList.remove('is-active');
+        }
+    };
+})();
+window.AppLoader = AppLoader;
+
 // Page progress bar
 var AppProgress = (function () {
     var el = null;
@@ -97,6 +131,7 @@ $(document).ready(function() {
 
         const $content = $('.main-content .container');
         AppProgress.start();
+        AppLoader.show();
 
         fetch(url)
             .then(response => {
@@ -137,12 +172,17 @@ $(document).ready(function() {
 
                     // Trigger custom event for page load
                     $(document).trigger('pjax:complete', [url]);
+
+                    // Hide overlay after a short delay — gives page scripts time to show their own loading state
+                    AppLoader.show(700);
                 } else {
+                    AppLoader.hide();
                     window.location.href = url;
                 }
             })
             .catch(error => {
                 console.error('PJAX error:', error);
+                AppLoader.hide();
                 window.location.href = url;
             })
             .finally(() => {
@@ -157,6 +197,20 @@ $(document).ready(function() {
             e.preventDefault();
             loadPage(url);
         }
+    });
+
+    // Handle subnav-tab href links via PJAX (e.g. /history, /history/analysis)
+    $(document).on('click', '.subnav-tab[href]', function(e) {
+        const url = $(this).attr('href');
+        if (url && url !== '#' && !url.startsWith('javascript:')) {
+            e.preventDefault();
+            loadPage(url);
+        }
+    });
+
+    // Handle in-page subnav tab switches (onclick-based) — show loader if rendering takes >150ms
+    $(document).on('click', '.subnav-tab:not([href])', function() {
+        AppLoader.showDelayed(150, 2500);
     });
 
     // Handle back/forward buttons
