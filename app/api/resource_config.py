@@ -15,7 +15,7 @@ def _get_singleton(db: Session) -> ResourceConfigModel | None:
 
 
 @router.get("/resource-config", response_model=ResourceConfigSchema)
-def get_resource_config(db: Session = Depends(get_db)):
+async def get_resource_config(db: Session = Depends(get_db)):
     cfg = _get_singleton(db)
     if not cfg:
         # create default
@@ -55,6 +55,7 @@ def get_resource_config(db: Session = Depends(get_db)):
     return ResourceConfigSchema(
         id=cfg.id,
         community=cfg.community,
+        interval_sec=cfg.interval_sec or 60,
         oids=oids,
         thresholds=thresholds,
         interface_oids=interface_oids,
@@ -67,12 +68,13 @@ def get_resource_config(db: Session = Depends(get_db)):
 
 
 @router.put("/resource-config", response_model=ResourceConfigSchema)
-def update_resource_config(payload: ResourceConfigBase, db: Session = Depends(get_db)):
+async def update_resource_config(payload: ResourceConfigBase, db: Session = Depends(get_db)):
     cfg = _get_singleton(db)
     if not cfg:
         cfg = ResourceConfigModel()
         db.add(cfg)
     cfg.community = payload.community
+    cfg.interval_sec = payload.interval_sec
     # Store oids; also embed thresholds, interface_oids, interface_thresholds, and bandwidth_mbps (single source of truth)
     oids = payload.oids or {}
     
@@ -141,9 +143,17 @@ def update_resource_config(payload: ResourceConfigBase, db: Session = Depends(ge
         if '__bandwidth_mbps__' in oids_out:
             bandwidth_mbps_out = float(oids_out.get('__bandwidth_mbps__', 1000.0))
         oids_out = {k: v for k, v in oids_out.items() if k not in ['__thresholds__', '__interface_oids__', '__interface_thresholds__', '__interface_bandwidths__', '__bandwidth_mbps__', '__selected_interfaces__']}
+    # 설정 변경 시 백그라운드 수집 재시작
+    try:
+        from app.utils.background_collector import background_collector
+        await background_collector.restart_on_config_change()
+    except Exception:
+        pass  # 수집 재시작 실패는 설정 저장 자체를 막지 않음
+
     return ResourceConfigSchema(
         id=cfg.id,
         community=cfg.community,
+        interval_sec=cfg.interval_sec or 60,
         oids=oids_out,
         thresholds=thresholds_out,
         interface_oids=interface_oids_out,

@@ -301,6 +301,57 @@ class BackgroundCollector:
         """작업 실행 중 여부 확인"""
         return task_id in self._running_tasks
     
+    async def start_on_startup(self):
+        """앱 시작 시 DB 설정을 읽어 모든 활성 프록시에 대해 자동으로 수집 시작"""
+        import json as json_lib
+        from app.models.resource_config import ResourceConfig as ResourceConfigModel
+
+        db = SessionLocal()
+        try:
+            proxies = db.query(Proxy).filter(Proxy.is_active == True).all()
+            if not proxies:
+                logger.info("[BackgroundCollector] 활성 프록시 없음 — 자동 수집 건너뜀")
+                return
+
+            cfg = db.query(ResourceConfigModel).order_by(ResourceConfigModel.id.asc()).first()
+            if not cfg:
+                logger.info("[BackgroundCollector] 수집 설정 없음 — 자동 수집 건너뜀")
+                return
+
+            oids_raw = json_lib.loads(cfg.oids_json or '{}')
+            oids = {k: v for k, v in oids_raw.items() if not k.startswith('__')}
+            if not oids:
+                logger.info("[BackgroundCollector] OID 미설정 — 자동 수집 건너뜀")
+                return
+
+            proxy_ids = [p.id for p in proxies]
+            community = cfg.community or 'public'
+            interval_sec = cfg.interval_sec or 60
+            task_id = f"ru_auto_{abs(hash(tuple(sorted(proxy_ids)) + (community,)))}"
+
+            await self.start_collection(
+                task_id=task_id,
+                proxy_ids=proxy_ids,
+                community=community,
+                oids=oids,
+                interval_sec=interval_sec,
+            )
+            logger.info(
+                "[BackgroundCollector] 자동 수집 시작: proxies=%d, interval=%ds, task_id=%s",
+                len(proxy_ids), interval_sec, task_id,
+            )
+        except Exception as e:
+            logger.error("[BackgroundCollector] 자동 수집 시작 실패: %s", e, exc_info=True)
+        finally:
+            db.close()
+
+    async def restart_on_config_change(self):
+        """설정 변경 시 자동 수집 재시작"""
+        auto_task_ids = [tid for tid in list(self._running_tasks.keys()) if tid.startswith('ru_auto_')]
+        for task_id in auto_task_ids:
+            await self.stop_collection(task_id)
+        await self.start_on_startup()
+
     async def start_retention_policy(self, interval_sec: int = 3600):
         """보존 정책 백그라운드 작업 시작 (기본 1시간마다 실행)"""
         if self._retention_task is not None and not self._retention_task.done():

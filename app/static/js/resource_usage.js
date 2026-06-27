@@ -31,14 +31,6 @@
         $('#ruEmptyState').show();
 
         // 이벤트 핸들러 (중복 바인딩 방지)
-        $('#ruToggleBtn').off('click').on('click', function() {
-            if (ru.intervalId) {
-                polling.stopPolling();
-            } else {
-                polling.startPolling();
-            }
-        });
-
         $('#ruCopyBtn').off('click').on('click', function() {
             heatmap.copyCurrentValues();
         });
@@ -93,27 +85,15 @@
             // 선택 필터 요약 초기 표시
             if (window.updateRuSelectionSummary) updateRuSelectionSummary();
             
-            // 복원 후 실행 상태 확인 및 처리
+            // 수집 상태 확인: 서버에서 이미 수집 중이면 콜백 등록 및 데이터 동기화
             try {
-                const running = state.loadRunningState();
-                // 백그라운드 작업 상태 확인
                 if (window.ResourceUsageCollector && window.ResourceUsageCollector.taskId) {
                     ru.taskId = window.ResourceUsageCollector.taskId;
-                    polling.setRunning(true);
                     ru.intervalId = 'background';
-                    // 페이지별 콜백 등록
                     polling.registerPageCallback();
-                    // 페이지 로드 시 수집이 실행 중이면 데이터 재동기화
                     polling.resyncDataOnPageReturn();
-                } else if (running) {
-                    // 프록시가 선택되어 있는지 확인
-                    if (state.getSelectedProxyIds().length === 0) { 
-                        polling.setRunning(false); 
-                    } else { 
-                        polling.startPolling(); 
-                    }
                 }
-            } catch (e) { 
+            } catch (e) {
                 console.error('State restoration failed:', e);
             }
         });

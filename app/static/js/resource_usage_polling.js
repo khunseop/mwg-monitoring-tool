@@ -161,19 +161,11 @@
         },
 
         /**
-         * 실행 상태 설정
+         * 실행 상태 설정 (서버 주도 수집 모드 — UI 상태만 동기화)
          * @param {boolean} running - 실행 중 여부
          */
         setRunning(running) {
             const state = window.ResourceUsageState;
-            const $toggleBtn = $('#ruToggleBtn');
-            if (running) {
-                $toggleBtn.removeClass('is-primary').addClass('is-danger').text('수집 중지');
-                $('#ruIntervalSec').attr('disabled', true);
-            } else {
-                $toggleBtn.removeClass('is-danger').addClass('is-primary').text('모니터링 시작');
-                $('#ruIntervalSec').attr('disabled', false);
-            }
             state.saveRunningState(running);
         },
 

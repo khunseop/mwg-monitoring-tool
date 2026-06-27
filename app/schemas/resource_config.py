@@ -5,6 +5,7 @@ from .base import TimestampModel
 
 class ResourceConfigBase(BaseModel):
     community: str = Field(default="public", min_length=1)
+    interval_sec: int = Field(default=60, ge=5, description="수집 주기 (초)")
     oids: Dict[str, str] = Field(default_factory=dict)
     thresholds: Dict[str, float] = Field(default_factory=dict)
     interface_oids: Dict[str, Dict[str, str]] = Field(default_factory=dict, description="인터페이스별 OID 설정 {인터페이스명: {in_oid: OID, out_oid: OID}}")

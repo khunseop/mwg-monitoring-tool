@@ -133,6 +133,7 @@ function getResourceConfigData() {
     
     const payload = {
         community: ($('#cfgCommunity').val() || 'public').toString(),
+        interval_sec: parseInt($('#cfgIntervalSec').val(), 10) || 60,
         oids: {
             cpu: $('#cfgOidCpu').val() || undefined,
             mem: $('#cfgOidMem').val() || undefined,
@@ -171,6 +172,7 @@ function loadResourceConfig() {
     return $.get('/api/resource-config')
         .done(cfg => {
             $('#cfgCommunity').val(cfg.community || 'public');
+            $('#cfgIntervalSec').val(cfg.interval_sec || 60);
             const oids = cfg.oids || {};
             $('#cfgOidCpu').val(oids.cpu || '');
             $('#cfgOidMem').val(oids.mem || '');
@@ -377,7 +379,7 @@ function initSettingsPage() {
     
     // 모든 입력 필드 변경 감지 (중복 방지)
     const configInputs = [
-        '#cfgCommunity', '#cfgOidCpu', '#cfgOidMem', '#cfgOidDisk', '#cfgOidCc', '#cfgOidCs', 
+        '#cfgCommunity', '#cfgIntervalSec', '#cfgOidCpu', '#cfgOidMem', '#cfgOidDisk', '#cfgOidCc', '#cfgOidCs',
         '#cfgOidHttp', '#cfgOidHttps', '#cfgOidHttp2', '#cfgOidBlocked',
         '#cfgThrCpu', '#cfgThrMem', '#cfgThrDisk', '#cfgThrCc', '#cfgThrCs',
         '#cfgThrHttp', '#cfgThrHttps', '#cfgThrHttp2', '#cfgThrBlocked',

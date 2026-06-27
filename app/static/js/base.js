@@ -443,6 +443,11 @@ window.ResourceUsageCollector = {
                         if (typeof window.setRunning === 'function') {
                             window.setRunning(true);
                         }
+                        // 자원사용률 페이지가 로드된 경우 콜백 등록 및 데이터 동기화
+                        if (window.ResourceUsagePolling) {
+                            window.ResourceUsagePolling.registerPageCallback();
+                            window.ResourceUsagePolling.resyncDataOnPageReturn();
+                        }
                     }
                 }
             }

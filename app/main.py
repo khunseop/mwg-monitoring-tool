@@ -364,12 +364,31 @@ def migrate_legacy_proxy_passwords():
 
 # (removed) one-time startup cleanup for legacy accumulated rows
 
+# One-time startup migration: add interval_sec column if missing (existing DB)
+@app.on_event("startup")
+def migrate_resource_config_interval_sec():
+    try:
+        db = SessionLocal()
+        try:
+            db.execute(text("ALTER TABLE resource_config ADD COLUMN interval_sec INTEGER NOT NULL DEFAULT 60"))
+            db.commit()
+            _startup_logger.info("[DB] resource_config.interval_sec 컬럼 추가 완료")
+        except Exception:
+            db.rollback()  # 컬럼이 이미 존재하면 무시
+        finally:
+            db.close()
+    except Exception:
+        pass
+
+
 # Start retention policy background task on startup
 @app.on_event("startup")
 async def start_background_tasks():
     from app.utils.background_collector import background_collector
     # Start retention policy task (runs every hour)
     await background_collector.start_retention_policy(interval_sec=3600)
+    # Auto-start resource collection using DB config
+    await background_collector.start_on_startup()
 
 @app.on_event("shutdown")
 async def stop_background_tasks():

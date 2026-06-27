@@ -9,6 +9,7 @@ class ResourceConfig(Base):
     id = Column(Integer, primary_key=True, index=True)
     community = Column(String, nullable=False, default="public")
     oids_json = Column(Text, nullable=False, default='{}')  # json string mapping
+    interval_sec = Column(Integer, nullable=False, default=60)
     created_at = Column(DateTime(timezone=True), default=now_kst)
     updated_at = Column(DateTime(timezone=True), onupdate=now_kst, default=now_kst)
 

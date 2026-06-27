@@ -31,6 +31,19 @@
                             <p class="help is-size-7">SNMP v2c 통신용 커뮤니티 문자열</p>
                         </div>
                     </div>
+                    <!-- 수집 주기 -->
+                    <div class="column is-2">
+                        <div class="field">
+                            <label class="label is-small">자원 수집 주기</label>
+                            <div class="field has-addons">
+                                <p class="control is-expanded">
+                                    <input class="input is-small has-text-right" id="cfgIntervalSec" type="number" min="5" max="3600" value="60">
+                                </p>
+                                <p class="control"><span class="button is-small is-static">초</span></p>
+                            </div>
+                            <p class="help is-size-7">앱 시작 시 자동 수집 주기</p>
+                        </div>
+                    </div>
                     <!-- Grid Page Size -->
                     <div class="column is-3">
                         <div class="field">

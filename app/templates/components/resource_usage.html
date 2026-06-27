@@ -35,17 +35,10 @@
         </div>
 
         <div class="is-flex is-align-items-center" style="gap: 1rem; margin-left: auto;">
-            <div class="is-flex is-align-items-center" style="gap: 0.4rem;">
-                <span class="filter-label">수집 주기</span>
-                <input class="input is-small has-text-centered" id="ruIntervalSec" type="number" min="5" value="60" style="width: 56px; border-radius: var(--radius-sm);">
-                <span class="filter-label">초</span>
-            </div>
-
             <span class="settings-bar-separator"></span>
             <button class="button is-ghost is-small px-3" id="ruCopyBtn" title="현재 표시된 모든 수집값을 클립보드에 복사합니다." style="color: var(--color-text-muted);">
                 <span>현재값 복사</span>
             </button>
-            <button class="button is-primary is-small px-5" id="ruToggleBtn" style="font-weight: 600;">모니터링 시작</button>
         </div>
     </div>
 
@@ -69,7 +62,7 @@
         </div>
         <div id="ruEmptyState" class="empty-state">
             <p class="empty-state-title">데이터 없음</p>
-            <p class="empty-state-body">위에서 그룹과 프록시를 선택한 뒤 "시작" 버튼을 눌러 실시간 수집을 시작하세요.</p>
+            <p class="empty-state-body">위에서 그룹과 프록시를 선택하세요. 수집 서버가 실행 중이면 최신 데이터가 자동으로 표시됩니다.</p>
         </div>
     </div>
 
